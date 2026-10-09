@@ -10,6 +10,8 @@
   <string name="amoledBlack" comment="Name of the pure black theme mode for AMOLED screens, shown in the app theme picker.">Amoled black</string>
   <string name="areYouSure" comment="This is shown in confirmation dialogs.">Are you sure?</string>
   <string name="areYouSureDownloadNnue" comment="Confirmation dialog before downloading the Stockfish NNUE file. %s is the download size, e.g. '40MB'.">Are you sure you want to download the NNUE file (%s)?</string>
+  <string name="blogLoadFailed" comment="Shown in the blog post reading screen when the post content could not be downloaded.">Could not load this post.</string>
+  <string name="blogNotTranslated" comment="Shown in the blog post reading screen when the post was not translated and is therefore displayed in its original language.">This post is not translated yet.</string>
   <string name="boardPositionLandscape" comment="Board settings entry that controls where the board sits when the device is in landscape mode.">Board position in landscape mode</string>
   <string name="boardSettings" comment="This is shown in the app main settings screen, which opens a screen dedicated to chess board settings.">Board settings</string>
   <string name="bronsteinDelay" comment="Name of the Bronstein delay chess clock time control type.">Bronstein delay</string>
@@ -59,6 +61,7 @@
   <string name="noSearchResults" comment="This is shown when the search did not return any results.">No results</string>
   <string name="notFollowingAnyUser" comment="This is shown in the list that contains user followed by the user. Displayed if the user does not follow any users.">You are not following any users.</string>
   <string name="okButton" comment="This is used in varius confirmations dialogs. Translation should be short." maxLength="10">OK</string>
+  <string name="openInBrowser" comment="Button that opens the current page on lichess.org in the device's browser.">Open in browser</string>
   <string name="openingExplorerNotAvailableOffline" comment="Shown in the opening explorer when the device is offline.">Opening Explorer is not available offline.</string>
   <string name="orImportPgnFile" comment="Button text to import a PGN file from the device">Or import a PGN file</string>
   <string name="overTheBoard" comment="Used in the main play menu to launch the Over the board game mode.">Over the board</string>

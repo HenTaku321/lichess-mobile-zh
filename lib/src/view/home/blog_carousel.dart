@@ -15,9 +15,9 @@ import 'package:lichess_mobile/src/tab_navigation.dart' show homeTabInteraction;
 import 'package:lichess_mobile/src/utils/http_network_image.dart';
 import 'package:lichess_mobile/src/utils/image.dart';
 import 'package:lichess_mobile/src/utils/screen.dart';
+import 'package:lichess_mobile/src/view/blog/blog_post_screen.dart';
 import 'package:lichess_mobile/src/widgets/user.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 const kDefaultBlogImage = AssetImage('assets/images/broadcast_image.webp');
 const kBlogCardItemContentPadding = EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0);
@@ -222,7 +222,7 @@ class _BlogCarouselItemState() extends ConsumerState<BlogCarouselItem> {
 
     return GestureDetector(
       onTap: () {
-        launchUrl(lichessUri(widget.post.url.toString()));
+        Navigator.of(context, rootNavigator: true).push(BlogPostScreen.buildRoute(widget.post));
       },
       onTapDown: (_) => _onTapDown(),
       onTapCancel: _onTapCancel,

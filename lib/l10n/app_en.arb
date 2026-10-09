@@ -16,6 +16,8 @@
       }
     }
   },
+  "mobileBlogLoadFailed": "Could not load this post.",
+  "mobileBlogNotTranslated": "This post is not translated yet.",
   "mobileBoardPositionLandscape": "Board position in landscape mode",
   "mobileBoardSettings": "Board settings",
   "mobileBronsteinDelay": "Bronstein delay",
@@ -96,6 +98,7 @@
   "mobileNoSearchResults": "No results",
   "mobileNotFollowingAnyUser": "You are not following any users.",
   "mobileOkButton": "OK",
+  "mobileOpenInBrowser": "Open in browser",
   "mobileOpeningExplorerNotAvailableOffline": "Opening Explorer is not available offline.",
   "mobileOrImportPgnFile": "Or import a PGN file",
   "mobileOverTheBoard": "Over the board",

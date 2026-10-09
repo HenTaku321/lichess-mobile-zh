@@ -10,6 +10,8 @@
   <string name="amoledBlack" comment="Name of the pure black theme mode for AMOLED screens, shown in the app theme picker.">Amoled 纯黑</string>
   <string name="areYouSure" comment="This is shown in confirmation dialogs.">您确定吗？</string>
   <string name="areYouSureDownloadNnue" comment="Confirmation dialog before downloading the Stockfish NNUE file. %s is the download size, e.g. '40MB'.">您确定要下载 NNUE 文件 (%s) 吗？</string>
+  <string name="blogLoadFailed" comment="Shown in the blog post reading screen when the post content could not be downloaded.">无法加载这篇文章</string>
+  <string name="blogNotTranslated" comment="Shown in the blog post reading screen when the post was not translated and is therefore displayed in its original language.">这篇文章尚未翻译</string>
   <string name="boardPositionLandscape" comment="Board settings entry that controls where the board sits when the device is in landscape mode.">横屏模式下的棋盘位置</string>
   <string name="boardSettings" comment="This is shown in the app main settings screen, which opens a screen dedicated to chess board settings.">棋盘设置</string>
   <string name="bronsteinDelay" comment="Name of the Bronstein delay chess clock time control type.">Bronstein 延时</string>
@@ -59,6 +61,7 @@
   <string name="noSearchResults" comment="This is shown when the search did not return any results.">无结果</string>
   <string name="notFollowingAnyUser" comment="This is shown in the list that contains user followed by the user. Displayed if the user does not follow any users.">您尚未关注任何用户</string>
   <string name="okButton" comment="This is used in varius confirmations dialogs. Translation should be short." maxLength="10">确定</string>
+  <string name="openInBrowser" comment="Button that opens the current page on lichess.org in the device's browser.">在浏览器中打开</string>
   <string name="openingExplorerNotAvailableOffline" comment="Shown in the opening explorer when the device is offline.">离线状态下无法使用开局探索器</string>
   <string name="orImportPgnFile" comment="Button text to import a PGN file from the device">或者导入 PGN 文件</string>
   <string name="overTheBoard" comment="Used in the main play menu to launch the Over the board game mode.">离线棋盘</string>

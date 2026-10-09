@@ -24,8 +24,6 @@ class const BlogPostScreen({required final BlogPost post, super.key}) extends Co
     return buildScreenRoute(screen: BlogPostScreen(post: post));
   }
 
-  final BlogPost post;
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final content = ref.watch(blogPostProvider(post));

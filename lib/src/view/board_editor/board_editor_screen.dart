@@ -282,7 +282,7 @@ class const _BottomBar(final BoardEditorControllerParams? params) extends Consum
                 ),
               if (editorState.variant == .chess960)
                 BottomSheetAction(
-                  makeLabel: (context) => const Text('Chess960 Position'),
+                  makeLabel: (context) => Text(context.l10n.mobileChess960Position),
                   onPressed: () {
                     showDialog<void>(
                       context: context,
@@ -500,7 +500,7 @@ class _FenDialogState() extends State<_FenDialog> {
           suffixIcon: IconButton(
             icon: const Icon(Icons.paste),
             onPressed: _pasteFromClipboard,
-            tooltip: 'Paste from clipboard',
+            tooltip: context.l10n.mobilePasteFromClipboard,
           ),
         ),
       ),
@@ -536,7 +536,7 @@ class _Chess960PositionDialogState() extends State<_Chess960PositionDialog> {
     final id = int.tryParse(value);
     setState(() {
       if (id != null && id > 959) {
-        _errorText = 'Max ID is 959';
+        _errorText = context.l10n.mobileMaxIdIs959;
       } else {
         _errorText = null;
       }
@@ -555,7 +555,7 @@ class _Chess960PositionDialogState() extends State<_Chess960PositionDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Chess960 Position'),
+      title: Text(context.l10n.mobileChess960Position),
       content: Column(
         mainAxisSize: .min,
         children: [
@@ -564,7 +564,7 @@ class _Chess960PositionDialogState() extends State<_Chess960PositionDialog> {
             keyboardType: .number,
             onChanged: _validateInput,
             decoration: InputDecoration(
-              hintText: 'Position ID (0-959)',
+              hintText: context.l10n.mobilePositionId,
               errorText: _errorText,
               suffixIcon: IconButton(
                 icon: const Icon(LichessIcons.die_six),

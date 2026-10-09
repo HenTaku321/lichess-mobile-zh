@@ -707,7 +707,7 @@ class const _BottomBar(final PuzzleStormResponse data) extends ConsumerWidget {
         if (stormState.mode == StormMode.ended && stormState.stats != null)
           BottomBarButton(
             icon: Icons.open_in_new,
-            label: 'Result',
+            label: context.l10n.mobileResult,
             showLabel: true,
             onTap: () => _showStats(context, stormState.stats!),
           ),

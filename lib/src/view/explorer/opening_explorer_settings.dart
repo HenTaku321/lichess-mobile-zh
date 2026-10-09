@@ -111,7 +111,7 @@ class const OpeningExplorerSettings() extends ConsumerWidget {
                   fontSize: 18,
                   decoration: TextDecoration.underline,
                 ),
-                text: prefs.playerDb.username ?? 'Select a Lichess player',
+                text: prefs.playerDb.username ?? context.l10n.mobileSelectALichessPlayer,
               ),
             ],
           ),

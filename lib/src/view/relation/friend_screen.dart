@@ -74,7 +74,7 @@ class _FriendScreenState() extends ConsumerState<FriendScreen> with TickerProvid
               padding: const EdgeInsets.all(16.0),
               children: [
                 const SizedBox(height: 16.0),
-                Text('Sort by', style: Theme.of(context).textTheme.bodyLarge),
+                Text(context.l10n.mobileSortBy, style: Theme.of(context).textTheme.bodyLarge),
                 const SizedBox(height: 16.0),
                 Filter<FriendListSort>(
                   filterType: FilterType.singleChoice,

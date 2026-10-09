@@ -91,7 +91,7 @@ class _BodyState() extends ConsumerState<_Body> {
                   suffixIcon: IconButton(
                     icon: const Icon(Icons.paste),
                     onPressed: _getClipboardData,
-                    tooltip: 'Paste from clipboard',
+                    tooltip: context.l10n.mobilePasteFromClipboard,
                   ),
                 ),
                 readOnly: true,

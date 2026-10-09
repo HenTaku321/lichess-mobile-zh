@@ -126,7 +126,7 @@ class const PracticeNextChapterButton({required final PracticeChapter chapter})
       onPressed: () => goToNextPracticeChapter(context, ref, chapter),
       icon: Icon(hasNext ? Icons.chevron_right : Icons.chevron_left),
       iconAlignment: hasNext ? IconAlignment.end : IconAlignment.start,
-      label: Text(hasNext ? 'Next exercise' : 'Back to practice'),
+      label: Text(hasNext ? context.l10n.mobileNextExercise : context.l10n.mobileBackToPractice),
     );
   }
 }
@@ -234,5 +234,5 @@ String practiceChapterKindLabel(BuildContext context, PracticeChapter chapter) =
     movesLeft: goal.movesAllowed ?? 0,
   ),
   PracticeGamebookChapter() => context.l10n.studyInteractiveLesson,
-  PracticeLessonChapter() => 'Lesson',
+  PracticeLessonChapter() => context.l10n.mobileLesson,
 };

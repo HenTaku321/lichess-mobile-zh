@@ -243,7 +243,7 @@ class _BodyState() extends ConsumerState<_Body> {
                     icon: Icons.biotech,
                   ),
                   BottomBarButton(
-                    label: 'Go to the next game',
+                    label: context.l10n.mobileGoToTheNextGame,
                     icon: Icons.skip_next,
                     onTap: offlineOngoingGames.maybeWhen(
                       data: (games) {
@@ -277,7 +277,7 @@ class _BodyState() extends ConsumerState<_Body> {
                     onLongPress: canGoBackward ? () => moveBackward() : null,
                     child: BottomBarButton(
                       onTap: canGoBackward ? () => moveBackward() : null,
-                      label: 'Previous',
+                      label: context.l10n.mobilePreviousMove,
                       icon: CupertinoIcons.chevron_back,
                       showTooltip: false,
                     ),

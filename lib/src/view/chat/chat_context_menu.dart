@@ -29,7 +29,7 @@ class const ChatBubbleContextMenu({
               onPressed: () async {
                 await Clipboard.setData(ClipboardData(text: message));
                 if (!context.mounted) return;
-                showSnackBar(context, 'Message copied.');
+                showSnackBar(context, context.l10n.mobileMessageCopied);
               },
               icon: Icons.copy_all_outlined,
               child: Text(context.l10n.copyToClipboard),

@@ -59,7 +59,7 @@ class _HttpLogScreenState() extends ConsumerState<HttpLogScreen> {
     final asyncState = ref.watch(httpLogPaginatorProvider(_searchQuery));
     return Scaffold(
       appBar: AppBar(
-        title: const Text('HTTP logs'),
+        title: Text(context.l10n.mobileHttpLogs),
         actions: [
           if (asyncState.value?.isDeleteButtonVisible == true)
             IconButton(
@@ -68,8 +68,7 @@ class _HttpLogScreenState() extends ConsumerState<HttpLogScreen> {
               onPressed: () {
                 showConfirmDialog<dynamic>(
                   context,
-                  // TODO localize
-                  title: const Text('Delete all logs'),
+                  title: Text(context.l10n.mobileDeleteAllLogs),
                   onConfirm: () =>
                       ref.read(httpLogPaginatorProvider(_searchQuery).notifier).deleteAll(),
                 );
@@ -123,7 +122,10 @@ class _HttpLogListState() extends ConsumerState<_HttpLogList> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(context.l10n.nothingToSeeHere),
-            TextButton(onPressed: widget.onRefresh, child: const Text('Tap to refresh')),
+            TextButton(
+              onPressed: widget.onRefresh,
+              child: Text(context.l10n.mobileTapToRefresh),
+            ),
           ],
         ),
       );

@@ -53,10 +53,10 @@ class _GifExportState() extends ConsumerState<GifExport> {
 
   Future<void> _export() async {
     setState(() {
-      loadingMessage = 'Generating GIF...';
+      loadingMessage = context.l10n.mobileGeneratingGif;
     });
-    _addMessageTimer(const Duration(seconds: 10), 'Long games take a bit more time...');
-    _addMessageTimer(const Duration(seconds: 30), 'Almost there! Finalizing the GIF...');
+    _addMessageTimer(const Duration(seconds: 10), context.l10n.mobileGifLongGamesTakeLonger);
+    _addMessageTimer(const Duration(seconds: 30), context.l10n.mobileGifAlmostThere);
 
     try {
       await shareGameGif(

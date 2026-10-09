@@ -2,6 +2,7 @@ import 'package:chessground/chessground.dart';
 import 'package:dartchess/dartchess.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lichess_mobile/l10n/l10n.dart';
 import 'package:lichess_mobile/src/constants.dart';
 import 'package:lichess_mobile/src/model/common/chess.dart';
 import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
@@ -34,11 +35,11 @@ class const ThemeSettingsScreen({super.key}) extends ConsumerWidget {
   }
 }
 
-String shapeColorL10n(ShapeColor shapeColor) => switch (shapeColor) {
-  ShapeColor.green => 'Green',
-  ShapeColor.red => 'Red',
-  ShapeColor.blue => 'Blue',
-  ShapeColor.yellow => 'Yellow',
+String shapeColorL10n(AppLocalizations l10n, ShapeColor shapeColor) => switch (shapeColor) {
+  ShapeColor.green => l10n.mobileShapeColorGreen,
+  ShapeColor.red => l10n.mobileShapeColorRed,
+  ShapeColor.blue => l10n.mobileShapeColorBlue,
+  ShapeColor.yellow => l10n.mobileShapeColorYellow,
 };
 
 class const _Body() extends ConsumerStatefulWidget {
@@ -197,7 +198,7 @@ class _BodyState() extends ConsumerState<_Body> {
                       icon: const Icon(LichessIcons.arrow_full_upperright),
                       settingsLabel: Text(context.l10n.mobileSettingsDrawnShapeColor),
                       explanation: context.l10n.mobileSettingsDrawnShapeColorHelp,
-                      settingsValue: shapeColorL10n(boardPrefs.shapeColor),
+                      settingsValue: shapeColorL10n(context.l10n, boardPrefs.shapeColor),
                       trailing: _ColorCircle(color: boardPrefs.shapeColor.color),
                       onTap: () {
                         showChoicePicker(

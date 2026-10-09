@@ -1,15 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+  <string name="abortTraining" comment="Over the board / coordinate training button that stops the current training run.">Abort Training</string>
   <string name="acceptDraw" comment="Over the board dialog asking whether to accept a draw after threefold repetition.">Accept draw?</string>
   <string name="account" comment="The account screen title.">Account</string>
   <string name="accountPreferences" comment="Displayed on settings screen. This is for preferences synced with website on the server.">Account preferences</string>
   <string name="accountPreferencesHelp" comment="Help displayed on the account preferences screen.">These preferences are applied to your Lichess account and will be used across all devices.</string>
   <string name="addToStudy" comment="Menu action in the analysis screen to add the current position or game to a study.">Add to study</string>
+  <string name="allBroadcasts" comment="Broadcast list filter showing all broadcasts, not just live ones.">All broadcasts</string>
   <string name="allGames" comment="This is shown instead of 'Number of Games' if the number could not be loaded">All games</string>
   <string name="allowTakebacksAndHints" comment="Subtitle of the casual mode switch when playing against the offline computer.">Allow takebacks and hints</string>
   <string name="amoledBlack" comment="Name of the pure black theme mode for AMOLED screens, shown in the app theme picker.">Amoled black</string>
+  <string name="appLogs" comment="Settings entry and screen title for the application's own log file.">App Logs</string>
   <string name="areYouSure" comment="This is shown in confirmation dialogs.">Are you sure?</string>
   <string name="areYouSureDownloadNnue" comment="Confirmation dialog before downloading the Stockfish NNUE file. %s is the download size, e.g. '40MB'.">Are you sure you want to download the NNUE file (%s)?</string>
+  <string name="backToPractice" comment="Button that leaves the last practice chapter and returns to the practice menu.">Back to practice</string>
   <string name="blogLoadFailed" comment="Shown in the blog post reading screen when the post content could not be downloaded.">Could not load this post.</string>
   <string name="blogNotTranslated" comment="Shown in the blog post reading screen when the post was not translated and is therefore displayed in its original language.">This post is not translated yet.</string>
   <string name="boardPositionLandscape" comment="Board settings entry that controls where the board sits when the device is in landscape mode.">Board position in landscape mode</string>
@@ -18,7 +22,9 @@
   <string name="cancelTakebackOffer" comment="Menu action that cancels a previous takeback offer">Cancel takeback offer</string>
   <string name="challengeCreated" comment="Shown as a bottom banner when another player has been challenged.">Challenge created: You will be notified when the game starts.\nYou can access it from the home tab.</string>
   <string name="challengeFromPosition" comment="Menu action in the board editor to challenge a friend from the edited position.">Challenge from position</string>
+  <string name="changesWillBeLost" comment="Confirmation dialog when leaving a screen with unsaved edits.">Your changes will be lost.</string>
   <string name="chapterName" comment="Label of the text field to name a new study chapter.">Chapter Name</string>
+  <string name="chess960Position" comment="Board editor entry that opens the Chess960 start position picker.">Chess960 Position</string>
   <string name="chessEngine" comment="Chess engine settings screen title.">Chess engine</string>
   <string name="chooseCustomBackground" comment="Theme settings entry that opens the custom background picker.">Choose a custom background</string>
   <string name="clearButton" comment="Buttons that clear things, e.g. recent searches. Should be short." maxLength="10">Clear</string>
@@ -31,37 +37,78 @@
   <string name="customizeHomeTip" comment="Shown in a widget on the home screen to let the user know that they can customize their homescreen">Tip: You can add more widgets to the Home Screen or remove those you don't need!</string>
   <string name="customizeHomeTipDismiss" comment="Hides the widget to customize the home screen.">Dismiss</string>
   <string name="dangerZone" comment="Header of the settings section containing account deletion.">Danger zone</string>
+  <string name="dateRangeAll" comment="Chip in the rating chart selecting the whole history. Keep it very short.">ALL</string>
+  <string name="dateRangeOneMonth" comment="Chip in the rating chart selecting the last month. Keep it very short.">1M</string>
+  <string name="dateRangeOneWeek" comment="Chip in the rating chart selecting the last week. Keep it very short.">1W</string>
+  <string name="dateRangeOneYear" comment="Chip in the rating chart selecting the last year. Keep it very short.">1Y</string>
+  <string name="dateRangeThreeMonths" comment="Chip in the rating chart selecting the last three months. Keep it very short.">3M</string>
+  <string name="deleteAllLogs" comment="Menu action that empties the log file.">Delete all logs</string>
+  <string name="deleteConversation" comment="Menu action that deletes a private message conversation.">Delete conversation</string>
+  <string name="deleteConversationConfirm" comment="Confirmation dialog before deleting a private message conversation.">Are you sure you want to delete this conversation?</string>
+  <string name="deleteUnusableNnueFiles" comment="Button that deletes engine files that cannot be used on this device.">Delete unusable NNUE files</string>
   <string name="deleteYourAccount" comment="iOS-only settings entry that opens the account deletion page.">Delete your account</string>
   <string name="displayModeCompact" comment="Label of the game history display mode menu entry that switches to the compact game list.">Compact</string>
   <string name="displayModeDetailed" comment="Label of the game history display mode menu entry that switches to the detailed game list.">Detailed</string>
   <string name="doYouAcceptChallenge" comment="Title of the challenge confirmation dialog.">Do you accept the challenge?</string>
   <string name="downloadMyGames" comment="Tournament menu action that downloads the user's games from that tournament as a PGN.">Download my games</string>
+  <string name="downloadNnueFile" comment="Button that starts downloading the engine's neural network file.">Download NNUE file</string>
+  <string name="downloadingNnueFile" comment="Shown while the engine's neural network file is being downloaded.">Downloading NNUE file</string>
+  <string name="engineEvaluation" comment="Title of the screen or dialog that explains the engine evaluation.">Engine evaluation</string>
   <string name="feedbackButton" comment="Shown in the settings, pressing this button will redirect to the lichess contact site.">Feedback</string>
+  <string name="filterBroadcasts" comment="Tooltip of the button that filters the broadcast list.">Filter broadcasts</string>
   <string name="filters" comment="Label of the board editor bottom bar button that opens position filters.">Filters</string>
+  <string name="flip" comment="Bottom bar button that turns the board around. Keep it very short.">Flip</string>
   <string name="flipClock" comment="Tooltip of the button that flips the chess clock orientation.">Flip clock</string>
   <string name="flipPiecesAfterMove" comment="Over the board display setting: rotate the board after each move.">Flip pieces and opponent info after move</string>
+  <string name="gamePoints" comment="Column header in a broadcast team table: game points. Keep it very short.">GP</string>
+  <string name="generatingGif" comment="Shown while a game is being exported as an animated GIF.">Generating GIF...</string>
   <string name="getFeedbackOnMoves" comment="Subtitle of the practice mode switch when playing against the offline computer.">Get feedback on your moves</string>
+  <string name="gifAlmostThere" comment="Progress message while a game is exported as an animated GIF.">Almost there! Finalizing the GIF...</string>
+  <string name="gifLongGamesTakeLonger" comment="Progress message while a long game is exported as an animated GIF.">Long games take a bit more time...</string>
+  <string name="goToTheNextGame" comment="Button that jumps to the next game of a correspondence or multi-game session.">Go to the next game</string>
   <string name="goodDay" comment="A greeting that is shown on the app's home page, e.g. 'Good day, GM Magnus' (%s is substituted with the user's name). This is associated with a 'sun' icon and is displayed only between 06:00 and 18:00 local time. If the language you're translating into does not have this time based concept, just use a generic formula (like 'Hello' in english).">Good day, %s</string>
   <string name="goodDayWithoutName" comment="A greeting that is shown on the app's home page, when the user is not logged in. This is associated with a 'sun' icon and is displayed only between 06:00 and 18:00 local time. If the language you're translating into does not have this time based concept, just use a generic formula (like 'Hello' in english).">Good day</string>
   <string name="goodEvening" comment="A greeting that is shown on the app's home page, e.g. 'Good evening, GM Magnus' (%s is substituted with the user's name). This is associated with a 'moon' icon and is displayed only between 18:00 and 06:00 local time. If the language you're translating into does not have this time based concept, just use a generic formula (like 'Hello' in english).">Good evening, %s</string>
   <string name="goodEveningWithoutName" comment="A greeting that is shown on the app's home page, when the user is not logged in. This is associated with a 'moon' icon and is displayed only between 18:00 and 06:00 local time. If the language you're translating into does not have this time based concept, just use a generic formula (like 'Hello' in english).">Good evening</string>
   <string name="goodMoveButThereIsBetter" comment="Verdict shown in the offline computer game when the player's move is good but not the best move available.">Good move, but there's better</string>
   <string name="hello" comment="Label of the home screen 'Hello' widget in the home customization editor.">Hello</string>
+  <string name="hideEvaluation" comment="Practice settings switch that hides the engine evaluation.">Hide evaluation</string>
   <string name="homeTab" comment="The tab in bottom navigation bar. Must be very short (10 characters max) to avoid ugly text shifting issues." maxLength="10">Home</string>
+  <string name="httpLogs" comment="Settings entry and screen title for the log of HTTP requests.">HTTP logs</string>
   <string name="ifAccountMatchesCodeSent" comment="Shown after requesting an email login code. %1$s is the email address, %2$s is the code length.">If an account matches %1$s, a %2$s character code was sent to it. Check your inbox and enter the code below.</string>
+  <string name="indexing" comment="Shown while the opening explorer builds its index, which can take a while.">Indexing</string>
   <string name="invalidOrExpiredLoginCode" comment="Error shown when an email login code is wrong or expired.">This code is invalid or has expired.</string>
+  <string name="joinTeams" comment="Button shown when the user has not joined any team yet.">Join teams</string>
+  <string name="lesson" comment="Label of a practice chapter that is a lesson rather than an exercise.">Lesson</string>
   <string name="liveStreamers" comment="This is shown as a heading in the streamer screen">Live streamers</string>
+  <string name="loadMore" comment="Button that loads the next page of a list.">Load more</string>
   <string name="localDatabaseSize" comment="Settings screen entry showing the size of the local database.">Local database size</string>
+  <string name="lossOrFiftyMoveDraw" comment="Tablebase verdict: the position is lost, or drawn by the fifty move rule.">Loss or 50 move draw</string>
+  <string name="matchPoints" comment="Column header in a broadcast team table: match points. Keep it very short.">MP</string>
+  <string name="maxIdIs959" comment="Validation message in the Chess960 position picker.">Max ID is 959</string>
+  <string name="messageCopied" comment="Snackbar shown after copying a chat message.">Message copied.</string>
   <string name="moveOnRelease" comment="Board settings switch: make the move when the finger is lifted instead of on tap.">Move on release</string>
   <string name="moveOnReleaseSubtitle" comment="Explanation of the 'Move on release' board setting.">When moving a piece by tapping, the move is made when you lift your finger, letting you slide to change the destination square.</string>
   <string name="mustBeLoggedIn" comment="This is shown when the user tries to access a feature that requires login.">You must be logged in to view this page.</string>
   <string name="nbOfflinePuzzles" comment="Label for the puzzle setting that controls how many puzzles are downloaded and kept available for offline play.">Offline puzzles</string>
   <string name="newGame" comment="New game button in OTB and play against offline computer features">New game</string>
+  <string name="nextExercise" comment="Button that goes to the next practice exercise.">Next exercise</string>
   <string name="nextMistake" comment="Bottom bar button in the retro (mistake finder) analysis mode.">Next mistake</string>
+  <string name="nextToPlay" comment="Shown on the board when playing offline, telling whose turn it is.">Next to play</string>
+  <string name="noGamesMatchingFilter" comment="Empty state of the broadcast board list after filtering.">No games matching filter criteria.</string>
+  <string name="noMorePuzzlesGoOnline" comment="Shown when the offline puzzle cache is empty and no more puzzles can be served.">No more puzzles. Go online to get more.</string>
+  <string name="noMorePuzzlesToReplay" comment="Shown when the user has replayed every puzzle of the set.">No more puzzles to replay.</string>
+  <string name="noPuzzlesGoOnline" comment="Shown when the offline puzzle cache is empty.">No puzzles available, please go online to fetch them.</string>
+  <string name="noPuzzlesToReplay" comment="Shown when the user has no puzzle to replay.">No puzzles to replay.</string>
   <string name="noSearchResults" comment="This is shown when the search did not return any results.">No results</string>
+  <string name="noServerAnalysisAvailable" comment="Shown in a game summary when the server has no analysis for this game.">No server analysis available</string>
+  <string name="noUpdatesYetInChannel" comment="Empty state of a team channel that has no post yet.">No updates yet in this channel</string>
+  <string name="noneOfYourTeamsInTournament" comment="Shown in a tournament that none of the user's teams take part in.">None of your teams are participating in this tournament</string>
   <string name="notFollowingAnyUser" comment="This is shown in the list that contains user followed by the user. Displayed if the user does not follow any users.">You are not following any users.</string>
+  <string name="nothingToPaste" comment="Snackbar shown when pasting into a chapter or game, with an empty clipboard.">Nothing to paste: the clipboard is empty</string>
   <string name="okButton" comment="This is used in varius confirmations dialogs. Translation should be short." maxLength="10">OK</string>
   <string name="openInBrowser" comment="Button that opens the current page on lichess.org in the device's browser.">Open in browser</string>
+  <string name="openingExplorerNotAvailable" comment="Shown when the opening explorer cannot be used for the current study or position.">Opening explorer not available.</string>
   <string name="openingExplorerNotAvailableOffline" comment="Shown in the opening explorer when the device is offline.">Opening Explorer is not available offline.</string>
   <string name="orImportPgnFile" comment="Button text to import a PGN file from the device">Or import a PGN file</string>
   <string name="overTheBoard" comment="Used in the main play menu to launch the Over the board game mode.">Over the board</string>
@@ -84,11 +131,16 @@
   <string name="perfShortUltraBullet" comment="Short label for the UltraBullet chess performance. Used in compact UI such as perf cards and game filters, where visual width is limited. Use a short abbreviation rather than the full name. The max length is only a rough cross-language limit; for CJK languages, prefer 2-4 characters if possible." maxLength="10">Ultra</string>
   <string name="pgnCopied" comment="Snackbar shown after copying a PGN line to the clipboard.">PGN copied.</string>
   <string name="playersMatchingSearchTerm" comment="This is shown when searching for a player. %s is the string that user entered in the search bar">Players with "%s"</string>
+  <string name="positionId" comment="Label of the field where the user types a Chess960 position number.">Position ID (0-959)</string>
   <string name="positionLeft" comment="Appears in the board settings screen to indicate clock position.">Left</string>
   <string name="positionRight" comment="Appears in the board settings screen to indicate clock position.">Right</string>
   <string name="practiceMode" comment="Offline computer game setting that enables practice mode.">Practice mode</string>
+  <string name="practiceModeNoClock" comment="Shown in the offline practice settings: practice games are not timed.">Practice mode is played without a clock.</string>
+  <string name="practiceSettings" comment="Title of the offline practice settings section.">Practice settings</string>
   <string name="prefMagnifyDraggedPiece" comment="Title of a setting the settings screen. When enabled, the piece being dragged around the board will be magnified.">Magnify dragged piece</string>
+  <string name="previousMove" comment="Bottom bar button that goes to the previous move of a game or variation.">Previous</string>
   <string name="previousPage" comment="Shows the previous page, e.g. in tournament standings">Previous</string>
+  <string name="previousPuzzle" comment="Bottom bar button that goes back to the previous puzzle of the run.">Previous</string>
   <string name="puzzleStormConfirmEndRun" comment="Text of the confirmation dialog when ending a puzzle storm run">Do you want to end this run?</string>
   <string name="puzzleStormFilterNothingToShow" comment="Shown when the user has no puzzles matching the filter criteria">Nothing to show, please change the filters</string>
   <string name="puzzleStormNothingToShow" comment="Shown when the user has not played any puzzle storm runs yet. Prefer to not translate Puzzle Storm.">Nothing to show. Play some runs of Puzzle Storm.</string>
@@ -98,6 +150,11 @@
   <string name="rateThisApp" comment="Settings screen entry that opens the app store listing.">Rate this app</string>
   <string name="recentSearches" comment="Title of the recent searches section in the search screen.">Recent searches</string>
   <string name="removeBookmark" comment="Label of the action of removing a game bookmark. Used in various places of the app where the space is constrained so this should remain short (eg: don't translate as 'Remove game bookmark', keep the essential).">Remove bookmark</string>
+  <string name="result" comment="Bottom bar button that opens the dialog showing the final result. Keep it very short.">Result</string>
+  <string name="reviewPastAttempts" comment="Subtitle of the puzzle history entry.">Review your past puzzle attempts.</string>
+  <string name="round" comment="Table header for the round of a broadcast team game. Keep it very short.">Round</string>
+  <string name="selectALichessPlayer" comment="Title of the opening explorer setting where the user picks a Lichess player.">Select a Lichess player</string>
+  <string name="selectALichessPlayerInSettings" comment="Shown in the opening explorer when no player has been selected yet.">Select a Lichess player in the settings.</string>
   <string name="selectAStudy" comment="Screen title when choosing a study to add a PGN to.">Select a study</string>
   <string name="sendMeACode" comment="Button that requests an email login code on the email sign in screen.">Send me a code</string>
   <string name="serverAnalysis" comment="Title of a switch in analysis settings, used to toggle the server analysis display.">Server analysis</string>
@@ -126,12 +183,18 @@
   <string name="settingsShowBorder" comment="Settings found in theme screen. If enabled a border will be shown around the board.">Show border</string>
   <string name="settingsTouchFeedback" comment="Entry in the settings. When enabled, the app will vibrate on some game events like move and capture.">Touch feedback</string>
   <string name="settingsTouchFeedbackSubtitle" comment="Help message for the touch feedback settings entry in main settings screen.">When enabled, the device will vibrate shortly when you move or capture a piece.</string>
+  <string name="shapeColorBlue" comment="Board theme setting: name of the colour used to draw shapes on the board.">Blue</string>
+  <string name="shapeColorGreen" comment="Board theme setting: name of the colour used to draw shapes on the board.">Green</string>
+  <string name="shapeColorRed" comment="Board theme setting: name of the colour used to draw shapes on the board.">Red</string>
+  <string name="shapeColorYellow" comment="Board theme setting: name of the colour used to draw shapes on the board.">Yellow</string>
   <string name="shareChallengeUrl" comment="Bottom bar button that shares the open challenge URL.">Share challenge URL</string>
   <string name="shareGamePGN" comment="Menu action that shares the PGN of a game">Share PGN</string>
   <string name="shareGameURL" comment="Menu action that shares the URL of the current game">Share game URL</string>
   <string name="shareLocalAnalysisPgn" comment="Menu action that shares the local analysis PGN from the analysis screen.">Share local analysis PGN</string>
   <string name="sharePositionAsFEN" comment="Menu action that shares the current position as a FEN string">Share position as FEN</string>
+  <string name="shareProfile" comment="Menu action that shares a user profile.">Share profile</string>
   <string name="sharePuzzle" comment="This is shown in the puzzle screen. When pressed, the user can share the puzzle.">Share this puzzle</string>
+  <string name="shareTournament" comment="Menu action that shares a tournament.">Share tournament</string>
   <string name="showComments" comment="Shown in the analysis screen.">Show comments</string>
   <string name="showEngineLines" comment="Analysis/broadcast/study settings switch that toggles engine lines.">Show engine lines</string>
   <string name="showEvaluationGauge" comment="Analysis/broadcast settings switch that toggles the evaluation gauge.">Show evaluation gauge</string>
@@ -141,20 +204,32 @@
   <string name="simpleDelay" comment="Name of the simple delay chess clock time control type.">Simple delay</string>
   <string name="smallBoard" comment="Analysis/broadcast/study settings switch that uses a smaller board.">Small board</string>
   <string name="somethingWentWrong" comment="This is a generic text to be shown when something unexpected happens, e.g. failing to load data from the server.">Something went wrong.</string>
+  <string name="sortBy" comment="Sheet title above the list of sort options.">Sort by</string>
   <string name="sortFriends" comment="Accessibility label of the sort button on the friends screen.">Sort friends</string>
+  <string name="sortOpenings" comment="Accessibility label of the button that sorts the list of puzzle openings.">Sort openings</string>
+  <string name="sortStudies" comment="Accessibility label of the button that sorts the list of studies.">Sort studies</string>
+  <string name="stopLiking" comment="Menu action that removes the user's like from a study.">Stop liking</string>
   <string name="stopShowingThreat" comment="This disables the 'Show Treat' mode in analysis.">Stop showing threat</string>
   <string name="systemColors" comment="The title of the system colors setting. When enabling this, tha app's colors will match those of the operating system.">System colors</string>
   <string name="tablebaseOffline" comment="Message shown when the endgame tablebase is not available offline.">Tablebase is not available offline.</string>
+  <string name="tapToFetchPuzzles" comment="Shown in the offline puzzle cache when the user can fetch puzzles.">Tap to fetch new puzzles.</string>
+  <string name="tapToRefresh" comment="Hint shown in the log screens, inviting the user to pull or tap to refresh.">Tap to refresh</string>
+  <string name="teamStandings" comment="Title of the tournament tab listing team standings.">Team Standings</string>
   <string name="theme" comment="Graphic theme section in the global app settings.">Theme</string>
+  <string name="tieBreaking" comment="Title above the list of tie-break scores in a broadcast.">Tie-breaking</string>
+  <string name="toggleSound" comment="Accessibility label of the button that mutes and unmutes the app.">Toggle sound</string>
   <string name="tooManyLoginAttempts" comment="Error shown when too many email login code requests were made.">Too many attempts. Please try again later.</string>
   <string name="tournamentCompleted" comment="Title of a tab in the tournament screen, showing tournaments that are already completed. Translation should be short ideally one word" maxLength="10">Completed</string>
   <string name="tournamentJumpToMyPage" comment="Accessibility description of a button that jumps to user's position in tournament standings">Jump to my page</string>
   <string name="unsupportedVariant" comment="Shown when trying to access/play a variant not yet supported in the app.">Variant %s is not supported in this version.</string>
+  <string name="unusableNnueFilesExplanation" comment="Explanation shown in the engine settings before deleting unusable NNUE files.">Some NNUE files on this device cannot be used by the engine. Deleting them frees up space and lets you download them again.</string>
+  <string name="updatesFromTeams" comment="Empty state of the team updates screen.">Updates from teams you join will appear here.</string>
   <string name="useSymmetricPieces" comment="Over the board display setting: use the same piece shape for both sides.">Use symmetric pieces</string>
   <string name="viewGame" comment="Button text in puzzle settings to view the originating game.">View Game</string>
   <string name="viewLicenses" comment="Account menu entry that opens the open source licenses page.">View licences</string>
   <string name="waitingForOpponentToJoin" comment="This is after the user has created a game and is waiting for an opponent to join.">Waiting for opponent to join...</string>
   <string name="watchTab" comment="The tab in bottom navigation bar. Must be very short (10 characters max) to avoid ugly text shifting issues." maxLength="10">Watch</string>
   <string name="weWillEmailYouCode" comment="Shown on the email sign in screen before requesting a login code.">We will email you a code to sign in with.</string>
+  <string name="winOrFiftyMoveDraw" comment="Tablebase verdict: the position is won, or drawn by the fifty move rule.">Win or 50 move draw</string>
   <string name="youCannotChallengeYourself" comment="Error snackbar when trying to challenge yourself from the board editor.">You cannot challenge yourself</string>
 </resources>

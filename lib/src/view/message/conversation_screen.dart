@@ -88,13 +88,13 @@ class _ConversationScreenState() extends ConsumerState<ConversationScreen> with 
           if (widget.user.id.value != 'lichess')
             IconButton(
               icon: const Icon(Icons.delete_outline),
-              tooltip: 'Delete conversation',
+              tooltip: context.l10n.mobileDeleteConversation,
               onPressed: () async {
                 final confirmed = await showDialog<bool>(
                   context: context,
                   builder: (context) => YesNoDialog(
                     title: Text(context.l10n.mobileAreYouSure),
-                    content: const Text('Are you sure you want to delete this conversation?'),
+                    content: Text(context.l10n.mobileDeleteConversationConfirm),
                     onYes: () => Navigator.of(context).pop(true),
                     onNo: () => Navigator.of(context).pop(false),
                   ),
@@ -153,7 +153,7 @@ class const _Body({required final LightUser user}) extends ConsumerWidget {
                             onPressed: () => ref
                                 .read(conversationControllerProvider(user.id).notifier)
                                 .getMore(),
-                            child: const Text('Load more'),
+                            child: Text(context.l10n.mobileLoadMore),
                           ),
                         );
                       case ContactTypingItem():

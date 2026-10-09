@@ -412,28 +412,28 @@ class const _MatchHistoryTable({
       children: [
         TableRow(
           children: [
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-              child: Text('Round', style: TextStyle(fontWeight: .bold)),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+              child: Text(context.l10n.mobileRound, style: const TextStyle(fontWeight: .bold)),
             ),
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 12.0),
               child: Text(context.l10n.teamTeam, style: const TextStyle(fontWeight: .bold)),
             ),
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12.0),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12.0),
               child: Text(
-                'MP',
+                context.l10n.mobileMatchPoints,
                 textAlign: .center,
-                style: TextStyle(fontWeight: .bold),
+                style: const TextStyle(fontWeight: .bold),
               ),
             ),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
               child: Text(
-                'GP',
+                context.l10n.mobileGamePoints,
                 textAlign: .center,
-                style: TextStyle(fontWeight: .bold),
+                style: const TextStyle(fontWeight: .bold),
               ),
             ),
           ],

@@ -71,7 +71,7 @@ class _ProfileScreenState() extends ConsumerState<ProfileScreen> {
                 ? const SizedBox.shrink()
                 : SemanticIconButton(
                     icon: const PlatformShareIcon(),
-                    semanticsLabel: 'Share profile',
+                    semanticsLabel: context.l10n.mobileShareProfile,
                     onPressed: () => launchShareDialog(
                       context,
                       ShareParams(uri: lichessUri('/@/${user.username}')),

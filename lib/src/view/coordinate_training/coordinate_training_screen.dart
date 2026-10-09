@@ -149,7 +149,7 @@ class _BodyState() extends ConsumerState<_Body> {
                         onPressed: ref
                             .read(coordinateTrainingControllerProvider.notifier)
                             .abortTraining,
-                        label: 'Abort Training',
+                        label: context.l10n.mobileAbortTraining,
                       )
                     else if (trainingState.lastScore != null)
                       _ScoreAndTrainingButton(
@@ -190,7 +190,7 @@ class _BodyState() extends ConsumerState<_Body> {
                 ),
                 BottomBarButton(
                   icon: Icons.info_outline,
-                  label: context.l10n.aboutX('Coordinate Training'),
+                  label: context.l10n.aboutX(context.l10n.coordinatesCoordinateTraining),
                   onTap: () => _coordinateTrainingInfoDialogBuilder(context),
                 ),
               ],
@@ -253,7 +253,7 @@ class const _CoordinateTrainingMenu() extends ConsumerWidget {
                   .setShowCoordinates,
             ),
             SwitchSettingTile(
-              title: const Text('Show Pieces'),
+              title: Text(context.l10n.coordinatesShowPieces),
               value: trainingPrefs.showPieces,
               onChanged: ref.read(coordinateTrainingPreferencesProvider.notifier).setShowPieces,
             ),

@@ -128,7 +128,7 @@ class _EditProfileScreenState() extends ConsumerState<EditProfileScreen> {
       builder: (context) {
         return YesNoDialog(
           title: Text(context.l10n.mobileAreYouSure),
-          content: const Text('Your changes will be lost.'),
+          content: Text(context.l10n.mobileChangesWillBeLost),
           onNo: () => Navigator.of(context).pop(false),
           onYes: () => Navigator.of(context).pop(true),
         );

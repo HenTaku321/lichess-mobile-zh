@@ -706,7 +706,7 @@ class const _BroadcastGameBottomBar({
           child: BottomBarButton(
             key: const ValueKey('goto-previous'),
             onTap: broadcastAnalysisState.canGoBack ? () => _moveBackward(ref) : null,
-            label: 'Previous',
+            label: context.l10n.mobilePreviousMove,
             icon: CupertinoIcons.chevron_back,
             showTooltip: false,
           ),

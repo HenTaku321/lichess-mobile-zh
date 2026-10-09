@@ -60,7 +60,7 @@ class _StudyListScreenState() extends ConsumerState<StudyListScreen> {
           ContextMenuIconButton(
             consumeOutsideTap: true,
             icon: const Icon(Icons.sort_outlined),
-            semanticsLabel: 'Sort studies',
+            semanticsLabel: context.l10n.mobileSortStudies,
             actions: [
               ContextMenuAction(
                 icon: order == StudyListOrder.hot ? Icons.check : null,

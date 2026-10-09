@@ -494,7 +494,7 @@ class const _BottomBar({
                 ),
               );
             },
-            label: 'Share this puzzle',
+            label: context.l10n.mobileSharePuzzle,
             icon: Theme.of(context).platform == TargetPlatform.iOS ? Icons.ios_share : Icons.share,
           ),
         if (streak.finished)
@@ -521,7 +521,7 @@ class const _BottomBar({
             onTap: puzzleState.canGoBack
                 ? () => ref.read(ctrlProvider.notifier).userPrevious()
                 : null,
-            label: 'Previous',
+            label: context.l10n.mobilePreviousPuzzle,
             icon: CupertinoIcons.chevron_back,
           ),
         if (streak.finished)

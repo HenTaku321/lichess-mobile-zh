@@ -283,7 +283,7 @@ class const _BottomBar({required final VoidCallback onFlipBoard}) extends Consum
         ),
         if (!clock.timeIncrement.isInfinite)
           BottomBarButton(
-            label: clock.active ? 'Pause' : 'Resume',
+            label: clock.active ? context.l10n.pause : context.l10n.resume,
             onTap: gameState.finished
                 ? null
                 : () {
@@ -296,7 +296,7 @@ class const _BottomBar({required final VoidCallback onFlipBoard}) extends Consum
             icon: clock.active ? CupertinoIcons.pause : CupertinoIcons.play,
           ),
         BottomBarButton(
-          label: 'Previous',
+          label: context.l10n.mobilePreviousMove,
           onTap: gameState.canGoBack
               ? () {
                   ref.read(overTheBoardGameControllerProvider.notifier).goBack();
@@ -310,7 +310,7 @@ class const _BottomBar({required final VoidCallback onFlipBoard}) extends Consum
           icon: CupertinoIcons.chevron_back,
         ),
         BottomBarButton(
-          label: 'Next',
+          label: context.l10n.next,
           onTap: gameState.canGoForward
               ? () {
                   ref.read(overTheBoardGameControllerProvider.notifier).goForward();
@@ -324,7 +324,7 @@ class const _BottomBar({required final VoidCallback onFlipBoard}) extends Consum
           icon: CupertinoIcons.chevron_forward,
         ),
         BottomBarButton(
-          label: 'Takeback',
+          label: context.l10n.takeback,
           onTap: gameState.canGoBack
               ? () {
                   ref.read(overTheBoardGameControllerProvider.notifier).goBack();

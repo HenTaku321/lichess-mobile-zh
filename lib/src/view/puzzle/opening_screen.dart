@@ -49,7 +49,7 @@ class const OpeningThemeScreen({super.key}) extends ConsumerWidget {
           ContextMenuIconButton(
             consumeOutsideTap: true,
             icon: const Icon(Icons.sort_outlined),
-            semanticsLabel: 'Sort openings',
+            semanticsLabel: context.l10n.mobileSortOpenings,
             actions: [
               ContextMenuAction(
                 icon: sort == PuzzleOpeningSort.popular ? Icons.check : null,
@@ -60,7 +60,7 @@ class const OpeningThemeScreen({super.key}) extends ConsumerWidget {
               ),
               ContextMenuAction(
                 icon: sort == PuzzleOpeningSort.alphabetical ? Icons.check : null,
-                label: 'Alphabetical',
+                label: context.l10n.studyAlphabetical,
                 onPressed: () {
                   ref.read(_openingsSortProvider.notifier).state = PuzzleOpeningSort.alphabetical;
                 },

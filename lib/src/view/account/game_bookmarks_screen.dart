@@ -74,9 +74,9 @@ class _BodyState() extends ConsumerState<_Body> {
         final list = state.gameList;
 
         return list.isEmpty
-            ? const Padding(
-                padding: EdgeInsets.symmetric(vertical: 32.0),
-                child: Center(child: Text('No games found')),
+            ? Padding(
+                padding: const EdgeInsets.symmetric(vertical: 32.0),
+                child: Center(child: Text(context.l10n.noGameFound)),
               )
             : ListView.separated(
                 controller: _scrollController,

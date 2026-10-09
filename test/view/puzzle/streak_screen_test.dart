@@ -105,7 +105,7 @@ void main() {
       // Play a wrong move
       await playMove(tester, 'd8', 'd7', orientation: Side.black);
       await tester.pumpAndSettle(const Duration(seconds: 2));
-      expect(find.text('GAME OVER'), findsOneWidget);
+      expect(find.text('Game Over'), findsOneWidget);
 
       // Exit screen and enter screen again
       // -> local score should be cleared, so score should be 0 again
@@ -203,7 +203,7 @@ void main() {
       await tester.pumpAndSettle(const Duration(milliseconds: 500));
 
       //game over correctly appears
-      expect(find.text('GAME OVER'), findsOneWidget);
+      expect(find.text('Game Over'), findsOneWidget);
 
       final button = findByTooltip('New streak');
       await tester.tap(button);

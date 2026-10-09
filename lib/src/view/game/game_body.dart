@@ -780,7 +780,7 @@ class const _GameBottomBar({
           )
         else if (data.playable && data.isCorrespondence) ...[
           BottomBarButton(
-            label: 'Go to the next game',
+            label: context.l10n.mobileGoToTheNextGame,
             icon: Icons.skip_next,
             onTap: ongoingGames.maybeWhen(
               data: (games) {
@@ -1072,7 +1072,7 @@ class const _MoveNavButton({required final GameFullId id, required final bool fo
         onLongPress: canGoBackward ? () => _move(ref) : null,
         child: BottomBarButton(
           onTap: canGoBackward ? () => _move(ref) : null,
-          label: 'Previous',
+          label: context.l10n.mobilePreviousMove,
           icon: CupertinoIcons.chevron_back,
           showTooltip: false,
         ),

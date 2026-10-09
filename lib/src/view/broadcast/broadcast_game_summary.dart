@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/broadcast/broadcast_analysis_controller.dart';
 import 'package:lichess_mobile/src/model/broadcast/broadcast_preferences.dart';
 import 'package:lichess_mobile/src/model/common/id.dart';
+import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/widgets/acpl_chart.dart';
 import 'package:lichess_mobile/src/widgets/game_summary_table.dart';
 import 'package:material_ui/material_ui.dart';
@@ -19,7 +20,7 @@ class const BroadcastGameSummary({
     final analysisState = ref.watch(ctrlProvider).requireValue;
 
     if (!broadcastPrefs.enableServerAnalysis || analysisState.analysisSummary == null) {
-      return const Center(child: Text('No server analysis available'));
+      return Center(child: Text(context.l10n.mobileNoServerAnalysisAvailable));
     }
 
     return ListView(

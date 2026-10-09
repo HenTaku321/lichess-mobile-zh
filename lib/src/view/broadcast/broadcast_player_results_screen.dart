@@ -492,7 +492,10 @@ class const _TieBreaksSection(
             color: ColorScheme.of(context).surfaceDim,
             child: Padding(
               padding: const EdgeInsets.all(8.0),
-              child: Text('Tie-breaking', style: Theme.of(context).textTheme.bodyLarge),
+              child: Text(
+                context.l10n.mobileTieBreaking,
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
             ),
           ),
           ...tieBreaks

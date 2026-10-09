@@ -20,9 +20,9 @@ enum _BroadcastFilter() {
   String l10n(AppLocalizations l10n) {
     switch (this) {
       case live:
-        return 'Live broadcasts';
+        return l10n.broadcastLiveBroadcasts;
       case all:
-        return 'All broadcasts';
+        return l10n.mobileAllBroadcasts;
     }
   }
 }
@@ -52,8 +52,7 @@ class _BroadcastListScreenState() extends State<BroadcastListScreen> {
     );
     final filterButton = SemanticIconButton(
       icon: const Icon(Icons.filter_list),
-      // TODO: translate
-      semanticsLabel: 'Filter broadcasts',
+      semanticsLabel: context.l10n.mobileFilterBroadcasts,
       onPressed: () => showModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,

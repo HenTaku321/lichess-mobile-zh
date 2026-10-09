@@ -375,7 +375,11 @@ class _CreateStudyChapterBottomSheetState() extends ConsumerState<CreateStudyCha
     // The input fields are read-only and pasting is their only affordance, so failing silently
     // here would be indistinguishable from a broken button.
     if (text.isEmpty) {
-      showSnackBar(context, 'Nothing to paste: the clipboard is empty', type: SnackBarType.error);
+      showSnackBar(
+        context,
+        context.l10n.mobileNothingToPaste,
+        type: SnackBarType.error,
+      );
       return;
     }
 

@@ -26,9 +26,9 @@ class const PuzzleFeedbackWidget({
               ? Icon(Icons.check, size: 36, color: context.lichessColors.good)
               : null,
           title: onStreak && state.result == PuzzleResult.lose
-              ? const Text(
-                  'GAME OVER',
-                  style: TextStyle(fontSize: 24, letterSpacing: 2.0),
+              ? Text(
+                  context.l10n.gameOver,
+                  style: const TextStyle(fontSize: 24, letterSpacing: 2.0),
                   textAlign: TextAlign.center,
                   overflow: TextOverflow.ellipsis,
                 )

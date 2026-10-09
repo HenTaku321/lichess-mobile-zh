@@ -197,7 +197,7 @@ class const _Body({required final TournamentId id, required final TournamentStat
           actions: [
             SemanticIconButton(
               icon: const PlatformShareIcon(),
-              semanticsLabel: 'Share tournament',
+              semanticsLabel: context.l10n.mobileShareTournament,
               onPressed: () =>
                   launchShareDialog(context, ShareParams(uri: lichessUri('/tournament/$id'))),
             ),
@@ -586,9 +586,9 @@ class const _TeamStanding(final TournamentState state) extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: .start,
         children: [
-          const Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Text('Team Standings', style: Styles.sectionTitle),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text(context.l10n.mobileTeamStandings, style: Styles.sectionTitle),
           ),
           ...teamStanding.map(
             (team) => _TeamStandingTile(
@@ -1194,7 +1194,7 @@ class _BottomBarState() extends ConsumerState<_BottomBar> {
                         if (teamBattle.joinWith!.isEmpty) {
                           showSnackBar(
                             context,
-                            'None of your teams are participating in this tournament',
+                            context.l10n.mobileNoneOfYourTeamsInTournament,
                             type: SnackBarType.error,
                           );
                           return;
@@ -1823,7 +1823,7 @@ class const _AllTeamsScreen({
     final allTeams = ref.watch(allTeamStandingsProvider(tournamentId));
     final tournamentFullName =
         ref.watch(tournamentControllerProvider(tournamentId)).value?.tournament.meta.fullName ??
-        'Team Standings';
+        context.l10n.mobileTeamStandings;
 
     return PlatformScaffold(
       appBar: PlatformAppBar(title: AppBarTitleText(tournamentFullName, maxLines: 2)),

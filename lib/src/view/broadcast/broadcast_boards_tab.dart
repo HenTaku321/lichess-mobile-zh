@@ -55,7 +55,7 @@ class const BroadcastBoardsTab({
                     Text(
                       value.games.isEmpty
                           ? context.l10n.broadcastNoBoardsYet
-                          : 'No games matching filter criteria.',
+                          : context.l10n.mobileNoGamesMatchingFilter,
                       textAlign: TextAlign.center,
                     ),
                   ],

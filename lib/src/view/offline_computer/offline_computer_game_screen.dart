@@ -742,8 +742,7 @@ class _NewGameSheetState() extends ConsumerState<_NewGameSheet> {
     SideChoice.white => context.l10n.white,
     SideChoice.random => context.l10n.randomColor,
     SideChoice.black => context.l10n.black,
-    // TODO: replace with a translated string once the feature is stable
-    SideChoice.nextToPlay => 'Next to play',
+    SideChoice.nextToPlay => context.l10n.mobileNextToPlay,
   };
 
   @override
@@ -903,7 +902,7 @@ class _NewGameSheetState() extends ConsumerState<_NewGameSheet> {
               settingsLabel: Text(context.l10n.timeControl),
               settingsValue: _timeControlType.label(context.l10n),
               enabled: !_practiceMode,
-              explanation: _practiceMode ? 'Practice mode is played without a clock.' : null,
+              explanation: _practiceMode ? context.l10n.mobilePracticeModeNoClock : null,
               onTap: _practiceMode
                   ? null
                   : () {
@@ -1157,7 +1156,7 @@ class const _OfflineComputerGameSettingsSheet() extends ConsumerWidget {
       children: [
         if (practiceMode)
           ListSection(
-            header: const Text('Practice settings'),
+            header: Text(context.l10n.mobilePracticeSettings),
             materialFilledCard: true,
             children: [
               SwitchSettingTile(
@@ -1168,7 +1167,7 @@ class const _OfflineComputerGameSettingsSheet() extends ConsumerWidget {
                 },
               ),
               SwitchSettingTile(
-                title: const Text('Hide evaluation'),
+                title: Text(context.l10n.mobileHideEvaluation),
                 value: prefs.hideEvaluation,
                 onChanged: (_) {
                   ref.read(offlineComputerGamePreferencesProvider.notifier).toggleHideEvaluation();

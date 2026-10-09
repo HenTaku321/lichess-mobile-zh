@@ -210,13 +210,13 @@ class const _StudyMenu({required final StudyOptions options}) extends ConsumerWi
     final state = ref.watch(studyControllerProvider(options)).requireValue;
 
     return ContextMenuIconButton(
-      semanticsLabel: 'Study menu',
+      semanticsLabel: context.l10n.studyMenu,
       icon: const Icon(Icons.more_horiz),
       actions: [
         if (authUser != null)
           ContextMenuAction(
             icon: state.study.liked ? Icons.favorite : Icons.favorite_border,
-            label: state.study.liked ? 'Stop liking' : context.l10n.studyLike,
+            label: state.study.liked ? context.l10n.mobileStopLiking : context.l10n.studyLike,
             onPressed: () {
               ref.read(studyControllerProvider(options).notifier).toggleLike();
             },
@@ -450,7 +450,7 @@ class const _Body({
                 isComputerAnalysisAllowed: true,
               );
             } else {
-              return const Center(child: Text('Opening explorer not available.'));
+              return Center(child: Text(context.l10n.mobileOpeningExplorerNotAvailable));
             }
           case AnalysisTab.summary:
             switch (studyState.chapterServerAnalysisStatus) {

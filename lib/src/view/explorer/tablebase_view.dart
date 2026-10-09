@@ -92,7 +92,7 @@ class const TablebaseView({
         addMoveSection(
           category: TablebaseCategory.maybeWin,
           headerKey: 'maybeWinMovesHeader',
-          headerChild: const Text('Win or 50 move draw'),
+          headerChild: Text(context.l10n.mobileWinOrFiftyMoveDraw),
           isWinningForWhite: position.turn == Side.white,
           moveKeyPrefix: 'maybe-win-move',
         );
@@ -120,7 +120,7 @@ class const TablebaseView({
         addMoveSection(
           category: TablebaseCategory.maybeLoss,
           headerKey: 'maybeLossMovesHeader',
-          headerChild: const Text('Loss or 50 move draw'),
+          headerChild: Text(context.l10n.mobileLossOrFiftyMoveDraw),
           isWinningForWhite: position.turn != Side.white,
           moveKeyPrefix: 'maybe-loss-move',
         );

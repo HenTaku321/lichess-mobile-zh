@@ -265,7 +265,7 @@ class const _BottomBar({required final AnalysisOptions options}) extends Consume
           icon: Icons.tune,
         ),
         BottomBarButton(
-          label: 'Flip',
+          label: context.l10n.mobileFlip,
           tooltip: context.l10n.flipBoard,
           showLabel: true,
           onTap: () => ref.read(ctrlProvider.notifier).toggleBoard(),
@@ -275,7 +275,7 @@ class const _BottomBar({required final AnalysisOptions options}) extends Consume
           onLongPress: canGoBack ? () => _moveBackward(ref) : null,
           child: BottomBarButton(
             onTap: canGoBack ? () => _moveBackward(ref) : null,
-            label: 'Previous',
+            label: context.l10n.mobilePreviousMove,
             showLabel: true,
             icon: CupertinoIcons.chevron_back,
             showTooltip: false,
@@ -285,7 +285,7 @@ class const _BottomBar({required final AnalysisOptions options}) extends Consume
           onLongPress: canGoNext ? () => _moveForward(ref) : null,
           child: BottomBarButton(
             icon: CupertinoIcons.chevron_forward,
-            label: 'Next',
+            label: context.l10n.next,
             showLabel: true,
             onTap: canGoNext ? () => _moveForward(ref) : null,
             showTooltip: false,

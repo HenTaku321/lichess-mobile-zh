@@ -102,7 +102,7 @@ class const _ChannelMessagesBody({
                       Icon(Icons.forum_outlined, size: 64, color: textShade(context, 0.4)),
                       const SizedBox(height: 16),
                       Text(
-                        'No updates yet in this channel',
+                        context.l10n.mobileNoUpdatesYetInChannel,
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                     ],

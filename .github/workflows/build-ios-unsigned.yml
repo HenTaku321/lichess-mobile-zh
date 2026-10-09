@@ -1,0 +1,76 @@
+name: Build unsigned iOS IPA
+
+# Produces an UNSIGNED .ipa for personal install (TrollStore / self-signing).
+# No Apple Developer account, no provisioning profile, no exportArchive:
+# this mirrors the repo's own "test_build" fastlane lane, which builds with
+# --no-codesign and packs the .app into an IPA by hand.
+#
+# Point the app at a translation proxy by setting repository *variables*
+# (Settings -> Secrets and variables -> Actions -> Variables), no code edit:
+#   LICHESS_HOST      e.g. lichess-zh.example.com        (default: lichess.org)
+#   LICHESS_WS_HOST   e.g. lichess-zh.example.com        (default: socket.lichess.org)
+# and repository *secret*:
+#   WS_SECRET         socket secret                          (default: somethingElseInProd)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-ios-unsigned
+  cancel-in-progress: true
+
+jobs:
+  ios:
+    name: Build unsigned IPA
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          cache: true
+          channel: stable
+          flutter-version-file: pubspec.yaml
+      - run: flutter --version
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # Regenerates *.freezed.dart / *.g.dart. The ARB files and the generated
+      # lib/l10n/l10n_*.dart ARE committed upstream, so no l10n step is needed here.
+      - name: Code generation
+        run: dart run build_runner build
+
+      # `flutter pub get` resets the generated SwiftPM manifest's deployment target to
+      # Flutter's default (iOS 13), which makes the archive fail on the Firebase plugins.
+      # The fastlane lane notes this; the release build below does not need pub get again.
+      - name: Build (release, no codesign)
+        run: |
+          flutter build ios --release --no-codesign \
+            --dart-define=LICHESS_HOST=${{ vars.LICHESS_HOST || 'lichess.org' }} \
+            --dart-define=LICHESS_WS_HOST=${{ vars.LICHESS_WS_HOST || 'socket.lichess.org' }} \
+            --dart-define=LICHESS_WS_SECRET=${{ secrets.WS_SECRET || 'somethingElseInProd' }}
+
+      - name: Pack unsigned IPA
+        run: |
+          set -euo pipefail
+          rm -rf out
+          mkdir -p out/Payload
+          cp -R build/ios/iphoneos/Runner.app out/Payload/
+          (cd out && zip -qry lichess-zh.ipa Payload)
+          rm -rf out/Payload
+          ls -lh out/lichess-zh.ipa
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: lichess-zh-unsigned-ipa
+          path: out/lichess-zh.ipa
+          if-no-files-found: error
+          retention-days: 30

@@ -38,8 +38,11 @@ jobs:
   ios:
     name: Build unsigned IPA
     runs-on: macos-26
-    # Cold iOS builds run long; keep headroom above the measured wall time.
-    timeout-minutes: 90
+    # Every run starts on a fresh runner, so the whole Swift Package Manager
+    # dependency graph (Firebase, grpc, abseil, ...) is compiled from source
+    # each time. Measured wall time on macos-26 already exceeded 87 minutes;
+    # leave generous headroom so a genuinely slow cold build can finish.
+    timeout-minutes: 180
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -63,12 +66,25 @@ jobs:
       # `flutter pub get` resets the generated SwiftPM manifest's deployment target to
       # Flutter's default (iOS 13), which makes the archive fail on the Firebase plugins.
       # The fastlane lane notes this; the release build below does not need pub get again.
+      # `xcodebuild` prints nothing for the bulk of the compile, so a silent log
+      # cannot be told apart from a hung one. A background ticker keeps the log
+      # timestamped and shows whether the build is still making progress.
       - name: Build (release, no codesign)
         run: |
+          set -uo pipefail
           flutter build ios --release --no-codesign \
             --dart-define=LICHESS_HOST=${{ vars.LICHESS_HOST || 'lichess.org' }} \
             --dart-define=LICHESS_WS_HOST=${{ vars.LICHESS_WS_HOST || 'socket.lichess.org' }} \
-            --dart-define=LICHESS_WS_SECRET=${{ secrets.WS_SECRET || 'somethingElseInProd' }}
+            --dart-define=LICHESS_WS_SECRET=${{ secrets.WS_SECRET || 'somethingElseInProd' }} &
+          build_pid=$!
+          rc=0
+          while kill -0 "$build_pid" 2>/dev/null; do
+            sleep 120
+            kill -0 "$build_pid" 2>/dev/null || break
+            echo "[$(date -u +%H:%M:%S)] still building (pid $build_pid, $((SECONDS/60))m elapsed)..."
+          done
+          wait "$build_pid" || rc=$?
+          exit "$rc"
 
       - name: Pack unsigned IPA
         run: |

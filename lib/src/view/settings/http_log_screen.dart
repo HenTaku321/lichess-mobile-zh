@@ -122,10 +122,7 @@ class _HttpLogListState() extends ConsumerState<_HttpLogList> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(context.l10n.nothingToSeeHere),
-            TextButton(
-              onPressed: widget.onRefresh,
-              child: Text(context.l10n.mobileTapToRefresh),
-            ),
+            TextButton(onPressed: widget.onRefresh, child: Text(context.l10n.mobileTapToRefresh)),
           ],
         ),
       );

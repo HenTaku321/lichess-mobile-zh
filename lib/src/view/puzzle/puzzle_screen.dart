@@ -177,9 +177,7 @@ class const _LoadNextPuzzle({required final GlobalKey boardKey, required final P
           return _PuzzleScaffold(
             angle: angle,
             initialPuzzleContext: null,
-            body: PuzzleErrorBoardWidget(
-              errorMessage: context.l10n.mobileNoMorePuzzlesGoOnline,
-            ),
+            body: PuzzleErrorBoardWidget(errorMessage: context.l10n.mobileNoMorePuzzlesGoOnline),
           );
         } else {
           return _PuzzleScaffold(

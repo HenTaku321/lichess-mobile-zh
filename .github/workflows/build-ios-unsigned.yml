@@ -20,6 +20,9 @@ name: Build unsigned iOS IPA
 
 on:
   push:
+    # Only the working branch. Restricting this keeps unrelated pushes (e.g.
+    # dependabot/* branches) from spending macOS runner minutes on a build.
+    branches: [zh-local]
   workflow_dispatch:
 
 # Group is intentionally NOT per-ref: all runs share it so a new push cancels a

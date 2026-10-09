@@ -10,10 +10,14 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "weekly"
+    # Keep this fork's weekly Dependabot PRs quiet: they are not wanted here,
+    # and each one would otherwise trigger the iOS build workflow.
+    open-pull-requests-limit: 0
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 0
     groups:
        ci-dependencies:
           patterns:

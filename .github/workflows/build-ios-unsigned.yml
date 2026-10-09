@@ -5,6 +5,12 @@ name: Build unsigned iOS IPA
 # this mirrors the repo's own "test_build" fastlane lane, which builds with
 # --no-codesign and packs the .app into an IPA by hand.
 #
+# Runs on every push. Only the newest run is kept: the workflow-wide concurrency
+# group serializes all runs and cancels an in-flight build when a newer push
+# arrives, so at most one macOS runner is ever active (macOS minutes are costly).
+# The IPA is published to the rolling prerelease GitHub Release "latest", which is
+# overwritten each time — Actions artifact storage is not used.
+#
 # Point the app at a translation proxy by setting repository *variables*
 # (Settings -> Secrets and variables -> Actions -> Variables), no code edit:
 #   LICHESS_HOST      e.g. lichess-zh.example.com        (default: lichess.org)
@@ -13,20 +19,24 @@ name: Build unsigned iOS IPA
 #   WS_SECRET         socket secret                          (default: somethingElseInProd)
 
 on:
+  push:
   workflow_dispatch:
 
-permissions:
-  contents: read
-
+# Group is intentionally NOT per-ref: all runs share it so a new push cancels a
+# build already running on the runner, not just one that is merely queued.
 concurrency:
   group: build-ios-unsigned
   cancel-in-progress: true
+
+permissions:
+  contents: write # required to create/update the rolling release
 
 jobs:
   ios:
     name: Build unsigned IPA
     runs-on: macos-26
-    timeout-minutes: 60
+    # Cold iOS builds run long; keep headroom above the measured wall time.
+    timeout-minutes: 90
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -67,10 +77,15 @@ jobs:
           rm -rf out/Payload
           ls -lh out/lichess-zh.ipa
 
-      - name: Upload IPA
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: lichess-zh-unsigned-ipa
-          path: out/lichess-zh.ipa
-          if-no-files-found: error
-          retention-days: 30
+      # Publish to the rolling "latest" release so exactly one IPA is kept.
+      - name: Publish to rolling GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release delete latest --yes --cleanup-tag 2>/dev/null || true
+          gh release create latest out/lichess-zh.ipa \
+            --title "Latest zh build" \
+            --notes "Unsigned IPA from ${GITHUB_SHA::7}, triggered by ${GITHUB_EVENT_NAME}. Install via TrollStore." \
+            --prerelease \
+            --target "${GITHUB_SHA}"

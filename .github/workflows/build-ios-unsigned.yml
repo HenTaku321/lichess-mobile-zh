@@ -5,9 +5,9 @@ name: Build unsigned iOS IPA
 # this mirrors the repo's own "test_build" fastlane lane, which builds with
 # --no-codesign and packs the .app into an IPA by hand.
 #
-# Runs on every push. Only the newest run is kept: the workflow-wide concurrency
-# group serializes all runs and cancels an in-flight build when a newer push
-# arrives, so at most one macOS runner is ever active (macOS minutes are costly).
+# Started by hand (see the trigger below). Only the newest run is kept: the
+# workflow-wide concurrency group serializes all runs and cancels an in-flight
+# build when a newer one arrives, so at most one macOS runner is ever active.
 # The IPA is published to the rolling prerelease GitHub Release "latest", which is
 # overwritten each time — Actions artifact storage is not used.
 #
@@ -19,10 +19,14 @@ name: Build unsigned iOS IPA
 #   WS_SECRET         socket secret                          (default: somethingElseInProd)
 
 on:
-  push:
-    # Only the working branch. Restricting this keeps unrelated pushes (e.g.
-    # dependabot/* branches) from spending macOS runner minutes on a build.
-    branches: [zh-local]
+  # Manual only, deliberately. A push trigger here means every intermediate
+  # commit made while iterating on Dart code fires a full iOS build, and the
+  # concurrency group below then cancels the build that was already running —
+  # so a typo fix can cost two macOS builds and produce no IPA. The fast
+  # feedback loop is `.github/workflows/test.yml`; run this one when there is
+  # something worth installing:
+  #
+  #   gh workflow run build-ios-unsigned.yml --ref zh-local
   workflow_dispatch:
 
 # Group is intentionally NOT per-ref: all runs share it so a new push cancels a

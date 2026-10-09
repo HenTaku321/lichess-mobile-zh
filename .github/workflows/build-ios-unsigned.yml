@@ -46,7 +46,12 @@ jobs:
     # dependency graph (Firebase, grpc, abseil, ...) is compiled from source
     # each time. Measured wall time on macos-26 already exceeded 87 minutes;
     # leave generous headroom so a genuinely slow cold build can finish.
-    timeout-minutes: 180
+    # One run was cancelled at the 180 minute cap while still inside
+    # "Build (release, no codesign)". At cancellation `upload-symbols` was alive,
+    # and that upload is the *last* build phase of the Runner target, so the
+    # compile had finished and the overrun was the upload retrying against
+    # Google. The Build step now skips it — see SKIP_CRASHLYTICS_UPLOAD below.
+    timeout-minutes: 240
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -85,10 +90,22 @@ jobs:
       # The fastlane lane notes this; the release build below does not need pub get again.
       # `xcodebuild` prints nothing for the bulk of the compile, so a silent log
       # cannot be told apart from a hung one. A background ticker keeps the log
-      # timestamped and shows whether the build is still making progress.
+      # timestamped and counts compiled object files, so the tail of a failed run
+      # says whether the build was still progressing when it was cut off.
+      #
+      # The Xcode "Crashlytics Upload Symbols" phase
+      # (ios/Runner.xcodeproj/project.pbxproj) is skipped for this build: uploading
+      # dSYMs to Google is meaningless for an unsigned personal build, and that
+      # upload is the phase that overran a previous run. Both the environment
+      # variable and a marker file next to the project are set, because a
+      # run-script phase gets the marker file regardless of how Flutter passes the
+      # environment down to xcodebuild.
       - name: Build (release, no codesign)
+        env:
+          SKIP_CRASHLYTICS_UPLOAD: '1'
         run: |
           set -uo pipefail
+          touch ios/.skip-crashlytics-upload
           flutter build ios --release --no-codesign \
             --dart-define=LICHESS_HOST=${{ vars.LICHESS_HOST || 'lichess.org' }} \
             --dart-define=LICHESS_WS_HOST=${{ vars.LICHESS_WS_HOST || 'socket.lichess.org' }} \
@@ -98,7 +115,8 @@ jobs:
           while kill -0 "$build_pid" 2>/dev/null; do
             sleep 120
             kill -0 "$build_pid" 2>/dev/null || break
-            echo "[$(date -u +%H:%M:%S)] still building (pid $build_pid, $((SECONDS/60))m elapsed)..."
+            objs=$(find "$HOME/Library/Developer/Xcode/DerivedData" build/ios -name '*.o' 2>/dev/null | wc -l | tr -d ' ')
+            echo "[$(date -u +%H:%M:%S)] still building (pid $build_pid, $((SECONDS/60))m elapsed, $objs objects compiled)..."
           done
           wait "$build_pid" || rc=$?
           exit "$rc"

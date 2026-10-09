@@ -66,6 +66,12 @@ jobs:
       - name: Code generation
         run: dart run build_runner build
 
+      # `gen-arb.mjs` imports `colors`, `xml2js` and `js-yaml`, and upstream never
+      # runs it in CI, so nothing else installs them.
+      - name: Install translation script dependencies
+        run: npm ci --no-audit --no-fund
+        working-directory: scripts
+
       # `translation/dest/**/<locale>.xml` is the source of truth for the ARBs:
       # this fork edits the zh-CN XML files, so gen-arb must run BEFORE the build
       # or the edits never reach the app. Runs `gen-arb.mjs` (XML -> app_*.arb),

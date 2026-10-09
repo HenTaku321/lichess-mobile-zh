@@ -58,10 +58,17 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      # Regenerates *.freezed.dart / *.g.dart. The ARB files and the generated
-      # lib/l10n/l10n_*.dart ARE committed upstream, so no l10n step is needed here.
+      # Regenerates *.freezed.dart / *.g.dart.
       - name: Code generation
         run: dart run build_runner build
+
+      # `translation/dest/**/<locale>.xml` is the source of truth for the ARBs:
+      # this fork edits the zh-CN XML files, so gen-arb must run BEFORE the build
+      # or the edits never reach the app. Runs `gen-arb.mjs` (XML -> app_*.arb),
+      # then `flutter gen-l10n` (ARB -> lib/l10n/l10n_*.dart), then the widget
+      # string catalog. Flutter is already installed by the step above.
+      - name: Generate translations
+        run: ./scripts/gen-translations.sh
 
       # `flutter pub get` resets the generated SwiftPM manifest's deployment target to
       # Flutter's default (iOS 13), which makes the archive fail on the Firebase plugins.

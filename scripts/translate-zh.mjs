@@ -19,6 +19,7 @@
 //
 // Options:
 //   --only <substr>   only modules whose name contains <substr>
+//   --all             translate every key, not just the ones the app references
 //   --dry-run         translate and report, write nothing
 //   --limit <n>       stop after n batches (cheap smoke test)
 //
@@ -26,7 +27,7 @@
 //   LLM_BASE_URL, LLM_API_KEY, LLM_MODEL, LLM_BATCH_LIMIT, LLM_BATCH_CHARS,
 //   LLM_TIMEOUT_SECONDS
 
-import { readFileSync, writeFileSync, renameSync, existsSync } from 'fs'
+import { readFileSync, writeFileSync, renameSync, existsSync, readdirSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 import { parseXml, replaceValues, samePlaceholders, placeholders, lineBreaks } from './xml.mjs'
@@ -75,13 +76,14 @@ const cfg = {
   timeoutMs: Number(process.env.LLM_TIMEOUT_SECONDS ?? 180) * 1000,
 }
 
-const opt = { only: null, dryRun: false, limit: 0 }
+const opt = { only: null, dryRun: false, limit: 0, all: false }
 const argv = process.argv.slice(2)
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i]
   if (a === '--only') opt.only = argv[++i]
   else if (a === '--dry-run') opt.dryRun = true
   else if (a === '--limit') opt.limit = Number(argv[++i])
+  else if (a === '--all') opt.all = true
   else if (a === '-h' || a === '--help') {
     console.log(readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(0, 25).join('\n'))
     process.exit(0)
@@ -199,8 +201,38 @@ function reject(unit, text) {
 
 // ---- collection -------------------------------------------------------------
 
-/** @returns {Unit[]|null} */
-function collectUnits(module, idBase) {
+// Only 44% of the corpus is reachable from the app: `contact` (0/83 keys),
+// `streamer` (0/45), `ublog` (0/50), `learn` (25/173) and `study` (51/183) are
+// lichess.org website copy that no Flutter screen ever reads. Translating those
+// costs money and review attention for zero visible effect, so by default the
+// run is narrowed to the keys the app actually references. --all overrides it.
+const ARB_KEY_RE = /l10n\.([A-Za-z0-9_]+)/g
+
+/** @returns {Set<string>} l10n getter names referenced anywhere under lib/ */
+function usedL10nKeys() {
+  const keys = new Set()
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const p = join(dir, entry.name)
+      if (entry.isDirectory()) walk(p)
+      else if (entry.name.endsWith('.dart') && !entry.name.endsWith('.g.dart') && !entry.name.endsWith('.freezed.dart')) {
+        for (const m of readFileSync(p, 'utf8').matchAll(ARB_KEY_RE)) keys.add(m[1])
+      }
+    }
+  }
+  walk(join(ROOT, 'lib'))
+  return keys
+}
+
+/** Mirrors fixKey() in scripts/gen-arb.mjs: this maps a translation name to the
+ * Dart getter the app would call for it. */
+function arbKey(module, name) {
+  const fixed = name.replace(/\./g, '_')
+  return module === 'site' ? fixed : module + fixed.charAt(0).toUpperCase() + fixed.slice(1)
+}
+
+/** @returns {{units: Unit[], skipped: number}|null} */
+function collectUnits(module, idBase, used) {
   const srcPath = join(SRC_DIR, `${module}.xml`)
   const zhPath = join(DEST_DIR, module, `${LANG}.xml`)
   if (!existsSync(srcPath) || !existsSync(zhPath)) return null
@@ -216,7 +248,14 @@ function collectUnits(module, idBase) {
   // the single "other" item, so a source "one" with no Chinese counterpart is
   // correctly skipped rather than newly invented.
   const units = []
+  let skipped = 0
   const push = (name, quantity, source, existing, comment, maxLength) => {
+    // `used` gates on the *base* name: every plural category of a used plural
+    // shares one getter, so it is kept or dropped as a whole.
+    if (used && !used.has(arbKey(module, name))) {
+      skipped++
+      return
+    }
     units.push({
       id: idBase + units.length,
       module,
@@ -247,7 +286,7 @@ function collectUnits(module, idBase) {
       push(p.name, item.quantity, enItem.text, item.text, comment, en.attrs.maxLength)
     }
   }
-  return units
+  return { units, skipped }
 }
 
 /** Chunks by both a unit count and a character budget: `site` has strings an
@@ -288,17 +327,24 @@ async function main() {
     process.exit(2)
   }
 
+  const skipUnused = !opt.all
+  const used = skipUnused ? usedL10nKeys() : null
+  if (skipUnused) console.log(`app references ${used.size} l10n keys; skipping the rest (--all to include them)`)
+
   let idBase = 0
   const files = []
+  let skipped = 0
   for (const m of modules) {
-    const units = collectUnits(m, idBase)
+    const units = collectUnits(m, idBase, used)
     if (!units) {
       console.warn(`skip ${m}: missing source or ${LANG} file`)
       continue
     }
-    idBase += units.length
-    files.push({ module: m, path: join(DEST_DIR, m, `${LANG}.xml`), units })
+    if (skipUnused) skipped += units.skipped
+    idBase += units.units.length
+    files.push({ module: m, path: join(DEST_DIR, m, `${LANG}.xml`), units: units.units })
   }
+  if (skipUnused) console.log(`skipped ${skipped} keys no screen reads`)
 
   const allUnits = files.flatMap((f) => f.units)
   const batches = chunk(allUnits)

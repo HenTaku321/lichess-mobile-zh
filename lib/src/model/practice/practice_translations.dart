@@ -16,11 +16,7 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 ///
 /// Applying it replaces the English in the parsed model, so every screen keeps reading
 /// `chapter.name` and `chapter.description` as before and none of them needs to know about it.
-class PracticeTranslations {
-  const PracticeTranslations(this._byEnglish);
-
-  final Map<String, String> _byEnglish;
-
+class const PracticeTranslations(final Map<String, String> _byEnglish) {
   /// Parses an overlay asset, or returns null when there is nothing usable in it.
   ///
   /// Unreadable input is not an error: the app is meant to run with the English text rather than

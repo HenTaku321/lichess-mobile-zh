@@ -122,6 +122,7 @@ flutter:
     - assets/positions.json
     - assets/endgames.json
     - assets/practice.json
+    - assets/practice.zh.json
 
   fonts:
     - family: LichessIcons

@@ -6,6 +6,7 @@ import 'package:lichess_mobile/l10n/l10n.dart';
 import 'package:lichess_mobile/src/model/common/chess.dart';
 import 'package:lichess_mobile/src/model/common/id.dart';
 import 'package:lichess_mobile/src/model/practice/practice_goal.dart';
+import 'package:lichess_mobile/src/model/practice/practice_translations.dart';
 
 part 'practice_structure.freezed.dart';
 
@@ -25,10 +26,15 @@ class PracticeStructure(final IList<PracticeSection> sections) {
         for (final chapter in study.chapters) chapter.id: study,
   };
 
-  /// Parses the practice asset.
-  factory fromJson(Map<String, dynamic> json) => PracticeStructure(
-    pick(json, 'sections').asListOrThrow((section) => PracticeSection.fromPick(section)).lock,
-  );
+  /// Parses the practice asset, replacing the chapter prose with [translations] when given.
+  factory fromJson(Map<String, dynamic> json, {PracticeTranslations? translations}) =>
+      PracticeStructure(
+        pick(json, 'sections')
+            .asListOrThrow(
+              (section) => PracticeSection.fromPick(section, translations: translations),
+            )
+            .lock,
+      );
 
   int get nbChapters => _studyOfChapter.length;
 
@@ -54,10 +60,12 @@ sealed class const PracticeSection._() with _$PracticeSection {
   const factory({required String id, required String name, required IList<PracticeStudy> studies}) =
       _PracticeSection;
 
-  factory fromPick(RequiredPick pick) => PracticeSection(
+  factory fromPick(RequiredPick pick, {PracticeTranslations? translations}) => PracticeSection(
     id: pick('id').asStringOrThrow(),
     name: pick('name').asStringOrThrow(),
-    studies: pick('studies').asListOrThrow((study) => PracticeStudy.fromPick(study)).lock,
+    studies: pick('studies')
+        .asListOrThrow((study) => PracticeStudy.fromPick(study, translations: translations))
+        .lock,
   );
 
   /// The translated [name], or [name] itself for a section the translations don't know.
@@ -83,12 +91,14 @@ sealed class const PracticeStudy._() with _$PracticeStudy {
     required IList<PracticeChapter> chapters,
   }) = _PracticeStudy;
 
-  factory fromPick(RequiredPick pick) => PracticeStudy(
+  factory fromPick(RequiredPick pick, {PracticeTranslations? translations}) => PracticeStudy(
     id: StudyId(pick('id').asStringOrThrow()),
     slug: pick('slug').asStringOrThrow(),
     name: pick('name').asStringOrThrow(),
     description: pick('description').asStringOrNull(),
-    chapters: pick('chapters').asListOrThrow((chapter) => PracticeChapter.fromPick(chapter)).lock,
+    chapters: pick('chapters')
+        .asListOrThrow((chapter) => PracticeChapter.fromPick(chapter, translations: translations))
+        .lock,
   );
 
   /// The translated [name], or [name] itself for a study the translations don't know.
@@ -222,26 +232,33 @@ sealed class const PracticeChapter._() with _$PracticeChapter {
     required String pgn,
   }) = PracticeLessonChapter;
 
-  factory fromPick(RequiredPick pick) {
+  factory fromPick(RequiredPick pick, {PracticeTranslations? translations}) {
     final id = StudyChapterId(pick('id').asStringOrThrow());
     final name = pick('name').asStringOrThrow();
     final fen = pick('fen').asStringOrThrow();
     final orientation = pick('orientation').asSideOrThrow();
     final description = pick('description').asStringOrNull();
+    // The overlay is content-addressed, so a string it does not know keeps its English, and a
+    // chapter without a description keeps having none.
+    final displayName = translations?.of(name) ?? name;
+    final displayDescription = translations?.of(description) ?? description;
     // Nulls are kept: the lists are indexed by ply.
-    IList<String?> perPly(String key) =>
-        pick(key)
-            .asListOrNull<String?>((ply) => ply.asStringOrThrow(), whenNull: (_) => null)
-            ?.lock ??
-        const IListConst([]);
+    IList<String?> perPly(String key) {
+      final english =
+          pick(key)
+              .asListOrNull<String?>((ply) => ply.asStringOrThrow(), whenNull: (_) => null)
+              ?.lock ??
+          const IListConst([]);
+      return translations?.ofList(english) ?? english;
+    }
 
     return switch (pick('kind').asStringOrThrow()) {
       'practice' => PracticeChapter.engine(
         id: id,
-        name: name,
+        name: displayName,
         fen: fen,
         orientation: orientation,
-        description: description,
+        description: displayDescription,
         goal: PracticeGoal.fromPick(pick('goal').required()),
         shapes:
             pick('shapes').asListOrNull((shape) {
@@ -253,20 +270,20 @@ sealed class const PracticeChapter._() with _$PracticeChapter {
       ),
       'gamebook' => PracticeChapter.gamebook(
         id: id,
-        name: name,
+        name: displayName,
         fen: fen,
         orientation: orientation,
-        description: description,
+        description: displayDescription,
         pgn: pick('pgn').asStringOrThrow(),
         hints: perPly('hints'),
         deviations: perPly('deviations'),
       ),
       'lesson' => PracticeChapter.lesson(
         id: id,
-        name: name,
+        name: displayName,
         fen: fen,
         orientation: orientation,
-        description: description,
+        description: displayDescription,
         pgn: pick('pgn').asStringOrThrow(),
       ),
       final kind => throw PickException(

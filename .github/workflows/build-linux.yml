@@ -1,0 +1,139 @@
+name: Build Linux desktop bundle
+
+# Produces a self-contained Linux desktop bundle (x86_64) from the same sources
+# as the unsigned IPA, for running the zh build on a Linux machine. Upstream
+# added the Linux target in cd9b8d1e6 ("Add Linux platform"), and the code
+# guards what does not exist there: Firebase is skipped in main.dart, the
+# database goes through sqflite_common_ffi, the sound service shells out. So it
+# builds and runs, with the mobile-only features off:
+#
+#   - no crash reporting or push (Firebase is not initialised)
+#   - no notifications, no home screen widgets
+#   - the browser sign-in does not work: flutter_appauth ships for Android, iOS
+#     and macOS only, and auth_repository.dart calls it unconditionally. Signing
+#     in goes through "Sign in with email" instead, which is plain HTTP
+#     (POST /auth/mobile-code/bearer) and never touches appauth.
+#
+# Started by hand, for the same reason as the iOS build: a push trigger means a
+# build per intermediate commit. See build-ios-unsigned.yml.
+#
+# The runner is x86_64 and so is the tarball. Flutter builds Linux desktop for
+# the host architecture only; there is no cross-compile flag for aarch64.
+#
+# Point the app at a translation proxy by setting repository *variables*
+# (Settings -> Secrets and variables -> Actions -> Variables), no code edit:
+#   LICHESS_HOST      e.g. lichess-zh.example.com        (default: lichess.org)
+#   LICHESS_WS_HOST   e.g. lichess-zh.example.com        (default: socket.lichess.org)
+#
+# The OAuth signed-client secret is NOT passed in from anywhere on GitHub, for
+# the same reason as the iOS build: anything the runner can see lives on GitHub
+# and ends up inside the published tarball either way, so the build bakes in the
+# placeholder below and the real value is swapped in locally, after download, by
+# patch-linux-secret.py (kept outside this repository, next to
+# patch-ipa-secret.py). The placeholder is exactly as long as the value that
+# replaces it on purpose: the Dart AOT snapshot stores the character count as a
+# Smi immediately before the characters, and an object cannot grow in place, so
+# equal length keeps the swap a pure byte replace.
+#
+# Published to its own rolling release (linux-latest) rather than the iOS one:
+# both workflows delete and recreate their release to keep exactly one asset, so
+# sharing the "latest" tag would mean each build erasing the other's download.
+
+on:
+  workflow_dispatch:
+
+# Not per-ref, like the iOS build: a newer dispatch cancels the one running,
+# so at most one Linux runner is active.
+concurrency:
+  group: build-linux-desktop
+  cancel-in-progress: true
+
+permissions:
+  contents: write # required to create/update the rolling release
+
+jobs:
+  linux:
+    name: Build Linux bundle
+    runs-on: ubuntu-latest
+    # A Linux build is short next to the iOS one (no SwiftPM graph, no Xcode);
+    # the cap is here so a wedged runner cannot hold the concurrency group.
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          cache: true
+          channel: stable
+          flutter-version-file: pubspec.yaml
+      - run: flutter --version
+
+      # Flutter's own Linux desktop requirements, plus what the plugins this app
+      # pulls in need to configure: flutter_secure_storage_linux asks pkg-config
+      # for secret-1 and jsoncpp, and sqflite_common_ffi wants libsqlite3 (test.yml
+      # installs the same pair).
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev \
+            libsecret-1-dev libjsoncpp-dev libsqlite3-0 libsqlite3-dev
+
+      - name: Enable the Linux desktop target
+        run: flutter config --enable-linux-desktop
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # Regenerates *.freezed.dart / *.g.dart.
+      - name: Code generation
+        run: dart run build_runner build
+
+      # `gen-arb.mjs` imports `colors`, `xml2js` and `js-yaml`, and upstream never
+      # runs it in CI, so nothing else installs them.
+      - name: Install translation script dependencies
+        run: npm ci --no-audit --no-fund
+        working-directory: scripts
+
+      # `translation/dest/**/<locale>.xml` is the source of truth for the ARBs:
+      # this fork edits the zh-CN XML files, so gen-arb must run BEFORE the build
+      # or the edits never reach the app. Same chain as the iOS build.
+      - name: Generate translations
+        run: ./scripts/gen-translations.sh
+
+      - name: Build (release)
+        run: |
+          flutter build linux --release \
+            --dart-define=LICHESS_HOST=${{ vars.LICHESS_HOST || 'lichess.org' }} \
+            --dart-define=LICHESS_WS_HOST=${{ vars.LICHESS_WS_HOST || 'socket.lichess.org' }} \
+            --dart-define=LICHESS_WS_SECRET=PLACEHOLDER_WS_SECRET_DO_NOT_USE
+
+      # The bundle is the whole app: the lichess_mobile binary, lib/ (libapp.so is
+      # the Dart AOT snapshot the secret is patched inside) and data/ with the
+      # assets, the zh practice overlay included. Renaming the top directory from
+      # 'bundle' to lichess-zh so it unpacks to something that says what it is.
+      - name: Pack bundle
+        run: |
+          set -euo pipefail
+          rm -rf out
+          mkdir -p out/lichess-zh
+          cp -R build/linux/x64/release/bundle/. out/lichess-zh/
+          (cd out && tar -czf lichess-zh-linux-x86_64.tar.gz lichess-zh)
+          rm -rf out/lichess-zh
+          ls -lh out/lichess-zh-linux-x86_64.tar.gz
+          sha256sum out/lichess-zh-linux-x86_64.tar.gz
+
+      # Publish to the rolling "linux-latest" release so exactly one tarball is kept.
+      - name: Publish to rolling GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release delete linux-latest --yes --cleanup-tag 2>/dev/null || true
+          gh release create linux-latest out/lichess-zh-linux-x86_64.tar.gz \
+            --title "Latest zh Linux desktop build" \
+            --notes "x86_64 desktop bundle from ${GITHUB_SHA::7}, triggered by ${GITHUB_EVENT_NAME}. Unpack and run lichess-zh/lichess_mobile." \
+            --prerelease \
+            --target "${GITHUB_SHA}"

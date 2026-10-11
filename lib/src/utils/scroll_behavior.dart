@@ -13,9 +13,7 @@ import 'package:material_ui/material_ui.dart';
 /// The mouse is added on every platform rather than behind a desktop check: a
 /// mouse is only ever attached to a desktop or to the web, so the check would
 /// spell out the same state at length, and a mouse on a phone should pan too.
-class AppScrollBehavior extends MaterialScrollBehavior {
-  const AppScrollBehavior();
-
+class const AppScrollBehavior() extends MaterialScrollBehavior {
   @override
   Set<PointerDeviceKind> get dragDevices => {...super.dragDevices, PointerDeviceKind.mouse};
 }

@@ -144,12 +144,22 @@ class PuzzleController(final PuzzleContext initialContext) extends Notifier<Puzz
         }
       } else {
         state = state.copyWith(feedback: PuzzleFeedback.bad);
-        _onFailOrWin(PuzzleResult.lose);
         if (initialContext.isPuzzleStreak != true) {
           final wrongPath = state.currentPath;
-          await Future<void>.delayed(const Duration(milliseconds: 500));
+          // [_onFailOrWin] records the attempt and fetches the next puzzle: a request to the
+          // server plus a write to the local session. On the desktop there is no native HTTP
+          // client, so setting a connection up runs on the platform thread (network/http.dart)
+          // and the frame animating the wrong move pays for it. Started here instead, it lands
+          // in the quiet pause before the board snaps back; the revert stays at 500ms.
+          await Future<void>.delayed(const Duration(milliseconds: 250));
+          _onFailOrWin(PuzzleResult.lose);
+          await Future<void>.delayed(const Duration(milliseconds: 250));
           _gameTree.deleteAt(wrongPath);
           _setPath(wrongPath.penultimate);
+        } else {
+          // The streak branch of [_onFailOrWin] plays the error sound and takes the board back
+          // straight away, so that one has to stay right behind the move.
+          _onFailOrWin(PuzzleResult.lose);
         }
       }
     }

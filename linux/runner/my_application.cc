@@ -48,7 +48,32 @@ static void my_application_activate(GApplication* application) {
     gtk_widget_show(GTK_WIDGET(header_bar));
     gtk_header_bar_set_title(header_bar, "Lichess");
     gtk_header_bar_set_show_close_button(header_bar, TRUE);
+    // show_close_button only says whether there is a close button at all. Which
+    // buttons exist is the decoration layout, which the header bar otherwise
+    // takes from the desktop -- and this app was coming up with a close button
+    // alone. Asking for all three explicitly does not depend on that setting
+    // reaching us.
+    gtk_header_bar_set_decoration_layout(header_bar, ":minimize,maximize,close");
     gtk_window_set_titlebar(window, GTK_WIDGET(header_bar));
+    // Pin the bar dark. Its color otherwise comes from whatever the GTK theme
+    // resolves to, which is the desktop's business, not the app's, and came out
+    // near-white over a dark app. APPLICATION priority beats the theme, so this
+    // stays dark whatever the theme does.
+    GtkCssProvider* provider = gtk_css_provider_new();
+    gtk_css_provider_load_from_data(
+        provider,
+        "headerbar, headerbar:backdrop {"
+        "  background-image: none;"
+        "  background-color: #262421;"
+        "  color: #e8e6e3;"
+        "  box-shadow: none;"
+        "  border: none;"
+        "}",
+        -1, nullptr);
+    gtk_style_context_add_provider_for_screen(
+        gtk_widget_get_screen(GTK_WIDGET(window)), GTK_STYLE_PROVIDER(provider),
+        GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+    g_object_unref(provider);
   } else {
     gtk_window_set_title(window, "Lichess");
   }

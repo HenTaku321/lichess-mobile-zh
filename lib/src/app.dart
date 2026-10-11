@@ -34,6 +34,7 @@ import 'package:lichess_mobile/src/tab_scaffold.dart';
 import 'package:lichess_mobile/src/theme.dart';
 import 'package:lichess_mobile/src/ui_event_coordinator.dart';
 import 'package:lichess_mobile/src/utils/screen.dart';
+import 'package:lichess_mobile/src/utils/scroll_behavior.dart';
 import 'package:material_ui/material_ui.dart';
 
 const String _kIosAppGroupId = 'group.org.lichess.mobileV2.LichessWidgets';
@@ -251,6 +252,7 @@ class _AppState() extends ConsumerState<Application> {
                   .copyWith(height: isShortVerticalScreen(context) ? 60 : null),
       ),
       home: const MainTabScaffold(),
+      scrollBehavior: const AppScrollBehavior(),
       navigatorObservers: [rootNavPageRouteObserver, rootNavRouteStackObserver],
     );
   }

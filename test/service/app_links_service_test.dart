@@ -994,6 +994,37 @@ void main() {
       expect(find.byType(BoardEditorScreen), findsOneWidget);
     });
 
+    // An author writing a study comment copies the address out of a browser, so
+    // the link carries the site the app is not built against. It is still the
+    // app's own content, and the study has a screen here.
+    testWidgets('routes a lichess.org content link to the in-app screen', (
+      WidgetTester tester,
+    ) async {
+      await triggerLinkifyOpen(tester, 'https://lichess.org/study/p9uY0321');
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.widget(find.byType(StudyScreen)),
+        isA<StudyScreen>()
+            .having((s) => s.options.id, 'id', 'p9uY0321')
+            .having((s) => s.options.initialChapter, 'initialChapter', isNull),
+      );
+    });
+
+    testWidgets('resolves a relative content link against lichess.org', (
+      WidgetTester tester,
+    ) async {
+      await triggerLinkifyOpen(tester, '/study/p9uY0321/abcd1234');
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.widget(find.byType(StudyScreen)),
+        isA<StudyScreen>()
+            .having((s) => s.options.id, 'id', 'p9uY0321')
+            .having((s) => s.options.initialChapter, 'initialChapter', 'abcd1234'),
+      );
+    });
+
     testWidgets('does not treat a host prefixed with the lichess host as first-party', (
       WidgetTester tester,
     ) async {

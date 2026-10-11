@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:lichess_mobile/src/model/broadcast/broadcast.dart';
 import 'package:lichess_mobile/src/model/broadcast/broadcast_providers.dart';
 import 'package:lichess_mobile/src/model/common/id.dart';
+import 'package:lichess_mobile/src/service/app_links_service.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/widgets/network_image.dart';
@@ -78,7 +79,7 @@ class const BroadcastOverviewTab({
                 data: description,
                 onTapLink: (text, url, title) {
                   if (url == null) return;
-                  launchUrl(Uri.https('lichess.org').resolve(url));
+                  ref.read(appLinksServiceProvider).openContentLink(context, url);
                 },
                 softLineBreak: true,
               ),

@@ -50,6 +50,11 @@ final _logger = Logger('AppLinks');
 const _kDailyPuzzleDeeplinkHost = 'training';
 const _kDailyPuzzleDeeplinkPath = 'daily';
 
+/// The site itself, as opposed to [kLichessHost], the server this build talks
+/// to. Links in content are written against this one: it is what a browser
+/// address bar shows and what an author copies.
+const _kLichessOrgHost = 'lichess.org';
+
 final appLinksServiceProvider = Provider<AppLinksService>((ref) {
   final service = AppLinksService(ref);
   ref.onDispose(() => service.dispose());
@@ -450,21 +455,74 @@ class AppLinksService(final Ref ref, {AppLinks? appLinks}) {
 
   static const kLichessLinkifiers = [UrlLinkifier(), EmailLinkifier(), UserTagLinkifier()];
 
-  /// Whether [url] is an http(s) URL whose parsed authority is exactly
-  /// [kLichessHost] — a prefix match would accept hosts like `lichess.dev.evil.com`.
-  static bool _isFirstPartyUrl(String url) {
-    final uri = Uri.tryParse(url);
-    if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) return false;
-    final expected = Uri.parse('${uri.scheme}://$kLichessHost');
+  /// Opens a link that was written by an author in content the app renders — a
+  /// study comment, a blog post, a broadcast or team description — the way the
+  /// app opens any other Lichess link: on the app's own screen when there is one
+  /// for that route, in the browser otherwise.
+  ///
+  /// An author writes links by hand, so they arrive in both shapes: the absolute
+  /// `https://lichess.org/study/...` one copied out of a browser, and the bare
+  /// `/study/...` one. Both are Lichess links — see [_isFirstPartyUri] — so
+  /// neither is handed to the browser while the app can show the study itself.
+  Future<void> openContentLink(BuildContext context, String url) async {
+    final uri = _contentUri(url);
+    if (uri == null) return;
+
+    if (_isFirstPartyUri(uri)) {
+      try {
+        // The fallback to the browser is inside: a Lichess link the app has no
+        // screen for — a forum page, an arbitrary article — ends up there.
+        await handleAppLink(context, uri);
+        return;
+      } catch (e, st) {
+        // A link is user-written text, so it can be malformed in ways the route
+        // resolution above does not expect. A browser is a better answer than an
+        // exception on the way to the user's finger.
+        _logger.info('Could not open content link $uri in the app:', e, st);
+      }
+    }
+
+    // The browser is the last resort, so a platform that cannot open one must not
+    // turn a tap on a link into an exception: the text stays readable, which is
+    // what the user was doing when they tapped it.
+    try {
+      if (context.mounted) await launchUrl(uri);
+    } catch (e, st) {
+      _logger.info('Could not open content link $uri in a browser:', e, st);
+    }
+  }
+
+  /// The absolute [Uri] a content link points at, or null if it is not a URL.
+  ///
+  /// A link that carries its own scheme is already absolute, whatever the scheme
+  /// is: http(s), a `mailto:` an author wrote, one the OS knows how to open. A
+  /// bare path — or a scheme-relative `//host/path` — is relative to lichess.org,
+  /// the site the content was published on.
+  static Uri? _contentUri(String url) {
+    final uri = Uri.tryParse(url.trim());
+    if (uri == null) return null;
+    if (uri.hasScheme) return uri;
+    if (uri.host.isEmpty && uri.path.isEmpty) return null;
+    return Uri.parse('https://$_kLichessOrgHost').resolveUri(uri);
+  }
+
+  /// Whether [uri] is an http(s) URL pointing at Lichess: the server this build
+  /// talks to, or lichess.org — the host authors write in their content, and the
+  /// one the deep link routes are written against.
+  ///
+  /// The comparison is on the parsed authority, so `lichess.org.evil.com` and
+  /// `lichess.org@evil.com` are not first party; a prefix match would accept them.
+  static bool _isFirstPartyUri(Uri uri) {
+    if (uri.scheme != 'http' && uri.scheme != 'https') return false;
+    if (uri.host == _kLichessOrgHost) return true;
+    final expected = Uri.parse('https://$kLichessHost');
     return uri.host == expected.host && uri.port == expected.port;
   }
 
   /// Handles link clicks in RichLinkText widgets throughout the app.
   Future<void> onLinkifyOpen(BuildContext context, LinkableElement link) async {
-    if (link is UrlElement && _isFirstPartyUrl(link.url)) {
-      // Handle Lichess links specifically
-      final appLinkUri = Uri.parse(link.url);
-      await handleAppLink(context, appLinkUri);
+    if (link is UrlElement) {
+      await openContentLink(context, link.url);
     } else if (link.originText.startsWith('@')) {
       final username = link.originText.substring(1);
       Navigator.of(context).push(

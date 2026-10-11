@@ -4,6 +4,7 @@ import 'package:lichess_mobile/src/model/blog/blog.dart';
 import 'package:lichess_mobile/src/model/blog/blog_post_content.dart';
 import 'package:lichess_mobile/src/model/blog/blog_repository.dart';
 import 'package:lichess_mobile/src/network/http.dart';
+import 'package:lichess_mobile/src/service/app_links_service.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
@@ -72,9 +73,9 @@ class const BlogPostScreen({required final BlogPost post, super.key}) extends Co
   }
 }
 
-class const _BlogPostBody({required final BlogPostContent content}) extends StatelessWidget {
+class const _BlogPostBody({required final BlogPostContent content}) extends ConsumerWidget {
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final imageUrl = content.imageUrl;
     return SingleChildScrollView(
       padding: Styles.bodyPadding,
@@ -100,7 +101,7 @@ class const _BlogPostBody({required final BlogPostContent content}) extends Stat
             softLineBreak: true,
             onTapLink: (text, url, title) {
               if (url == null) return;
-              launchUrl(Uri.https('lichess.org').resolve(url));
+              ref.read(appLinksServiceProvider).openContentLink(context, url);
             },
           ),
         ],

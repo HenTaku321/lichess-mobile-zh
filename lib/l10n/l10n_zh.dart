@@ -9,6 +9,9 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
+  String get mobileAbortTraining => '中止训练';
+
+  @override
   String get mobileAcceptDraw => '接受和棋？';
 
   @override
@@ -24,6 +27,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mobileAddToStudy => '添加到研习';
 
   @override
+  String get mobileAllBroadcasts => '全部转播';
+
+  @override
   String get mobileAllGames => '所有对局';
 
   @override
@@ -33,12 +39,24 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mobileAmoledBlack => 'Amoled 纯黑';
 
   @override
+  String get mobileAppLogs => '应用日志';
+
+  @override
   String get mobileAreYouSure => '您确定吗？';
 
   @override
   String mobileAreYouSureDownloadNnue(String param) {
     return '您确定要下载 NNUE 文件 ($param) 吗？';
   }
+
+  @override
+  String get mobileBackToPractice => '返回练习';
+
+  @override
+  String get mobileBlogLoadFailed => '无法加载这篇文章';
+
+  @override
+  String get mobileBlogNotTranslated => '这篇文章尚未翻译';
 
   @override
   String get mobileBoardPositionLandscape => '横屏模式下的棋盘位置';
@@ -59,7 +77,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mobileChallengeFromPosition => '从局面发起挑战';
 
   @override
+  String get mobileChangesWillBeLost => '您的更改将会丢失。';
+
+  @override
   String get mobileChapterName => '章节名称';
+
+  @override
+  String get mobileChess960Position => 'Chess960 局面';
 
   @override
   String get mobileChessEngine => '国际象棋引擎';
@@ -100,6 +124,33 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mobileDangerZone => '危险操作';
 
   @override
+  String get mobileDateRangeAll => '全部';
+
+  @override
+  String get mobileDateRangeOneMonth => '1月';
+
+  @override
+  String get mobileDateRangeOneWeek => '1周';
+
+  @override
+  String get mobileDateRangeOneYear => '1年';
+
+  @override
+  String get mobileDateRangeThreeMonths => '3月';
+
+  @override
+  String get mobileDeleteAllLogs => '删除全部日志';
+
+  @override
+  String get mobileDeleteConversation => '删除对话';
+
+  @override
+  String get mobileDeleteConversationConfirm => '您确定要删除此对话吗？';
+
+  @override
+  String get mobileDeleteUnusableNnueFiles => '删除无法使用的 NNUE 文件';
+
+  @override
   String get mobileDeleteYourAccount => '删除您的账户';
 
   @override
@@ -115,10 +166,25 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mobileDownloadMyGames => '下载我的对局';
 
   @override
+  String get mobileDownloadNnueFile => '下载 NNUE 文件';
+
+  @override
+  String get mobileDownloadingNnueFile => '正在下载 NNUE 文件';
+
+  @override
+  String get mobileEngineEvaluation => '引擎评估';
+
+  @override
   String get mobileFeedbackButton => '问题反馈';
 
   @override
+  String get mobileFilterBroadcasts => '筛选转播';
+
+  @override
   String get mobileFilters => '筛选';
+
+  @override
+  String get mobileFlip => '翻转';
 
   @override
   String get mobileFlipClock => '翻转计时器';
@@ -127,7 +193,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mobileFlipPiecesAfterMove => '走棋后翻转棋子和对手信息';
 
   @override
+  String get mobileGamePoints => '局分';
+
+  @override
+  String get mobileGeneratingGif => '正在生成 GIF...';
+
+  @override
   String get mobileGetFeedbackOnMoves => '获取着法反馈';
+
+  @override
+  String get mobileGifAlmostThere => '快好了！正在完成 GIF...';
+
+  @override
+  String get mobileGifLongGamesTakeLonger => '长对局需要多等一会儿...';
+
+  @override
+  String get mobileGoToTheNextGame => '转到下一局';
 
   @override
   String mobileGoodDay(String param) {
@@ -152,7 +233,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mobileHello => '您好';
 
   @override
+  String get mobileHideEvaluation => '隐藏评估';
+
+  @override
   String get mobileHomeTab => '首页';
+
+  @override
+  String get mobileHttpLogs => 'HTTP 日志';
 
   @override
   String mobileIfAccountMatchesCodeSent(String param1, String param2) {
@@ -160,13 +247,37 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get mobileIndexing => '正在建立索引';
+
+  @override
   String get mobileInvalidOrExpiredLoginCode => '验证码无效或已过期！';
+
+  @override
+  String get mobileJoinTeams => '加入团队';
+
+  @override
+  String get mobileLesson => '课程';
 
   @override
   String get mobileLiveStreamers => '主播';
 
   @override
+  String get mobileLoadMore => '加载更多';
+
+  @override
   String get mobileLocalDatabaseSize => '本地数据库大小';
+
+  @override
+  String get mobileLossOrFiftyMoveDraw => '负或50回合和棋';
+
+  @override
+  String get mobileMatchPoints => '场分';
+
+  @override
+  String get mobileMaxIdIs959 => '最大编号为 959';
+
+  @override
+  String get mobileMessageCopied => '消息已复制。';
 
   @override
   String get mobileMoveOnRelease => '松开时走棋';
@@ -184,16 +295,55 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mobileNewGame => '新的对局';
 
   @override
+  String get mobileNextExercise => '下一题';
+
+  @override
   String get mobileNextMistake => '下一个错着';
+
+  @override
+  String get mobileNextToPlay => '待行棋方';
+
+  @override
+  String get mobileNoGamesMatchingFilter => '没有符合筛选条件的对局。';
+
+  @override
+  String get mobileNoMorePuzzlesGoOnline => '没有更多谜题了，请联网获取更多。';
+
+  @override
+  String get mobileNoMorePuzzlesToReplay => '没有更多可重做的谜题了。';
+
+  @override
+  String get mobileNoPuzzlesGoOnline => '暂无谜题，请联网获取。';
+
+  @override
+  String get mobileNoPuzzlesToReplay => '没有可重做的谜题。';
 
   @override
   String get mobileNoSearchResults => '无结果';
 
   @override
+  String get mobileNoServerAnalysisAvailable => '没有可用的服务器分析';
+
+  @override
+  String get mobileNoUpdatesYetInChannel => '此频道暂无动态';
+
+  @override
+  String get mobileNoneOfYourTeamsInTournament => '您的团队均未参加本次锦标赛';
+
+  @override
   String get mobileNotFollowingAnyUser => '您尚未关注任何用户';
 
   @override
+  String get mobileNothingToPaste => '剪贴板为空，没有可粘贴的内容';
+
+  @override
   String get mobileOkButton => '确定';
+
+  @override
+  String get mobileOpenInBrowser => '在浏览器中打开';
+
+  @override
+  String get mobileOpeningExplorerNotAvailable => '开局探索不可用。';
 
   @override
   String get mobileOpeningExplorerNotAvailableOffline => '离线状态下无法使用开局探索器';
@@ -264,19 +414,43 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get mobilePositionId => '局面编号（0-959）';
+
+  @override
   String get mobilePositionLeft => '左侧';
 
   @override
   String get mobilePositionRight => '右侧';
 
   @override
+  String get mobilePracticeGoalMate => '将杀对手';
+
+  @override
+  String get mobilePracticeGoalPromotion => '安全升变你的兵';
+
+  @override
+  String get mobilePracticeSuccess => '成功！';
+
+  @override
   String get mobilePracticeMode => '练习模式';
+
+  @override
+  String get mobilePracticeModeNoClock => '练习模式不计时。';
+
+  @override
+  String get mobilePracticeSettings => '练习设置';
 
   @override
   String get mobilePrefMagnifyDraggedPiece => '放大拖动的棋子';
 
   @override
+  String get mobilePreviousMove => '上一着';
+
+  @override
   String get mobilePreviousPage => '上一页';
+
+  @override
+  String get mobilePreviousPuzzle => '上一题';
 
   @override
   String get mobilePuzzleStormConfirmEndRun => '您想结束本轮挑战吗？';
@@ -304,6 +478,21 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get mobileRemoveBookmark => '移除书签';
+
+  @override
+  String get mobileResult => '结果';
+
+  @override
+  String get mobileReviewPastAttempts => '回顾您过去的解题记录。';
+
+  @override
+  String get mobileRound => '轮次';
+
+  @override
+  String get mobileSelectALichessPlayer => '选择一位 Lichess 棋手';
+
+  @override
+  String get mobileSelectALichessPlayerInSettings => '请在设置中选择一位 Lichess 棋手。';
 
   @override
   String get mobileSelectAStudy => '选择研习';
@@ -390,6 +579,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mobileSettingsTouchFeedbackSubtitle => '启用后，移动或吃子时设备将短暂振动。';
 
   @override
+  String get mobileShapeColorBlue => '蓝色';
+
+  @override
+  String get mobileShapeColorGreen => '绿色';
+
+  @override
+  String get mobileShapeColorRed => '红色';
+
+  @override
+  String get mobileShapeColorYellow => '黄色';
+
+  @override
   String get mobileShareChallengeUrl => '分享挑战链接';
 
   @override
@@ -405,7 +606,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mobileSharePositionAsFEN => '分享 FEN 对局代码';
 
   @override
+  String get mobileShareProfile => '分享个人资料';
+
+  @override
   String get mobileSharePuzzle => '分享此谜题';
+
+  @override
+  String get mobileShareTournament => '分享锦标赛';
 
   @override
   String get mobileShowComments => '显示评论';
@@ -435,7 +642,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mobileSomethingWentWrong => '出现错误';
 
   @override
+  String get mobileSortBy => '排序方式';
+
+  @override
   String get mobileSortFriends => '好友排序';
+
+  @override
+  String get mobileSortOpenings => '开局排序';
+
+  @override
+  String get mobileSortStudies => '研习排序';
+
+  @override
+  String get mobileStopLiking => '取消点赞';
 
   @override
   String get mobileStopShowingThreat => '停止显示威胁';
@@ -447,7 +666,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mobileTablebaseOffline => '残局库在离线状态下不可用！';
 
   @override
+  String get mobileTapToFetchPuzzles => '点击获取新谜题。';
+
+  @override
+  String get mobileTapToRefresh => '点击刷新';
+
+  @override
+  String get mobileTeamStandings => '团队排名';
+
+  @override
   String get mobileTheme => '主题';
+
+  @override
+  String get mobileTieBreaking => '破同分';
+
+  @override
+  String get mobileToggleSound => '声音开关';
 
   @override
   String get mobileTooManyLoginAttempts => '尝试次数过多，请稍后重试。';
@@ -462,6 +696,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String mobileUnsupportedVariant(String param) {
     return '此版本不支持 $param 变体';
   }
+
+  @override
+  String get mobileUnusableNnueFilesExplanation => '此设备上有一些 NNUE 文件无法被引擎使用。删除它们可以释放存储空间，之后您可以重新下载。';
+
+  @override
+  String get mobileUpdatesFromTeams => '您加入的团队动态将显示在这里。';
 
   @override
   String get mobileUseSymmetricPieces => '使用对称的棋子';
@@ -482,7 +722,60 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mobileWeWillEmailYouCode => '我们将通过邮件向您发送用于登录的验证码。';
 
   @override
+  String get mobileWinOrFiftyMoveDraw => '胜或50回合和棋';
+
+  @override
   String get mobileYouCannotChallengeYourself => '您无法向自己发起挑战';
+
+  @override
+  String mobilePracticeGoalDefendIn(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '再防守 $count 步',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String mobilePracticeGoalDrawIn(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '再守和 $count 步',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String mobilePracticeGoalEqualIn(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '在 $count 步内取得均势',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String mobilePracticeGoalMateIn(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '在 $count 步内将杀对手',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String mobilePracticeGoalWinIn(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '在 $count 步内取得胜势',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get activityActivity => '动态';

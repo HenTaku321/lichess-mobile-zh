@@ -134,6 +134,24 @@
   <string name="positionId" comment="Label of the field where the user types a Chess960 position number.">局面编号（0-959）</string>
   <string name="positionLeft" comment="Appears in the board settings screen to indicate clock position.">左侧</string>
   <string name="positionRight" comment="Appears in the board settings screen to indicate clock position.">右侧</string>
+  <plurals name="practiceGoalDefendIn" comment="Practice goal of a practice chapter: the position is worse and the player must hold out. %s is the number of moves left to hold.">
+    <item quantity="other">再防守 %s 步</item>
+  </plurals>
+  <plurals name="practiceGoalDrawIn" comment="Practice goal of a practice chapter: the position is drawn and the player must keep it drawn. %s is the number of moves left to hold it.">
+    <item quantity="other">再守和 %s 步</item>
+  </plurals>
+  <plurals name="practiceGoalEqualIn" comment="Practice goal of a practice chapter: the position is worse and the player must make it equal. %s is the number of moves left to do it in.">
+    <item quantity="other">在 %s 步内取得均势</item>
+  </plurals>
+  <string name="practiceGoalMate" comment="Practice goal of a practice chapter with no move limit: mate the opponent at some point. Shown in the list of chapters and on the board.">将杀对手</string>
+  <plurals name="practiceGoalMateIn" comment="Practice goal of a practice chapter: mate the opponent within a limited number of moves. %s is the number of moves left to mate in.">
+    <item quantity="other">在 %s 步内将杀对手</item>
+  </plurals>
+  <string name="practiceGoalPromotion" comment="Practice goal of a practice chapter: promote a pawn, but to a piece that keeps the position won.">安全升变你的兵</string>
+  <plurals name="practiceGoalWinIn" comment="Practice goal of a practice chapter: the position is better and the player must keep it winning. %s is the number of moves left to do it in.">
+    <item quantity="other">在 %s 步内取得胜势</item>
+  </plurals>
+  <string name="practiceSuccess" comment="Shown on the board once the goal of a practice chapter has been reached.">成功！</string>
   <string name="practiceMode" comment="Offline computer game setting that enables practice mode.">练习模式</string>
   <string name="practiceModeNoClock" comment="Shown in the offline practice settings: practice games are not timed.">练习模式不计时。</string>
   <string name="practiceSettings" comment="Title of the offline practice settings section.">练习设置</string>

@@ -9,6 +9,9 @@ class AppLocalizationsEs extends AppLocalizations {
   AppLocalizationsEs([String locale = 'es']) : super(locale);
 
   @override
+  String get mobileAbortTraining => 'Abort Training';
+
+  @override
   String get mobileAcceptDraw => '¿Aceptar tablas?';
 
   @override
@@ -24,6 +27,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get mobileAddToStudy => 'Añadir al estudio';
 
   @override
+  String get mobileAllBroadcasts => 'All broadcasts';
+
+  @override
   String get mobileAllGames => 'Todas las partidas';
 
   @override
@@ -33,12 +39,24 @@ class AppLocalizationsEs extends AppLocalizations {
   String get mobileAmoledBlack => 'Negro Amoled';
 
   @override
+  String get mobileAppLogs => 'App Logs';
+
+  @override
   String get mobileAreYouSure => '¿Estás seguro?';
 
   @override
   String mobileAreYouSureDownloadNnue(String param) {
     return '¿Estás seguro de que deseas descargar el archivo NNUE ($param)?';
   }
+
+  @override
+  String get mobileBackToPractice => 'Back to practice';
+
+  @override
+  String get mobileBlogLoadFailed => 'Could not load this post.';
+
+  @override
+  String get mobileBlogNotTranslated => 'This post is not translated yet.';
 
   @override
   String get mobileBoardPositionLandscape => 'Posición del tablero en modo horizontal';
@@ -59,7 +77,13 @@ class AppLocalizationsEs extends AppLocalizations {
   String get mobileChallengeFromPosition => 'Desafío desde la posición';
 
   @override
+  String get mobileChangesWillBeLost => 'Your changes will be lost.';
+
+  @override
   String get mobileChapterName => 'Nombre del capítulo';
+
+  @override
+  String get mobileChess960Position => 'Chess960 Position';
 
   @override
   String get mobileChessEngine => 'Motor de ajedrez';
@@ -100,6 +124,33 @@ class AppLocalizationsEs extends AppLocalizations {
   String get mobileDangerZone => 'Zona de riesgo';
 
   @override
+  String get mobileDateRangeAll => 'ALL';
+
+  @override
+  String get mobileDateRangeOneMonth => '1M';
+
+  @override
+  String get mobileDateRangeOneWeek => '1W';
+
+  @override
+  String get mobileDateRangeOneYear => '1Y';
+
+  @override
+  String get mobileDateRangeThreeMonths => '3M';
+
+  @override
+  String get mobileDeleteAllLogs => 'Delete all logs';
+
+  @override
+  String get mobileDeleteConversation => 'Delete conversation';
+
+  @override
+  String get mobileDeleteConversationConfirm => 'Are you sure you want to delete this conversation?';
+
+  @override
+  String get mobileDeleteUnusableNnueFiles => 'Delete unusable NNUE files';
+
+  @override
   String get mobileDeleteYourAccount => 'Eliminar tu cuenta';
 
   @override
@@ -115,10 +166,25 @@ class AppLocalizationsEs extends AppLocalizations {
   String get mobileDownloadMyGames => 'Descargar todas mis partidas';
 
   @override
+  String get mobileDownloadNnueFile => 'Download NNUE file';
+
+  @override
+  String get mobileDownloadingNnueFile => 'Downloading NNUE file';
+
+  @override
+  String get mobileEngineEvaluation => 'Engine evaluation';
+
+  @override
   String get mobileFeedbackButton => 'Contacto';
 
   @override
+  String get mobileFilterBroadcasts => 'Filter broadcasts';
+
+  @override
   String get mobileFilters => 'Filtros';
+
+  @override
+  String get mobileFlip => 'Flip';
 
   @override
   String get mobileFlipClock => 'Voltear reloj';
@@ -127,7 +193,22 @@ class AppLocalizationsEs extends AppLocalizations {
   String get mobileFlipPiecesAfterMove => 'Invertir piezas e información del oponente después de mover';
 
   @override
+  String get mobileGamePoints => 'GP';
+
+  @override
+  String get mobileGeneratingGif => 'Generating GIF...';
+
+  @override
   String get mobileGetFeedbackOnMoves => 'Obtén comentarios sobre tus movimientos';
+
+  @override
+  String get mobileGifAlmostThere => 'Almost there! Finalizing the GIF...';
+
+  @override
+  String get mobileGifLongGamesTakeLonger => 'Long games take a bit more time...';
+
+  @override
+  String get mobileGoToTheNextGame => 'Go to the next game';
 
   @override
   String mobileGoodDay(String param) {
@@ -152,7 +233,13 @@ class AppLocalizationsEs extends AppLocalizations {
   String get mobileHello => 'Hola';
 
   @override
+  String get mobileHideEvaluation => 'Hide evaluation';
+
+  @override
   String get mobileHomeTab => 'Inicio';
+
+  @override
+  String get mobileHttpLogs => 'HTTP logs';
 
   @override
   String mobileIfAccountMatchesCodeSent(String param1, String param2) {
@@ -160,13 +247,37 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String get mobileIndexing => 'Indexing';
+
+  @override
   String get mobileInvalidOrExpiredLoginCode => 'Este código no es válido o ha caducado.';
+
+  @override
+  String get mobileJoinTeams => 'Join teams';
+
+  @override
+  String get mobileLesson => 'Lesson';
 
   @override
   String get mobileLiveStreamers => 'Presentadores en vivo';
 
   @override
+  String get mobileLoadMore => 'Load more';
+
+  @override
   String get mobileLocalDatabaseSize => 'Tamaño de base de datos local';
+
+  @override
+  String get mobileLossOrFiftyMoveDraw => 'Loss or 50 move draw';
+
+  @override
+  String get mobileMatchPoints => 'MP';
+
+  @override
+  String get mobileMaxIdIs959 => 'Max ID is 959';
+
+  @override
+  String get mobileMessageCopied => 'Message copied.';
 
   @override
   String get mobileMoveOnRelease => 'Mover al soltar';
@@ -184,16 +295,55 @@ class AppLocalizationsEs extends AppLocalizations {
   String get mobileNewGame => 'Nueva Partida';
 
   @override
+  String get mobileNextExercise => 'Next exercise';
+
+  @override
   String get mobileNextMistake => 'Siguiente error';
+
+  @override
+  String get mobileNextToPlay => 'Next to play';
+
+  @override
+  String get mobileNoGamesMatchingFilter => 'No games matching filter criteria.';
+
+  @override
+  String get mobileNoMorePuzzlesGoOnline => 'No more puzzles. Go online to get more.';
+
+  @override
+  String get mobileNoMorePuzzlesToReplay => 'No more puzzles to replay.';
+
+  @override
+  String get mobileNoPuzzlesGoOnline => 'No puzzles available, please go online to fetch them.';
+
+  @override
+  String get mobileNoPuzzlesToReplay => 'No puzzles to replay.';
 
   @override
   String get mobileNoSearchResults => 'Sin resultados';
 
   @override
+  String get mobileNoServerAnalysisAvailable => 'No server analysis available';
+
+  @override
+  String get mobileNoUpdatesYetInChannel => 'No updates yet in this channel';
+
+  @override
+  String get mobileNoneOfYourTeamsInTournament => 'None of your teams are participating in this tournament';
+
+  @override
   String get mobileNotFollowingAnyUser => 'No sigues a ningún usuario.';
 
   @override
+  String get mobileNothingToPaste => 'Nothing to paste: the clipboard is empty';
+
+  @override
   String get mobileOkButton => 'Aceptar';
+
+  @override
+  String get mobileOpenInBrowser => 'Open in browser';
+
+  @override
+  String get mobileOpeningExplorerNotAvailable => 'Opening explorer not available.';
 
   @override
   String get mobileOpeningExplorerNotAvailableOffline => 'El explorador de aperturas no está disponible sin conexión.';
@@ -264,19 +414,43 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String get mobilePositionId => 'Position ID (0-959)';
+
+  @override
   String get mobilePositionLeft => 'A la izquierda';
 
   @override
   String get mobilePositionRight => 'A la derecha';
 
   @override
+  String get mobilePracticeGoalMate => 'Checkmate the opponent';
+
+  @override
+  String get mobilePracticeGoalPromotion => 'Safely promote your pawn';
+
+  @override
+  String get mobilePracticeSuccess => 'Success!';
+
+  @override
   String get mobilePracticeMode => 'Modo de práctica';
+
+  @override
+  String get mobilePracticeModeNoClock => 'Practice mode is played without a clock.';
+
+  @override
+  String get mobilePracticeSettings => 'Practice settings';
 
   @override
   String get mobilePrefMagnifyDraggedPiece => 'Aumentar la pieza arrastrada';
 
   @override
+  String get mobilePreviousMove => 'Previous';
+
+  @override
   String get mobilePreviousPage => 'Anterior';
+
+  @override
+  String get mobilePreviousPuzzle => 'Previous';
 
   @override
   String get mobilePuzzleStormConfirmEndRun => '¿Quieres terminar esta ronda?';
@@ -304,6 +478,21 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get mobileRemoveBookmark => 'Borrar marcador';
+
+  @override
+  String get mobileResult => 'Result';
+
+  @override
+  String get mobileReviewPastAttempts => 'Review your past puzzle attempts.';
+
+  @override
+  String get mobileRound => 'Round';
+
+  @override
+  String get mobileSelectALichessPlayer => 'Select a Lichess player';
+
+  @override
+  String get mobileSelectALichessPlayerInSettings => 'Select a Lichess player in the settings.';
 
   @override
   String get mobileSelectAStudy => 'Selecciona un estudio';
@@ -390,6 +579,18 @@ class AppLocalizationsEs extends AppLocalizations {
   String get mobileSettingsTouchFeedbackSubtitle => 'Si está activa, el dispositivo vibrará brevemente cuando muevas o captures una pieza.';
 
   @override
+  String get mobileShapeColorBlue => 'Blue';
+
+  @override
+  String get mobileShapeColorGreen => 'Green';
+
+  @override
+  String get mobileShapeColorRed => 'Red';
+
+  @override
+  String get mobileShapeColorYellow => 'Yellow';
+
+  @override
   String get mobileShareChallengeUrl => 'Compartir enlace del desafío';
 
   @override
@@ -405,7 +606,13 @@ class AppLocalizationsEs extends AppLocalizations {
   String get mobileSharePositionAsFEN => 'Compartir la posición como FEN';
 
   @override
+  String get mobileShareProfile => 'Share profile';
+
+  @override
   String get mobileSharePuzzle => 'Compartir este ejercicio';
+
+  @override
+  String get mobileShareTournament => 'Share tournament';
 
   @override
   String get mobileShowComments => 'Mostrar comentarios';
@@ -435,7 +642,19 @@ class AppLocalizationsEs extends AppLocalizations {
   String get mobileSomethingWentWrong => 'Algo ha fallado.';
 
   @override
+  String get mobileSortBy => 'Sort by';
+
+  @override
   String get mobileSortFriends => 'Ordenar amigos';
+
+  @override
+  String get mobileSortOpenings => 'Sort openings';
+
+  @override
+  String get mobileSortStudies => 'Sort studies';
+
+  @override
+  String get mobileStopLiking => 'Stop liking';
 
   @override
   String get mobileStopShowingThreat => 'Dejar de mostrar amenaza';
@@ -447,7 +666,22 @@ class AppLocalizationsEs extends AppLocalizations {
   String get mobileTablebaseOffline => 'La base de finales no está disponible sin conexión.';
 
   @override
+  String get mobileTapToFetchPuzzles => 'Tap to fetch new puzzles.';
+
+  @override
+  String get mobileTapToRefresh => 'Tap to refresh';
+
+  @override
+  String get mobileTeamStandings => 'Team Standings';
+
+  @override
   String get mobileTheme => 'Tema';
+
+  @override
+  String get mobileTieBreaking => 'Tie-breaking';
+
+  @override
+  String get mobileToggleSound => 'Toggle sound';
 
   @override
   String get mobileTooManyLoginAttempts => 'Demasiados intentos. Vuelve a intentarlo más tarde.';
@@ -462,6 +696,12 @@ class AppLocalizationsEs extends AppLocalizations {
   String mobileUnsupportedVariant(String param) {
     return 'La variante $param no es compatible con esta versión.';
   }
+
+  @override
+  String get mobileUnusableNnueFilesExplanation => 'Some NNUE files on this device cannot be used by the engine. Deleting them frees up space and lets you download them again.';
+
+  @override
+  String get mobileUpdatesFromTeams => 'Updates from teams you join will appear here.';
 
   @override
   String get mobileUseSymmetricPieces => 'Usar piezas simétricas';
@@ -482,7 +722,65 @@ class AppLocalizationsEs extends AppLocalizations {
   String get mobileWeWillEmailYouCode => 'Te enviaremos un código para iniciar sesión.';
 
   @override
+  String get mobileWinOrFiftyMoveDraw => 'Win or 50 move draw';
+
+  @override
   String get mobileYouCannotChallengeYourself => 'No puedes desafiarte a ti mismo';
+
+  @override
+  String mobilePracticeGoalDefendIn(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Defend for $count more moves',
+      one: 'Defend for $count more move',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String mobilePracticeGoalDrawIn(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Hold the draw for $count more moves',
+      one: 'Hold the draw for $count more move',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String mobilePracticeGoalEqualIn(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Equalize in $count moves',
+      one: 'Equalize in $count move',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String mobilePracticeGoalMateIn(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Checkmate the opponent in $count moves',
+      one: 'Checkmate the opponent in $count move',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String mobilePracticeGoalWinIn(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Get a winning position in $count moves',
+      one: 'Get a winning position in $count move',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get activityActivity => 'Actividad';

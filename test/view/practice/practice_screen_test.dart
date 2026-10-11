@@ -285,13 +285,13 @@ void main() {
     await tester.pumpWidget(app);
     await tester.pump();
 
-    expect(find.text('Checkmate the opponent in 1 move'), findsOneWidget);
+    expect(find.text(l10n.mobilePracticeGoalMateIn(1)), findsOneWidget);
     expect(find.text('Deliver mate.'), findsOneWidget);
 
     await playMove(tester, 'h2', 'h8');
     await tester.pump();
 
-    expect(find.text('Success!'), findsOneWidget);
+    expect(find.text(l10n.mobilePracticeSuccess), findsOneWidget);
     expect(find.text('Next exercise'), findsNothing, reason: 'the last chapter of its study');
     expect(find.text('Back to practice'), findsOneWidget);
 

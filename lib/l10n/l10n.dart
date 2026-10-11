@@ -196,6 +196,12 @@ abstract class AppLocalizations {
     Locale('zh', 'TW')
   ];
 
+  /// No description provided for @mobileAbortTraining.
+  ///
+  /// In en, this message translates to:
+  /// **'Abort Training'**
+  String get mobileAbortTraining;
+
   /// No description provided for @mobileAcceptDraw.
   ///
   /// In en, this message translates to:
@@ -226,6 +232,12 @@ abstract class AppLocalizations {
   /// **'Add to study'**
   String get mobileAddToStudy;
 
+  /// No description provided for @mobileAllBroadcasts.
+  ///
+  /// In en, this message translates to:
+  /// **'All broadcasts'**
+  String get mobileAllBroadcasts;
+
   /// No description provided for @mobileAllGames.
   ///
   /// In en, this message translates to:
@@ -244,6 +256,12 @@ abstract class AppLocalizations {
   /// **'Amoled black'**
   String get mobileAmoledBlack;
 
+  /// No description provided for @mobileAppLogs.
+  ///
+  /// In en, this message translates to:
+  /// **'App Logs'**
+  String get mobileAppLogs;
+
   /// No description provided for @mobileAreYouSure.
   ///
   /// In en, this message translates to:
@@ -255,6 +273,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Are you sure you want to download the NNUE file ({param})?'**
   String mobileAreYouSureDownloadNnue(String param);
+
+  /// No description provided for @mobileBackToPractice.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to practice'**
+  String get mobileBackToPractice;
+
+  /// No description provided for @mobileBlogLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load this post.'**
+  String get mobileBlogLoadFailed;
+
+  /// No description provided for @mobileBlogNotTranslated.
+  ///
+  /// In en, this message translates to:
+  /// **'This post is not translated yet.'**
+  String get mobileBlogNotTranslated;
 
   /// No description provided for @mobileBoardPositionLandscape.
   ///
@@ -292,11 +328,23 @@ abstract class AppLocalizations {
   /// **'Challenge from position'**
   String get mobileChallengeFromPosition;
 
+  /// No description provided for @mobileChangesWillBeLost.
+  ///
+  /// In en, this message translates to:
+  /// **'Your changes will be lost.'**
+  String get mobileChangesWillBeLost;
+
   /// No description provided for @mobileChapterName.
   ///
   /// In en, this message translates to:
   /// **'Chapter Name'**
   String get mobileChapterName;
+
+  /// No description provided for @mobileChess960Position.
+  ///
+  /// In en, this message translates to:
+  /// **'Chess960 Position'**
+  String get mobileChess960Position;
 
   /// No description provided for @mobileChessEngine.
   ///
@@ -370,6 +418,60 @@ abstract class AppLocalizations {
   /// **'Danger zone'**
   String get mobileDangerZone;
 
+  /// No description provided for @mobileDateRangeAll.
+  ///
+  /// In en, this message translates to:
+  /// **'ALL'**
+  String get mobileDateRangeAll;
+
+  /// No description provided for @mobileDateRangeOneMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'1M'**
+  String get mobileDateRangeOneMonth;
+
+  /// No description provided for @mobileDateRangeOneWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'1W'**
+  String get mobileDateRangeOneWeek;
+
+  /// No description provided for @mobileDateRangeOneYear.
+  ///
+  /// In en, this message translates to:
+  /// **'1Y'**
+  String get mobileDateRangeOneYear;
+
+  /// No description provided for @mobileDateRangeThreeMonths.
+  ///
+  /// In en, this message translates to:
+  /// **'3M'**
+  String get mobileDateRangeThreeMonths;
+
+  /// No description provided for @mobileDeleteAllLogs.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete all logs'**
+  String get mobileDeleteAllLogs;
+
+  /// No description provided for @mobileDeleteConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete conversation'**
+  String get mobileDeleteConversation;
+
+  /// No description provided for @mobileDeleteConversationConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete this conversation?'**
+  String get mobileDeleteConversationConfirm;
+
+  /// No description provided for @mobileDeleteUnusableNnueFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete unusable NNUE files'**
+  String get mobileDeleteUnusableNnueFiles;
+
   /// No description provided for @mobileDeleteYourAccount.
   ///
   /// In en, this message translates to:
@@ -400,17 +502,47 @@ abstract class AppLocalizations {
   /// **'Download my games'**
   String get mobileDownloadMyGames;
 
+  /// No description provided for @mobileDownloadNnueFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Download NNUE file'**
+  String get mobileDownloadNnueFile;
+
+  /// No description provided for @mobileDownloadingNnueFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading NNUE file'**
+  String get mobileDownloadingNnueFile;
+
+  /// No description provided for @mobileEngineEvaluation.
+  ///
+  /// In en, this message translates to:
+  /// **'Engine evaluation'**
+  String get mobileEngineEvaluation;
+
   /// No description provided for @mobileFeedbackButton.
   ///
   /// In en, this message translates to:
   /// **'Feedback'**
   String get mobileFeedbackButton;
 
+  /// No description provided for @mobileFilterBroadcasts.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter broadcasts'**
+  String get mobileFilterBroadcasts;
+
   /// No description provided for @mobileFilters.
   ///
   /// In en, this message translates to:
   /// **'Filters'**
   String get mobileFilters;
+
+  /// No description provided for @mobileFlip.
+  ///
+  /// In en, this message translates to:
+  /// **'Flip'**
+  String get mobileFlip;
 
   /// No description provided for @mobileFlipClock.
   ///
@@ -424,11 +556,41 @@ abstract class AppLocalizations {
   /// **'Flip pieces and opponent info after move'**
   String get mobileFlipPiecesAfterMove;
 
+  /// No description provided for @mobileGamePoints.
+  ///
+  /// In en, this message translates to:
+  /// **'GP'**
+  String get mobileGamePoints;
+
+  /// No description provided for @mobileGeneratingGif.
+  ///
+  /// In en, this message translates to:
+  /// **'Generating GIF...'**
+  String get mobileGeneratingGif;
+
   /// No description provided for @mobileGetFeedbackOnMoves.
   ///
   /// In en, this message translates to:
   /// **'Get feedback on your moves'**
   String get mobileGetFeedbackOnMoves;
+
+  /// No description provided for @mobileGifAlmostThere.
+  ///
+  /// In en, this message translates to:
+  /// **'Almost there! Finalizing the GIF...'**
+  String get mobileGifAlmostThere;
+
+  /// No description provided for @mobileGifLongGamesTakeLonger.
+  ///
+  /// In en, this message translates to:
+  /// **'Long games take a bit more time...'**
+  String get mobileGifLongGamesTakeLonger;
+
+  /// No description provided for @mobileGoToTheNextGame.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to the next game'**
+  String get mobileGoToTheNextGame;
 
   /// No description provided for @mobileGoodDay.
   ///
@@ -466,11 +628,23 @@ abstract class AppLocalizations {
   /// **'Hello'**
   String get mobileHello;
 
+  /// No description provided for @mobileHideEvaluation.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide evaluation'**
+  String get mobileHideEvaluation;
+
   /// No description provided for @mobileHomeTab.
   ///
   /// In en, this message translates to:
   /// **'Home'**
   String get mobileHomeTab;
+
+  /// No description provided for @mobileHttpLogs.
+  ///
+  /// In en, this message translates to:
+  /// **'HTTP logs'**
+  String get mobileHttpLogs;
 
   /// No description provided for @mobileIfAccountMatchesCodeSent.
   ///
@@ -478,11 +652,29 @@ abstract class AppLocalizations {
   /// **'If an account matches {param1}, a {param2} character code was sent to it. Check your inbox and enter the code below.'**
   String mobileIfAccountMatchesCodeSent(String param1, String param2);
 
+  /// No description provided for @mobileIndexing.
+  ///
+  /// In en, this message translates to:
+  /// **'Indexing'**
+  String get mobileIndexing;
+
   /// No description provided for @mobileInvalidOrExpiredLoginCode.
   ///
   /// In en, this message translates to:
   /// **'This code is invalid or has expired.'**
   String get mobileInvalidOrExpiredLoginCode;
+
+  /// No description provided for @mobileJoinTeams.
+  ///
+  /// In en, this message translates to:
+  /// **'Join teams'**
+  String get mobileJoinTeams;
+
+  /// No description provided for @mobileLesson.
+  ///
+  /// In en, this message translates to:
+  /// **'Lesson'**
+  String get mobileLesson;
 
   /// No description provided for @mobileLiveStreamers.
   ///
@@ -490,11 +682,41 @@ abstract class AppLocalizations {
   /// **'Live streamers'**
   String get mobileLiveStreamers;
 
+  /// No description provided for @mobileLoadMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Load more'**
+  String get mobileLoadMore;
+
   /// No description provided for @mobileLocalDatabaseSize.
   ///
   /// In en, this message translates to:
   /// **'Local database size'**
   String get mobileLocalDatabaseSize;
+
+  /// No description provided for @mobileLossOrFiftyMoveDraw.
+  ///
+  /// In en, this message translates to:
+  /// **'Loss or 50 move draw'**
+  String get mobileLossOrFiftyMoveDraw;
+
+  /// No description provided for @mobileMatchPoints.
+  ///
+  /// In en, this message translates to:
+  /// **'MP'**
+  String get mobileMatchPoints;
+
+  /// No description provided for @mobileMaxIdIs959.
+  ///
+  /// In en, this message translates to:
+  /// **'Max ID is 959'**
+  String get mobileMaxIdIs959;
+
+  /// No description provided for @mobileMessageCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Message copied.'**
+  String get mobileMessageCopied;
 
   /// No description provided for @mobileMoveOnRelease.
   ///
@@ -526,11 +748,53 @@ abstract class AppLocalizations {
   /// **'New game'**
   String get mobileNewGame;
 
+  /// No description provided for @mobileNextExercise.
+  ///
+  /// In en, this message translates to:
+  /// **'Next exercise'**
+  String get mobileNextExercise;
+
   /// No description provided for @mobileNextMistake.
   ///
   /// In en, this message translates to:
   /// **'Next mistake'**
   String get mobileNextMistake;
+
+  /// No description provided for @mobileNextToPlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Next to play'**
+  String get mobileNextToPlay;
+
+  /// No description provided for @mobileNoGamesMatchingFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'No games matching filter criteria.'**
+  String get mobileNoGamesMatchingFilter;
+
+  /// No description provided for @mobileNoMorePuzzlesGoOnline.
+  ///
+  /// In en, this message translates to:
+  /// **'No more puzzles. Go online to get more.'**
+  String get mobileNoMorePuzzlesGoOnline;
+
+  /// No description provided for @mobileNoMorePuzzlesToReplay.
+  ///
+  /// In en, this message translates to:
+  /// **'No more puzzles to replay.'**
+  String get mobileNoMorePuzzlesToReplay;
+
+  /// No description provided for @mobileNoPuzzlesGoOnline.
+  ///
+  /// In en, this message translates to:
+  /// **'No puzzles available, please go online to fetch them.'**
+  String get mobileNoPuzzlesGoOnline;
+
+  /// No description provided for @mobileNoPuzzlesToReplay.
+  ///
+  /// In en, this message translates to:
+  /// **'No puzzles to replay.'**
+  String get mobileNoPuzzlesToReplay;
 
   /// No description provided for @mobileNoSearchResults.
   ///
@@ -538,17 +802,53 @@ abstract class AppLocalizations {
   /// **'No results'**
   String get mobileNoSearchResults;
 
+  /// No description provided for @mobileNoServerAnalysisAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'No server analysis available'**
+  String get mobileNoServerAnalysisAvailable;
+
+  /// No description provided for @mobileNoUpdatesYetInChannel.
+  ///
+  /// In en, this message translates to:
+  /// **'No updates yet in this channel'**
+  String get mobileNoUpdatesYetInChannel;
+
+  /// No description provided for @mobileNoneOfYourTeamsInTournament.
+  ///
+  /// In en, this message translates to:
+  /// **'None of your teams are participating in this tournament'**
+  String get mobileNoneOfYourTeamsInTournament;
+
   /// No description provided for @mobileNotFollowingAnyUser.
   ///
   /// In en, this message translates to:
   /// **'You are not following any users.'**
   String get mobileNotFollowingAnyUser;
 
+  /// No description provided for @mobileNothingToPaste.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to paste: the clipboard is empty'**
+  String get mobileNothingToPaste;
+
   /// No description provided for @mobileOkButton.
   ///
   /// In en, this message translates to:
   /// **'OK'**
   String get mobileOkButton;
+
+  /// No description provided for @mobileOpenInBrowser.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in browser'**
+  String get mobileOpenInBrowser;
+
+  /// No description provided for @mobileOpeningExplorerNotAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening explorer not available.'**
+  String get mobileOpeningExplorerNotAvailable;
 
   /// No description provided for @mobileOpeningExplorerNotAvailableOffline.
   ///
@@ -682,6 +982,12 @@ abstract class AppLocalizations {
   /// **'Players with \"{param}\"'**
   String mobilePlayersMatchingSearchTerm(String param);
 
+  /// No description provided for @mobilePositionId.
+  ///
+  /// In en, this message translates to:
+  /// **'Position ID (0-959)'**
+  String get mobilePositionId;
+
   /// No description provided for @mobilePositionLeft.
   ///
   /// In en, this message translates to:
@@ -694,11 +1000,41 @@ abstract class AppLocalizations {
   /// **'Right'**
   String get mobilePositionRight;
 
+  /// No description provided for @mobilePracticeGoalMate.
+  ///
+  /// In en, this message translates to:
+  /// **'Checkmate the opponent'**
+  String get mobilePracticeGoalMate;
+
+  /// No description provided for @mobilePracticeGoalPromotion.
+  ///
+  /// In en, this message translates to:
+  /// **'Safely promote your pawn'**
+  String get mobilePracticeGoalPromotion;
+
+  /// No description provided for @mobilePracticeSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Success!'**
+  String get mobilePracticeSuccess;
+
   /// No description provided for @mobilePracticeMode.
   ///
   /// In en, this message translates to:
   /// **'Practice mode'**
   String get mobilePracticeMode;
+
+  /// No description provided for @mobilePracticeModeNoClock.
+  ///
+  /// In en, this message translates to:
+  /// **'Practice mode is played without a clock.'**
+  String get mobilePracticeModeNoClock;
+
+  /// No description provided for @mobilePracticeSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Practice settings'**
+  String get mobilePracticeSettings;
 
   /// No description provided for @mobilePrefMagnifyDraggedPiece.
   ///
@@ -706,11 +1042,23 @@ abstract class AppLocalizations {
   /// **'Magnify dragged piece'**
   String get mobilePrefMagnifyDraggedPiece;
 
+  /// No description provided for @mobilePreviousMove.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous'**
+  String get mobilePreviousMove;
+
   /// No description provided for @mobilePreviousPage.
   ///
   /// In en, this message translates to:
   /// **'Previous'**
   String get mobilePreviousPage;
+
+  /// No description provided for @mobilePreviousPuzzle.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous'**
+  String get mobilePreviousPuzzle;
 
   /// No description provided for @mobilePuzzleStormConfirmEndRun.
   ///
@@ -765,6 +1113,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Remove bookmark'**
   String get mobileRemoveBookmark;
+
+  /// No description provided for @mobileResult.
+  ///
+  /// In en, this message translates to:
+  /// **'Result'**
+  String get mobileResult;
+
+  /// No description provided for @mobileReviewPastAttempts.
+  ///
+  /// In en, this message translates to:
+  /// **'Review your past puzzle attempts.'**
+  String get mobileReviewPastAttempts;
+
+  /// No description provided for @mobileRound.
+  ///
+  /// In en, this message translates to:
+  /// **'Round'**
+  String get mobileRound;
+
+  /// No description provided for @mobileSelectALichessPlayer.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a Lichess player'**
+  String get mobileSelectALichessPlayer;
+
+  /// No description provided for @mobileSelectALichessPlayerInSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a Lichess player in the settings.'**
+  String get mobileSelectALichessPlayerInSettings;
 
   /// No description provided for @mobileSelectAStudy.
   ///
@@ -934,6 +1312,30 @@ abstract class AppLocalizations {
   /// **'When enabled, the device will vibrate shortly when you move or capture a piece.'**
   String get mobileSettingsTouchFeedbackSubtitle;
 
+  /// No description provided for @mobileShapeColorBlue.
+  ///
+  /// In en, this message translates to:
+  /// **'Blue'**
+  String get mobileShapeColorBlue;
+
+  /// No description provided for @mobileShapeColorGreen.
+  ///
+  /// In en, this message translates to:
+  /// **'Green'**
+  String get mobileShapeColorGreen;
+
+  /// No description provided for @mobileShapeColorRed.
+  ///
+  /// In en, this message translates to:
+  /// **'Red'**
+  String get mobileShapeColorRed;
+
+  /// No description provided for @mobileShapeColorYellow.
+  ///
+  /// In en, this message translates to:
+  /// **'Yellow'**
+  String get mobileShapeColorYellow;
+
   /// No description provided for @mobileShareChallengeUrl.
   ///
   /// In en, this message translates to:
@@ -964,11 +1366,23 @@ abstract class AppLocalizations {
   /// **'Share position as FEN'**
   String get mobileSharePositionAsFEN;
 
+  /// No description provided for @mobileShareProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'Share profile'**
+  String get mobileShareProfile;
+
   /// No description provided for @mobileSharePuzzle.
   ///
   /// In en, this message translates to:
   /// **'Share this puzzle'**
   String get mobileSharePuzzle;
+
+  /// No description provided for @mobileShareTournament.
+  ///
+  /// In en, this message translates to:
+  /// **'Share tournament'**
+  String get mobileShareTournament;
 
   /// No description provided for @mobileShowComments.
   ///
@@ -1024,11 +1438,35 @@ abstract class AppLocalizations {
   /// **'Something went wrong.'**
   String get mobileSomethingWentWrong;
 
+  /// No description provided for @mobileSortBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort by'**
+  String get mobileSortBy;
+
   /// No description provided for @mobileSortFriends.
   ///
   /// In en, this message translates to:
   /// **'Sort friends'**
   String get mobileSortFriends;
+
+  /// No description provided for @mobileSortOpenings.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort openings'**
+  String get mobileSortOpenings;
+
+  /// No description provided for @mobileSortStudies.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort studies'**
+  String get mobileSortStudies;
+
+  /// No description provided for @mobileStopLiking.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop liking'**
+  String get mobileStopLiking;
 
   /// No description provided for @mobileStopShowingThreat.
   ///
@@ -1048,11 +1486,41 @@ abstract class AppLocalizations {
   /// **'Tablebase is not available offline.'**
   String get mobileTablebaseOffline;
 
+  /// No description provided for @mobileTapToFetchPuzzles.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to fetch new puzzles.'**
+  String get mobileTapToFetchPuzzles;
+
+  /// No description provided for @mobileTapToRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to refresh'**
+  String get mobileTapToRefresh;
+
+  /// No description provided for @mobileTeamStandings.
+  ///
+  /// In en, this message translates to:
+  /// **'Team Standings'**
+  String get mobileTeamStandings;
+
   /// No description provided for @mobileTheme.
   ///
   /// In en, this message translates to:
   /// **'Theme'**
   String get mobileTheme;
+
+  /// No description provided for @mobileTieBreaking.
+  ///
+  /// In en, this message translates to:
+  /// **'Tie-breaking'**
+  String get mobileTieBreaking;
+
+  /// No description provided for @mobileToggleSound.
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle sound'**
+  String get mobileToggleSound;
 
   /// No description provided for @mobileTooManyLoginAttempts.
   ///
@@ -1077,6 +1545,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Variant {param} is not supported in this version.'**
   String mobileUnsupportedVariant(String param);
+
+  /// No description provided for @mobileUnusableNnueFilesExplanation.
+  ///
+  /// In en, this message translates to:
+  /// **'Some NNUE files on this device cannot be used by the engine. Deleting them frees up space and lets you download them again.'**
+  String get mobileUnusableNnueFilesExplanation;
+
+  /// No description provided for @mobileUpdatesFromTeams.
+  ///
+  /// In en, this message translates to:
+  /// **'Updates from teams you join will appear here.'**
+  String get mobileUpdatesFromTeams;
 
   /// No description provided for @mobileUseSymmetricPieces.
   ///
@@ -1114,11 +1594,47 @@ abstract class AppLocalizations {
   /// **'We will email you a code to sign in with.'**
   String get mobileWeWillEmailYouCode;
 
+  /// No description provided for @mobileWinOrFiftyMoveDraw.
+  ///
+  /// In en, this message translates to:
+  /// **'Win or 50 move draw'**
+  String get mobileWinOrFiftyMoveDraw;
+
   /// No description provided for @mobileYouCannotChallengeYourself.
   ///
   /// In en, this message translates to:
   /// **'You cannot challenge yourself'**
   String get mobileYouCannotChallengeYourself;
+
+  /// No description provided for @mobilePracticeGoalDefendIn.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Defend for {count} more move} other{Defend for {count} more moves}}'**
+  String mobilePracticeGoalDefendIn(int count);
+
+  /// No description provided for @mobilePracticeGoalDrawIn.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Hold the draw for {count} more move} other{Hold the draw for {count} more moves}}'**
+  String mobilePracticeGoalDrawIn(int count);
+
+  /// No description provided for @mobilePracticeGoalEqualIn.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Equalize in {count} move} other{Equalize in {count} moves}}'**
+  String mobilePracticeGoalEqualIn(int count);
+
+  /// No description provided for @mobilePracticeGoalMateIn.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Checkmate the opponent in {count} move} other{Checkmate the opponent in {count} moves}}'**
+  String mobilePracticeGoalMateIn(int count);
+
+  /// No description provided for @mobilePracticeGoalWinIn.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Get a winning position in {count} move} other{Get a winning position in {count} moves}}'**
+  String mobilePracticeGoalWinIn(int count);
 
   /// No description provided for @activityActivity.
   ///

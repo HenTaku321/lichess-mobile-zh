@@ -113,18 +113,23 @@ class const _Table({required final PracticeEngineState state}) extends ConsumerW
     return PracticeTable(
       children: [
         switch (state.status) {
-          .solved => const PracticeFeedbackLine(
+          .solved => PracticeFeedbackLine(
             icon: Icons.check_circle,
             color: LichessColors.good,
-            text: 'Success!',
+            text: context.l10n.mobilePracticeSuccess,
           ),
           .failed => PracticeFeedbackLine(
             icon: Icons.cancel,
             color: LichessColors.error,
-            text: goal.describe(playerSide: chapter.orientation, movesLeft: goal.movesAllowed ?? 0),
+            text: goal.describe(
+              context.l10n,
+              playerSide: chapter.orientation,
+              movesLeft: goal.movesAllowed ?? 0,
+            ),
           ),
           .ongoing => Text(
             goal.describe(
+              context.l10n,
               playerSide: chapter.orientation,
               movesLeft: (goal.movesAllowed ?? 0) - state.nbMoves,
             ),

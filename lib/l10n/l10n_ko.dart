@@ -9,6 +9,9 @@ class AppLocalizationsKo extends AppLocalizations {
   AppLocalizationsKo([String locale = 'ko']) : super(locale);
 
   @override
+  String get mobileAbortTraining => 'Abort Training';
+
+  @override
   String get mobileAcceptDraw => '무승부를 수락하시겠습니까?';
 
   @override
@@ -24,6 +27,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get mobileAddToStudy => '연구에 추가하기';
 
   @override
+  String get mobileAllBroadcasts => 'All broadcasts';
+
+  @override
   String get mobileAllGames => '모든 대국';
 
   @override
@@ -33,12 +39,24 @@ class AppLocalizationsKo extends AppLocalizations {
   String get mobileAmoledBlack => 'AMOLED 블랙';
 
   @override
+  String get mobileAppLogs => 'App Logs';
+
+  @override
   String get mobileAreYouSure => '확실하십니까?';
 
   @override
   String mobileAreYouSureDownloadNnue(String param) {
     return '정말로 NNUE 파일($param)을 다운로드하시겠습니까?';
   }
+
+  @override
+  String get mobileBackToPractice => 'Back to practice';
+
+  @override
+  String get mobileBlogLoadFailed => 'Could not load this post.';
+
+  @override
+  String get mobileBlogNotTranslated => 'This post is not translated yet.';
 
   @override
   String get mobileBoardPositionLandscape => '가로 화면에서의 보드 위치';
@@ -59,7 +77,13 @@ class AppLocalizationsKo extends AppLocalizations {
   String get mobileChallengeFromPosition => '사용자 지정 포지션에서 도전';
 
   @override
+  String get mobileChangesWillBeLost => 'Your changes will be lost.';
+
+  @override
   String get mobileChapterName => '챕터 이름';
+
+  @override
+  String get mobileChess960Position => 'Chess960 Position';
 
   @override
   String get mobileChessEngine => '체스 엔진';
@@ -100,6 +124,33 @@ class AppLocalizationsKo extends AppLocalizations {
   String get mobileDangerZone => '위험 구역';
 
   @override
+  String get mobileDateRangeAll => 'ALL';
+
+  @override
+  String get mobileDateRangeOneMonth => '1M';
+
+  @override
+  String get mobileDateRangeOneWeek => '1W';
+
+  @override
+  String get mobileDateRangeOneYear => '1Y';
+
+  @override
+  String get mobileDateRangeThreeMonths => '3M';
+
+  @override
+  String get mobileDeleteAllLogs => 'Delete all logs';
+
+  @override
+  String get mobileDeleteConversation => 'Delete conversation';
+
+  @override
+  String get mobileDeleteConversationConfirm => 'Are you sure you want to delete this conversation?';
+
+  @override
+  String get mobileDeleteUnusableNnueFiles => 'Delete unusable NNUE files';
+
+  @override
   String get mobileDeleteYourAccount => '계정 삭제';
 
   @override
@@ -115,10 +166,25 @@ class AppLocalizationsKo extends AppLocalizations {
   String get mobileDownloadMyGames => '나의 대국 다운로드';
 
   @override
+  String get mobileDownloadNnueFile => 'Download NNUE file';
+
+  @override
+  String get mobileDownloadingNnueFile => 'Downloading NNUE file';
+
+  @override
+  String get mobileEngineEvaluation => 'Engine evaluation';
+
+  @override
   String get mobileFeedbackButton => '피드백';
 
   @override
+  String get mobileFilterBroadcasts => 'Filter broadcasts';
+
+  @override
   String get mobileFilters => '필터';
+
+  @override
+  String get mobileFlip => 'Flip';
 
   @override
   String get mobileFlipClock => '시계 뒤집기';
@@ -127,7 +193,22 @@ class AppLocalizationsKo extends AppLocalizations {
   String get mobileFlipPiecesAfterMove => '수를 둔 뒤 기물과 상대 정보 뒤집기';
 
   @override
+  String get mobileGamePoints => 'GP';
+
+  @override
+  String get mobileGeneratingGif => 'Generating GIF...';
+
+  @override
   String get mobileGetFeedbackOnMoves => '수에 피드백 받기';
+
+  @override
+  String get mobileGifAlmostThere => 'Almost there! Finalizing the GIF...';
+
+  @override
+  String get mobileGifLongGamesTakeLonger => 'Long games take a bit more time...';
+
+  @override
+  String get mobileGoToTheNextGame => 'Go to the next game';
 
   @override
   String mobileGoodDay(String param) {
@@ -152,7 +233,13 @@ class AppLocalizationsKo extends AppLocalizations {
   String get mobileHello => '안녕하세요';
 
   @override
+  String get mobileHideEvaluation => 'Hide evaluation';
+
+  @override
   String get mobileHomeTab => '홈';
+
+  @override
+  String get mobileHttpLogs => 'HTTP logs';
 
   @override
   String mobileIfAccountMatchesCodeSent(String param1, String param2) {
@@ -160,13 +247,37 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
+  String get mobileIndexing => 'Indexing';
+
+  @override
   String get mobileInvalidOrExpiredLoginCode => '유효하지 않거나 만료된 코드입니다.';
+
+  @override
+  String get mobileJoinTeams => 'Join teams';
+
+  @override
+  String get mobileLesson => 'Lesson';
 
   @override
   String get mobileLiveStreamers => '방송 중인 스트리머';
 
   @override
+  String get mobileLoadMore => 'Load more';
+
+  @override
   String get mobileLocalDatabaseSize => '로컬 데이터베이스 크기';
+
+  @override
+  String get mobileLossOrFiftyMoveDraw => 'Loss or 50 move draw';
+
+  @override
+  String get mobileMatchPoints => 'MP';
+
+  @override
+  String get mobileMaxIdIs959 => 'Max ID is 959';
+
+  @override
+  String get mobileMessageCopied => 'Message copied.';
 
   @override
   String get mobileMoveOnRelease => '손가락을 뗄 때 수 두기';
@@ -184,16 +295,55 @@ class AppLocalizationsKo extends AppLocalizations {
   String get mobileNewGame => '새 게임';
 
   @override
+  String get mobileNextExercise => 'Next exercise';
+
+  @override
   String get mobileNextMistake => '다음 실수';
+
+  @override
+  String get mobileNextToPlay => 'Next to play';
+
+  @override
+  String get mobileNoGamesMatchingFilter => 'No games matching filter criteria.';
+
+  @override
+  String get mobileNoMorePuzzlesGoOnline => 'No more puzzles. Go online to get more.';
+
+  @override
+  String get mobileNoMorePuzzlesToReplay => 'No more puzzles to replay.';
+
+  @override
+  String get mobileNoPuzzlesGoOnline => 'No puzzles available, please go online to fetch them.';
+
+  @override
+  String get mobileNoPuzzlesToReplay => 'No puzzles to replay.';
 
   @override
   String get mobileNoSearchResults => '결과 없음';
 
   @override
+  String get mobileNoServerAnalysisAvailable => 'No server analysis available';
+
+  @override
+  String get mobileNoUpdatesYetInChannel => 'No updates yet in this channel';
+
+  @override
+  String get mobileNoneOfYourTeamsInTournament => 'None of your teams are participating in this tournament';
+
+  @override
   String get mobileNotFollowingAnyUser => '팔로우한 사용자가 없습니다.';
 
   @override
+  String get mobileNothingToPaste => 'Nothing to paste: the clipboard is empty';
+
+  @override
   String get mobileOkButton => '확인';
+
+  @override
+  String get mobileOpenInBrowser => 'Open in browser';
+
+  @override
+  String get mobileOpeningExplorerNotAvailable => 'Opening explorer not available.';
 
   @override
   String get mobileOpeningExplorerNotAvailableOffline => '오프닝 탐색기는 오프라인 상태에서 이용할 수 없습니다.';
@@ -264,19 +414,43 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
+  String get mobilePositionId => 'Position ID (0-959)';
+
+  @override
   String get mobilePositionLeft => '왼쪽';
 
   @override
   String get mobilePositionRight => '오른쪽';
 
   @override
+  String get mobilePracticeGoalMate => 'Checkmate the opponent';
+
+  @override
+  String get mobilePracticeGoalPromotion => 'Safely promote your pawn';
+
+  @override
+  String get mobilePracticeSuccess => 'Success!';
+
+  @override
   String get mobilePracticeMode => '연습 모드';
+
+  @override
+  String get mobilePracticeModeNoClock => 'Practice mode is played without a clock.';
+
+  @override
+  String get mobilePracticeSettings => 'Practice settings';
 
   @override
   String get mobilePrefMagnifyDraggedPiece => '드래그 중 기물 확대';
 
   @override
+  String get mobilePreviousMove => 'Previous';
+
+  @override
   String get mobilePreviousPage => '이전';
+
+  @override
+  String get mobilePreviousPuzzle => 'Previous';
 
   @override
   String get mobilePuzzleStormConfirmEndRun => '이 도전을 종료하시겠습니까?';
@@ -304,6 +478,21 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get mobileRemoveBookmark => '북마크 제거';
+
+  @override
+  String get mobileResult => 'Result';
+
+  @override
+  String get mobileReviewPastAttempts => 'Review your past puzzle attempts.';
+
+  @override
+  String get mobileRound => 'Round';
+
+  @override
+  String get mobileSelectALichessPlayer => 'Select a Lichess player';
+
+  @override
+  String get mobileSelectALichessPlayerInSettings => 'Select a Lichess player in the settings.';
 
   @override
   String get mobileSelectAStudy => '연구 선택';
@@ -390,6 +579,18 @@ class AppLocalizationsKo extends AppLocalizations {
   String get mobileSettingsTouchFeedbackSubtitle => '기물을 움직이거나 잡았을 때 기기가 짧게 진동합니다.';
 
   @override
+  String get mobileShapeColorBlue => 'Blue';
+
+  @override
+  String get mobileShapeColorGreen => 'Green';
+
+  @override
+  String get mobileShapeColorRed => 'Red';
+
+  @override
+  String get mobileShapeColorYellow => 'Yellow';
+
+  @override
   String get mobileShareChallengeUrl => '도전 URL 공유';
 
   @override
@@ -405,7 +606,13 @@ class AppLocalizationsKo extends AppLocalizations {
   String get mobileSharePositionAsFEN => 'FEN으로 공유';
 
   @override
+  String get mobileShareProfile => 'Share profile';
+
+  @override
   String get mobileSharePuzzle => '이 퍼즐을 공유하기';
+
+  @override
+  String get mobileShareTournament => 'Share tournament';
 
   @override
   String get mobileShowComments => '댓글 보기';
@@ -435,7 +642,19 @@ class AppLocalizationsKo extends AppLocalizations {
   String get mobileSomethingWentWrong => '문제가 발생했습니다.';
 
   @override
+  String get mobileSortBy => 'Sort by';
+
+  @override
   String get mobileSortFriends => '친구 정렬';
+
+  @override
+  String get mobileSortOpenings => 'Sort openings';
+
+  @override
+  String get mobileSortStudies => 'Sort studies';
+
+  @override
+  String get mobileStopLiking => 'Stop liking';
 
   @override
   String get mobileStopShowingThreat => '위험요소 표시하지 않기';
@@ -447,7 +666,22 @@ class AppLocalizationsKo extends AppLocalizations {
   String get mobileTablebaseOffline => '테이블베이스는 오프라인에서 사용할 수 없습니다.';
 
   @override
+  String get mobileTapToFetchPuzzles => 'Tap to fetch new puzzles.';
+
+  @override
+  String get mobileTapToRefresh => 'Tap to refresh';
+
+  @override
+  String get mobileTeamStandings => 'Team Standings';
+
+  @override
   String get mobileTheme => '테마';
+
+  @override
+  String get mobileTieBreaking => 'Tie-breaking';
+
+  @override
+  String get mobileToggleSound => 'Toggle sound';
 
   @override
   String get mobileTooManyLoginAttempts => '시도 횟수가 너무 많습니다. 나중에 다시 시도해 주세요.';
@@ -462,6 +696,12 @@ class AppLocalizationsKo extends AppLocalizations {
   String mobileUnsupportedVariant(String param) {
     return '$param 변형 게임은 이 버전에서 지원되지 않습니다.';
   }
+
+  @override
+  String get mobileUnusableNnueFilesExplanation => 'Some NNUE files on this device cannot be used by the engine. Deleting them frees up space and lets you download them again.';
+
+  @override
+  String get mobileUpdatesFromTeams => 'Updates from teams you join will appear here.';
 
   @override
   String get mobileUseSymmetricPieces => '대칭 디자인의 기물 사용';
@@ -482,7 +722,65 @@ class AppLocalizationsKo extends AppLocalizations {
   String get mobileWeWillEmailYouCode => '로그인할 수 있는 코드를 이메일로 보내드리겠습니다.';
 
   @override
+  String get mobileWinOrFiftyMoveDraw => 'Win or 50 move draw';
+
+  @override
   String get mobileYouCannotChallengeYourself => '본인에게는 도전할 수 없습니다';
+
+  @override
+  String mobilePracticeGoalDefendIn(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Defend for $count more moves',
+      one: 'Defend for $count more move',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String mobilePracticeGoalDrawIn(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Hold the draw for $count more moves',
+      one: 'Hold the draw for $count more move',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String mobilePracticeGoalEqualIn(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Equalize in $count moves',
+      one: 'Equalize in $count move',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String mobilePracticeGoalMateIn(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Checkmate the opponent in $count moves',
+      one: 'Checkmate the opponent in $count move',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String mobilePracticeGoalWinIn(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Get a winning position in $count moves',
+      one: 'Get a winning position in $count move',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get activityActivity => '활동';

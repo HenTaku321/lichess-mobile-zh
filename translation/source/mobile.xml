@@ -134,6 +134,29 @@
   <string name="positionId" comment="Label of the field where the user types a Chess960 position number.">Position ID (0-959)</string>
   <string name="positionLeft" comment="Appears in the board settings screen to indicate clock position.">Left</string>
   <string name="positionRight" comment="Appears in the board settings screen to indicate clock position.">Right</string>
+  <plurals name="practiceGoalDefendIn" comment="Practice goal of a practice chapter: the position is worse and the player must hold out. %s is the number of moves left to hold.">
+    <item quantity="one">Defend for %s more move</item>
+    <item quantity="other">Defend for %s more moves</item>
+  </plurals>
+  <plurals name="practiceGoalDrawIn" comment="Practice goal of a practice chapter: the position is drawn and the player must keep it drawn. %s is the number of moves left to hold it.">
+    <item quantity="one">Hold the draw for %s more move</item>
+    <item quantity="other">Hold the draw for %s more moves</item>
+  </plurals>
+  <plurals name="practiceGoalEqualIn" comment="Practice goal of a practice chapter: the position is worse and the player must make it equal. %s is the number of moves left to do it in.">
+    <item quantity="one">Equalize in %s move</item>
+    <item quantity="other">Equalize in %s moves</item>
+  </plurals>
+  <string name="practiceGoalMate" comment="Practice goal of a practice chapter with no move limit: mate the opponent at some point. Shown in the list of chapters and on the board.">Checkmate the opponent</string>
+  <plurals name="practiceGoalMateIn" comment="Practice goal of a practice chapter: mate the opponent within a limited number of moves. %s is the number of moves left to mate in.">
+    <item quantity="one">Checkmate the opponent in %s move</item>
+    <item quantity="other">Checkmate the opponent in %s moves</item>
+  </plurals>
+  <string name="practiceGoalPromotion" comment="Practice goal of a practice chapter: promote a pawn, but to a piece that keeps the position won.">Safely promote your pawn</string>
+  <plurals name="practiceGoalWinIn" comment="Practice goal of a practice chapter: the position is better and the player must keep it winning. %s is the number of moves left to do it in.">
+    <item quantity="one">Get a winning position in %s move</item>
+    <item quantity="other">Get a winning position in %s moves</item>
+  </plurals>
+  <string name="practiceSuccess" comment="Shown on the board once the goal of a practice chapter has been reached.">Success!</string>
   <string name="practiceMode" comment="Offline computer game setting that enables practice mode.">Practice mode</string>
   <string name="practiceModeNoClock" comment="Shown in the offline practice settings: practice games are not timed.">Practice mode is played without a clock.</string>
   <string name="practiceSettings" comment="Title of the offline practice settings section.">Practice settings</string>

@@ -1,6 +1,7 @@
 import 'package:chessground/chessground.dart';
 import 'package:dartchess/dartchess.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lichess_mobile/l10n/l10n.dart';
 import 'package:lichess_mobile/src/model/practice/practice_goal.dart';
 import 'package:lichess_mobile/src/model/practice/practice_progress.dart';
 import 'package:lichess_mobile/src/model/practice/practice_repository.dart';
@@ -186,19 +187,21 @@ class const PracticeFeedbackLine({
 extension PracticeGoalText on PracticeGoal {
   /// What the player has to do, with [movesLeft] moves left to do it in.
   ///
-  /// The wording of lichess.org, which is not translated there either.
-  String describe({required Side playerSide, required int movesLeft}) {
-    String moves(int count, [String what = 'move']) => '$count $what${count == 1 ? '' : 's'}';
+  /// The wording of lichess.org, which is not translated there either, so translating it is on us:
+  /// see the `practiceGoal*` keys of `translation/source/mobile.xml`. It is built from [movesLeft]
+  /// rather than read from an asset, which is why it goes through `AppLocalizations` with a plural
+  /// and not through the practice overlay `assets/practice.zh.json`, which only holds prose.
+  String describe(AppLocalizations l10n, {required Side playerSide, required int movesLeft}) {
     return switch (this) {
-      PracticeGoalMate() => 'Checkmate the opponent',
-      PracticeGoalMateIn() => 'Checkmate the opponent in ${moves(movesLeft)}',
-      PracticeGoalDrawIn() => 'Hold the draw for ${moves(movesLeft, 'more move')}',
-      PracticeGoalEqualIn() => 'Equalize in ${moves(movesLeft)}',
+      PracticeGoalMate() => l10n.mobilePracticeGoalMate,
+      PracticeGoalMateIn() => l10n.mobilePracticeGoalMateIn(movesLeft),
+      PracticeGoalDrawIn() => l10n.mobilePracticeGoalDrawIn(movesLeft),
+      PracticeGoalEqualIn() => l10n.mobilePracticeGoalEqualIn(movesLeft),
       PracticeGoalEvalIn(:final cp) =>
         (playerSide == Side.white) == (cp >= 0)
-            ? 'Get a winning position in ${moves(movesLeft)}'
-            : 'Defend for ${moves(movesLeft)}',
-      PracticeGoalPromotion() => 'Safely promote your pawn',
+            ? l10n.mobilePracticeGoalWinIn(movesLeft)
+            : l10n.mobilePracticeGoalDefendIn(movesLeft),
+      PracticeGoalPromotion() => l10n.mobilePracticeGoalPromotion,
     };
   }
 
@@ -230,6 +233,7 @@ extension PracticePgnShape on PgnCommentShape {
 /// The label of a practice chapter's kind, for the list of chapters.
 String practiceChapterKindLabel(BuildContext context, PracticeChapter chapter) => switch (chapter) {
   PracticeEngineChapter(:final goal, :final orientation) => goal.describe(
+    context.l10n,
     playerSide: orientation,
     movesLeft: goal.movesAllowed ?? 0,
   ),

@@ -178,6 +178,9 @@
   "mobilePositionId": "Position ID (0-959)",
   "mobilePositionLeft": "Left",
   "mobilePositionRight": "Right",
+  "mobilePracticeGoalMate": "Checkmate the opponent",
+  "mobilePracticeGoalPromotion": "Safely promote your pawn",
+  "mobilePracticeSuccess": "Success!",
   "mobilePracticeMode": "Practice mode",
   "mobilePracticeModeNoClock": "Practice mode is played without a clock.",
   "mobilePracticeSettings": "Practice settings",
@@ -283,6 +286,46 @@
   "mobileWeWillEmailYouCode": "We will email you a code to sign in with.",
   "mobileWinOrFiftyMoveDraw": "Win or 50 move draw",
   "mobileYouCannotChallengeYourself": "You cannot challenge yourself",
+  "mobilePracticeGoalDefendIn": "{count, plural, =1{Defend for {count} more move} other{Defend for {count} more moves}}",
+  "@mobilePracticeGoalDefendIn": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mobilePracticeGoalDrawIn": "{count, plural, =1{Hold the draw for {count} more move} other{Hold the draw for {count} more moves}}",
+  "@mobilePracticeGoalDrawIn": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mobilePracticeGoalEqualIn": "{count, plural, =1{Equalize in {count} move} other{Equalize in {count} moves}}",
+  "@mobilePracticeGoalEqualIn": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mobilePracticeGoalMateIn": "{count, plural, =1{Checkmate the opponent in {count} move} other{Checkmate the opponent in {count} moves}}",
+  "@mobilePracticeGoalMateIn": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mobilePracticeGoalWinIn": "{count, plural, =1{Get a winning position in {count} move} other{Get a winning position in {count} moves}}",
+  "@mobilePracticeGoalWinIn": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "activityActivity": "Activity",
   "activityHostedALiveStream": "Hosted a live stream",
   "activityRankedInSwissTournament": "Ranked #{param1} in {param2}",

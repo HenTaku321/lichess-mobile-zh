@@ -9,6 +9,9 @@ class AppLocalizationsUz extends AppLocalizations {
   AppLocalizationsUz([String locale = 'uz']) : super(locale);
 
   @override
+  String get mobileAbortTraining => 'Abort Training';
+
+  @override
   String get mobileAcceptDraw => 'Accept draw?';
 
   @override
@@ -24,6 +27,9 @@ class AppLocalizationsUz extends AppLocalizations {
   String get mobileAddToStudy => 'Add to study';
 
   @override
+  String get mobileAllBroadcasts => 'All broadcasts';
+
+  @override
   String get mobileAllGames => 'Barcha oʻyinlar';
 
   @override
@@ -33,12 +39,24 @@ class AppLocalizationsUz extends AppLocalizations {
   String get mobileAmoledBlack => 'Amoled black';
 
   @override
+  String get mobileAppLogs => 'App Logs';
+
+  @override
   String get mobileAreYouSure => 'Ishonchingiz komilmi?';
 
   @override
   String mobileAreYouSureDownloadNnue(String param) {
     return 'Are you sure you want to download the NNUE file ($param)?';
   }
+
+  @override
+  String get mobileBackToPractice => 'Back to practice';
+
+  @override
+  String get mobileBlogLoadFailed => 'Could not load this post.';
+
+  @override
+  String get mobileBlogNotTranslated => 'This post is not translated yet.';
 
   @override
   String get mobileBoardPositionLandscape => 'Board position in landscape mode';
@@ -59,7 +77,13 @@ class AppLocalizationsUz extends AppLocalizations {
   String get mobileChallengeFromPosition => 'Challenge from position';
 
   @override
+  String get mobileChangesWillBeLost => 'Your changes will be lost.';
+
+  @override
   String get mobileChapterName => 'Chapter Name';
+
+  @override
+  String get mobileChess960Position => 'Chess960 Position';
 
   @override
   String get mobileChessEngine => 'Shaxmat dvijogi';
@@ -100,6 +124,33 @@ class AppLocalizationsUz extends AppLocalizations {
   String get mobileDangerZone => 'Danger zone';
 
   @override
+  String get mobileDateRangeAll => 'ALL';
+
+  @override
+  String get mobileDateRangeOneMonth => '1M';
+
+  @override
+  String get mobileDateRangeOneWeek => '1W';
+
+  @override
+  String get mobileDateRangeOneYear => '1Y';
+
+  @override
+  String get mobileDateRangeThreeMonths => '3M';
+
+  @override
+  String get mobileDeleteAllLogs => 'Delete all logs';
+
+  @override
+  String get mobileDeleteConversation => 'Delete conversation';
+
+  @override
+  String get mobileDeleteConversationConfirm => 'Are you sure you want to delete this conversation?';
+
+  @override
+  String get mobileDeleteUnusableNnueFiles => 'Delete unusable NNUE files';
+
+  @override
   String get mobileDeleteYourAccount => 'Delete your account';
 
   @override
@@ -115,10 +166,25 @@ class AppLocalizationsUz extends AppLocalizations {
   String get mobileDownloadMyGames => 'Download my games';
 
   @override
+  String get mobileDownloadNnueFile => 'Download NNUE file';
+
+  @override
+  String get mobileDownloadingNnueFile => 'Downloading NNUE file';
+
+  @override
+  String get mobileEngineEvaluation => 'Engine evaluation';
+
+  @override
   String get mobileFeedbackButton => 'Fikr‑mulohaza';
 
   @override
+  String get mobileFilterBroadcasts => 'Filter broadcasts';
+
+  @override
   String get mobileFilters => 'Filters';
+
+  @override
+  String get mobileFlip => 'Flip';
 
   @override
   String get mobileFlipClock => 'Flip clock';
@@ -127,7 +193,22 @@ class AppLocalizationsUz extends AppLocalizations {
   String get mobileFlipPiecesAfterMove => 'Flip pieces and opponent info after move';
 
   @override
+  String get mobileGamePoints => 'GP';
+
+  @override
+  String get mobileGeneratingGif => 'Generating GIF...';
+
+  @override
   String get mobileGetFeedbackOnMoves => 'Get feedback on your moves';
+
+  @override
+  String get mobileGifAlmostThere => 'Almost there! Finalizing the GIF...';
+
+  @override
+  String get mobileGifLongGamesTakeLonger => 'Long games take a bit more time...';
+
+  @override
+  String get mobileGoToTheNextGame => 'Go to the next game';
 
   @override
   String mobileGoodDay(String param) {
@@ -152,7 +233,13 @@ class AppLocalizationsUz extends AppLocalizations {
   String get mobileHello => 'Hello';
 
   @override
+  String get mobileHideEvaluation => 'Hide evaluation';
+
+  @override
   String get mobileHomeTab => 'Asosiy';
+
+  @override
+  String get mobileHttpLogs => 'HTTP logs';
 
   @override
   String mobileIfAccountMatchesCodeSent(String param1, String param2) {
@@ -160,13 +247,37 @@ class AppLocalizationsUz extends AppLocalizations {
   }
 
   @override
+  String get mobileIndexing => 'Indexing';
+
+  @override
   String get mobileInvalidOrExpiredLoginCode => 'This code is invalid or has expired.';
+
+  @override
+  String get mobileJoinTeams => 'Join teams';
+
+  @override
+  String get mobileLesson => 'Lesson';
 
   @override
   String get mobileLiveStreamers => 'Efirdagi strimerlar';
 
   @override
+  String get mobileLoadMore => 'Load more';
+
+  @override
   String get mobileLocalDatabaseSize => 'Local database size';
+
+  @override
+  String get mobileLossOrFiftyMoveDraw => 'Loss or 50 move draw';
+
+  @override
+  String get mobileMatchPoints => 'MP';
+
+  @override
+  String get mobileMaxIdIs959 => 'Max ID is 959';
+
+  @override
+  String get mobileMessageCopied => 'Message copied.';
 
   @override
   String get mobileMoveOnRelease => 'Move on release';
@@ -184,16 +295,55 @@ class AppLocalizationsUz extends AppLocalizations {
   String get mobileNewGame => 'Yangi oʻyin';
 
   @override
+  String get mobileNextExercise => 'Next exercise';
+
+  @override
   String get mobileNextMistake => 'Next mistake';
+
+  @override
+  String get mobileNextToPlay => 'Next to play';
+
+  @override
+  String get mobileNoGamesMatchingFilter => 'No games matching filter criteria.';
+
+  @override
+  String get mobileNoMorePuzzlesGoOnline => 'No more puzzles. Go online to get more.';
+
+  @override
+  String get mobileNoMorePuzzlesToReplay => 'No more puzzles to replay.';
+
+  @override
+  String get mobileNoPuzzlesGoOnline => 'No puzzles available, please go online to fetch them.';
+
+  @override
+  String get mobileNoPuzzlesToReplay => 'No puzzles to replay.';
 
   @override
   String get mobileNoSearchResults => 'Natija yoʻq';
 
   @override
+  String get mobileNoServerAnalysisAvailable => 'No server analysis available';
+
+  @override
+  String get mobileNoUpdatesYetInChannel => 'No updates yet in this channel';
+
+  @override
+  String get mobileNoneOfYourTeamsInTournament => 'None of your teams are participating in this tournament';
+
+  @override
   String get mobileNotFollowingAnyUser => 'Siz hech kimga obuna boʻlmagansiz.';
 
   @override
+  String get mobileNothingToPaste => 'Nothing to paste: the clipboard is empty';
+
+  @override
   String get mobileOkButton => 'OK';
+
+  @override
+  String get mobileOpenInBrowser => 'Open in browser';
+
+  @override
+  String get mobileOpeningExplorerNotAvailable => 'Opening explorer not available.';
 
   @override
   String get mobileOpeningExplorerNotAvailableOffline => 'Oflayn rejimda debyutlar bazasi ishlamaydi.';
@@ -264,19 +414,43 @@ class AppLocalizationsUz extends AppLocalizations {
   }
 
   @override
+  String get mobilePositionId => 'Position ID (0-959)';
+
+  @override
   String get mobilePositionLeft => 'Chap';
 
   @override
   String get mobilePositionRight => 'O‘ng';
 
   @override
+  String get mobilePracticeGoalMate => 'Checkmate the opponent';
+
+  @override
+  String get mobilePracticeGoalPromotion => 'Safely promote your pawn';
+
+  @override
+  String get mobilePracticeSuccess => 'Success!';
+
+  @override
   String get mobilePracticeMode => 'Practice mode';
+
+  @override
+  String get mobilePracticeModeNoClock => 'Practice mode is played without a clock.';
+
+  @override
+  String get mobilePracticeSettings => 'Practice settings';
 
   @override
   String get mobilePrefMagnifyDraggedPiece => 'Surilayotgan donani kattalashtirish';
 
   @override
+  String get mobilePreviousMove => 'Previous';
+
+  @override
   String get mobilePreviousPage => 'Oldingi';
+
+  @override
+  String get mobilePreviousPuzzle => 'Previous';
 
   @override
   String get mobilePuzzleStormConfirmEndRun => 'Urinishni yakunlamoqchimisiz?';
@@ -304,6 +478,21 @@ class AppLocalizationsUz extends AppLocalizations {
 
   @override
   String get mobileRemoveBookmark => 'Saqlanganlardan olib tashlash';
+
+  @override
+  String get mobileResult => 'Result';
+
+  @override
+  String get mobileReviewPastAttempts => 'Review your past puzzle attempts.';
+
+  @override
+  String get mobileRound => 'Round';
+
+  @override
+  String get mobileSelectALichessPlayer => 'Select a Lichess player';
+
+  @override
+  String get mobileSelectALichessPlayerInSettings => 'Select a Lichess player in the settings.';
 
   @override
   String get mobileSelectAStudy => 'Select a study';
@@ -390,6 +579,18 @@ class AppLocalizationsUz extends AppLocalizations {
   String get mobileSettingsTouchFeedbackSubtitle => 'Yoqilgan boʻlsa, yurish qilganingizda yoki donani olganingizda qurilmangiz vibratsiya beradi.';
 
   @override
+  String get mobileShapeColorBlue => 'Blue';
+
+  @override
+  String get mobileShapeColorGreen => 'Green';
+
+  @override
+  String get mobileShapeColorRed => 'Red';
+
+  @override
+  String get mobileShapeColorYellow => 'Yellow';
+
+  @override
   String get mobileShareChallengeUrl => 'Share challenge URL';
 
   @override
@@ -405,7 +606,13 @@ class AppLocalizationsUz extends AppLocalizations {
   String get mobileSharePositionAsFEN => 'Pozitsiyani FEN sifatida ulashish';
 
   @override
+  String get mobileShareProfile => 'Share profile';
+
+  @override
   String get mobileSharePuzzle => 'Ushbu masalani ulashish';
+
+  @override
+  String get mobileShareTournament => 'Share tournament';
 
   @override
   String get mobileShowComments => 'Sharhlarni koʻrsatish';
@@ -435,7 +642,19 @@ class AppLocalizationsUz extends AppLocalizations {
   String get mobileSomethingWentWrong => 'Nimadir xato ketdi.';
 
   @override
+  String get mobileSortBy => 'Sort by';
+
+  @override
   String get mobileSortFriends => 'Sort friends';
+
+  @override
+  String get mobileSortOpenings => 'Sort openings';
+
+  @override
+  String get mobileSortStudies => 'Sort studies';
+
+  @override
+  String get mobileStopLiking => 'Stop liking';
 
   @override
   String get mobileStopShowingThreat => 'Tahdidni yashirish';
@@ -447,7 +666,22 @@ class AppLocalizationsUz extends AppLocalizations {
   String get mobileTablebaseOffline => 'Tablebase is not available offline.';
 
   @override
+  String get mobileTapToFetchPuzzles => 'Tap to fetch new puzzles.';
+
+  @override
+  String get mobileTapToRefresh => 'Tap to refresh';
+
+  @override
+  String get mobileTeamStandings => 'Team Standings';
+
+  @override
   String get mobileTheme => 'Tema';
+
+  @override
+  String get mobileTieBreaking => 'Tie-breaking';
+
+  @override
+  String get mobileToggleSound => 'Toggle sound';
 
   @override
   String get mobileTooManyLoginAttempts => 'Too many attempts. Please try again later.';
@@ -462,6 +696,12 @@ class AppLocalizationsUz extends AppLocalizations {
   String mobileUnsupportedVariant(String param) {
     return '$param varianti ushbu versiyada qoʻllab‑quvvatlanmaydi.';
   }
+
+  @override
+  String get mobileUnusableNnueFilesExplanation => 'Some NNUE files on this device cannot be used by the engine. Deleting them frees up space and lets you download them again.';
+
+  @override
+  String get mobileUpdatesFromTeams => 'Updates from teams you join will appear here.';
 
   @override
   String get mobileUseSymmetricPieces => 'Use symmetric pieces';
@@ -482,7 +722,65 @@ class AppLocalizationsUz extends AppLocalizations {
   String get mobileWeWillEmailYouCode => 'We will email you a code to sign in with.';
 
   @override
+  String get mobileWinOrFiftyMoveDraw => 'Win or 50 move draw';
+
+  @override
   String get mobileYouCannotChallengeYourself => 'You cannot challenge yourself';
+
+  @override
+  String mobilePracticeGoalDefendIn(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Defend for $count more moves',
+      one: 'Defend for $count more move',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String mobilePracticeGoalDrawIn(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Hold the draw for $count more moves',
+      one: 'Hold the draw for $count more move',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String mobilePracticeGoalEqualIn(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Equalize in $count moves',
+      one: 'Equalize in $count move',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String mobilePracticeGoalMateIn(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Checkmate the opponent in $count moves',
+      one: 'Checkmate the opponent in $count move',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String mobilePracticeGoalWinIn(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Get a winning position in $count moves',
+      one: 'Get a winning position in $count move',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get activityActivity => 'Faollik';

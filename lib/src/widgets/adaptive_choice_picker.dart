@@ -4,7 +4,7 @@ import 'package:material_ui/material_ui.dart';
 
 /// Shows a platform adaptive choice picker dialog
 ///
-/// On Android, it shows a dialog with radio buttons.
+/// On Android and on the desktop platforms, it shows a dialog with radio buttons.
 /// On iOS, it shows a modal action sheet if the number of choices is less than or equal to 10.
 /// Otherwise, it shows a [CupertinoPicker].
 Future<void> showChoicePicker<T>(
@@ -16,7 +16,15 @@ Future<void> showChoicePicker<T>(
   void Function(T choice)? onSelectedItemChanged,
 }) {
   switch (Theme.of(context).platform) {
+    // The Material radio dialog serves both Android and the desktop platforms:
+    // a desktop has neither iOS's action sheets nor a picker idiom of its own,
+    // and it used to fall through to an exception, so a settings entry backed by
+    // this picker could not be opened at all with a mouse.
     case TargetPlatform.android:
+    case TargetPlatform.linux:
+    case TargetPlatform.macOS:
+    case TargetPlatform.windows:
+    case TargetPlatform.fuchsia:
       final deviceHeight = MediaQuery.heightOf(context);
       return showDialog<void>(
         context: context,
@@ -118,8 +126,6 @@ Future<void> showChoicePicker<T>(
           },
         );
       }
-    default:
-      throw Exception('Unexpected platform $Theme.of(context).platform');
   }
 }
 

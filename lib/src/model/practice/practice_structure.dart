@@ -274,7 +274,7 @@ sealed class const PracticeChapter._() with _$PracticeChapter {
         fen: fen,
         orientation: orientation,
         description: displayDescription,
-        pgn: pick('pgn').asStringOrThrow(),
+        pgn: _localizedPgn(pick('pgn').asStringOrThrow(), translations),
         hints: perPly('hints'),
         deviations: perPly('deviations'),
       ),
@@ -284,11 +284,45 @@ sealed class const PracticeChapter._() with _$PracticeChapter {
         fen: fen,
         orientation: orientation,
         description: displayDescription,
-        pgn: pick('pgn').asStringOrThrow(),
+        pgn: _localizedPgn(pick('pgn').asStringOrThrow(), translations),
       ),
       final kind => throw PickException(
         'Unknown practice chapter kind "$kind" at ${pick.debugParsingExit}',
       ),
     };
   }
+}
+
+/// Rewrites the `{...}` comments of a chapter's PGN through [translations].
+///
+/// The prose a gamebook or lesson shows between moves is authored commentary inside the PGN, and
+/// it reaches no other part of the app: a chapter's name, description, hints and deviations are
+/// picked out of the JSON and overlaid there, while this text stays embedded in the PGN string and
+/// is read straight off the parsed comment by the chapter views. Rewriting the string here means
+/// all of them keep reading `chapter.pgn` and get the overlay for free.
+///
+/// Only a comment whose exact text the overlay knows is replaced, so a shape directive, a
+/// reworded chapter or an uncovered locale is copied through untouched, and a PGN that cannot be
+/// scanned comes back unchanged rather than mangled. A translation containing a brace is left out
+/// for the same reason: it would end the comment early.
+String _localizedPgn(String pgn, PracticeTranslations? translations) {
+  if (translations == null) return pgn;
+  final out = StringBuffer();
+  var from = 0;
+  while (true) {
+    final open = pgn.indexOf('{', from);
+    if (open < 0) break;
+    final close = pgn.indexOf('}', open + 1);
+    if (close < 0) break;
+    final comment = pgn.substring(open + 1, close);
+    final chinese = translations.of(comment.trim());
+    out.write(pgn.substring(from, open + 1));
+    out.write(
+      chinese != null && !chinese.contains('{') && !chinese.contains('}') ? ' $chinese ' : comment,
+    );
+    out.write('}');
+    from = close + 1;
+  }
+  out.write(pgn.substring(from));
+  return out.toString();
 }

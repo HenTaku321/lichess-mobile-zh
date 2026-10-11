@@ -14,21 +14,53 @@ import 'package:lichess_mobile/src/view/watch/watch_tab_screen.dart';
 import 'package:lichess_mobile/src/widgets/background.dart';
 import 'package:material_ui/material_ui.dart';
 
-/// Main scaffold that provides the bottom navigation bar and tab switching view.
+/// Width from which the tab bar moves off the bottom of the window onto a rail
+/// down its left side.
+///
+/// The app is a phone app: upstream lays it out for a handset, and a bottom bar
+/// is a handset's own chrome. In a desktop window that reads as a phone that
+/// happens to be wide, which is the thing this fixes: the destinations are the
+/// same, only their axis changes.
+///
+/// 900 is `FormFactor.desktop` (see `utils/screen.dart`), so the rail arrives
+/// around where the screens themselves start using their wide layouts. It is
+/// also clear of the 800px the widget tests run at, which stay on the bottom bar
+/// their assertions expect.
+const double _kNavigationRailMinWidth = 900;
+
+/// Main scaffold that provides the tab navigation (a bottom bar, or a rail on a
+/// wide window) and tab switching view.
 class const MainTabScaffold({super.key}) extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentTab = ref.watch(currentBottomTabProvider);
 
     final extendBody = Theme.of(context).platform == TargetPlatform.iOS;
+    // A rail is about horizontal room, so it is the window's width that decides
+    // and not the shortest side the screens use. The comparison is strict to
+    // match how `FormFactor.desktop` is read there. iOS is left alone at any
+    // width: its users are on a phone or a tablet and expect the bar they know.
+    final useRail =
+        Theme.of(context).platform != TargetPlatform.iOS &&
+        MediaQuery.sizeOf(context).width > _kNavigationRailMinWidth;
+    final tabView = _TabSwitchingView(currentTab: currentTab, tabBuilder: _tabBuilder);
 
     return FullScreenBackground(
       child: MainTabScaffoldProperties(
         extendBody: extendBody,
         child: Scaffold(
-          body: _TabSwitchingView(currentTab: currentTab, tabBuilder: _tabBuilder),
+          body: useRail
+              ? Row(
+                  children: [
+                    _TabNavigationRail(currentTab: currentTab, onTap: (i) => _onItemTapped(ref, i)),
+                    Expanded(child: tabView),
+                  ],
+                )
+              : tabView,
           extendBody: extendBody,
-          bottomNavigationBar: Theme.of(context).platform == TargetPlatform.iOS
+          bottomNavigationBar: useRail
+              ? null
+              : Theme.of(context).platform == TargetPlatform.iOS
               ? _CupertinoTabBar(
                   height: 50,
                   backgroundColor: NavigationBarTheme.of(context).backgroundColor,
@@ -135,6 +167,39 @@ class const MainTabScaffold({super.key}) extends ConsumerWidget {
         assert(false, 'Unexpected tab');
         return const SizedBox.shrink();
     }
+  }
+}
+
+/// The five tabs as a vertical rail, for a window too wide to be a phone.
+///
+/// The destinations, their icons and labels, and the [onTap] contract are the
+/// bottom bar's, so the two cannot drift apart; only the axis differs.
+class const _TabNavigationRail({
+  required final BottomTab currentTab,
+  required final ValueChanged<int> onTap,
+}) extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return NavigationRail(
+      selectedIndex: currentTab.index,
+      // Icon above its own label, as in the bottom bar, rather than upstream's
+      // default of labels appearing only once the rail is expanded.
+      labelType: NavigationRailLabelType.all,
+      // No backgroundColor: the bar's is only ever set when the platform is iOS
+      // (see `theme.dart`), and this rail is never built there, so asking for it
+      // would always yield null. The rail's own default fills it instead.
+      onDestinationSelected: onTap,
+      destinations: [
+        for (final tab in BottomTab.values)
+          NavigationRailDestination(
+            // Filled when selected, as in the bottom bar, which sets the same
+            // `fill` by hand because its theme is not the rail's.
+            icon: Icon(tab.icon, fill: 0),
+            selectedIcon: Icon(tab.icon, fill: 1),
+            label: Text(tab.label(context.l10n)),
+          ),
+      ],
+    );
   }
 }
 

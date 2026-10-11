@@ -361,7 +361,17 @@ class _RegisterCallbackClient(
 /// * When a response has the 401 status, checks if the authUser token is still valid,
 /// and deletes the authUser if it's not.
 class LichessClient(final Client _inner, final Ref _ref) implements Client {
-  static const defaultRequestTimeout = Duration(seconds: 15);
+  /// How long a request may wait for the response headers.
+  ///
+  /// Raised from upstream's 15 seconds for this fork. The app talks to a
+  /// translation proxy (see `LICHESS_HOST`), which holds a translated page back
+  /// until its translation budget runs out rather than serve it half in
+  /// English, and that budget is the proxy's `TRANSLATE_DEADLINE_SECONDS`. This
+  /// has to stay comfortably above it: a shorter one here aborts a request the
+  /// proxy is still working on, turning Chinese-that-was-coming into an error.
+  /// The cost of the raise is that a stalled network takes this long to
+  /// surface, which the connectivity monitor covers.
+  static const defaultRequestTimeout = Duration(seconds: 45);
 
   final PackageInfo _cachedPackageInfo = _ref.read(preloadedDataProvider).requireValue.packageInfo;
   final BaseDeviceInfo _cachedDeviceInfo = _ref.read(preloadedDataProvider).requireValue.deviceInfo;

@@ -27,9 +27,17 @@ class FixedThinkingTime(final Duration duration) extends ThinkingTime {
   Duration forMove({required Position position, required Move move, Move? lastMove}) => duration;
 }
 
-/// The opponent for [spec], kept alive for the duration of the test.
-EngineOpponent readOpponentFor(ProviderContainer container, OpponentSpec spec) {
-  final provider = engineOpponentProvider(spec);
+/// The opponent for [spec] and [variant], kept alive for the duration of the test.
+///
+/// The variant defaults to the standard game, which is what every test that is not about a variant
+/// plays: on these platforms the app bundles its engines, so the engine a spec resolves to does not
+/// depend on the variant in the first place.
+EngineOpponent readOpponentFor(
+  ProviderContainer container,
+  OpponentSpec spec, {
+  Variant variant = Variant.standard,
+}) {
+  final provider = engineOpponentProvider((spec, variant));
   container.listen(provider, (_, _) {});
   return container.read(provider);
 }
@@ -99,7 +107,11 @@ void main() {
       final container = await makeContainer();
       final budget = container.read(engineBudgetProvider);
 
-      await readOpponent(container, StockfishLevel.level6).findMove(
+      await readOpponentFor(
+        container,
+        const StockfishOpponentSpec(StockfishLevel.level6),
+        variant: Variant.crazyhouse,
+      ).findMove(
         initialPosition: Chess.initial,
         moves: const IListConst([]),
         variant: Variant.crazyhouse,
@@ -561,7 +573,11 @@ void main() {
       final container = await makeBookContainer(firstMoveBook());
       final books = container.read(maiaBookServiceProvider) as FakeMaiaOfflineBookService;
 
-      await readOpponentFor(container, const MaiaOpponentSpec(MaiaRating.maia1500)).findMove(
+      await readOpponentFor(
+        container,
+        const MaiaOpponentSpec(MaiaRating.maia1500),
+        variant: Variant.chess960,
+      ).findMove(
         initialPosition: Chess.initial,
         moves: const IListConst([]),
         variant: Variant.chess960,

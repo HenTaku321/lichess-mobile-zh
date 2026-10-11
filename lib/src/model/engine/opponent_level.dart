@@ -1,5 +1,6 @@
 import 'package:lichess_mobile/src/model/common/chess.dart';
 import 'package:lichess_mobile/src/model/engine/engine_spec.dart';
+import 'package:lichess_mobile/src/model/engine/engine_utils.dart';
 
 /// Stockfish strength levels. Level 1 is the easiest, level 12 is the hardest.
 enum StockfishLevel({
@@ -114,8 +115,16 @@ sealed class const OpponentSpec() {
   /// The opponent a new game plays by default. Stockfish, which can play every variant.
   static const defaultSpec = StockfishOpponentSpec(StockfishLevel.defaultLevel);
 
-  /// The engine this opponent plays on.
-  EngineSpec get engineSpec;
+  /// The engine this opponent plays [variant] on.
+  ///
+  /// A method rather than a getter because the answer depends on the variant: the app's
+  /// Fairy-Stockfish plays every variant, while the stockfish installed on a machine the app
+  /// bundles no engine for plays the standard game and nothing else.
+  ///
+  /// [hasBundledEngines] is that platform fact, taken as an argument rather than asked of the
+  /// binding so that this stays answerable without one — see [hasBundledEnginesProvider], which is
+  /// where it is read.
+  EngineSpec engineSpecFor(Variant variant, {required bool hasBundledEngines});
 
   /// A short label for the UI.
   String get displayName;
@@ -130,8 +139,17 @@ sealed class const OpponentSpec() {
 final class const StockfishOpponentSpec(final StockfishLevel level) extends OpponentSpec {
   /// Always Fairy-Stockfish: the weakest levels need negative skill levels, which only Fairy
   /// supports, and it is the only engine that can play every variant.
+  ///
+  /// Where the app bundles no engine, the stockfish installed on the machine takes the standard
+  /// game — the same games, and the same options, the app's Stockfish would have played, and the
+  /// only ones that engine knows. Every other variant keeps asking for Fairy-Stockfish, which is
+  /// neither installed nor bundled: that fails, loudly, rather than being played as something the
+  /// engine cannot play.
   @override
-  EngineSpec get engineSpec => const StockfishSpec.fairy();
+  EngineSpec engineSpecFor(Variant variant, {required bool hasBundledEngines}) =>
+      !hasBundledEngines && officialStockfishVariants.contains(variant)
+      ? const SystemStockfishSpec()
+      : const StockfishSpec.fairy();
 
   @override
   String get displayName => 'Stockfish level ${level.level}';
@@ -157,8 +175,11 @@ final class const StockfishOpponentSpec(final StockfishLevel level) extends Oppo
 final class const MaiaOpponentSpec(final MaiaRating rating) extends OpponentSpec {
   /// Maia is LC0 with a Maia network, and the network is a per-search option — so every rating is
   /// the same spec, and they all share one engine.
+  ///
+  /// The variant and the platform change nothing: LC0 ships in neither the app nor a package, and
+  /// the app asks for it wherever it runs, on the variants the network can play.
   @override
-  EngineSpec get engineSpec => const Lc0Spec();
+  EngineSpec engineSpecFor(Variant variant, {required bool hasBundledEngines}) => const Lc0Spec();
 
   @override
   String get displayName => 'Maia ${rating.rating}';

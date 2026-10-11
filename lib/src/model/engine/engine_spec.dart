@@ -57,6 +57,30 @@ final class StockfishSpec extends EngineSpec {
   String toString() => 'StockfishSpec(${flavor.name})';
 }
 
+/// The stockfish installed on this machine, run as a child process.
+///
+/// Desktop only: on a phone the engines are native libraries inside the app, and there is nothing
+/// to spawn. What this spec does *not* carry is the path to the executable — a spec is the
+/// identity of a live engine and doubles as a provider key, so it has to be a value that never
+/// drifts between rebuilds. Finding the binary on `PATH` is the transport's job, and every
+/// "the stockfish on this machine" is one engine.
+final class const SystemStockfishSpec() extends EngineSpec {
+  @override
+  EngineSlot get slot => EngineSlot.system;
+
+  @override
+  String get label => 'system stockfish';
+
+  @override
+  bool operator ==(Object other) => other is SystemStockfishSpec;
+
+  @override
+  int get hashCode => (SystemStockfishSpec).hashCode;
+
+  @override
+  String toString() => 'SystemStockfishSpec()';
+}
+
 /// Leela Chess Zero.
 ///
 /// Note what this does *not* carry: the network. `setoption name WeightsFile` is

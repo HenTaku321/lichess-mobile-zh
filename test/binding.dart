@@ -65,6 +65,11 @@ class TestLichessBinding() extends LichessBinding {
   @override
   int numAppStarts = 1;
 
+  /// True, so that tests get the platform the app ships engines for unless they ask for the
+  /// desktop: the desktop behaviour is about a stockfish on the machine, which no test has.
+  @override
+  bool hasBundledEngines = true;
+
   @override
   FakeSharedPreferences get sharedPreferences {
     return _sharedPreferences ??= FakeSharedPreferences();
@@ -85,6 +90,7 @@ class TestLichessBinding() extends LichessBinding {
     _firebaseMessaging = null;
     _sharedPreferences = null;
     numAppStarts = 1;
+    hasBundledEngines = true;
   }
 
   FakeFirebaseCrashlytics? _firebaseCrashlytics;

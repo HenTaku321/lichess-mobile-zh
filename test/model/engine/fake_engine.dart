@@ -28,11 +28,13 @@ Rule ruleFromUciVariant(String uciVariant) => switch (uciVariant) {
 };
 
 /// Both Stockfish flavors report the same name, as the real binaries do: which one is running is
-/// read from the spec, not from the name.
+/// read from the spec, not from the name. The stockfish on the machine is whatever version it is,
+/// but it answers to its own name too, which is all this has to stand in for.
 String _engineNameFor(EngineSpec spec) => switch (spec) {
   StockfishSpec(flavor: StockfishFlavor.light) => 'Stockfish 19',
   StockfishSpec(flavor: StockfishFlavor.latestNoNNUE) => 'Stockfish 19',
   StockfishSpec(flavor: StockfishFlavor.variant) => 'Fairy-Stockfish',
+  SystemStockfishSpec() => 'Stockfish 19',
   Lc0Spec() => 'Lc0 v0.32.1',
 };
 

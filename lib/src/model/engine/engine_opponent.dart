@@ -8,6 +8,8 @@ import 'package:lichess_mobile/src/model/common/chess.dart';
 import 'package:lichess_mobile/src/model/engine/engine.dart';
 import 'package:lichess_mobile/src/model/engine/engine_budget.dart';
 import 'package:lichess_mobile/src/model/engine/engine_providers.dart';
+import 'package:lichess_mobile/src/model/engine/engine_spec.dart';
+import 'package:lichess_mobile/src/model/engine/engine_utils.dart';
 import 'package:lichess_mobile/src/model/engine/opening_book.dart';
 import 'package:lichess_mobile/src/model/engine/opponent_level.dart';
 import 'package:lichess_mobile/src/model/engine/thinking_time.dart';
@@ -16,6 +18,13 @@ import 'package:logging/logging.dart';
 import 'package:meta/meta.dart';
 
 final _logger = Logger('EngineOpponent');
+
+/// The engine [spec] plays [variant] on, here.
+///
+/// The one place this opponent's engine is named: the provider that keeps an engine alive and the
+/// search that asks for it both go through this, so they cannot end up on two different engines.
+EngineSpec _engineSpecFor(Ref ref, OpponentSpec spec, Variant variant) =>
+    spec.engineSpecFor(variant, hasBundledEngines: ref.read(hasBundledEnginesProvider));
 
 /// The softmax temperature LC0 turns the network's policy logits into priors with.
 ///
@@ -195,7 +204,7 @@ abstract class EngineOpponentBase<S extends OpponentSpec>({
       );
       if (!identical(_pending, completer)) return;
 
-      final engine = await ref.read(engineProvider(spec.engineSpec).future);
+      final engine = await ref.read(engineProvider(_engineSpecFor(ref, spec, variant)).future);
       if (!identical(_pending, completer)) return;
 
       final search = engine.search(request);
@@ -444,36 +453,42 @@ class MaiaOpponent({
   }
 }
 
-/// The opponent for [OpponentSpec], and the engine it plays on.
+/// The opponent for [(spec, variant)], and the engine it plays on.
 ///
 /// Watching this is what keeps that engine alive: an offline game holds its opponent for as long
 /// as it is being played, and lets go of it — and of the engine — when it ends.
-final engineOpponentProvider = Provider.autoDispose.family<EngineOpponent, OpponentSpec>((
-  ref,
-  spec,
-) {
-  // Listened to rather than watched: this gives the opponent's engine the same lifetime as the
-  // opponent, so that [findMove] never has to start one, without rebuilding — and so disposing —
-  // the opponent every time the engine's [AsyncValue] moves on.
-  ref.listen(engineProvider(spec.engineSpec), (_, _) {});
+///
+/// The variant is part of the key because which engine the opponent plays on depends on it: on a
+/// machine the app bundles no engine for, only the standard game is on the stockfish installed
+/// there. Two variants of one level are two opponents holding two engines, which is what they are.
+final engineOpponentProvider = Provider.autoDispose.family<EngineOpponent, (OpponentSpec, Variant)>(
+  (ref, key) {
+    final (spec, variant) = key;
 
-  final opponent = switch (spec) {
-    final StockfishOpponentSpec stockfish => StockfishOpponent(
-      ref: ref,
-      spec: stockfish,
-      budget: ref.read(engineBudgetProvider),
-    ),
-    final MaiaOpponentSpec maia => MaiaOpponent(
-      ref: ref,
-      spec: maia,
-      weights: ref.read(maiaWeightsServiceProvider),
-      books: ref.read(maiaBookServiceProvider),
-      onlineBook: ref.read(maiaOnlineBookProvider),
-      thinkingTime: ref.read(thinkingTimeProvider),
-    ),
-  };
+    // Listened to rather than watched: this gives the opponent's engine the same lifetime as the
+    // opponent, so that [findMove] never has to start one, without rebuilding — and so disposing —
+    // the opponent every time the engine's [AsyncValue] moves on.
+    ref.listen(engineProvider(_engineSpecFor(ref, spec, variant)), (_, _) {});
 
-  ref.onDispose(opponent.stop);
+    final opponent = switch (spec) {
+      final StockfishOpponentSpec stockfish => StockfishOpponent(
+        ref: ref,
+        spec: stockfish,
+        budget: ref.read(engineBudgetProvider),
+      ),
+      final MaiaOpponentSpec maia => MaiaOpponent(
+        ref: ref,
+        spec: maia,
+        weights: ref.read(maiaWeightsServiceProvider),
+        books: ref.read(maiaBookServiceProvider),
+        onlineBook: ref.read(maiaOnlineBookProvider),
+        thinkingTime: ref.read(thinkingTimeProvider),
+      ),
+    };
 
-  return opponent;
-}, name: 'EngineOpponentProvider');
+    ref.onDispose(opponent.stop);
+
+    return opponent;
+  },
+  name: 'EngineOpponentProvider',
+);

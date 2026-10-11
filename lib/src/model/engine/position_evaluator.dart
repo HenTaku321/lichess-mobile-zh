@@ -73,16 +73,29 @@ StockfishFlavor evaluatorFlavorFor(
 /// search request. What it is asked is whether some other role shares the evaluator's engine, and
 /// the slot settles that: the `latestNoNNUE` → `light` fallback can make this name the wrong
 /// Stockfish, but only a variant or an unplayable material ever resolves to Fairy.
+///
+/// Where the app bundles no engine, both Stockfish flavors are the one stockfish on the machine,
+/// so both answer [EngineSlot.system]. It has to agree with what the evaluator actually resolves a
+/// spec to — see [PositionEvaluator._resolveSpec] — because the answer is what tells an offline
+/// game's opponent whether it is being run on the evaluator's engine or on one of its own.
 EngineSlot evaluatorEngineSlotFor(
   Ref ref,
   Variant variant,
   Position position, {
   ChessEnginePref? enginePref,
-}) => switch (evaluatorFlavorFor(ref, variant, position, enginePref: enginePref)) {
-  StockfishFlavor.variant => EngineSlot.fairy,
-  StockfishFlavor.light => EngineSlot.sfLight,
-  StockfishFlavor.latestNoNNUE => EngineSlot.sfLatest,
-};
+}) {
+  final flavor = evaluatorFlavorFor(ref, variant, position, enginePref: enginePref);
+  if (!ref.read(hasBundledEnginesProvider)) {
+    // Fairy-Stockfish is not the machine's stockfish, and there is none: a variant still asks for
+    // the engine the app would have had to bundle.
+    return flavor == StockfishFlavor.variant ? EngineSlot.fairy : EngineSlot.system;
+  }
+  return switch (flavor) {
+    StockfishFlavor.variant => EngineSlot.fairy,
+    StockfishFlavor.light => EngineSlot.sfLight,
+    StockfishFlavor.latestNoNNUE => EngineSlot.sfLatest,
+  };
+}
 
 /// Evaluates positions for analysis.
 ///
@@ -319,7 +332,19 @@ class PositionEvaluator(
 
   /// Subscribes to [spec]'s engine, replacing whatever was subscribed to before.
   void _watchEngine(EngineSpec spec) {
-    if (_spec == spec) return;
+    if (_spec == spec) {
+      // Already watching this engine, and the work that asked for it is waiting on the loading
+      // state [_acquireEngine] left behind. Nothing else will clear it: the provider is answering
+      // the same engine it was answering before this flavor was resolved, so its listener has
+      // nothing new to say. Two flavors can resolve to one spec — where the app bundles no engine,
+      // both Stockfish flavors are the stockfish on the machine — and the switch from one to the
+      // other must not strand the evaluator on that loading state.
+      if (_engine case final engine?) {
+        _setEngine(AsyncData(engine.name.value));
+        _computeCurrentWork();
+      }
+      return;
+    }
 
     _detachEngine();
     _engineSubscription?.close();
@@ -409,6 +434,15 @@ class PositionEvaluator(
 
   /// The spec for [flavor], falling back to the light engine when the NNUE file is not on disk.
   Future<EngineSpec> _resolveSpec(StockfishFlavor flavor) async {
+    // Where the app bundles no engine: the one stockfish on the machine, whichever flavor was
+    // asked for. There is no net to choose between, which is why this needs no look on disk, and
+    // why both flavors resolve to one spec — see [evaluatorEngineSlotFor], which says the same
+    // thing in the synchronous terms the callers of a search request need.
+    if (!ref.read(hasBundledEnginesProvider)) {
+      return flavor == StockfishFlavor.variant
+          ? const StockfishSpec.fairy()
+          : const SystemStockfishSpec();
+    }
     switch (flavor) {
       case StockfishFlavor.variant:
         return const StockfishSpec.fairy();

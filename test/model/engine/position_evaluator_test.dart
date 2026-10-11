@@ -10,6 +10,7 @@ import 'package:lichess_mobile/src/model/engine/engine_factory.dart';
 import 'package:lichess_mobile/src/model/engine/engine_providers.dart';
 import 'package:lichess_mobile/src/model/engine/engine_slot.dart';
 import 'package:lichess_mobile/src/model/engine/engine_spec.dart';
+import 'package:lichess_mobile/src/model/engine/engine_utils.dart';
 import 'package:lichess_mobile/src/model/engine/evaluation_context.dart';
 import 'package:lichess_mobile/src/model/engine/evaluation_preferences.dart';
 import 'package:lichess_mobile/src/model/engine/position_evaluator.dart';
@@ -61,6 +62,19 @@ EvaluationContext makeContext({
   id: id ?? const StringId('test'),
   variant: variant,
   initialPosition: initialPosition ?? Chess.initial,
+);
+
+/// A [Ref] for the parts of the engine layer that are written against one, which a container is
+/// not.
+final refProvider = Provider<Ref>((ref) => ref, name: 'TestRefProvider');
+
+/// A container for a desktop, where the app bundles no engine.
+///
+/// The one platform fact the evaluator asks about is read through a provider, so it is overridden
+/// rather than asked of the binding: [TestLichessBinding] answers for a phone, and every other test
+/// in this file is about a phone.
+Future<ProviderContainer> makeDesktopContainer() => makeContainer(
+  overrides: {hasBundledEnginesProvider: hasBundledEnginesProvider.overrideWithValue(false)},
 );
 
 /// Chooses the engine the evaluator will use for the official chess variants.
@@ -830,6 +844,35 @@ void main() {
       final pinned = readEvaluator(container, pinnedContext);
       await pinned.evaluate(makeWork(id: const StringId('pinned'))).first;
       expect(pinned.state.spec, const StockfishSpec.light());
+    });
+
+    test('Runs the stockfish on the machine where the app bundles no engine', () async {
+      final container = await makeDesktopContainer();
+      final service = readEvaluator(container);
+
+      await service.evaluate(makeWork()).first;
+
+      expect(service.state.spec, const SystemStockfishSpec());
+      expect(fakeEngine.spec, const SystemStockfishSpec());
+
+      // Asked synchronously by whoever decides whether an offline opponent and this evaluator are
+      // on one engine, so it has to name the same engine the spec above resolves to.
+      final ref = container.read(refProvider);
+      expect(evaluatorEngineSlotFor(ref, Variant.standard, Chess.initial), EngineSlot.system);
+      expect(evaluatorEngineSlotFor(ref, Variant.crazyhouse, Chess.initial), EngineSlot.fairy);
+    });
+
+    test('Runs the machine stockfish even when the latest engine is preferred', () async {
+      final container = await makeDesktopContainer();
+      await setEnginePref(container, ChessEnginePref.sfLatest);
+
+      final service = readEvaluator(container);
+      await service.evaluate(makeWork()).first;
+
+      // The net the latest flavor needs on disk is the concern of an engine the app ships, and
+      // there is none here: the stockfish on the machine brought its own.
+      expect(service.state.spec, const SystemStockfishSpec());
+      expect(fakeEngine.spec, const SystemStockfishSpec());
     });
 
     test('Falls back to Fairy-Stockfish on material Stockfish will not accept', () async {

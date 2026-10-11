@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/engine/engine.dart';
@@ -6,6 +7,7 @@ import 'package:lichess_mobile/src/model/engine/engine_failure.dart';
 import 'package:lichess_mobile/src/model/engine/engine_slot.dart';
 import 'package:lichess_mobile/src/model/engine/engine_spec.dart';
 import 'package:lichess_mobile/src/model/engine/engine_transport.dart';
+import 'package:lichess_mobile/src/model/engine/system_stockfish_transport.dart';
 import 'package:logging/logging.dart';
 
 final _logger = Logger('EngineFactory');
@@ -198,7 +200,31 @@ class _Attempt() {
 Future<EngineTransport> _connectToPlugin(EngineSpec spec) => switch (spec) {
   final StockfishSpec stockfish => StockfishTransport.connect(stockfish),
   final Lc0Spec lc0 => Lc0Transport.connect(lc0),
+  final SystemStockfishSpec system => _connectToSystemStockfish(system),
 };
+
+/// Starts the stockfish installed on the machine, as a child process.
+///
+/// The one start failure worth a sentence of its own: having no stockfish on `PATH` is the ordinary
+/// state of a desktop that never installed one, and the generic "the engine failed to start" would
+/// leave the user with a dead evaluator and nothing to do about it.
+Future<EngineTransport> _connectToSystemStockfish(SystemStockfishSpec spec) async {
+  try {
+    return await SystemStockfishTransport.connect(spec);
+  } on ProcessException catch (e, st) {
+    throw EngineCreationException(
+      EngineFailure(
+        kind: EngineFailureKind.start,
+        message:
+            'Could not run "$kSystemStockfishExecutable": no such executable on PATH. Install a '
+            'stockfish — for example `pacman -S stockfish` — and restart the app to use it',
+        engine: spec.label,
+        error: e,
+        stackTrace: st,
+      ),
+    );
+  }
+}
 
 /// The app's [EngineFactory].
 ///

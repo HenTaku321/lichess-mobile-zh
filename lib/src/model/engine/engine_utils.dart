@@ -2,11 +2,28 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:dartchess/dartchess.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lichess_mobile/src/binding.dart';
 import 'package:lichess_mobile/src/constants.dart';
 import 'package:lichess_mobile/src/model/common/chess.dart';
 import 'package:lichess_mobile/src/model/common/eval.dart';
 import 'package:lichess_mobile/src/model/engine/engine_spec.dart';
 import 'package:multistockfish/multistockfish.dart';
+
+/// Whether the engines the app ships can be run here.
+///
+/// False on the desktop this fork builds for, where there is no engine in the bundle and the only
+/// engine there can be is the stockfish installed on the machine, run as a child process. What it
+/// decides: which spec a flavor resolves to, and whether the settings that choose between the
+/// app's engines are worth showing at all.
+///
+/// A provider rather than a question asked of the binding at each call site, because the tests that
+/// want the desktop behaviour have no binding to ask — several run in a bare `ProviderContainer` —
+/// and because the answer does not change over the life of a process.
+final hasBundledEnginesProvider = Provider<bool>(
+  (ref) => LichessBinding.instance.hasBundledEngines,
+  name: 'HasBundledEnginesProvider',
+);
 
 /// Maximum number of CPU cores available for engine use.
 final maxEngineCores = max(Platform.numberOfProcessors - 1, 1);

@@ -56,6 +56,14 @@ abstract class LichessBinding() {
   /// Counts how many times the app has been (cold) started.
   int get numAppStarts;
 
+  /// Whether the engines that ship inside the app can be run here.
+  ///
+  /// True where the app bundles them: on Android and iOS they are native libraries that the engine
+  /// plugin creates in-process. False on the one desktop platform this fork builds, where there is
+  /// no engine in the bundle and the only engine there can be is the stockfish installed on the
+  /// machine, run as a child process.
+  bool get hasBundledEngines;
+
   /// The shared preferences instance. Must be preloaded before use.
   ///
   /// This is a synchronous getter that throws an error if shared preferences
@@ -123,6 +131,13 @@ class AppLichessBinding() extends LichessBinding {
 
   @override
   int get numAppStarts => sharedPreferences.getInt(_kNumAppStartsKey) ?? 0;
+
+  /// Read from the platform the app was built for rather than from `dart:io`, because that is what
+  /// the engine plugins answer to as well: they exist for Android and iOS only.
+  @override
+  bool get hasBundledEngines =>
+      defaultTargetPlatform == TargetPlatform.android ||
+      defaultTargetPlatform == TargetPlatform.iOS;
 
   /// Preload shared preferences.
   ///

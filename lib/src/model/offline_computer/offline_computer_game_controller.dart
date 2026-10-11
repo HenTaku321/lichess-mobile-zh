@@ -20,6 +20,7 @@ import 'package:lichess_mobile/src/model/common/speed.dart';
 import 'package:lichess_mobile/src/model/common/time_increment.dart';
 import 'package:lichess_mobile/src/model/engine/engine_budget.dart';
 import 'package:lichess_mobile/src/model/engine/engine_opponent.dart';
+import 'package:lichess_mobile/src/model/engine/engine_utils.dart';
 import 'package:lichess_mobile/src/model/engine/evaluation_context.dart';
 import 'package:lichess_mobile/src/model/engine/evaluation_preferences.dart';
 import 'package:lichess_mobile/src/model/engine/position_evaluator.dart';
@@ -107,7 +108,13 @@ class OfflineComputerGameController() extends Notifier<OfflineComputerGameState>
   ProviderSubscription<EngineEvaluationState>? _evaluatorSubscription;
   EvaluationContext? _evaluatorContext;
   ProviderSubscription<EngineOpponent>? _opponentSubscription;
-  OpponentSpec? _opponentSpec;
+
+  /// The opponent and variant [_opponentSubscription] is holding, or null when it holds none.
+  ///
+  /// Both, because both are the provider's key: which engine an opponent plays on depends on the
+  /// variant, so an opponent that is the same level as before is still a different opponent — on a
+  /// different engine — when the game is played on a different variant.
+  (OpponentSpec, Variant)? _opponentKey;
 
   /// Stops whatever the engines are doing for this game: the opponent's search, and any hint or
   /// move evaluation in flight.
@@ -128,12 +135,16 @@ class OfflineComputerGameController() extends Notifier<OfflineComputerGameState>
   ///
   /// True on every variant Stockfish cannot play: Fairy-Stockfish is then both the only engine
   /// that can evaluate the position and the one the opponent plays on, and the same [EngineSpec]
-  /// is the same [Engine]. False when this game never evaluates at all — the opponent then has
-  /// the engine to itself, and a table sized for hints nobody asks for would be held for nothing.
+  /// is the same [Engine] — and on every game at all where the app bundles no engine, since the
+  /// stockfish installed on the machine is then the one engine there is. False when this game
+  /// never evaluates at all — the opponent then has the engine to itself, and a table sized for
+  /// hints nobody asks for would be held for nothing.
   bool get _sharesOneEngine {
     if (!state.game.casual && !state.game.practiceMode) return false;
     final variant = state.game.meta.variant;
-    return state.game.opponentSpec.engineSpec.slot ==
+    return state.game.opponentSpec
+            .engineSpecFor(variant, hasBundledEngines: ref.read(hasBundledEnginesProvider))
+            .slot ==
         evaluatorEngineSlotFor(
           ref,
           variant,
@@ -210,13 +221,13 @@ class OfflineComputerGameController() extends Notifier<OfflineComputerGameState>
   }
 
   EngineOpponent get _opponent {
-    final spec = state.game.opponentSpec;
-    if (_opponentSpec != spec) {
+    final key = (state.game.opponentSpec, state.game.meta.variant);
+    if (_opponentKey != key) {
       _opponentSubscription?.close();
-      _opponentSpec = spec;
-      _opponentSubscription = ref.listen(engineOpponentProvider(spec), (_, _) {});
+      _opponentKey = key;
+      _opponentSubscription = ref.listen(engineOpponentProvider(key), (_, _) {});
     }
-    return ref.read(engineOpponentProvider(spec));
+    return ref.read(engineOpponentProvider(key));
   }
 
   @override

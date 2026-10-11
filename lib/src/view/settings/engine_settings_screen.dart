@@ -37,9 +37,13 @@ class _EngineSettingsScreenState() extends ConsumerState<EngineSettingsScreen> {
 
   @override
   void initState() {
-    _checkFiles();
-
-    _downloadProgress = ref.read(stockfishNnueServiceProvider).nnueDownloadProgress;
+    // The net below is the app's own engine's: where the app bundles no engine there is nothing to
+    // look for and nothing to download, and asking the service would only set it to work on behalf
+    // of a screen that shows none of it.
+    if (ref.read(hasBundledEnginesProvider)) {
+      _checkFiles();
+      _downloadProgress = ref.read(stockfishNnueServiceProvider).nnueDownloadProgress;
+    }
 
     super.initState();
   }
@@ -75,96 +79,104 @@ class _EngineSettingsScreenState() extends ConsumerState<EngineSettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final prefs = ref.watch(engineEvaluationPreferencesProvider);
+    final hasBundledEngines = ref.watch(hasBundledEnginesProvider);
 
     return PlatformScaffold(
       appBar: PlatformAppBar(title: Text(context.l10n.mobileChessEngine)),
       body: ListView(
         children: [
-          if (_hasVerifiedNNUEFile == null)
-            Shimmer(
-              child: ShimmerLoading(isLoading: true, child: ListSection.loading(itemsNumber: 2)),
-            )
-          else
-            ListSection(
-              children: [
-                SettingsListTile(
-                  settingsLabel: Text(context.l10n.mobileChessEngine),
-                  // The check tells apart the net that is on disk from the one still to download:
-                  // it only means something for the latest engine, the light one ships with the app.
-                  settingsValue:
-                      prefs.enginePref == ChessEnginePref.sfLatest && _hasVerifiedNNUEFile == true
-                      ? '${prefs.enginePref.label} \u2713'
-                      : prefs.enginePref.label,
-                  onTap: () {
-                    showChoicePicker(
-                      context,
-                      choices: ChessEnginePref.values,
-                      selectedItem: prefs.enginePref,
-                      labelBuilder: (ChessEnginePref t) => Text(t.label),
-                      onSelectedItemChanged: (ChessEnginePref? value) {
-                        ref
-                            .read(engineEvaluationPreferencesProvider.notifier)
-                            .setEvaluationFunction(value ?? ChessEnginePref.sfLight);
-                        if (value == ChessEnginePref.sfLatest && _hasVerifiedNNUEFile == false) {
-                          _startDownload();
-                        }
-                      },
-                    );
-                  },
-                ),
-                if (prefs.enginePref == ChessEnginePref.sfLatest && _hasVerifiedNNUEFile == false)
-                  LoadingButtonBuilder(
-                    initialFuture: _downloadNNUEFileFuture,
-                    fetchData: () => ref
-                        .read(stockfishNnueServiceProvider)
-                        .downloadNNUEFile(inBackground: false),
-                    builder: (context, isLoading, fetchData) {
-                      return ListTile(
-                        trailing: isLoading
-                            ? AnimatedBuilder(
-                                animation: _downloadProgress,
-                                builder: (_, _) {
-                                  final progress = _downloadProgress.value;
-                                  return CircularProgressIndicator(
-                                    value: progress > 0.0 ? progress : null,
-                                  );
-                                },
-                              )
-                            : const Icon(Icons.download),
-                        title: Text(
-                          isLoading
-                              ? context.l10n.mobileDownloadingNnueFile
-                              : context.l10n.mobileDownloadNnueFile,
-                        ),
-                        subtitle: const Text(nnueDownloadSizeMB),
-                        enabled: !isLoading,
-                        onTap: () async {
-                          final downloaded = await fetchData();
-                          if (context.mounted && downloaded) {
-                            setState(() {
-                              _hasVerifiedNNUEFile = true;
-                              _hasUnusableNNUEFiles = false;
-                            });
+          // What the app's own engines have to choose between: which of them to run, and the net
+          // the latest one needs on disk. Where the app bundles no engine, the engine is the
+          // stockfish installed on the machine — there is one of those, and it brought its own net
+          // — so there is nothing to choose and nothing to download, and neither is shown. The
+          // settings below still are: they are about how the engine is asked to search.
+          if (hasBundledEngines) ...[
+            if (_hasVerifiedNNUEFile == null)
+              Shimmer(
+                child: ShimmerLoading(isLoading: true, child: ListSection.loading(itemsNumber: 2)),
+              )
+            else
+              ListSection(
+                children: [
+                  SettingsListTile(
+                    settingsLabel: Text(context.l10n.mobileChessEngine),
+                    // The check tells apart the net that is on disk from the one still to download:
+                    // it only means something for the latest engine, the light one ships with the app.
+                    settingsValue:
+                        prefs.enginePref == ChessEnginePref.sfLatest && _hasVerifiedNNUEFile == true
+                        ? '${prefs.enginePref.label} \u2713'
+                        : prefs.enginePref.label,
+                    onTap: () {
+                      showChoicePicker(
+                        context,
+                        choices: ChessEnginePref.values,
+                        selectedItem: prefs.enginePref,
+                        labelBuilder: (ChessEnginePref t) => Text(t.label),
+                        onSelectedItemChanged: (ChessEnginePref? value) {
+                          ref
+                              .read(engineEvaluationPreferencesProvider.notifier)
+                              .setEvaluationFunction(value ?? ChessEnginePref.sfLight);
+                          if (value == ChessEnginePref.sfLatest && _hasVerifiedNNUEFile == false) {
+                            _startDownload();
                           }
                         },
                       );
                     },
                   ),
-                if (_hasVerifiedNNUEFile == false && _hasUnusableNNUEFiles)
-                  ListTile(
-                    trailing: const Icon(Icons.delete),
-                    title: Text(context.l10n.mobileDeleteUnusableNnueFiles),
-                    subtitle: Text(context.l10n.mobileUnusableNnueFilesExplanation),
-                    onTap: () async {
-                      await ref.read(stockfishNnueServiceProvider).deleteNNUEFiles();
-                      if (!mounted) return;
-                      setState(() {
-                        _hasUnusableNNUEFiles = false;
-                      });
-                    },
-                  ),
-              ],
-            ),
+                  if (prefs.enginePref == ChessEnginePref.sfLatest && _hasVerifiedNNUEFile == false)
+                    LoadingButtonBuilder(
+                      initialFuture: _downloadNNUEFileFuture,
+                      fetchData: () => ref
+                          .read(stockfishNnueServiceProvider)
+                          .downloadNNUEFile(inBackground: false),
+                      builder: (context, isLoading, fetchData) {
+                        return ListTile(
+                          trailing: isLoading
+                              ? AnimatedBuilder(
+                                  animation: _downloadProgress,
+                                  builder: (_, _) {
+                                    final progress = _downloadProgress.value;
+                                    return CircularProgressIndicator(
+                                      value: progress > 0.0 ? progress : null,
+                                    );
+                                  },
+                                )
+                              : const Icon(Icons.download),
+                          title: Text(
+                            isLoading
+                                ? context.l10n.mobileDownloadingNnueFile
+                                : context.l10n.mobileDownloadNnueFile,
+                          ),
+                          subtitle: const Text(nnueDownloadSizeMB),
+                          enabled: !isLoading,
+                          onTap: () async {
+                            final downloaded = await fetchData();
+                            if (context.mounted && downloaded) {
+                              setState(() {
+                                _hasVerifiedNNUEFile = true;
+                                _hasUnusableNNUEFiles = false;
+                              });
+                            }
+                          },
+                        );
+                      },
+                    ),
+                  if (_hasVerifiedNNUEFile == false && _hasUnusableNNUEFiles)
+                    ListTile(
+                      trailing: const Icon(Icons.delete),
+                      title: Text(context.l10n.mobileDeleteUnusableNnueFiles),
+                      subtitle: Text(context.l10n.mobileUnusableNnueFilesExplanation),
+                      onTap: () async {
+                        await ref.read(stockfishNnueServiceProvider).deleteNNUEFiles();
+                        if (!mounted) return;
+                        setState(() {
+                          _hasUnusableNNUEFiles = false;
+                        });
+                      },
+                    ),
+                ],
+              ),
+          ],
           EngineSettingsWidget(
             onSetEngineSearchTime: (value) {
               ref.read(engineEvaluationPreferencesProvider.notifier).setEngineSearchTime(value);

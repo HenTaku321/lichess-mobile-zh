@@ -83,4 +83,10 @@
   <string name="viewGame" comment="Button text in puzzle settings to view the originating game.">查看對局</string>
   <string name="waitingForOpponentToJoin" comment="This is after the user has created a game and is waiting for an opponent to join.">正在等待對手加入...</string>
   <string name="watchTab" comment="The tab in bottom navigation bar. Must be very short (10 characters max) to avoid ugly text shifting issues." maxLength="10">觀戰</string>
+  <string name="chess" comment="The game of chess, as opposed to xiangqi. Used as a game name in the offline opponent picker.">國際象棋</string>
+  <string name="xiangqi" comment="Xiangqi, the Chinese chess variant, as opposed to international chess. Used as a game name in the offline opponent picker and as a screen title.">象棋</string>
+  <string name="xiangqiBoardCoordinates" comment="The board coordinates setting, as it appears on the xiangqi game settings sheet. Nine files by ten ranks, unlike the chess board's eight by eight.">棋盤座標（A-I, 0-9）</string>
+  <string name="xiangqiEasy" comment="Xiangqi engine strength: the easiest level.">簡單</string>
+  <string name="xiangqiHard" comment="Xiangqi engine strength: the hardest level.">困難</string>
+  <string name="xiangqiMedium" comment="Xiangqi engine strength: the medium level.">中等</string>
 </resources>

@@ -7,6 +7,9 @@ import 'package:lichess_mobile/src/constants.dart';
 import 'package:lichess_mobile/src/model/common/chess.dart';
 import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
 import 'package:lichess_mobile/src/model/settings/general_preferences.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_move.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_rules.dart';
 import 'package:lichess_mobile/src/styles/lichess_icons.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/color_palette.dart';
@@ -19,6 +22,7 @@ import 'package:lichess_mobile/src/view/settings/piece_set_screen.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_choice_picker.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:lichess_mobile/src/widgets/settings.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
 import 'package:material_ui/material_ui.dart';
 
 class const ThemeSettingsScreen({super.key}) extends ConsumerWidget {
@@ -329,29 +333,62 @@ class const _BoardPreview({
 }) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    // The xiangqi preview shows the theme's colour the way the live board does: the opening position
+    // with one move played, so that the last move's highlight is on the board as it is on the chess
+    // preview — 炮二平五, red's right cannon to the centre.
+    const opening = XiangqiMove(XiangqiSquare.at(7, 2), XiangqiSquare.at(4, 2));
+
     return Center(
-      child: StaticChessboard(
-        size: size,
-        orientation: Side.white,
-        lastMove: const NormalMove(from: Square.e2, to: Square.e4),
-        fen: 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1',
-        shapes: {
-          Circle(color: boardPrefs.shapeColor.color, orig: Square.fromName('b8')),
-          Arrow(
-            color: boardPrefs.shapeColor.color,
-            orig: Square.fromName('b8'),
-            dest: Square.fromName('c6'),
-          ),
-        },
-        settings: StaticChessboardSettings.fromBoardSettings(
-          boardPrefs
-              .toBoardSettings(Variant.standard)
-              .copyWith(
+      // The two boards side by side are wider than a phone, so the pair is shrunk to fit rather than
+      // left to overflow it.
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            StaticChessboard(
+              size: size,
+              orientation: Side.white,
+              lastMove: const NormalMove(from: Square.e2, to: Square.e4),
+              fen: 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1',
+              shapes: {
+                Circle(color: boardPrefs.shapeColor.color, orig: Square.fromName('b8')),
+                Arrow(
+                  color: boardPrefs.shapeColor.color,
+                  orig: Square.fromName('b8'),
+                  dest: Square.fromName('c6'),
+                ),
+              },
+              settings: StaticChessboardSettings.fromBoardSettings(
+                boardPrefs
+                    .toBoardSettings(Variant.standard)
+                    .copyWith(
+                      brightness: brightness,
+                      hue: hue,
+                      borderRadius: Styles.boardBorderRadius,
+                      boxShadow: boardShadows,
+                    ),
+              ),
+            ),
+            const SizedBox(width: 16.0),
+            // Nine files by ten ranks — ten cells of height for nine of width, plus half a cell of
+            // frame around each — so the box that lets the board fill it exactly is nine tenths as
+            // wide as it is tall.
+            SizedBox(
+              width: size * 0.9,
+              height: size,
+              child: BrightnessHueFilter(
                 brightness: brightness,
                 hue: hue,
-                borderRadius: Styles.boardBorderRadius,
-                boxShadow: boardShadows,
+                child: XiangqiBoard(
+                  position: play(XiangqiPosition.initial(), opening),
+                  lastMove: opening,
+                  showBorder: boardPrefs.showBorder,
+                  style: XiangqiBoardStyle.fromChessboardColorScheme(boardPrefs.boardTheme.colors),
+                ),
               ),
+            ),
+          ],
         ),
       ),
     );

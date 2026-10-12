@@ -24,6 +24,7 @@
   <string name="challengeFromPosition" comment="Menu action in the board editor to challenge a friend from the edited position.">Challenge from position</string>
   <string name="changesWillBeLost" comment="Confirmation dialog when leaving a screen with unsaved edits.">Your changes will be lost.</string>
   <string name="chapterName" comment="Label of the text field to name a new study chapter.">Chapter Name</string>
+  <string name="chess" comment="The game of chess, as opposed to xiangqi. Used as a game name in the offline opponent picker.">Chess</string>
   <string name="chess960Position" comment="Board editor entry that opens the Chess960 start position picker.">Chess960 Position</string>
   <string name="chessEngine" comment="Chess engine settings screen title.">Chess engine</string>
   <string name="chooseCustomBackground" comment="Theme settings entry that opens the custom background picker.">Choose a custom background</string>
@@ -168,6 +169,8 @@
   <string name="puzzleStormFilterNothingToShow" comment="Shown when the user has no puzzles matching the filter criteria">Nothing to show, please change the filters</string>
   <string name="puzzleStormNothingToShow" comment="Shown when the user has not played any puzzle storm runs yet. Prefer to not translate Puzzle Storm.">Nothing to show. Play some runs of Puzzle Storm.</string>
   <string name="puzzleStormSubtitle" comment="Shown as a description for the 'Puzzle Storm' mode">Solve as many puzzles as possible in 3 minutes.</string>
+  <string name="puzzleStormTitle" comment="Name of the 'Puzzle Storm' mode. Title of its screen, of its entry in the puzzle menu, and of the 'about' dialog. Short: it is also a bottom bar label.">Puzzle Storm</string>
+  <string name="puzzleStreakTitle" comment="Name of the 'Puzzle Streak' mode. Title of its screen, of its entry in the puzzle menu, and of the 'about' dialog. Short: it is also a bottom bar label.">Puzzle Streak</string>
   <string name="puzzleThemesSubtitle" comment="Shown as a description for the 'Puzzle themes' mode">Play puzzles from your favorite openings, or choose a theme.</string>
   <string name="puzzlesTab" comment="The tab in bottom navigation bar. Must be very short (10 characters max) to avoid ugly text shifting issues." maxLength="10">Puzzles</string>
   <string name="rateThisApp" comment="Settings screen entry that opens the app store listing.">Rate this app</string>
@@ -254,5 +257,10 @@
   <string name="watchTab" comment="The tab in bottom navigation bar. Must be very short (10 characters max) to avoid ugly text shifting issues." maxLength="10">Watch</string>
   <string name="weWillEmailYouCode" comment="Shown on the email sign in screen before requesting a login code.">We will email you a code to sign in with.</string>
   <string name="winOrFiftyMoveDraw" comment="Tablebase verdict: the position is won, or drawn by the fifty move rule.">Win or 50 move draw</string>
+  <string name="xiangqi" comment="Xiangqi, the Chinese chess variant, as opposed to international chess. Used as a game name in the offline opponent picker and as a screen title.">Xiangqi</string>
+  <string name="xiangqiBoardCoordinates" comment="The board coordinates setting, as it appears on the xiangqi game settings sheet. Nine files by ten ranks, unlike the chess board's eight by eight.">Board coordinates (A-I, 0-9)</string>
+  <string name="xiangqiEasy" comment="Xiangqi engine strength: the easiest level.">Easy</string>
+  <string name="xiangqiHard" comment="Xiangqi engine strength: the hardest level.">Hard</string>
+  <string name="xiangqiMedium" comment="Xiangqi engine strength: the medium level.">Medium</string>
   <string name="youCannotChallengeYourself" comment="Error snackbar when trying to challenge yourself from the board editor.">You cannot challenge yourself</string>
 </resources>

@@ -83,6 +83,9 @@ class AppLocalizationsHi extends AppLocalizations {
   String get mobileChapterName => 'Chapter Name';
 
   @override
+  String get mobileChess => 'Chess';
+
+  @override
   String get mobileChess960Position => 'Chess960 Position';
 
   @override
@@ -465,6 +468,12 @@ class AppLocalizationsHi extends AppLocalizations {
   String get mobilePuzzleStormSubtitle => '3 मिनट में ज्यादा से ज्यादा पजल सॉल्व करें।';
 
   @override
+  String get mobilePuzzleStormTitle => 'Puzzle Storm';
+
+  @override
+  String get mobilePuzzleStreakTitle => 'Puzzle Streak';
+
+  @override
   String get mobilePuzzleThemesSubtitle => 'अपने मनपसंद ओपनिंग्स से पजल सॉल्व करें, या एक थीम चुनें।';
 
   @override
@@ -723,6 +732,21 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String get mobileWinOrFiftyMoveDraw => 'Win or 50 move draw';
+
+  @override
+  String get mobileXiangqi => 'Xiangqi';
+
+  @override
+  String get mobileXiangqiBoardCoordinates => 'Board coordinates (A-I, 0-9)';
+
+  @override
+  String get mobileXiangqiEasy => 'Easy';
+
+  @override
+  String get mobileXiangqiHard => 'Hard';
+
+  @override
+  String get mobileXiangqiMedium => 'Medium';
 
   @override
   String get mobileYouCannotChallengeYourself => 'You cannot challenge yourself';

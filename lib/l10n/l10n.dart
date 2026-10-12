@@ -340,6 +340,12 @@ abstract class AppLocalizations {
   /// **'Chapter Name'**
   String get mobileChapterName;
 
+  /// No description provided for @mobileChess.
+  ///
+  /// In en, this message translates to:
+  /// **'Chess'**
+  String get mobileChess;
+
   /// No description provided for @mobileChess960Position.
   ///
   /// In en, this message translates to:
@@ -1084,6 +1090,18 @@ abstract class AppLocalizations {
   /// **'Solve as many puzzles as possible in 3 minutes.'**
   String get mobilePuzzleStormSubtitle;
 
+  /// No description provided for @mobilePuzzleStormTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Puzzle Storm'**
+  String get mobilePuzzleStormTitle;
+
+  /// No description provided for @mobilePuzzleStreakTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Puzzle Streak'**
+  String get mobilePuzzleStreakTitle;
+
   /// No description provided for @mobilePuzzleThemesSubtitle.
   ///
   /// In en, this message translates to:
@@ -1599,6 +1617,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Win or 50 move draw'**
   String get mobileWinOrFiftyMoveDraw;
+
+  /// No description provided for @mobileXiangqi.
+  ///
+  /// In en, this message translates to:
+  /// **'Xiangqi'**
+  String get mobileXiangqi;
+
+  /// No description provided for @mobileXiangqiBoardCoordinates.
+  ///
+  /// In en, this message translates to:
+  /// **'Board coordinates (A-I, 0-9)'**
+  String get mobileXiangqiBoardCoordinates;
+
+  /// No description provided for @mobileXiangqiEasy.
+  ///
+  /// In en, this message translates to:
+  /// **'Easy'**
+  String get mobileXiangqiEasy;
+
+  /// No description provided for @mobileXiangqiHard.
+  ///
+  /// In en, this message translates to:
+  /// **'Hard'**
+  String get mobileXiangqiHard;
+
+  /// No description provided for @mobileXiangqiMedium.
+  ///
+  /// In en, this message translates to:
+  /// **'Medium'**
+  String get mobileXiangqiMedium;
 
   /// No description provided for @mobileYouCannotChallengeYourself.
   ///

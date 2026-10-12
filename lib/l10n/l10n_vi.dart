@@ -83,6 +83,9 @@ class AppLocalizationsVi extends AppLocalizations {
   String get mobileChapterName => 'Chapter Name';
 
   @override
+  String get mobileChess => 'Chess';
+
+  @override
   String get mobileChess960Position => 'Chess960 Position';
 
   @override
@@ -465,6 +468,12 @@ class AppLocalizationsVi extends AppLocalizations {
   String get mobilePuzzleStormSubtitle => 'Giải càng nhiều câu đố càng tốt trong 3 phút.';
 
   @override
+  String get mobilePuzzleStormTitle => 'Puzzle Storm';
+
+  @override
+  String get mobilePuzzleStreakTitle => 'Puzzle Streak';
+
+  @override
   String get mobilePuzzleThemesSubtitle => 'Giải câu đố từ những khai cuộc yêu thích của bạn hoặc chọn một chủ đề.';
 
   @override
@@ -723,6 +732,21 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get mobileWinOrFiftyMoveDraw => 'Win or 50 move draw';
+
+  @override
+  String get mobileXiangqi => 'Xiangqi';
+
+  @override
+  String get mobileXiangqiBoardCoordinates => 'Board coordinates (A-I, 0-9)';
+
+  @override
+  String get mobileXiangqiEasy => 'Easy';
+
+  @override
+  String get mobileXiangqiHard => 'Hard';
+
+  @override
+  String get mobileXiangqiMedium => 'Medium';
 
   @override
   String get mobileYouCannotChallengeYourself => 'You cannot challenge yourself';

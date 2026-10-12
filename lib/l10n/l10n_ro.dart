@@ -83,6 +83,9 @@ class AppLocalizationsRo extends AppLocalizations {
   String get mobileChapterName => 'Nume capitol';
 
   @override
+  String get mobileChess => 'Chess';
+
+  @override
   String get mobileChess960Position => 'Chess960 Position';
 
   @override
@@ -465,6 +468,12 @@ class AppLocalizationsRo extends AppLocalizations {
   String get mobilePuzzleStormSubtitle => 'Rezolvă cât mai multe puzzle-uri în 3 minute.';
 
   @override
+  String get mobilePuzzleStormTitle => 'Puzzle Storm';
+
+  @override
+  String get mobilePuzzleStreakTitle => 'Puzzle Streak';
+
+  @override
   String get mobilePuzzleThemesSubtitle => 'Joacă puzzle-uri din deschiderile tale preferate sau alege o temă.';
 
   @override
@@ -723,6 +732,21 @@ class AppLocalizationsRo extends AppLocalizations {
 
   @override
   String get mobileWinOrFiftyMoveDraw => 'Win or 50 move draw';
+
+  @override
+  String get mobileXiangqi => 'Xiangqi';
+
+  @override
+  String get mobileXiangqiBoardCoordinates => 'Board coordinates (A-I, 0-9)';
+
+  @override
+  String get mobileXiangqiEasy => 'Easy';
+
+  @override
+  String get mobileXiangqiHard => 'Hard';
+
+  @override
+  String get mobileXiangqiMedium => 'Medium';
 
   @override
   String get mobileYouCannotChallengeYourself => 'Nu te poți provoca singur';

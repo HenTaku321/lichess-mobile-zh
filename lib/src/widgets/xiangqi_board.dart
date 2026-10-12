@@ -1,26 +1,133 @@
 import 'dart:math' as math;
 
+import 'package:chessground/chessground.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_move.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_notation.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_rules.dart';
 import 'package:material_ui/material_ui.dart';
 
-/// The colours the board is drawn in: a wooden board, which looks the same in a light room and a
-/// dark one, so none of these come from the theme.
-const _surface = Color(0xFFF1DCB0);
-const _frame = Color(0xFF8A5A2B);
-const _ink = Color(0xFF6B4A20);
-const _riverInk = Color(0xFFA98A55);
-const _pieceFace = Color(0xFFFDF3DC);
-const _pieceRing = Color(0xFF7A5326);
-const _redInk = Color(0xFFB7282E);
-const _blackInk = Color(0xFF23262B);
-const _lastMove = Color(0x59D98A18);
-const _selected = Color(0xCCD98A18);
-const _target = Color(0x66333A2B);
-const _check = Color(0x33D0342C);
-const _checkRing = Color(0xE6D0342C);
+/// The colours a board is drawn in.
+///
+/// The set is the wooden board this widget has always drawn — a board that looks the same in a
+/// light room and a dark one, so none of these comes from the theme — lifted out of the painter so
+/// that a caller can recolour it. Every member has a default equal to the colour it replaced, so
+/// `const XiangqiBoardStyle()` renders exactly the board of old. A board can instead be dressed in
+/// one of the app's chessboard themes: see [XiangqiBoardStyle.fromChessboardColorScheme].
+@immutable
+final class const XiangqiBoardStyle({
+  /// The light field the grid is drawn on.
+  final Color surface = const Color(0xFFF1DCB0),
+
+  /// The darker frame around the field.
+  final Color frame = const Color(0xFF8A5A2B),
+
+  /// The grid's lines and the board's printed marks.
+  final Color ink = const Color(0xFF6B4A20),
+
+  /// 楚河 and 汉界, printed more faintly than the grid.
+  final Color riverInk = const Color(0xFFA98A55),
+
+  /// The face of a piece.
+  final Color pieceFace = const Color(0xFFFDF3DC),
+
+  /// The ring around a piece's face.
+  final Color pieceRing = const Color(0xFF7A5326),
+
+  /// The character and inner ring of red's pieces.
+  final Color redInk = const Color(0xFFB7282E),
+
+  /// The character and inner ring of black's pieces.
+  final Color blackInk = const Color(0xFF23262B),
+
+  /// The two squares a move was played between.
+  final Color lastMove = const Color(0x59D98A18),
+
+  /// The ring around the picked-up piece, and around the square a drag began on.
+  final Color selected = const Color(0xCCD98A18),
+
+  /// The dot on an empty point a selected piece may play to, and the ring around a piece it may
+  /// take.
+  final Color target = const Color(0x66333A2B),
+
+  /// The wash behind a general that is in check.
+  final Color check = const Color(0x33D0342C),
+
+  /// The ring around a general that is in check.
+  final Color checkRing = const Color(0xE6D0342C),
+
+  /// The circle drawn on the square a hinted move would be played from. Blue rather than a colour
+  /// from the board's own palette, because a hint is the app speaking and not part of the board.
+  final Color hint = const Color(0x990099C8),
+}) {
+  /// The colours of [colorScheme], one of the app's chessboard themes, laid over this board.
+  ///
+  /// The xiangqi board is a single field with lines drawn across it, not a chequered grid, so only
+  /// the two flat colours of a theme can be taken from it: its light square becomes the field and its
+  /// dark square the frame. [ink] is the dark square too, which is the darkest flat colour the theme
+  /// offers and so the one that stays legible drawn over its own light field; [riverInk] is that ink
+  /// faded towards the field, the way 楚河汉界 are printed faintly today. The two move highlights are
+  /// read from their solid colour where a theme gives one, and fall back to this board's own defaults
+  /// where it does not — `horsey` draws them as images alone, with no colour to read. [target] is the
+  /// theme's valid-move colour.
+  ///
+  /// Only the colours are taken. Twenty of the app's twenty-four themes paint their squares from a
+  /// photograph, which the chessboard shows through an image background; this board is a `CustomPaint`
+  /// of one colour and some lines, with no grid for a wood grain or a marble vein to align to, so it
+  /// can wear no more than the theme's two flat colours and stays flat. That is an accepted loss: the
+  /// colour follows the theme, the texture does not.
+  factory fromChessboardColorScheme(ChessboardColorScheme colorScheme) {
+    const plain = XiangqiBoardStyle();
+    final ink = colorScheme.darkSquare;
+    return XiangqiBoardStyle(
+      surface: colorScheme.lightSquare,
+      frame: ink,
+      ink: ink,
+      riverInk: Color.lerp(ink, colorScheme.lightSquare, 0.45)!,
+      lastMove: colorScheme.lastMove.solidColor ?? plain.lastMove,
+      selected: colorScheme.selected.solidColor ?? plain.selected,
+      target: colorScheme.validMoves,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is XiangqiBoardStyle &&
+          other.surface == surface &&
+          other.frame == frame &&
+          other.ink == ink &&
+          other.riverInk == riverInk &&
+          other.pieceFace == pieceFace &&
+          other.pieceRing == pieceRing &&
+          other.redInk == redInk &&
+          other.blackInk == blackInk &&
+          other.lastMove == lastMove &&
+          other.selected == selected &&
+          other.target == target &&
+          other.check == check &&
+          other.checkRing == checkRing &&
+          other.hint == hint;
+
+  @override
+  int get hashCode => Object.hash(
+    surface,
+    frame,
+    ink,
+    riverInk,
+    pieceFace,
+    pieceRing,
+    redInk,
+    blackInk,
+    lastMove,
+    selected,
+    target,
+    check,
+    checkRing,
+    hint,
+  );
+}
 
 /// The faces a board's characters are looked for in, in order, before the platform's own last
 /// resort. A serif face is what a board is printed in; the platform's own CJK font, whatever it
@@ -46,6 +153,14 @@ const _markPoints = [
   (8, 6),
 ];
 
+/// The room a board leaves around its grid, measured in cells: half a cell, the margin the board
+/// has always had, or a whole one when the file coordinates are on and need somewhere to stand.
+const _xiangqiInset = 0.5;
+const _xiangqiCoordinateInset = 1.0;
+
+double _xiangqiMargin(bool showCoordinates) =>
+    showCoordinates ? _xiangqiCoordinateInset : _xiangqiInset;
+
 /// Where a xiangqi board's lines fall, and where a touch on it lands.
 ///
 /// The board is nine cells wide and ten cells tall — eight gaps between its nine files, nine
@@ -53,36 +168,48 @@ const _markPoints = [
 /// neither is the room it is given. [fit] takes the room and returns the geometry of the largest
 /// board that fits in it, which is what the widget draws, centred.
 ///
+/// When [showCoordinates] is set the board reserves a whole cell of frame instead of half, so that
+/// the file digits have a margin below the pieces to stand in. The grid, the pieces and the
+/// measuring are otherwise the same board, one cell bigger; with the flag off — as it is by
+/// default — nothing below is any different from what it has always been.
+///
 /// One cell is the whole of the geometry: every distance on the board is a multiple of it, so a
 /// board of any size is the same board.
 @immutable
-final class const XiangqiBoardGeometry(final double cell) {
+final class const XiangqiBoardGeometry(
+  final double cell, {
+
+  /// Whether the board is laying out the wider frame the file coordinates are printed in.
+  final bool showCoordinates = false,
+}) {
   /// The geometry of the largest board that fits in [available].
   ///
   /// A side of [available] that is not finite is treated as no constraint at all, so a board in a
   /// column — no height to speak of — simply fills the width. Both sides infinite is not something
   /// that can be drawn and is refused.
-  factory fit(Size available) {
+  factory fit(Size available, {bool showCoordinates = false}) {
+    final margin = _xiangqiMargin(showCoordinates);
     final cell = math.min(
-      available.width.isFinite ? available.width / 9 : double.infinity,
-      available.height.isFinite ? available.height / 10 : double.infinity,
+      available.width.isFinite ? available.width / (8 + 2 * margin) : double.infinity,
+      available.height.isFinite ? available.height / (9 + 2 * margin) : double.infinity,
     );
     if (!cell.isFinite) {
       throw FlutterError(
         'XiangqiBoard cannot size itself from $available: it needs a bounded width or height.',
       );
     }
-    return XiangqiBoardGeometry(cell);
+    return XiangqiBoardGeometry(cell, showCoordinates: showCoordinates);
   }
 
-  /// The distance from the outer line to the edge of the board, half a cell of wooden frame.
-  double get pad => cell / 2;
+  /// The distance from the outer line to the edge of the board: half a cell of wooden frame, or a
+  /// whole one when the file coordinates need the room.
+  double get pad => cell * _xiangqiMargin(showCoordinates);
 
   /// The board's own width, frame included.
-  double get width => cell * 9;
+  double get width => cell * (8 + 2 * _xiangqiMargin(showCoordinates));
 
   /// The board's own height, frame included.
-  double get height => cell * 10;
+  double get height => cell * (9 + 2 * _xiangqiMargin(showCoordinates));
 
   /// The radius of a piece drawn on the board.
   double get pieceRadius => cell * 0.44;
@@ -118,7 +245,56 @@ final class const XiangqiBoardGeometry(final double cell) {
   }
 }
 
-/// A xiangqi board, drawn rather than assembled.
+/// One piece travelling between two squares while a move is being drawn.
+typedef XiangqiTranslatingPiece = ({XiangqiSquare from, XiangqiSquare to, XiangqiPiece piece});
+
+/// One piece fading out of the square it was captured on while a move is being drawn.
+typedef XiangqiFadingPiece = ({XiangqiSquare square, XiangqiPiece piece});
+
+/// What to animate when the position on a board has changed from [from] to [to], given [move],
+/// the move that was played.
+///
+/// The whole correctness of the animation is that a move explains exactly one change: a piece
+/// leaves one square and arrives on another. [move] explains the change between the two positions
+/// only when the piece that stood on `move.from` is now on `move.to` and `move.from` is now empty;
+/// when all three hold, one translating piece comes back and, if something stood on `move.to` in
+/// [from], one fading piece for the capture. In every other case both lists are empty, and empty
+/// means "draw [to] and animate nothing".
+///
+/// That single test is also what makes undo, a new game, and a board turned around animate nothing
+/// at all, with no separate flag to keep in step: undo leaves a different piece on `move.from` and
+/// the moved piece still on `move.to`, so the equality fails and the board simply snaps.
+///
+/// This is a pure top-level function deliberately. The rule above is the whole feature, and keeping
+/// it out of the widget means it can be held against two positions directly, with no widget to pump
+/// and no frame to advance.
+///
+/// The nearest-piece heuristic chessground uses to pair up two positions is not needed here (see
+/// its `preparePieceAnimations`): a chessground board is handed a new position and no move, so it
+/// has to guess which piece went where, while this one is always given the exact [move] and moves
+/// exactly one piece.
+({IList<XiangqiTranslatingPiece> translating, IList<XiangqiFadingPiece> fading})
+xiangqiPieceAnimation(XiangqiPosition from, XiangqiPosition to, XiangqiMove? move) {
+  final piece = move == null ? null : from.pieceAt(move.from);
+  if (move == null ||
+      piece == null ||
+      to.pieceAt(move.to) != piece ||
+      to.pieceAt(move.from) != null) {
+    return (
+      translating: const IListConst<XiangqiTranslatingPiece>([]),
+      fading: const IListConst<XiangqiFadingPiece>([]),
+    );
+  }
+  final captured = from.pieceAt(move.to);
+  return (
+    translating: [(from: move.from, to: move.to, piece: piece)].lock,
+    fading: captured == null
+        ? const IListConst<XiangqiFadingPiece>([])
+        : [(square: move.to, piece: captured)].lock,
+  );
+}
+
+/// A xiangqi board, drawn rather than assembled, and played by hand.
 ///
 /// This is a picture and not a tree of boxes: nine files crossing ten ranks at ninety points, which
 /// is not a thing boxes are good at, and the chess board the app already has cannot be bent into it
@@ -129,6 +305,10 @@ final class const XiangqiBoardGeometry(final double cell) {
 /// Everything is drawn, the pieces included. A xiangqi piece is a circle with a character on it,
 /// and that character is [XiangqiPiece.glyph], so there is no art to ship and no pieces to lay out:
 /// the board scales to any size and the characters come from whatever CJK font the platform has.
+///
+/// A move can be animated: give [lastMove] and a new [position] and the piece that moved is drawn
+/// travelling from the square it left to the square it arrived on. The move's [animationDuration]
+/// of zero means no animation at all.
 ///
 /// The board fills the room it is given, which does not have to be square — see
 /// [XiangqiBoardGeometry.fit].
@@ -145,37 +325,225 @@ class const XiangqiBoard({
   /// drawn as a ring around that piece.
   final IList<XiangqiMove> moves = const IListConst([]),
 
-  /// The move that was played last, its from and to both marked.
+  /// The move that was played last, its from and to both marked, and the piece that moved drawn
+  /// travelling between the two when the position changes.
   final XiangqiMove? lastMove,
 
   /// Called with the square a touch landed on. Not called when the touch lands beside the board.
   final void Function(XiangqiSquare square)? onTapSquare,
-}) extends StatelessWidget {
+
+  /// Called with the square a drag began on and the square it was released over, when the two are
+  /// different squares. A drag released back on the square it started from, or off the board, is
+  /// not a move and is not reported.
+  ///
+  /// This is also what makes the board draggable: with no handler there is nothing a drag could
+  /// report, so the board does not pick a piece up at all.
+  final void Function(XiangqiSquare from, XiangqiSquare to)? onDragMove,
+
+  /// How long a move takes to be drawn travelling. [Duration.zero] draws it already arrived.
+  final Duration animationDuration = const Duration(milliseconds: 150),
+
+  /// Whether to print the files' digits along the bottom edge, in the numbering of the side that
+  /// is playing from the bottom.
+  final bool showCoordinates = false,
+
+  /// Whether to mark the from and the to of [lastMove].
+  final bool showLastMove = true,
+
+  /// Whether to draw the outer frame around the board.
+  final bool showBorder = true,
+
+  /// A move to hint at, drawn as a translucent circle on the square it would be played from.
+  final XiangqiMove? hint,
+
+  /// The colours the board is drawn in.
+  final XiangqiBoardStyle style = const XiangqiBoardStyle(),
+}) extends StatefulWidget {
+  @override
+  State<XiangqiBoard> createState() => _XiangqiBoardState();
+}
+
+class _XiangqiBoardState() extends State<XiangqiBoard> with SingleTickerProviderStateMixin {
+  /// The pieces being drawn travelling and fading out, empty when no move is being drawn.
+  IList<XiangqiTranslatingPiece> _translating = const IListConst([]);
+  IList<XiangqiFadingPiece> _fading = const IListConst([]);
+
+  /// The square a drag began on, and where the finger is now, while one is in flight.
+  XiangqiSquare? _dragFrom;
+  Offset? _dragPosition;
+
+  late final AnimationController _controller;
+  late final CurvedAnimation _translation;
+  late final CurvedAnimation _fade;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: widget.animationDuration,
+      animationBehavior: .preserve,
+    )..addStatusListener(_onAnimationStatus);
+    _translation = CurvedAnimation(parent: _controller, curve: Curves.easeInOutCubic);
+    _fade = CurvedAnimation(parent: _controller, curve: Curves.easeInQuad);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _translation.dispose();
+    _fade.dispose();
+    super.dispose();
+  }
+
+  /// Empties the pieces being drawn, so that a finished animation leaves the board drawing the
+  /// position itself: the travelling piece has arrived, and there is nothing left to interpolate.
+  void _clearAnimation() {
+    _translating = const IListConst([]);
+    _fading = const IListConst([]);
+  }
+
+  void _onAnimationStatus(AnimationStatus status) {
+    if (status == .completed) {
+      setState(_clearAnimation);
+    }
+  }
+
+  void _stopAnimation() {
+    _controller.stop();
+    _clearAnimation();
+  }
+
+  @override
+  void didUpdateWidget(covariant XiangqiBoard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.animationDuration != widget.animationDuration) {
+      _controller.duration = widget.animationDuration;
+    }
+
+    // A move caught mid-flight by the board being turned around is noise: the piece would travel
+    // across a board it did not start on. The turn wins and the move is dropped.
+    if (oldWidget.orientation != widget.orientation) {
+      _stopAnimation();
+      return;
+    }
+
+    if (oldWidget.position == widget.position) return;
+
+    final animation = xiangqiPieceAnimation(oldWidget.position, widget.position, widget.lastMove);
+    if (widget.animationDuration == Duration.zero ||
+        (animation.translating.isEmpty && animation.fading.isEmpty)) {
+      _stopAnimation();
+      return;
+    }
+
+    // Restarting from zero truncates an animation that has not finished, and that is deliberate:
+    // at its easiest the engine answers in about a millisecond, so a new position often arrives
+    // well inside the 150 ms the last move is still being drawn for. Queueing the remainder of a
+    // sub-150 ms animation is not worth the bookkeeping, so the new one takes over, as chessground
+    // lets its own.
+    _translating = animation.translating;
+    _fading = animation.fading;
+    _controller.forward(from: 0.0);
+  }
+
+  /// Begins a drag if the finger has come down on a piece of the side to move. Which moves are
+  /// legal is the caller's business: the board does not know the rules, and a square with a piece
+  /// of your own on it is the only thing it can be sure of.
+  void _startDrag(XiangqiBoardGeometry geometry, Offset local) {
+    final square = geometry.squareAt(local, widget.orientation);
+    if (square == null) return;
+    final piece = widget.position.pieceAt(square);
+    if (piece == null || piece.side != widget.position.turn) return;
+    setState(() {
+      _dragFrom = square;
+      _dragPosition = local;
+    });
+  }
+
+  void _updateDrag(Offset local) {
+    if (_dragFrom == null) return;
+    setState(() => _dragPosition = local);
+  }
+
+  /// Ends a drag: the piece is dropped, and the caller is told where it went if that is a square
+  /// other than the one it was picked up on. Releasing on the origin square or off the board reports
+  /// nothing, and no tap is invented in its place — the finger did not tap.
+  void _endDrag(XiangqiBoardGeometry geometry) {
+    final from = _dragFrom;
+    final at = _dragPosition;
+    if (from != null || at != null) {
+      setState(() {
+        _dragFrom = null;
+        _dragPosition = null;
+      });
+    }
+    final onDragMove = widget.onDragMove;
+    if (from == null || at == null || onDragMove == null) return;
+    final to = geometry.squareAt(at, widget.orientation);
+    if (to != null && to != from) onDragMove(from, to);
+  }
+
+  void _cancelDrag() {
+    if (_dragFrom == null && _dragPosition == null) return;
+    setState(() {
+      _dragFrom = null;
+      _dragPosition = null;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final tap = onTapSquare;
+    final tap = widget.onTapSquare;
+    final drag = widget.onDragMove;
     return LayoutBuilder(
       builder: (context, constraints) {
-        final geometry = XiangqiBoardGeometry.fit(constraints.biggest);
+        final geometry = XiangqiBoardGeometry.fit(
+          constraints.biggest,
+          showCoordinates: widget.showCoordinates,
+        );
         return Center(
           child: GestureDetector(
             behavior: .opaque,
+            // The drag begins where the finger came down and not where the pan was recognised,
+            // which is a third of a square away: the piece picked up is the one under the touch.
+            dragStartBehavior: .down,
             onTapUp: tap == null
                 ? null
                 : (details) {
-                    final square = geometry.squareAt(details.localPosition, orientation);
+                    final square = geometry.squareAt(details.localPosition, widget.orientation);
                     if (square != null) tap(square);
                   },
+            // A board that cannot report where a piece was dropped does not pick one up: with no
+            // [XiangqiBoard.onDragMove] there is nothing a drag could do, and a piece rising under
+            // the finger and sinking again would be a gesture with no meaning.
+            onPanStart: drag == null
+                ? null
+                : (details) => _startDrag(geometry, details.localPosition),
+            onPanUpdate: drag == null ? null : (details) => _updateDrag(details.localPosition),
+            onPanEnd: drag == null ? null : (details) => _endDrag(geometry),
+            onPanCancel: drag == null ? null : _cancelDrag,
             child: CustomPaint(
               size: Size(geometry.width, geometry.height),
-              painter: _XiangqiBoardPainter(
+              painter: XiangqiBoardPainter(
                 geometry: geometry,
-                position: position,
-                orientation: orientation,
-                selected: selected,
-                moves: moves,
-                lastMove: lastMove,
-                isCheck: isCheck(position),
+                position: widget.position,
+                orientation: widget.orientation,
+                selected: widget.selected,
+                moves: widget.moves,
+                lastMove: widget.lastMove,
+                isCheck: isCheck(widget.position),
+                style: widget.style,
+                showLastMove: widget.showLastMove,
+                showBorder: widget.showBorder,
+                hint: widget.hint,
+                translating: _translating,
+                fading: _fading,
+                translation: _translation,
+                fade: _fade,
+                dragFrom: _dragFrom,
+                dragPosition: _dragPosition,
               ),
             ),
           ),
@@ -185,7 +553,12 @@ class const XiangqiBoard({
   }
 }
 
-class _XiangqiBoardPainter({
+/// Draws a board and everything on it, the pieces that are being animated included.
+///
+/// Public, with the pieces being animated opened up, for the same reason chessground's painters
+/// are: pieces here are `CustomPaint` output and not widgets, so a test has no key to find them by
+/// and this is its only door onto what is halfway through a move.
+class XiangqiBoardPainter({
   required final XiangqiBoardGeometry geometry,
   required final XiangqiPosition position,
   required final XiangqiSide orientation,
@@ -193,31 +566,61 @@ class _XiangqiBoardPainter({
   required final IList<XiangqiMove> moves,
   required final XiangqiMove? lastMove,
   required final bool isCheck,
+  required final XiangqiBoardStyle style,
+  required final bool showLastMove,
+  required final bool showBorder,
+  required final XiangqiMove? hint,
+  required final IList<XiangqiTranslatingPiece> _translating,
+  required final IList<XiangqiFadingPiece> _fading,
+  required final Animation<double> _translation,
+  required final Animation<double> _fade,
+  required final XiangqiSquare? dragFrom,
+  required final Offset? dragPosition,
 }) extends CustomPainter {
+  this : super(repaint: Listenable.merge([_translation, _fade]));
+
+  /// The pieces travelling between squares in the move being drawn, empty when none is.
+  @visibleForTesting
+  IList<XiangqiTranslatingPiece> get translating => _translating;
+
+  /// The pieces fading out of the squares they were captured on.
+  @visibleForTesting
+  IList<XiangqiFadingPiece> get fading => _fading;
+
   double get cell => geometry.cell;
 
   @override
   void paint(Canvas canvas, Size size) {
     paintSurface(canvas);
     paintGrid(canvas);
+    paintCoordinates(canvas);
     paintMarks(canvas);
     paintLastMove(canvas);
     paintCheck(canvas);
     paintPieces(canvas);
+    paintTranslating(canvas);
+    paintFading(canvas);
     paintTargets(canvas);
     paintSelection(canvas);
+    paintHint(canvas);
+    paintDraggedPiece(canvas);
   }
 
-  /// The wooden board itself: a darker frame around a lighter field.
+  /// The wooden board itself: a darker frame around a lighter field, or, with no frame wanted, one
+  /// field filling the lot.
   void paintSurface(Canvas canvas) {
     final board = RRect.fromRectAndRadius(
       Rect.fromLTWH(0, 0, geometry.width, geometry.height),
       Radius.circular(cell * 0.16),
     );
-    canvas.drawRRect(board, Paint()..color = _frame);
+    if (!showBorder) {
+      canvas.drawRRect(board, Paint()..color = style.surface);
+      return;
+    }
+    canvas.drawRRect(board, Paint()..color = style.frame);
     canvas.drawRRect(
       RRect.fromRectAndRadius(board.outerRect.deflate(cell * 0.12), Radius.circular(cell * 0.08)),
-      Paint()..color = _surface,
+      Paint()..color = style.surface,
     );
   }
 
@@ -225,7 +628,7 @@ class _XiangqiBoardPainter({
   /// diagonals, and the seven inner files cut in two by the river.
   void paintGrid(Canvas canvas) {
     final line = Paint()
-      ..color = _ink
+      ..color = style.ink
       ..strokeWidth = math.max(1, cell * 0.022)
       ..strokeCap = StrokeCap.round;
 
@@ -248,7 +651,7 @@ class _XiangqiBoardPainter({
     canvas.drawRect(
       Rect.fromPoints(geometry.pointAt(0, 9), geometry.pointAt(8, 0)).inflate(cell * 0.1),
       Paint()
-        ..color = _ink
+        ..color = style.ink
         ..style = .stroke
         ..strokeWidth = math.max(1, cell * 0.014),
     );
@@ -261,6 +664,38 @@ class _XiangqiBoardPainter({
     }
   }
 
+  /// The digits for the nine files, printed under the bottom rank.
+  ///
+  /// Each digit is [xiangqiFileDigit] for the side at the bottom, so it is that side's own way of
+  /// naming the file, and the reversal between the two sides — red counts 一 from its right, black
+  /// counts 1 from its own, and the board counts a to i from the left — is made there and nowhere
+  /// else. The digits are laid out in file order, left to right, so the whole line is read in file
+  /// order as printed on the board.
+  ///
+  /// There is no matching axis down the sides. A traditional board numbers the files alone; the
+  /// ranks have no convention to follow, and inventing one would have the app tell the player
+  /// something about the game that is not true, so the sides carry nothing.
+  void paintCoordinates(Canvas canvas) {
+    if (!geometry.showCoordinates) return;
+    final textStyle = TextStyle(
+      color: style.ink,
+      fontSize: cell * 0.38,
+      fontWeight: FontWeight.bold,
+      fontFamilyFallback: _cjkFallback,
+    );
+    // The middle of the clear band between the bottom rank and the frame's lower edge: below the
+    // bottom pieces, which reach a piece radius past the rank line, and above the board's edge.
+    final y = geometry.height - (geometry.pad - geometry.pieceRadius) / 2;
+    for (var file = 0; file <= 8; file++) {
+      paintText(
+        canvas,
+        xiangqiFileDigit(orientation, file),
+        textStyle,
+        Offset(geometry.pointAt(file, 0).dx, y),
+      );
+    }
+  }
+
   /// 楚河 and 汉界 in the river, and the corner brackets the board prints at the cannons' and
   /// soldiers' starting points.
   ///
@@ -269,7 +704,7 @@ class _XiangqiBoardPainter({
   /// upside down, and there is no way to write 楚河 that is more right than another.
   void paintMarks(Canvas canvas) {
     final riverStyle = TextStyle(
-      color: _riverInk,
+      color: style.riverInk,
       fontSize: cell * 0.46,
       fontWeight: FontWeight.bold,
       letterSpacing: cell * 0.2,
@@ -284,7 +719,7 @@ class _XiangqiBoardPainter({
     // point without ever touching them. Only the quadrants whose neighbour is still on the board
     // get one, which is why a soldier in the corner has two and the rest have four.
     final bracket = Paint()
-      ..color = _ink
+      ..color = style.ink
       ..strokeWidth = math.max(1, cell * 0.022)
       ..strokeCap = StrokeCap.round;
     const reach = 0.13;
@@ -312,8 +747,8 @@ class _XiangqiBoardPainter({
   /// own marker.
   void paintLastMove(Canvas canvas) {
     final move = lastMove;
-    if (move == null) return;
-    final paint = Paint()..color = _lastMove;
+    if (!showLastMove || move == null) return;
+    final paint = Paint()..color = style.lastMove;
     for (final square in [move.from, move.to]) {
       canvas.drawRRect(
         RRect.fromRectAndRadius(
@@ -336,12 +771,12 @@ class _XiangqiBoardPainter({
     for (var index = 0; index < kXiangqiSquares; index++) {
       if (position.board[index] == king) {
         final centre = geometry.centerOf(XiangqiSquare(index), orientation);
-        canvas.drawCircle(centre, geometry.pieceRadius * 1.2, Paint()..color = _check);
+        canvas.drawCircle(centre, geometry.pieceRadius * 1.2, Paint()..color = style.check);
         canvas.drawCircle(
           centre,
           geometry.pieceRadius * 1.2,
           Paint()
-            ..color = _checkRing
+            ..color = style.checkRing
             ..style = .stroke
             ..strokeWidth = cell * 0.06,
         );
@@ -351,41 +786,87 @@ class _XiangqiBoardPainter({
   }
 
   void paintPieces(Canvas canvas) {
+    // The two pieces that are being drawn somewhere else this frame: the one arriving on its
+    // destination is the translating piece, and the one under the finger is the dragged piece.
+    // Drawing them here as well would show two of each.
+    final arrivingAt = {for (final moving in _translating) moving.to};
+    final dragFrom = this.dragFrom;
     for (var index = 0; index < kXiangqiSquares; index++) {
+      final square = XiangqiSquare(index);
+      if (arrivingAt.contains(square) || square == dragFrom) continue;
       final piece = position.board[index];
       if (piece == null) continue;
-      final centre = geometry.centerOf(XiangqiSquare(index), orientation);
-      final ink = piece.side == .red ? _redInk : _blackInk;
+      paintPiece(canvas, geometry.centerOf(square, orientation), piece);
+    }
+  }
 
-      canvas.drawCircle(centre, geometry.pieceRadius, Paint()..color = _pieceFace);
-      canvas.drawCircle(
-        centre,
-        geometry.pieceRadius - cell * 0.0225,
-        Paint()
-          ..color = _pieceRing
-          ..style = .stroke
-          ..strokeWidth = cell * 0.045,
-      );
-      canvas.drawCircle(
-        centre,
-        geometry.pieceRadius * 0.84,
-        Paint()
-          ..color = ink
-          ..style = .stroke
-          ..strokeWidth = cell * 0.014,
-      );
-      paintText(
+  /// One piece, centred on [centre] and drawn at [scale] of its usual size.
+  void paintPiece(Canvas canvas, Offset centre, XiangqiPiece piece, {double scale = 1}) {
+    final radius = geometry.pieceRadius * scale;
+    final ink = piece.side == .red ? style.redInk : style.blackInk;
+    canvas.drawCircle(centre, radius, Paint()..color = style.pieceFace);
+    canvas.drawCircle(
+      centre,
+      radius - cell * 0.0225 * scale,
+      Paint()
+        ..color = style.pieceRing
+        ..style = .stroke
+        ..strokeWidth = cell * 0.045 * scale,
+    );
+    canvas.drawCircle(
+      centre,
+      radius * 0.84,
+      Paint()
+        ..color = ink
+        ..style = .stroke
+        ..strokeWidth = cell * 0.014 * scale,
+    );
+    paintText(
+      canvas,
+      piece.glyph,
+      TextStyle(
+        color: ink,
+        fontSize: cell * 0.6 * scale,
+        fontWeight: FontWeight.bold,
+        fontFamilyFallback: _cjkFallback,
+      ),
+      centre,
+    );
+  }
+
+  /// The pieces a move has travelling: each is the one piece that moved, drawn partway between the
+  /// square it left and the square it is arriving on. Every other piece is drawn straight from the
+  /// position, so this is the only thing the animation moves.
+  void paintTranslating(Canvas canvas) {
+    final t = _translation.value;
+    for (final moving in _translating) {
+      paintPiece(
         canvas,
-        piece.glyph,
-        TextStyle(
-          color: ink,
-          fontSize: cell * 0.6,
-          fontWeight: FontWeight.bold,
-          fontFamilyFallback: _cjkFallback,
-        ),
-        centre,
+        Offset.lerp(
+          geometry.centerOf(moving.from, orientation),
+          geometry.centerOf(moving.to, orientation),
+          t,
+        )!,
+        moving.piece,
       );
     }
+  }
+
+  /// The piece a capture is taking. It is already gone from the position, so it is drawn from the
+  /// record of the move instead, fading out where it stood while the taking piece arrives on top
+  /// of it.
+  void paintFading(Canvas canvas) {
+    if (_fading.isEmpty) return;
+    final opacity = 1 - _fade.value;
+    if (opacity <= 0) return;
+    canvas.saveLayer(
+      Rect.fromLTWH(0, 0, geometry.width, geometry.height),
+      Paint()..color = Color.fromRGBO(0, 0, 0, opacity),
+    );
+    for (final gone in _fading) {
+      paintPiece(canvas, geometry.centerOf(gone.square, orientation), gone.piece);
+    }
+    canvas.restore();
   }
 
   /// What the selected piece may play: a dot on an empty point, a ring around a piece that would be
@@ -394,13 +875,13 @@ class _XiangqiBoardPainter({
     for (final move in moves) {
       final centre = geometry.centerOf(move.to, orientation);
       if (position.pieceAt(move.to) == null) {
-        canvas.drawCircle(centre, cell * 0.13, Paint()..color = _target);
+        canvas.drawCircle(centre, cell * 0.13, Paint()..color = style.target);
       } else {
         canvas.drawCircle(
           centre,
           geometry.pieceRadius * 1.08,
           Paint()
-            ..color = _target
+            ..color = style.target
             ..style = .stroke
             ..strokeWidth = cell * 0.07,
         );
@@ -408,17 +889,55 @@ class _XiangqiBoardPainter({
     }
   }
 
+  /// The ring around the picked-up piece, and around the square a drag was picked up on: both say
+  /// the same thing, that this is the piece the player is holding.
   void paintSelection(Canvas canvas) {
-    final square = selected;
-    if (square == null) return;
+    final paint = Paint()
+      ..color = style.selected
+      ..style = .stroke
+      ..strokeWidth = cell * 0.07;
+    for (final square in [selected, dragFrom]) {
+      if (square == null) continue;
+      canvas.drawCircle(geometry.centerOf(square, orientation), geometry.pieceRadius * 1.1, paint);
+    }
+  }
+
+  /// A translucent circle on the square a hinted move would be played from, over the pieces so
+  /// that it is never hidden.
+  ///
+  /// A circle and not an arrow: the chess game's own hint is a single circle on one square (see
+  /// `offline_computer_game_screen.dart`), and a xiangqi hint matching it is the whole point of
+  /// this one.
+  void paintHint(Canvas canvas) {
+    final hint = this.hint;
+    if (hint == null) return;
     canvas.drawCircle(
-      geometry.centerOf(square, orientation),
-      geometry.pieceRadius * 1.1,
-      Paint()
-        ..color = _selected
-        ..style = .stroke
-        ..strokeWidth = cell * 0.07,
+      geometry.centerOf(hint.from, orientation),
+      cell * 0.45,
+      Paint()..color = style.hint,
     );
+  }
+
+  /// The piece under the player's finger, a little larger than the rest and lifted off the board by
+  /// a soft shadow.
+  ///
+  /// A dragged piece is not a translating one. Dragging is the player's hand moving a piece and
+  /// animating is the engine drawing a move the board has already been given, and the two are never
+  /// happening at once: nothing arrives from a drag until the caller plays it back as a position.
+  void paintDraggedPiece(Canvas canvas) {
+    final from = dragFrom;
+    final at = dragPosition;
+    if (from == null || at == null) return;
+    final piece = position.pieceAt(from);
+    if (piece == null) return;
+    canvas.drawCircle(
+      at,
+      geometry.pieceRadius * 1.15,
+      Paint()
+        ..color = const Color(0x55000000)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, cell * 0.08),
+    );
+    paintPiece(canvas, at, piece, scale: 1.15);
   }
 
   /// Writes [text] centred on [centre].
@@ -431,14 +950,23 @@ class _XiangqiBoardPainter({
   }
 
   @override
-  bool shouldRepaint(covariant _XiangqiBoardPainter oldDelegate) =>
+  bool shouldRepaint(covariant XiangqiBoardPainter oldDelegate) =>
       oldDelegate.geometry.cell != geometry.cell ||
+      oldDelegate.geometry.showCoordinates != geometry.showCoordinates ||
       oldDelegate.position != position ||
       oldDelegate.orientation != orientation ||
       oldDelegate.selected != selected ||
       oldDelegate.moves != moves ||
       oldDelegate.lastMove != lastMove ||
-      oldDelegate.isCheck != isCheck;
+      oldDelegate.isCheck != isCheck ||
+      oldDelegate.style != style ||
+      oldDelegate.showLastMove != showLastMove ||
+      oldDelegate.showBorder != showBorder ||
+      oldDelegate.hint != hint ||
+      oldDelegate.dragFrom != dragFrom ||
+      oldDelegate.dragPosition != dragPosition ||
+      oldDelegate._translating != _translating ||
+      oldDelegate._fading != _fading;
 }
 
 bool _onBoard(int file, int rank) => file >= 0 && file <= 8 && rank >= 0 && rank <= 9;

@@ -83,6 +83,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get mobileChapterName => '챕터 이름';
 
   @override
+  String get mobileChess => 'Chess';
+
+  @override
   String get mobileChess960Position => 'Chess960 Position';
 
   @override
@@ -465,6 +468,12 @@ class AppLocalizationsKo extends AppLocalizations {
   String get mobilePuzzleStormSubtitle => '3분 이내에 최대한 많은 퍼즐을 해결하세요.';
 
   @override
+  String get mobilePuzzleStormTitle => 'Puzzle Storm';
+
+  @override
+  String get mobilePuzzleStreakTitle => 'Puzzle Streak';
+
+  @override
   String get mobilePuzzleThemesSubtitle => '당신이 가장 좋아하는 오프닝으로부터의 퍼즐을 플레이하거나, 테마를 선택하세요.';
 
   @override
@@ -723,6 +732,21 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get mobileWinOrFiftyMoveDraw => 'Win or 50 move draw';
+
+  @override
+  String get mobileXiangqi => 'Xiangqi';
+
+  @override
+  String get mobileXiangqiBoardCoordinates => 'Board coordinates (A-I, 0-9)';
+
+  @override
+  String get mobileXiangqiEasy => 'Easy';
+
+  @override
+  String get mobileXiangqiHard => 'Hard';
+
+  @override
+  String get mobileXiangqiMedium => 'Medium';
 
   @override
   String get mobileYouCannotChallengeYourself => '본인에게는 도전할 수 없습니다';

@@ -1,14 +1,19 @@
+import 'dart:convert';
+
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lichess_mobile/src/model/engine/engine.dart';
 import 'package:lichess_mobile/src/model/engine/engine_spec.dart';
+import 'package:lichess_mobile/src/model/engine/evaluation_preferences.dart';
+import 'package:lichess_mobile/src/model/settings/preferences_storage.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_move.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_game_screen.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_game_layout.dart';
 
 import '../../binding.dart';
 import '../../model/engine/fake_transport.dart';
@@ -37,9 +42,15 @@ XiangqiMove moveAt(String iccs) {
 /// parsing are all the real ones and only the bytes in and out are not. It is also what the game
 /// needs to be testable at all — the engine it really starts is a 48 MB network written out of the
 /// bundle first, which a test surface has nowhere to put.
+///
+/// The evaluation is off unless [engineEvaluation] asks for it. The engine is one engine and the
+/// screen shares it between the opponent and the evaluation bar, so an evaluation left running would
+/// take the engine out from under the opponent's search and the commands the tests read — the
+/// `go depth 9` an answer is made of — would belong to the bar instead.
 Future<FakeTransport> pumpGameScreen(
   WidgetTester tester, {
   Size surfaceSize = kTestSurfaceSize,
+  bool engineEvaluation = false,
 }) async {
   final transport = FakeTransport(
     spec: const PikafishSpec(nnuePath: '/test/pikafish.nnue'),
@@ -53,6 +64,11 @@ Future<FakeTransport> pumpGameScreen(
       tester,
       home: const XiangqiGameScreen(),
       overrides: {xiangqiEngineProvider: xiangqiEngineProvider.overrideWith((Ref ref) => engine)},
+      defaultPreferences: {
+        PrefCategory.engineEvaluation.storageKey: jsonEncode(
+          EngineEvaluationPrefState.defaults.copyWith(isEnabled: engineEvaluation).toJson(),
+        ),
+      },
       surfaceSize: surfaceSize,
     ),
   );
@@ -87,11 +103,15 @@ Future<void> answer(WidgetTester tester, FakeTransport transport, String iccs) a
 ///
 /// Aimed at the drawn board rather than at the box it is drawn in, which are not the same thing: the
 /// board takes the largest board that fits its room and centres it, so on a phone-shaped surface —
-/// taller than the board's own 9:10 — there is a band of the box above and below the board, and a
+/// taller than the board's own 10:11 — there is a band of the box above and below the board, and a
 /// touch aimed at the box's top-left corner would land beside it.
+///
+/// The geometry is measured with the coordinates on, which is the preference's default: they widen
+/// the board's margin by half a cell on every side, and a geometry measured without them would put
+/// every square half a cell off from where the board drew it.
 Future<void> tapSquare(WidgetTester tester, String name) async {
   final box = tester.getRect(find.byType(XiangqiBoard));
-  final geometry = XiangqiBoardGeometry.fit(box.size);
+  final geometry = XiangqiBoardGeometry.fit(box.size, showCoordinates: true);
   final board = Rect.fromCenter(center: box.center, width: geometry.width, height: geometry.height);
   await tester.tapAt(board.topLeft + geometry.centerOf(squareAt(name), .red));
   await tester.pump();
@@ -117,7 +137,30 @@ void main() {
       // engine until they have moved — which is what a takeback with nothing to take back means.
       expect(barButton(tester, CupertinoIcons.arrow_uturn_left).onTap, isNull);
       expect(barButton(tester, CupertinoIcons.flag).onTap, isNotNull);
+      // A hint is the player asking the engine a question, and the engine is free until the
+      // opponent needs it: the button is live exactly while the computer is not thinking.
+      expect(barButton(tester, CupertinoIcons.lightbulb).onTap, isNotNull);
       expect(find.text('Computer thinking ...'), findsNothing);
+    });
+
+    testWidgets('the evaluation bar is drawn beside the board when the evaluation is on', (
+      tester,
+    ) async {
+      await pumpGameScreen(tester, engineEvaluation: true);
+
+      // A search of the opening position has been started, and until it has said anything the bar
+      // is drawn level rather than left out: a bar that came and went on every move would flicker.
+      final gauge = tester.widget<XiangqiEvalGauge>(find.byType(XiangqiEvalGauge));
+      expect(gauge.redWinProbability, 0.5);
+      expect(gauge.evaluation, isNull);
+      // The board is drawn from red's side here, so the bar is too: red's end of it is the bottom.
+      expect(gauge.orientation, XiangqiSide.red);
+    });
+
+    testWidgets('there is no evaluation bar when the evaluation is off', (tester) async {
+      await pumpGameScreen(tester);
+
+      expect(find.byType(XiangqiEvalGauge), findsNothing);
     });
 
     testWidgets('the player moves and the computer answers', (tester) async {
@@ -128,13 +171,18 @@ void main() {
 
       await tapSquare(tester, 'e2');
       expect(find.text('Computer thinking ...'), findsOneWidget);
+      // The engine is one engine, and while the computer is thinking it is the computer's: a hint
+      // asked for now would take it out from under the search the opponent's move is coming from.
+      expect(barButton(tester, CupertinoIcons.lightbulb).onTap, isNull);
 
       await answer(tester, transport, 'h9g7');
 
       expect(find.text('Your turn'), findsOneWidget);
       expect(tester.widget<XiangqiBoard>(find.byType(XiangqiBoard)).lastMove, moveAt('h9g7'));
-      // Both sides have moved, so there is something for the player to take back.
+      // Both sides have moved, so there is something for the player to take back, and the engine is
+      // the player's again.
       expect(barButton(tester, CupertinoIcons.arrow_uturn_left).onTap, isNotNull);
+      expect(barButton(tester, CupertinoIcons.lightbulb).onTap, isNotNull);
     });
 
     testWidgets('picking a piece up and putting it down again is all it takes to move', (
@@ -225,7 +273,9 @@ void main() {
 
       expect(find.text('Side'), findsOneWidget);
       expect(find.text('Red'), findsOneWidget);
-      expect(find.text('Difficulty'), findsOneWidget);
+      // The opponent is the computer and nothing else here, so the row is named with the app's own
+      // word for one rather than a word of this screen's inventing.
+      expect(find.text('Opponent'), findsOneWidget);
       expect(find.text('Medium'), findsOneWidget);
     });
 

@@ -21,6 +21,15 @@ class const MoveList({
   required final int currentMoveIndex,
   final Color? inlineColor,
   final BoxDecoration? inlineDecoration,
+
+  /// The piece notation to draw the moves in, instead of the user's own preference.
+  ///
+  /// Chess moves are written in algebraic and can only ever differ in the font their pieces are
+  /// drawn in — see [PieceNotation]. A caller that has notation of its own to show, xiangqi's
+  /// 炮二平五 being the one the app needs, passes a value here so the list draws the strings it is
+  /// given as they are rather than under the chess piece font. Left out, every existing caller
+  /// keeps following the user's setting exactly as it did before.
+  final PieceNotation? pieceNotation,
   final void Function(int moveIndex)? onSelectMove,
 }) extends ConsumerStatefulWidget {
   @override
@@ -64,9 +73,13 @@ class _MoveListState() extends ConsumerState<MoveList> {
 
   @override
   Widget build(BuildContext context) {
-    final pieceNotation = ref
+    // The user's preference is read on its own first, and not as the right-hand side of the `??`
+    // below: `maybeWhen` takes its own type from the expression it is written in, and beside a
+    // nullable field that type would be nullable too, which no move can be drawn in.
+    final preferredPieceNotation = ref
         .watch(pieceNotationProvider)
         .maybeWhen(data: (value) => value, orElse: () => defaultAccountPreferences.pieceNotation);
+    final pieceNotation = widget.pieceNotation ?? preferredPieceNotation;
 
     return widget.type == MoveListType.inline
         ? Container(

@@ -25,6 +25,38 @@ Future<Rect> pumpBoard(
   return tester.getRect(find.byType(XiangqiBoard));
 }
 
+/// The painter the board is drawing itself with.
+///
+/// The pieces here are canvas output rather than widgets, so there is nothing to find by key and
+/// this is the only door onto what the board has drawn — including, for a move in flight, the
+/// pieces it has travelling.
+XiangqiBoardPainter painterOf(WidgetTester tester) =>
+    tester
+            .widget<CustomPaint>(
+              find.descendant(of: find.byType(XiangqiBoard), matching: find.byType(CustomPaint)),
+            )
+            .painter!
+        as XiangqiBoardPainter;
+
+/// Drags the point at [from] by [delta], in steps, and lets go.
+///
+/// The steps matter: a pan is only recognised once the finger has travelled further than the touch
+/// slop, so a drag has to be walked rather than jumped, exactly as a finger would walk it.
+Future<void> dragFrom(
+  WidgetTester tester,
+  Rect board,
+  XiangqiBoardGeometry geometry,
+  XiangqiSquare from,
+  List<Offset> steps,
+) async {
+  final gesture = await tester.startGesture(board.topLeft + geometry.centerOf(from, .red));
+  for (final step in steps) {
+    await gesture.moveBy(step);
+  }
+  await gesture.up();
+  await tester.pump();
+}
+
 void main() {
   group('XiangqiBoardGeometry', () {
     test('takes the largest board that fits the room, whichever side runs out first', () {
@@ -53,6 +85,32 @@ void main() {
       expect(inAColumn.cell, 40);
       expect(inAColumn.height, 400);
       expect(() => XiangqiBoardGeometry.fit(Size.infinite), throwsFlutterError);
+    });
+
+    test('leaves the board exactly as it was when the coordinates are off', () {
+      // The whole point of the flag being optional: a caller that does not ask for coordinates
+      // gets the board that has always been drawn, to the pixel.
+      expect(XiangqiBoardGeometry.fit(const Size(360, 400)).showCoordinates, isFalse);
+      expect(XiangqiBoardGeometry.fit(const Size(360, 400)).pad, 20);
+    });
+
+    test('reserves a whole extra cell of margin for the file coordinates', () {
+      // Ten cells across and eleven up: the same grid, with a whole cell of frame instead of half
+      // of one, so the digits have a clear band below the bottom rank to be printed in. A piece
+      // reaches 0.44 of a cell past the line it stands on, which is most of a half-cell margin and
+      // comfortably less than a whole one.
+      final numbered = XiangqiBoardGeometry.fit(const Size(400, 440), showCoordinates: true);
+      expect(numbered.showCoordinates, isTrue);
+      expect(numbered.cell, 40);
+      expect(numbered.width, 400);
+      expect(numbered.height, 440);
+      expect(numbered.pad, 40);
+
+      // The same room fits a smaller board once the frame has to be wider, and the grid inside it
+      // is the same grid, a cell further in.
+      final crowded = XiangqiBoardGeometry.fit(const Size(360, 400), showCoordinates: true);
+      expect(crowded.cell, 36);
+      expect(crowded.width, 360);
     });
 
     test('puts a0 in the bottom left corner and i9 in the top right', () {
@@ -109,6 +167,57 @@ void main() {
     });
   });
 
+  group('xiangqiPieceAnimation', () {
+    final before = XiangqiPosition.fromFen('3ak4/9/9/9/9/9/9/R3r4/9/3AK4 w - - 0 1');
+    final after = XiangqiPosition.fromFen('3ak4/9/9/9/9/9/9/4R4/9/3AK4 w - - 0 1');
+    final capture = XiangqiMove.parseIccs('a2e2')!;
+
+    test('has the piece that moved travelling, and the piece it took fading out', () {
+      final animation = xiangqiPieceAnimation(before, after, capture);
+      expect(animation.translating.toList(), [
+        (
+          from: XiangqiSquare.parse('a2')!,
+          to: XiangqiSquare.parse('e2')!,
+          piece: before.pieceAt(XiangqiSquare.parse('a2')!)!,
+        ),
+      ]);
+      expect(animation.fading.toList(), [
+        (square: XiangqiSquare.parse('e2')!, piece: before.pieceAt(XiangqiSquare.parse('e2')!)!),
+      ]);
+    });
+
+    test('has nothing fading for a move that takes nothing', () {
+      final quiet = XiangqiMove.parseIccs('a2b2')!;
+      final quietAfter = XiangqiPosition.fromFen('3ak4/9/9/9/9/9/9/1R2r4/9/3AK4 w - - 0 1');
+      final animation = xiangqiPieceAnimation(before, quietAfter, quiet);
+      expect(animation.translating, hasLength(1));
+      expect(animation.fading, isEmpty);
+    });
+
+    test('has nothing moving when the move does not explain the change', () {
+      // An undo is the case that matters: the board goes back to where it was while the last move
+      // is still the one that was taken back, and the piece it names is no longer on its square.
+      expect(xiangqiPieceAnimation(after, before, capture).translating, isEmpty);
+
+      // A move that is not the one played at all.
+      expect(
+        xiangqiPieceAnimation(before, after, XiangqiMove.parseIccs('a2a3')).translating,
+        isEmpty,
+      );
+
+      // A whole position swap, as a new game or a board set up by hand is.
+      expect(
+        xiangqiPieceAnimation(before, XiangqiPosition.initial(), capture).translating,
+        isEmpty,
+      );
+    });
+
+    test('has nothing moving when there is no move at all', () {
+      expect(xiangqiPieceAnimation(before, after, null).translating, isEmpty);
+      expect(xiangqiPieceAnimation(before, after, null).fading, isEmpty);
+    });
+  });
+
   group('XiangqiBoard', () {
     testWidgets('reports the square that was tapped', (tester) async {
       final tapped = <XiangqiSquare>[];
@@ -155,6 +264,18 @@ void main() {
       final rect = await pumpBoard(tester, XiangqiBoard(position: XiangqiPosition.initial()));
       await tester.tapAt(rect.center);
       expect(tester.takeException(), isNull);
+
+      // With no drag handler the board does not pick a piece up either: there is nothing a drag
+      // could report, so the piece stays where it is.
+      final geometry = XiangqiBoardGeometry.fit(rect.size);
+      final gesture = await tester.startGesture(
+        rect.topLeft + geometry.centerOf(XiangqiSquare.parse('e3')!, .red),
+      );
+      await gesture.moveBy(const Offset(0, -40));
+      await tester.pump();
+      expect(painterOf(tester).dragFrom, isNull);
+      await gesture.up();
+      await tester.pump();
     });
 
     testWidgets('draws a position that has everything on it at once', (tester) async {
@@ -187,6 +308,250 @@ void main() {
         ),
       );
       expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('draws the whole set of options at once too', (tester) async {
+      // Every new option on, on a board that is being dragged and hinted at the same time as it is
+      // animating a move: the arrangement the painter has the most ways to throw from.
+      final before = XiangqiPosition.initial();
+      final move = XiangqiMove.parseIccs('h2e2')!;
+      final replied = XiangqiMove.parseIccs('h9g7')!;
+      final position = play(play(before, move), replied);
+      final rect = await pumpBoard(
+        tester,
+        XiangqiBoard(
+          position: position,
+          lastMove: replied,
+          showCoordinates: true,
+          hint: XiangqiMove.parseIccs('b2e2'),
+          selected: XiangqiSquare.parse('e2'),
+          moves: legalMovesFrom(position, XiangqiSquare.parse('e2')!),
+          onDragMove: (from, to) {},
+          style: const XiangqiBoardStyle(ink: Color(0xFF112233)),
+        ),
+        size: const Size(400, 440),
+      );
+      expect(tester.takeException(), isNull);
+      final geometry = XiangqiBoardGeometry.fit(rect.size, showCoordinates: true);
+      await dragFrom(tester, rect, geometry, XiangqiSquare.parse('e2')!, const [Offset(0, -40)]);
+      expect(tester.takeException(), isNull);
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets(
+      'reports a drag from the square it was picked up on to the square it was let go on',
+      (tester) async {
+        final dragged = <(XiangqiSquare, XiangqiSquare)>[];
+        final rect = await pumpBoard(
+          tester,
+          XiangqiBoard(
+            position: XiangqiPosition.initial(),
+            onDragMove: (from, to) => dragged.add((from, to)),
+          ),
+        );
+        final geometry = XiangqiBoardGeometry.fit(rect.size);
+        final e3 = XiangqiSquare.parse('e3')!;
+        // One cell up: red's soldier steps forward, and both ends of the drag are named.
+        await dragFrom(tester, rect, geometry, e3, const [Offset(0, -40)]);
+        expect(dragged, [(e3, XiangqiSquare.parse('e4'))]);
+      },
+    );
+
+    testWidgets('reports a one-rank drag on a board narrower than the pan slop', (tester) async {
+      // A pan normally waits for 36 logical pixels of travel, and a narrow board puts one rank
+      // inside that: 30 points here, which is a phone of about 320 points with the padding a game
+      // screen puts around the board. The pan still gets the gesture, because the finger has moved
+      // further than the tap allows, so the tap bows out and the pan is the only one left in the
+      // arena to win it on the way up. The move the player made is the move that is reported.
+      final dragged = <(XiangqiSquare, XiangqiSquare)>[];
+      final rect = await pumpBoard(
+        tester,
+        XiangqiBoard(
+          position: XiangqiPosition.initial(),
+          onDragMove: (from, to) => dragged.add((from, to)),
+        ),
+        size: const Size(270, 300),
+      );
+      final geometry = XiangqiBoardGeometry.fit(rect.size);
+      expect(geometry.cell, 30);
+      final e3 = XiangqiSquare.parse('e3')!;
+      await dragFrom(tester, rect, geometry, e3, const [Offset(0, -30)]);
+      expect(dragged, [(e3, XiangqiSquare.parse('e4'))]);
+    });
+
+    testWidgets('reports nothing when the drag is let go back where it started', (tester) async {
+      final dragged = <(XiangqiSquare, XiangqiSquare)>[];
+      final rect = await pumpBoard(
+        tester,
+        XiangqiBoard(
+          position: XiangqiPosition.initial(),
+          onDragMove: (from, to) => dragged.add((from, to)),
+        ),
+      );
+      final geometry = XiangqiBoardGeometry.fit(rect.size);
+      final e3 = XiangqiSquare.parse('e3')!;
+      // Off the square and back onto it: the piece was picked up and put down again, which is not
+      // a move, and the board does not invent a tap out of it either.
+      await dragFrom(tester, rect, geometry, e3, const [Offset(0, -40), Offset(0, 40)]);
+      expect(dragged, isEmpty);
+    });
+
+    testWidgets('reports nothing when the drag is let go beside the board', (tester) async {
+      final dragged = <(XiangqiSquare, XiangqiSquare)>[];
+      final rect = await pumpBoard(
+        tester,
+        XiangqiBoard(
+          position: XiangqiPosition.initial(),
+          onDragMove: (from, to) => dragged.add((from, to)),
+        ),
+      );
+      final geometry = XiangqiBoardGeometry.fit(rect.size);
+      // Dragged clean off the right-hand edge of the board, where there is no square to land on.
+      await dragFrom(tester, rect, geometry, XiangqiSquare.parse('e3')!, const [Offset(200, 0)]);
+      expect(dragged, isEmpty);
+    });
+
+    testWidgets('picks up only a piece of the side to move', (tester) async {
+      final dragged = <(XiangqiSquare, XiangqiSquare)>[];
+      final rect = await pumpBoard(
+        tester,
+        XiangqiBoard(
+          position: XiangqiPosition.initial(),
+          onDragMove: (from, to) => dragged.add((from, to)),
+        ),
+      );
+      final geometry = XiangqiBoardGeometry.fit(rect.size);
+      // Red to move, so black's chariot is not the player's to pick up, and an empty square has
+      // nothing on it to pick up at all.
+      await dragFrom(tester, rect, geometry, XiangqiSquare.parse('a9')!, const [Offset(0, 40)]);
+      await dragFrom(tester, rect, geometry, XiangqiSquare.parse('e5')!, const [Offset(0, 40)]);
+      expect(dragged, isEmpty);
+    });
+
+    testWidgets('draws the piece that moved travelling, and only while it is moving', (
+      tester,
+    ) async {
+      final before = XiangqiPosition.initial();
+      final move = XiangqiMove.parseIccs('e3e4')!;
+      final after = play(before, move);
+      final pawn = before.pieceAt(XiangqiSquare.parse('e3')!)!;
+      await pumpBoard(tester, XiangqiBoard(position: before));
+      expect(painterOf(tester).translating, isEmpty);
+
+      await pumpBoard(tester, XiangqiBoard(position: after, lastMove: move));
+      // One frame in, the piece is travelling and the board has not yet drawn it on its
+      // destination.
+      expect(painterOf(tester).translating.toList(), [
+        (from: XiangqiSquare.parse('e3')!, to: XiangqiSquare.parse('e4')!, piece: pawn),
+      ]);
+      expect(painterOf(tester).fading, isEmpty);
+
+      // And once it has arrived the board is a board again, drawing the position itself.
+      await tester.pumpAndSettle();
+      expect(painterOf(tester).translating, isEmpty);
+      expect(painterOf(tester).fading, isEmpty);
+    });
+
+    testWidgets('draws the captured piece fading out under the piece that took it', (tester) async {
+      // A position built for the capture alone, so that the move is unambiguous: red's chariot on
+      // a2 takes black's on e2 down the second rank.
+      final before = XiangqiPosition.fromFen('3ak4/9/9/9/9/9/9/R3r4/9/3AK4 w - - 0 1');
+      final move = XiangqiMove.parseIccs('a2e2')!;
+      final after = play(before, move);
+      final taken = before.pieceAt(XiangqiSquare.parse('e2')!)!;
+      await pumpBoard(tester, XiangqiBoard(position: before));
+      await pumpBoard(tester, XiangqiBoard(position: after, lastMove: move));
+      expect(painterOf(tester).translating, hasLength(1));
+      expect(painterOf(tester).fading.toList(), [
+        (square: XiangqiSquare.parse('e2')!, piece: taken),
+      ]);
+      await tester.pumpAndSettle();
+      expect(painterOf(tester).fading, isEmpty);
+    });
+
+    testWidgets('draws the move already arrived when the duration is zero', (tester) async {
+      final before = XiangqiPosition.initial();
+      final move = XiangqiMove.parseIccs('e3e4')!;
+      final after = play(before, move);
+      await pumpBoard(tester, XiangqiBoard(position: before));
+      await pumpBoard(
+        tester,
+        XiangqiBoard(position: after, lastMove: move, animationDuration: Duration.zero),
+      );
+      expect(painterOf(tester).translating, isEmpty);
+    });
+
+    testWidgets('draws nothing travelling when the move does not explain the change', (
+      tester,
+    ) async {
+      // An undo, which is the case that matters: the board goes back to where it was while the last
+      // move is still the one that was taken back.
+      final before = XiangqiPosition.initial();
+      final move = XiangqiMove.parseIccs('e3e4')!;
+      final after = play(before, move);
+      await pumpBoard(tester, XiangqiBoard(position: after, lastMove: move));
+      await pumpBoard(tester, XiangqiBoard(position: before, lastMove: move));
+      expect(painterOf(tester).translating, isEmpty);
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('draws nothing travelling when the board is turned around', (tester) async {
+      // A move and a flip at once is noise, and the flip wins: the piece would otherwise travel
+      // across a board it never started on.
+      final before = XiangqiPosition.initial();
+      final move = XiangqiMove.parseIccs('e3e4')!;
+      final after = play(before, move);
+      await pumpBoard(tester, XiangqiBoard(position: before));
+      await pumpBoard(tester, XiangqiBoard(position: after, lastMove: move, orientation: .black));
+      expect(painterOf(tester).translating, isEmpty);
+      await tester.pumpAndSettle();
+    });
+  });
+
+  group('XiangqiBoard options', () {
+    testWidgets('hands the painter the flags it was given', (tester) async {
+      final move = XiangqiMove.parseIccs('e3e4')!;
+      final position = play(XiangqiPosition.initial(), move);
+      const style = XiangqiBoardStyle(surface: Color(0xFF000000), redInk: Color(0xFFFF00FF));
+      final hint = XiangqiMove.parseIccs('b2e2');
+      final rect = await pumpBoard(
+        tester,
+        XiangqiBoard(
+          position: position,
+          lastMove: move,
+          showCoordinates: true,
+          showLastMove: false,
+          showBorder: false,
+          hint: hint,
+          style: style,
+        ),
+        size: const Size(400, 440),
+      );
+      final painter = painterOf(tester);
+      expect(painter.showLastMove, isFalse);
+      expect(painter.showBorder, isFalse);
+      expect(painter.hint, hint);
+      expect(painter.style, style);
+      expect(painter.geometry.showCoordinates, isTrue);
+      final expected = XiangqiBoardGeometry.fit(rect.size, showCoordinates: true);
+      expect(painter.geometry.cell, expected.cell);
+      expect(painter.geometry.pad, expected.pad);
+      expect(painter.geometry.width, expected.width);
+      expect(painter.geometry.height, expected.height);
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('draws the same board with the defaults as the board that was always drawn', (
+      tester,
+    ) async {
+      await pumpBoard(tester, XiangqiBoard(position: XiangqiPosition.initial()));
+      final painter = painterOf(tester);
+      expect(painter.showLastMove, isTrue);
+      expect(painter.showBorder, isTrue);
+      expect(painter.hint, isNull);
+      expect(painter.style, const XiangqiBoardStyle());
+      expect(painter.geometry.showCoordinates, isFalse);
+      expect(painter.geometry.cell, 40);
     });
   });
 }

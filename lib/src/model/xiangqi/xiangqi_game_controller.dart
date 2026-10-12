@@ -12,6 +12,7 @@ import 'package:lichess_mobile/src/model/ui_events.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_move.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_rules.dart';
+import 'package:lichess_mobile/src/service/move_feedback.dart';
 import 'package:lichess_mobile/src/service/pikafish_nnue_service.dart';
 import 'package:logging/logging.dart';
 
@@ -43,10 +44,13 @@ const _kEngineFailedMessage =
 /// `movetime 2000` reaches depth 17 over 202116 nodes. The first two are therefore a move back in an
 /// instant and a move in a blink, and only the third costs the computer the two seconds it is given
 /// — which is why it is the only one a player can feel.
-enum XiangqiDifficulty(final String label, final SearchLimit limit) {
-  easy('Easy', SearchLimit.depth(3)),
-  medium('Medium', SearchLimit.depth(9)),
-  hard('Hard', SearchLimit.movetime(Duration(seconds: 2))),
+/// Each level is named by the view, which is the only place that can: the three names are the app's
+/// own translated ones (`mobileXiangqiEasy` and its neighbours) and a model cannot read a
+/// `BuildContext`. What the model owns is the limit, which is what a level actually is.
+enum XiangqiDifficulty(final SearchLimit limit) {
+  easy(SearchLimit.depth(3)),
+  medium(SearchLimit.depth(9)),
+  hard(SearchLimit.movetime(Duration(seconds: 2))),
 }
 
 /// How the game ended, if it has.
@@ -278,11 +282,25 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
 
   /// Makes [move] and, if the game is still running, hands the turn to the engine.
   void _play(XiangqiMove move) {
+    // Read before the move is made: afterwards the square holds whatever landed on it, and nothing
+    // there says whether what arrived took a piece or merely moved to a square that was empty.
+    final isCapture = state.position.pieceAt(move.to) != null;
+
     state = state.copyWith(
       positions: state.positions.add(play(state.position, move)),
       moves: state.moves.add(move),
       selected: null,
     );
+
+    // Xiangqi has no dartchess variant, so a capture is reported with none; the service reads that
+    // as the ordinary capture sound, which is what a capture in this game always is.
+    final check = isCheck(state.position);
+    if (isCapture) {
+      ref.read(moveFeedbackServiceProvider).captureFeedback(null, check: check);
+    } else {
+      ref.read(moveFeedbackServiceProvider).moveFeedback(check: check);
+    }
+
     if (!state.isFinished && !state.isPlayerTurn) unawaited(_playEngineMove());
   }
 

@@ -83,6 +83,9 @@ class AppLocalizationsEl extends AppLocalizations {
   String get mobileChapterName => 'Chapter Name';
 
   @override
+  String get mobileChess => 'Chess';
+
+  @override
   String get mobileChess960Position => 'Chess960 Position';
 
   @override
@@ -465,6 +468,12 @@ class AppLocalizationsEl extends AppLocalizations {
   String get mobilePuzzleStormSubtitle => 'Λύστε όσα περισσότερα τακτικά μπορείτε σε 3 λεπτά.';
 
   @override
+  String get mobilePuzzleStormTitle => 'Puzzle Storm';
+
+  @override
+  String get mobilePuzzleStreakTitle => 'Puzzle Streak';
+
+  @override
   String get mobilePuzzleThemesSubtitle => 'Λύστε τακτικά από τα αγαπημένα σας ανοίγματα, ή επιλέξτε κάποιο θέμα.';
 
   @override
@@ -723,6 +732,21 @@ class AppLocalizationsEl extends AppLocalizations {
 
   @override
   String get mobileWinOrFiftyMoveDraw => 'Win or 50 move draw';
+
+  @override
+  String get mobileXiangqi => 'Xiangqi';
+
+  @override
+  String get mobileXiangqiBoardCoordinates => 'Board coordinates (A-I, 0-9)';
+
+  @override
+  String get mobileXiangqiEasy => 'Easy';
+
+  @override
+  String get mobileXiangqiHard => 'Hard';
+
+  @override
+  String get mobileXiangqiMedium => 'Medium';
 
   @override
   String get mobileYouCannotChallengeYourself => 'You cannot challenge yourself';

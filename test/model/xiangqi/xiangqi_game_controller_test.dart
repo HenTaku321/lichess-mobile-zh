@@ -1,14 +1,19 @@
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lichess_mobile/src/model/common/chess.dart';
 import 'package:lichess_mobile/src/model/engine/engine.dart';
 import 'package:lichess_mobile/src/model/engine/engine_spec.dart';
+import 'package:lichess_mobile/src/model/settings/general_preferences.dart';
 import 'package:lichess_mobile/src/model/ui_events.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_move.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_rules.dart';
+import 'package:lichess_mobile/src/service/sound_service.dart';
 
+import '../../binding.dart';
+import '../../service/fake_sound_service.dart';
 import '../engine/fake_transport.dart';
 
 /// The square named [name], which the tests below write the way a player would.
@@ -42,7 +47,10 @@ class XiangqiHarness(final ProviderContainer container, final FakeTransport tran
 /// under test is the game, and an [Engine] over a [FakeTransport] is the smallest thing that answers
 /// the way Pikafish does — the handshake, the option hygiene, the commands and the `bestmove`
 /// parsing are all the real ones, and only the bytes in and out are not.
-Future<XiangqiHarness> makeHarness() async {
+Future<XiangqiHarness> makeHarness({SoundService? soundService}) async {
+  final binding = TestLichessBinding.ensureInitialized();
+  addTearDown(binding.reset);
+
   final transport = FakeTransport(
     spec: const PikafishSpec(nnuePath: '/test/pikafish.nnue'),
     startupLines: kPikafishHandshake,
@@ -51,7 +59,13 @@ Future<XiangqiHarness> makeHarness() async {
   addTearDown(engine.dispose);
 
   final container = ProviderContainer(
-    overrides: [xiangqiEngineProvider.overrideWith((Ref ref) => engine)],
+    overrides: [
+      xiangqiEngineProvider.overrideWith((Ref ref) => engine),
+      // A move now plays a sound and a haptic as it lands — see [MoveFeedbackService] — and a test
+      // surface has neither an audio device nor a preference store behind it: the haptics go
+      // nowhere, and the sound service is faked so that nothing tries to open a player.
+      soundServiceProvider.overrideWithValue(soundService ?? FakeSoundService()),
+    ],
   );
   addTearDown(container.dispose);
 
@@ -77,6 +91,32 @@ Future<void> answer(FakeTransport transport, String iccs) async {
   await pumpEventQueue();
   transport.emit('bestmove $iccs');
   await pumpEventQueue();
+}
+
+/// A sound service that writes down what it was asked to play, so that a test can tell one kind of
+/// move from another.
+///
+/// A capture is asked for as `playCaptureSound` and a quiet move as `play`, and both are written
+/// down as the sound they mean: the point of the test is which of the two the game asked for, not
+/// which method it went through.
+class RecordingSoundService() implements SoundService {
+  final List<Sound> sounds = [];
+
+  @override
+  Future<void> play(Sound sound, {double? volume}) async {
+    sounds.add(sound);
+  }
+
+  @override
+  Future<void> playCaptureSound(Variant variant, {double? volume}) async {
+    sounds.add(Sound.capture);
+  }
+
+  @override
+  Future<void> changeTheme(SoundTheme theme, {bool playSound = false}) async {}
+
+  @override
+  Future<void> release() async {}
 }
 
 void main() {
@@ -118,6 +158,21 @@ void main() {
       expect(harness.state.isEngineThinking, isFalse);
       expect(harness.state.isPlayerTurn, isTrue);
       expect(harness.state.isInCheck, isFalse);
+    });
+
+    test('a move is heard as it is played, and a piece picked up is not', () async {
+      final sound = RecordingSoundService();
+      final harness = await makeHarness(soundService: sound);
+      harness.controller.startNewGame(side: .red, difficulty: .medium);
+      // A player on red is not asked for anything of the engine's, so whatever is heard from here
+      // is the player's own doing.
+      expect(sound.sounds, isEmpty);
+
+      harness.controller.tapSquare(square('h2'));
+      expect(sound.sounds, isEmpty, reason: 'picking a piece up is not a move');
+
+      harness.controller.tapSquare(square('e2'));
+      expect(sound.sounds, [Sound.move]);
     });
 
     test('the difficulty is how long the computer is allowed to think', () async {

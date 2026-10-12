@@ -34,8 +34,15 @@ class MoveFeedbackService(final SoundService _soundService, final Ref _ref) {
     }
   }
 
-  void captureFeedback(Variant variant, {bool check = false}) {
-    _soundService.playCaptureSound(variant);
+  /// The feedback for a capture, in the chess [variant] it was played in — or null, for a capture in
+  /// a game that is not chess at all.
+  ///
+  /// Xiangqi is the caller that has no variant to give: its pieces and its rules are none of
+  /// `dartchess`'s business, and the only thing a variant decides here is whether the sound is an
+  /// atomic explosion, which no game but chess atomic has. A null is therefore handed on as
+  /// [Variant.standard] — the capture sound, which is what a capture always sounds like.
+  void captureFeedback(Variant? variant, {bool check = false}) {
+    _soundService.playCaptureSound(variant ?? Variant.standard);
 
     if (_ref.read(boardPreferencesProvider).hapticFeedback) {
       if (check) {

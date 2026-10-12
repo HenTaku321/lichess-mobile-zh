@@ -83,6 +83,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mobileChapterName => '章节名称';
 
   @override
+  String get mobileChess => '国际象棋';
+
+  @override
   String get mobileChess960Position => 'Chess960 局面';
 
   @override
@@ -459,10 +462,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mobilePuzzleStormFilterNothingToShow => '暂无内容，请调整筛选条件';
 
   @override
-  String get mobilePuzzleStormNothingToShow => '暂无内容，请先进行几轮 Puzzle Storm 挑战。';
+  String get mobilePuzzleStormNothingToShow => '暂无内容，请先完成几轮谜题风暴挑战。';
 
   @override
   String get mobilePuzzleStormSubtitle => '在 3 分钟内尽可能多地解答谜题';
+
+  @override
+  String get mobilePuzzleStormTitle => '谜题风暴';
+
+  @override
+  String get mobilePuzzleStreakTitle => '谜题连胜';
 
   @override
   String get mobilePuzzleThemesSubtitle => '解答您喜爱的开局谜题，或选择特定主题';
@@ -723,6 +732,21 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get mobileWinOrFiftyMoveDraw => '胜或50回合和棋';
+
+  @override
+  String get mobileXiangqi => '象棋';
+
+  @override
+  String get mobileXiangqiBoardCoordinates => '棋盘坐标 (A-I, 0-9)';
+
+  @override
+  String get mobileXiangqiEasy => '简单';
+
+  @override
+  String get mobileXiangqiHard => '困难';
+
+  @override
+  String get mobileXiangqiMedium => '中等';
 
   @override
   String get mobileYouCannotChallengeYourself => '您无法向自己发起挑战';
@@ -7066,7 +7090,7 @@ class AppLocalizationsZh extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '完成了 $count 次 $param2 的挑战',
+      other: '完成了 $count 次$param2挑战',
     );
     return '$_temp0';
   }
@@ -7972,6 +7996,9 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get mobileChallengeCreated => '挑戰已建立：對戰開始時您將收到通知。\n您可以在首頁分頁中查看。';
 
   @override
+  String get mobileChess => '國際象棋';
+
+  @override
   String get mobileClearButton => '清除';
 
   @override
@@ -8203,6 +8230,21 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get mobileWatchTab => '觀戰';
+
+  @override
+  String get mobileXiangqi => '象棋';
+
+  @override
+  String get mobileXiangqiBoardCoordinates => '棋盤座標（A-I, 0-9）';
+
+  @override
+  String get mobileXiangqiEasy => '簡單';
+
+  @override
+  String get mobileXiangqiHard => '困難';
+
+  @override
+  String get mobileXiangqiMedium => '中等';
 
   @override
   String get activityActivity => '活動';

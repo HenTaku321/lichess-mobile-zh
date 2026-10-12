@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/common/chess.dart';
+import 'package:lichess_mobile/src/model/engine/engine_availability.dart';
+import 'package:lichess_mobile/src/model/engine/engine_utils.dart';
 import 'package:lichess_mobile/src/model/engine/opponent_level.dart';
 import 'package:lichess_mobile/src/service/weights_service.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
@@ -92,8 +94,19 @@ class _OpponentPickerSheetState() extends ConsumerState<_OpponentPickerSheet> {
   MaiaRating? _downloading;
   MaiaRating? _failed;
 
-  bool get _maiaAvailable =>
+  /// Which of the app's engines are on this machine. A platform constant — all four on the phone,
+  /// and on the desktop the two Stockfish flavours but not LC0, so Maia has nothing there to run the
+  /// network on.
+  EngineAvailability get _engines => ref.read(engineAvailabilityProvider);
+
+  /// Whether the choice between the two engines means anything: whether Maia knows how to play the
+  /// variant on screen at all.
+  bool get _maiaOffered =>
       const MaiaOpponentSpec(MaiaRating.defaultRating).supportsVariant(widget.variant);
+
+  /// Whether Maia can actually be played here: it knows the variant, and the engine that runs the
+  /// network is on this machine.
+  bool get _maiaAvailable => _maiaOffered && _engines.lc0;
 
   MaiaWeightsService get _weights => ref.read(maiaWeightsServiceProvider);
 
@@ -164,13 +177,22 @@ class _OpponentPickerSheetState() extends ConsumerState<_OpponentPickerSheet> {
   Widget build(BuildContext context) {
     return BottomSheetScrollableContainer(
       children: [
-        if (_maiaAvailable)
+        // Shown wherever there is a choice to be made at all — including where Maia cannot be
+        // played, so that the greyed segment is what says so. Hiding it there would leave the
+        // engine that is missing as the one thing the screen does not mention.
+        if (_maiaOffered)
           Padding(
             padding: Styles.horizontalBodyPadding,
             child: SegmentedButton<OpponentEngine>(
               segments: [
                 for (final engine in OpponentEngine.values)
-                  ButtonSegment(value: engine, label: Text(engine.name)),
+                  ButtonSegment(
+                    value: engine,
+                    label: Text(engine.name),
+                    // Only Stockfish is left where the app has no LC0 to play Maia with — on the
+                    // desktop, where Stockfish is the app's own and there is no network engine.
+                    enabled: engine == OpponentEngine.stockfish || _engines.lc0,
+                  ),
               ],
               selected: {_engine},
               showSelectedIcon: false,

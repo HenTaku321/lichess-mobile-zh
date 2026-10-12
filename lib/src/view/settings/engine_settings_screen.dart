@@ -37,10 +37,11 @@ class _EngineSettingsScreenState() extends ConsumerState<EngineSettingsScreen> {
 
   @override
   void initState() {
-    // The net below is the app's own engine's: where the app bundles no engine there is nothing to
-    // look for and nothing to download, and asking the service would only set it to work on behalf
-    // of a screen that shows none of it.
-    if (ref.read(hasBundledEnginesProvider)) {
+    // The net below belongs to the full-net Stockfish, and only to it: on a machine that engine is
+    // not built for there is nothing to look for and nothing to download, and asking the service
+    // would only set it to work on behalf of a screen that shows none of it. See the section in
+    // `build`, which is hidden by the same condition.
+    if (ref.read(engineAvailabilityProvider).sfLatest) {
       _checkFiles();
       _downloadProgress = ref.read(stockfishNnueServiceProvider).nnueDownloadProgress;
     }
@@ -79,18 +80,18 @@ class _EngineSettingsScreenState() extends ConsumerState<EngineSettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final prefs = ref.watch(engineEvaluationPreferencesProvider);
-    final hasBundledEngines = ref.watch(hasBundledEnginesProvider);
+    final engines = ref.watch(engineAvailabilityProvider);
 
     return PlatformScaffold(
       appBar: PlatformAppBar(title: Text(context.l10n.mobileChessEngine)),
       body: ListView(
         children: [
           // What the app's own engines have to choose between: which of them to run, and the net
-          // the latest one needs on disk. Where the app bundles no engine, the engine is the
-          // stockfish installed on the machine — there is one of those, and it brought its own net
-          // — so there is nothing to choose and nothing to download, and neither is shown. The
-          // settings below still are: they are about how the engine is asked to search.
-          if (hasBundledEngines) ...[
+          // the full one needs on disk. So it is shown where both Stockfish flavours are built —
+          // where only the light one is, there is one engine rather than a choice, nothing to
+          // download, and no row that would say anything the analysis screen does not. The settings
+          // below still are: they are about how the engine is asked to search.
+          if (engines.sfLatest) ...[
             if (_hasVerifiedNNUEFile == null)
               Shimmer(
                 child: ShimmerLoading(isLoading: true, child: ListSection.loading(itemsNumber: 2)),

@@ -30,6 +30,36 @@ const kFakeLc0OptionDeclarations = [
   'option name UCI_Chess960 type check default false',
 ];
 
+/// The lines Pikafish prints when it is asked `uci`, transcribed from the engine this app ships.
+///
+/// What matters about it is what is **missing**. There is no `Skill Level` and no
+/// `UCI_LimitStrength` — Pikafish has no strength setting at all, where Fairy-Stockfish's negative
+/// skill levels are how the app's weakest chess opponents are made — so how hard it plays can only
+/// be said with a search limit. There is no `UCI_Variant` either, so it is never told which game it
+/// is playing from an option: a xiangqi position reaches it as a FEN and nothing else. And there is
+/// no `UCI_Chess960`, which is why a xiangqi search sends no options at all.
+///
+/// The banner and the `id name` are what the build calls itself, which Pikafish derives from the
+/// build date and the git state it was built in rather than from the commit; nothing asserts on
+/// them.
+const kPikafishHandshake = [
+  'Pikafish dev-20261012-nogit by the Pikafish developers (see AUTHORS file)',
+  'id name Pikafish dev-20261012-nogit',
+  'id author the Pikafish developers (see AUTHORS file)',
+  'option name Debug Log File type string default <empty>',
+  'option name NumaPolicy type string default auto',
+  'option name Threads type spin default 1 min 1 max 1024',
+  'option name Hash type spin default 16 min 1 max 33554432',
+  'option name Clear Hash type button',
+  'option name Ponder type check default false',
+  'option name MultiPV type spin default 1 min 1 max 128',
+  'option name Move Overhead type spin default 10 min 0 max 5000',
+  'option name nodestime type spin default 0 min 0 max 10000',
+  'option name UCI_ShowWDL type check default false',
+  'option name EvalFile type string default pikafish.nnue',
+  'uciok',
+];
+
 /// An [EngineTransport] that records what was sent to it and lets a test answer by hand.
 ///
 /// This is the seam for testing the UCI protocol itself: no plugin, no isolates, no engine — just

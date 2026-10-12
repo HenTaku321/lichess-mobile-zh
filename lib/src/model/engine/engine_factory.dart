@@ -198,7 +198,8 @@ class _Attempt() {
 }
 
 Future<EngineTransport> _connectToPlugin(EngineSpec spec) => switch (spec) {
-  final StockfishSpec stockfish => StockfishTransport.connect(stockfish),
+  final StockfishSpec stockfish => PluginTransport.connect(stockfish),
+  final PikafishSpec pikafish => PluginTransport.connect(pikafish),
   final Lc0Spec lc0 => Lc0Transport.connect(lc0),
   final SystemStockfishSpec system => _connectToSystemStockfish(system),
 };

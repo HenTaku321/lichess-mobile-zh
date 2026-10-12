@@ -4,6 +4,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:lichess_mobile/firebase_options.dart';
+import 'package:lichess_mobile/src/model/engine/engine_availability.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// A singleton class that provides access to plugins and external APIs.
@@ -56,13 +57,12 @@ abstract class LichessBinding() {
   /// Counts how many times the app has been (cold) started.
   int get numAppStarts;
 
-  /// Whether the engines that ship inside the app can be run here.
+  /// Which of the engines that ship inside the app can be run here.
   ///
-  /// True where the app bundles them: on Android and iOS they are native libraries that the engine
-  /// plugin creates in-process. False on the one desktop platform this fork builds, where there is
-  /// no engine in the bundle and the only engine there can be is the stockfish installed on the
-  /// machine, run as a child process.
-  bool get hasBundledEngines;
+  /// On Android and iOS they are all native libraries in the bundle, which the engine plugin
+  /// creates in-process; on the Linux desktop build this fork adds, two of the four are, and the
+  /// other two have no library to load.
+  EngineAvailability get bundledEngines;
 
   /// The shared preferences instance. Must be preloaded before use.
   ///
@@ -133,11 +133,20 @@ class AppLichessBinding() extends LichessBinding {
   int get numAppStarts => sharedPreferences.getInt(_kNumAppStartsKey) ?? 0;
 
   /// Read from the platform the app was built for rather than from `dart:io`, because that is what
-  /// the engine plugins answer to as well: they exist for Android and iOS only.
+  /// the engine plugins answer to as well: a flavour is compiled for a target platform or it is not
+  /// there at all.
+  ///
+  /// Linux is the third case, and the one this fork adds: the `multistockfish` packages are built
+  /// for it, which is the light Stockfish and Fairy-Stockfish — see [EngineAvailability.desktop] for
+  /// why the other two are not.
   @override
-  bool get hasBundledEngines =>
-      defaultTargetPlatform == TargetPlatform.android ||
-      defaultTargetPlatform == TargetPlatform.iOS;
+  EngineAvailability get bundledEngines => switch (defaultTargetPlatform) {
+    TargetPlatform.android || TargetPlatform.iOS => EngineAvailability.phone,
+    TargetPlatform.linux => EngineAvailability.desktop,
+    TargetPlatform.macOS ||
+    TargetPlatform.windows ||
+    TargetPlatform.fuchsia => EngineAvailability.none,
+  };
 
   /// Preload shared preferences.
   ///

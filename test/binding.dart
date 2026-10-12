@@ -4,6 +4,7 @@ import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lichess_mobile/src/binding.dart';
+import 'package:lichess_mobile/src/model/engine/engine_availability.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// The binding instance used in tests.
@@ -65,10 +66,11 @@ class TestLichessBinding() extends LichessBinding {
   @override
   int numAppStarts = 1;
 
-  /// True, so that tests get the platform the app ships engines for unless they ask for the
-  /// desktop: the desktop behaviour is about a stockfish on the machine, which no test has.
+  /// Every flavour, so that tests get the phone unless they ask for something else. The other values
+  /// are the desktop, where two of the four are built, and [EngineAvailability.none], whose
+  /// behaviour is about a stockfish on the machine, which no test has.
   @override
-  bool hasBundledEngines = true;
+  EngineAvailability bundledEngines = EngineAvailability.phone;
 
   @override
   FakeSharedPreferences get sharedPreferences {
@@ -90,7 +92,7 @@ class TestLichessBinding() extends LichessBinding {
     _firebaseMessaging = null;
     _sharedPreferences = null;
     numAppStarts = 1;
-    hasBundledEngines = true;
+    bundledEngines = EngineAvailability.phone;
   }
 
   FakeFirebaseCrashlytics? _firebaseCrashlytics;

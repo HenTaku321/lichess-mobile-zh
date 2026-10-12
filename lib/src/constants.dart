@@ -13,6 +13,21 @@ const kLichessWSSecret = String.fromEnvironment(
   defaultValue: 'somethingElseInProd',
 );
 
+/// The shared secret this build presents to the translation proxy at
+/// [kLichessHost], which bills its operator for every request it answers and
+/// therefore only answers callers that carry it.
+///
+/// Empty means "send nothing", which is the right request for a debug build, and
+/// for any build that talks to the real lichess server. Release builds bake in
+/// the fixed-length placeholder below, which the packaging step replaces byte for
+/// byte — the same mechanism, and for the same reason, as [kLichessWSSecret]: the
+/// real value must never exist in this repository, in CI, or in an artifact.
+const kZhProxyToken = String.fromEnvironment('ZH_PROXY_TOKEN', defaultValue: '');
+
+/// The header the proxy reads [kZhProxyToken] from. It has to match the proxy's
+/// `zhTokenHeader`; the two are one contract with two ends.
+const kZhProxyTokenHeader = 'X-Zh-Token';
+
 const kLichessCDNHost = String.fromEnvironment(
   'LICHESS_CDN_HOST',
   defaultValue: 'https://lichess1.org',

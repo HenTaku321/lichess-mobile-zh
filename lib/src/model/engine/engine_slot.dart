@@ -18,6 +18,14 @@ enum EngineSlot() {
   /// Fairy-Stockfish: chess variants, and negative skill levels.
   fairy,
 
+  /// Pikafish: xiangqi, and nothing else.
+  ///
+  /// A fourth native library rather than a fourth setting on the third, so it
+  /// wants a slot of its own — the plugin keeps one engine per flavour, and the
+  /// app's xiangqi games would otherwise fight a chess analysis over the same
+  /// library.
+  pikafish,
+
   /// Leela Chess Zero, which is also how Maia is played: Maia is LC0 with a
   /// Maia network.
   lc0,

@@ -96,6 +96,12 @@ jobs:
       # - name: Run riverpod lint
       #   run: dart run custom_lint
 
+      # No test reads the Pikafish network, but pubspec.yaml declares it as an asset and
+      # `flutter test` builds the asset bundle before it runs anything, so a checkout without it
+      # fails there on a missing file. The repository does not carry it (see .gitignore).
+      - name: Fetch the Pikafish network
+        run: ./scripts/fetch-pikafish-nnue.sh
+
       - name: Run unit tests
         run: flutter test
 

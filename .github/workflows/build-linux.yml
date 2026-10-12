@@ -5,7 +5,14 @@ name: Build Linux desktop bundle
 # added the Linux target in cd9b8d1e6 ("Add Linux platform"), and the code
 # guards what does not exist there: Firebase is skipped in main.dart, the
 # database goes through sqflite_common_ffi, the sound service shells out. So it
-# builds and runs, with the mobile-only features off:
+# builds and runs, and the engines are the app's own here too: the three
+# Stockfish flavours come from our fork of dart-multistockfish (see the
+# dependency_overrides in pubspec.yaml), which adds a Linux build to each, so all
+# eight variants are playable without a stockfish from the AUR. Maia still is
+# not: LC0 has no Linux build in the fork. The gate below the build fails the job
+# if a flavour's shared object is missing from the bundle.
+#
+# The mobile-only features stay off:
 #
 #   - no crash reporting or push (Firebase is not initialised)
 #   - no notifications, no home screen widgets
@@ -103,12 +110,55 @@ jobs:
       - name: Generate translations
         run: ./scripts/gen-translations.sh
 
+      # The Pikafish network is an asset the repository does not carry (see .gitignore), so a
+      # build without this step fails in `flutter build` on a missing asset rather than shipping a
+      # desktop edition whose xiangqi opponent evaluates noise. Checks the sha256 and fails the job
+      # on a mismatch; a no-op when the file is already there.
+      - name: Fetch the Pikafish network
+        run: ./scripts/fetch-pikafish-nnue.sh
+
       - name: Build (release)
         run: |
+          # Both placeholders are swapped byte for byte by patch-linux-secret.py
+          # (32 bytes and 37), so neither may change length: Dart keeps the string's
+          # character count as a Smi right before the characters and an AOT snapshot
+          # object cannot grow in place. Same contract as the iOS build.
           flutter build linux --release \
             --dart-define=LICHESS_HOST=${{ vars.LICHESS_HOST || 'lichess.org' }} \
             --dart-define=LICHESS_WS_HOST=${{ vars.LICHESS_WS_HOST || 'socket.lichess.org' }} \
-            --dart-define=LICHESS_WS_SECRET=PLACEHOLDER_WS_SECRET_DO_NOT_USE
+            --dart-define=LICHESS_WS_SECRET=PLACEHOLDER_WS_SECRET_DO_NOT_USE \
+            --dart-define=ZH_PROXY_TOKEN=PLACEHOLDER_ZH_PROXY_TOKEN_DO_NOT_USE
+
+      # The four flavours are FFI plugins, so their shared objects are installed
+      # into bundle/lib beside the executable and loaded from there at runtime
+      # (see the Linux branch of the umbrella package's stockfish.dart). If a
+      # flavour silently stopped being built, the app would look fine until
+      # someone tried to play a variant on it, and the tarball would be published
+      # before anyone noticed. Hence the check here rather than in a test: this is
+      # the only place the real bundle exists.
+      #
+      # The network is checked for the same reason and by its size: Pikafish
+      # without it does not fail, it plays at random, which is the kind of bug
+      # that gets reported as "the computer is bad at chess".
+      - name: Check the bundled engines are there
+        run: |
+          set -euo pipefail
+          for flavour in chess light pikafish variant; do
+            lib=build/linux/x64/release/bundle/lib/libmultistockfish_${flavour}.so
+            if [ ! -f "$lib" ]; then
+              echo "::error::missing $lib — the $flavour engine did not get built or bundled"
+              exit 1
+            fi
+            ls -l "$lib"
+          done
+
+          nnue=build/linux/x64/release/bundle/data/flutter_assets/assets/pikafish/pikafish.nnue
+          size=$(stat -c%s "$nnue" 2>/dev/null || echo 0)
+          if [ "$size" != 50244700 ]; then
+            echo "::error::$nnue is $size bytes, expected 50244700 — the network is missing or truncated"
+            exit 1
+          fi
+          ls -l "$nnue"
 
       # The bundle is the whole app: the lichess_mobile binary, lib/ (libapp.so is
       # the Dart AOT snapshot the secret is patched inside) and data/ with the

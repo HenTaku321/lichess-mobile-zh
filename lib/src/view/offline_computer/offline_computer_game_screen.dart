@@ -11,6 +11,8 @@ import 'package:lichess_mobile/src/model/analysis/analysis_controller.dart';
 import 'package:lichess_mobile/src/model/common/chess.dart';
 import 'package:lichess_mobile/src/model/common/local_game_clock.dart';
 import 'package:lichess_mobile/src/model/common/time_increment.dart';
+import 'package:lichess_mobile/src/model/engine/engine_availability.dart';
+import 'package:lichess_mobile/src/model/engine/engine_utils.dart';
 import 'package:lichess_mobile/src/model/engine/practice_comment.dart';
 import 'package:lichess_mobile/src/model/game/game_board_params.dart';
 import 'package:lichess_mobile/src/model/game/offline_computer_game.dart';
@@ -751,12 +753,23 @@ class _NewGameSheetState() extends ConsumerState<_NewGameSheet> {
     final prefs = ref.read(offlineComputerGamePreferencesProvider);
     _selectedSideChoice = widget.initialFen != null ? SideChoice.nextToPlay : prefs.sideChoice;
     final preferredVariant = widget.initialVariant ?? prefs.variant;
-    _selectedVariant = widget.initialFen == null && preferredVariant == Variant.fromPosition
+    final variant = widget.initialFen == null && preferredVariant == Variant.fromPosition
         ? Variant.standard
         : preferredVariant;
+    final engines = _engines;
+    // A variant nothing here can play — one chosen on a phone and opened on a machine the app ships
+    // no engine for, where the engines are the ones the system has — goes back to the standard game,
+    // which every build can play. Which variants those are is the opponent's answer to give, and the
+    // default opponent is the one that can play the most of them.
+    _selectedVariant = OpponentSpec.defaultSpec.supports(variant, engines: engines)
+        ? variant
+        : Variant.standard;
     // The variant is not always the one the preferred opponent was chosen for: a game started from
-    // a variant screen brings its own.
-    _selectedOpponent = prefs.opponentSpec.supportsVariant(_selectedVariant)
+    // a variant screen brings its own. Nor is the preferred opponent always one that can play here
+    // at all — a Maia chosen on a phone, on a machine with no LC0 to run it — and that is the
+    // difference the comparison below is about rather than what the engine could do on the machine
+    // it was chosen on.
+    _selectedOpponent = prefs.opponentSpec.supports(_selectedVariant, engines: engines)
         ? prefs.opponentSpec
         : OpponentSpec.defaultSpec;
     if (_selectedOpponent case MaiaOpponentSpec(:final rating) when !rating.isBundled) {
@@ -852,6 +865,7 @@ class _NewGameSheetState() extends ConsumerState<_NewGameSheet> {
   Widget build(BuildContext context) {
     final boardPrefs = ref.watch(boardPreferencesProvider);
     final hasClock = !_practiceMode && _timeControlType == TimeControlType.clock;
+    final engines = _engines;
 
     return BottomSheetScrollableContainer(
       children: [
@@ -1018,6 +1032,12 @@ class _NewGameSheetState() extends ConsumerState<_NewGameSheet> {
                   choices: playSupportedVariants.toList(),
                   selectedItem: _selectedVariant,
                   labelBuilder: (variant) => VariantLabel(variant),
+                  // A variant this machine has no opponent for is listed and greyed out rather than
+                  // left out: the list then says the same thing everywhere, and a greyed row
+                  // explains itself where a missing one would only puzzle. On a machine the app
+                  // ships no engine for that is every variant but the three the installed stockfish
+                  // plays.
+                  isEnabled: (variant) => _selectedOpponent.supports(variant, engines: engines),
                   onSelectedItemChanged: (Variant variant) {
                     setState(() {
                       _selectedVariant = variant;
@@ -1026,8 +1046,10 @@ class _NewGameSheetState() extends ConsumerState<_NewGameSheet> {
                       }
                       // Maia only knows standard chess, so picking a variant it cannot play hands
                       // the game back to Stockfish rather than leaving an opponent that would
-                      // have to refuse to move.
-                      if (!_selectedOpponent.supportsVariant(variant)) {
+                      // have to refuse to move. The picker greys such a variant out where it can,
+                      // but it cannot everywhere: the iOS action sheet has no per-row disabled
+                      // state, and it is the same list the app shows there.
+                      if (!_selectedOpponent.supports(variant, engines: engines)) {
                         _selectedOpponent = OpponentSpec.defaultSpec;
                       }
                     });
@@ -1138,10 +1160,18 @@ class _NewGameSheetState() extends ConsumerState<_NewGameSheet> {
     await ref.read(offlineComputerGamePreferencesProvider.notifier).setOpponent(opponent);
   }
 
+  /// Which of the app's engines are on this machine. A platform constant, so reading it where it is
+  /// needed cannot go stale — and it is why nothing here has to watch for it to change.
+  EngineAvailability get _engines => ref.read(engineAvailabilityProvider);
+
+  /// A play button that starts a game with an opponent that has nothing to move with is worse than
+  /// one that cannot be pressed: the game is not lost, it never begins. The sheet's own state should
+  /// keep this true, and this is what says so when it does not.
   bool get _isPlayEnabled =>
-      _selectedVariant != Variant.fromPosition ||
-      widget.initialFen != null ||
-      (_fromPositionFen != null && _fromPositionFen!.isNotEmpty);
+      _selectedOpponent.supports(_selectedVariant, engines: _engines) &&
+      (_selectedVariant != Variant.fromPosition ||
+          widget.initialFen != null ||
+          (_fromPositionFen != null && _fromPositionFen!.isNotEmpty));
 }
 
 class const _OfflineComputerGameSettingsSheet() extends ConsumerWidget {

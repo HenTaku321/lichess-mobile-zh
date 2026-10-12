@@ -1,4 +1,5 @@
 import 'package:lichess_mobile/src/model/common/chess.dart';
+import 'package:lichess_mobile/src/model/engine/engine_availability.dart';
 import 'package:lichess_mobile/src/model/engine/engine_spec.dart';
 import 'package:lichess_mobile/src/model/engine/engine_utils.dart';
 
@@ -121,16 +122,28 @@ sealed class const OpponentSpec() {
   /// Fairy-Stockfish plays every variant, while the stockfish installed on a machine the app
   /// bundles no engine for plays the standard game and nothing else.
   ///
-  /// [hasBundledEngines] is that platform fact, taken as an argument rather than asked of the
-  /// binding so that this stays answerable without one — see [hasBundledEnginesProvider], which is
-  /// where it is read.
-  EngineSpec engineSpecFor(Variant variant, {required bool hasBundledEngines});
+  /// [engines] is that platform fact, taken as an argument rather than asked of the binding so that
+  /// this stays answerable without one — see [engineAvailabilityProvider], which is where it is
+  /// read.
+  EngineSpec engineSpecFor(Variant variant, {required EngineAvailability engines});
 
   /// A short label for the UI.
   String get displayName;
 
   /// Whether this opponent can play [variant] at all.
   bool supportsVariant(Variant variant);
+
+  /// Whether this opponent can play [variant] here, on this machine.
+  ///
+  /// [supportsVariant] answers for the engine alone; [engines] says whether that engine is on this
+  /// machine at all. The two differ only where the app bundles no engine, which is no platform it is
+  /// built for: there the game is played by the stockfish installed on the system, which knows the
+  /// variants in [officialStockfishVariants] and no others, and Maia's LC0 is not installed at all,
+  /// so Maia can play nothing.
+  ///
+  /// This is what the UI greys a choice out by, so it answers for what can actually be played here
+  /// rather than for what the engine could do on a machine that has it.
+  bool supports(Variant variant, {required EngineAvailability engines});
 
   Map<String, dynamic> toJson();
 }
@@ -140,14 +153,18 @@ final class const StockfishOpponentSpec(final StockfishLevel level) extends Oppo
   /// Always Fairy-Stockfish: the weakest levels need negative skill levels, which only Fairy
   /// supports, and it is the only engine that can play every variant.
   ///
-  /// Where the app bundles no engine, the stockfish installed on the machine takes the standard
-  /// game — the same games, and the same options, the app's Stockfish would have played, and the
-  /// only ones that engine knows. Every other variant keeps asking for Fairy-Stockfish, which is
-  /// neither installed nor bundled: that fails, loudly, rather than being played as something the
-  /// engine cannot play.
+  /// Where the app ships no Fairy-Stockfish, the stockfish installed on the machine takes the
+  /// standard game — the same games, and the same options, the app's Stockfish would have played,
+  /// and the only ones that engine knows. Every other variant keeps asking for Fairy-Stockfish,
+  /// which is neither installed nor bundled: that fails, loudly, rather than being played as
+  /// something the engine cannot play.
+  ///
+  /// No platform the app is built for reaches that: the desktop ships Fairy-Stockfish like the
+  /// phone does. It is kept because it is what the app does on a machine with nothing of its own,
+  /// which is what [EngineAvailability.none] means and what the tests of that behaviour use.
   @override
-  EngineSpec engineSpecFor(Variant variant, {required bool hasBundledEngines}) =>
-      !hasBundledEngines && officialStockfishVariants.contains(variant)
+  EngineSpec engineSpecFor(Variant variant, {required EngineAvailability engines}) =>
+      !engines.fairy && officialStockfishVariants.contains(variant)
       ? const SystemStockfishSpec()
       : const StockfishSpec.fairy();
 
@@ -156,6 +173,12 @@ final class const StockfishOpponentSpec(final StockfishLevel level) extends Oppo
 
   @override
   bool supportsVariant(Variant variant) => true;
+
+  /// Every variant where the app ships Fairy-Stockfish; only the three the official engine plays
+  /// where it does not, because those are the ones the system's stockfish is asked for.
+  @override
+  bool supports(Variant variant, {required EngineAvailability engines}) =>
+      engines.fairy || officialStockfishVariants.contains(variant);
 
   @override
   Map<String, dynamic> toJson() => {'type': 'stockfish', 'level': level.name};
@@ -179,7 +202,8 @@ final class const MaiaOpponentSpec(final MaiaRating rating) extends OpponentSpec
   /// The variant and the platform change nothing: LC0 ships in neither the app nor a package, and
   /// the app asks for it wherever it runs, on the variants the network can play.
   @override
-  EngineSpec engineSpecFor(Variant variant, {required bool hasBundledEngines}) => const Lc0Spec();
+  EngineSpec engineSpecFor(Variant variant, {required EngineAvailability engines}) =>
+      const Lc0Spec();
 
   @override
   String get displayName => 'Maia ${rating.rating}';
@@ -187,6 +211,12 @@ final class const MaiaOpponentSpec(final MaiaRating rating) extends OpponentSpec
   @override
   bool supportsVariant(Variant variant) =>
       variant == Variant.standard || variant == Variant.fromPosition;
+
+  /// Only where the app ships LC0 — which is the phone, not the desktop, where it is not built at
+  /// all. Anywhere else the network has no engine to run on, however many variants it could play.
+  @override
+  bool supports(Variant variant, {required EngineAvailability engines}) =>
+      engines.lc0 && supportsVariant(variant);
 
   @override
   Map<String, dynamic> toJson() => {'type': 'maia', 'rating': rating.name};

@@ -24,7 +24,7 @@ final _logger = Logger('EngineOpponent');
 /// The one place this opponent's engine is named: the provider that keeps an engine alive and the
 /// search that asks for it both go through this, so they cannot end up on two different engines.
 EngineSpec _engineSpecFor(Ref ref, OpponentSpec spec, Variant variant) =>
-    spec.engineSpecFor(variant, hasBundledEngines: ref.read(hasBundledEnginesProvider));
+    spec.engineSpecFor(variant, engines: ref.read(engineAvailabilityProvider));
 
 /// The softmax temperature LC0 turns the network's policy logits into priors with.
 ///

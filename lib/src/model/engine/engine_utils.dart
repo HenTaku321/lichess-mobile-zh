@@ -7,22 +7,23 @@ import 'package:lichess_mobile/src/binding.dart';
 import 'package:lichess_mobile/src/constants.dart';
 import 'package:lichess_mobile/src/model/common/chess.dart';
 import 'package:lichess_mobile/src/model/common/eval.dart';
+import 'package:lichess_mobile/src/model/engine/engine_availability.dart';
 import 'package:lichess_mobile/src/model/engine/engine_spec.dart';
 import 'package:multistockfish/multistockfish.dart';
 
-/// Whether the engines the app ships can be run here.
+/// Which of the engines the app ships can be run here.
 ///
-/// False on the desktop this fork builds for, where there is no engine in the bundle and the only
-/// engine there can be is the stockfish installed on the machine, run as a child process. What it
-/// decides: which spec a flavor resolves to, and whether the settings that choose between the
-/// app's engines are worth showing at all.
+/// What it decides: which spec a flavor resolves to, which variants an opponent can be asked for,
+/// and whether the settings that choose between the app's engines are worth showing at all. All
+/// four flavours are on a phone and two are on the desktop this fork builds for — see
+/// [EngineAvailability], which is where that platform fact is written down and why.
 ///
 /// A provider rather than a question asked of the binding at each call site, because the tests that
 /// want the desktop behaviour have no binding to ask — several run in a bare `ProviderContainer` —
 /// and because the answer does not change over the life of a process.
-final hasBundledEnginesProvider = Provider<bool>(
-  (ref) => LichessBinding.instance.hasBundledEngines,
-  name: 'HasBundledEnginesProvider',
+final engineAvailabilityProvider = Provider<EngineAvailability>(
+  (ref) => LichessBinding.instance.bundledEngines,
+  name: 'EngineAvailabilityProvider',
 );
 
 /// Maximum number of CPU cores available for engine use.
@@ -73,6 +74,40 @@ String bundledMaiaAsset(String fileName) => '$kBundledMaiaAssetDir/$fileName';
 
 /// URL to download the Maia network for [fileName].
 Uri maiaWeightsUrl(String fileName) => Uri.parse('$_maiaDownloadUrl$fileName');
+
+/// The Pikafish network, which is bundled with the app rather than downloaded — see
+/// `PikafishNnueService`.
+///
+/// Pikafish embeds no network: it loads one from disk through its `EvalFile` option, and an engine
+/// started without one does not fail, it evaluates every position to noise — which on a board looks
+/// like a computer playing at random rather than like a missing file. So the file is an asset, and
+/// it is fetched into the asset tree by `scripts/fetch-pikafish-nnue.sh` at build time rather than
+/// committed: 48 MB of binary in git is a cost every clone pays for the rest of the project's life.
+///
+/// The three values below are what that script checks the download against, and what the app checks
+/// the copy it writes on first run against. They come in a set because they are one fact about one
+/// file: the size and the hash of the network that is paired with the Pikafish snapshot vendored in
+/// the `multistockfish_pikafish` package. A network from a different Pikafish is not refused with a
+/// message — it is refused deep inside the first search — so if that snapshot is ever bumped,
+/// these move with it.
+const kPikafishNnueFileName = 'pikafish.nnue';
+
+/// The asset the network is read from.
+const kPikafishNnueAsset = 'assets/pikafish/$kPikafishNnueFileName';
+
+/// The directory, under the app support directory, the network is written to.
+///
+/// A directory of its own rather than the app support directory itself, where Stockfish's networks
+/// live: `StockfishNnueService` reads that directory for `*.nnue` files it does not recognise as
+/// *Stockfish* networks, to offer reclaiming their space, and a Pikafish network sitting in it
+/// would be listed as an outdated 48 MB Stockfish download.
+const kPikafishNnueDirName = 'pikafish';
+
+/// The size of the network in bytes, as the release serves it.
+const kPikafishNnueSize = 50244700;
+
+/// Its sha256, from the same release.
+const kPikafishNnueSha256 = '10b84dd80bb4e324aa389cab327feeb7b4c44578e35a86105d4fcd5f840c3ac7';
 
 final _sfVersionPattern = RegExp(r'Stockfish\s+(\d+)');
 

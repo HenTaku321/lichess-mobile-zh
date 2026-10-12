@@ -29,12 +29,14 @@ import 'package:lichess_mobile/src/service/notification_service.dart';
 import 'package:lichess_mobile/src/service/quick_actions.dart';
 import 'package:lichess_mobile/src/service/recap_service.dart';
 import 'package:lichess_mobile/src/service/shared_pgn_service.dart';
+import 'package:lichess_mobile/src/service/window_service.dart';
 import 'package:lichess_mobile/src/tab_navigation.dart';
 import 'package:lichess_mobile/src/tab_scaffold.dart';
 import 'package:lichess_mobile/src/theme.dart';
 import 'package:lichess_mobile/src/ui_event_coordinator.dart';
 import 'package:lichess_mobile/src/utils/screen.dart';
 import 'package:lichess_mobile/src/utils/scroll_behavior.dart';
+import 'package:lichess_mobile/src/widgets/window_title_bar.dart';
 import 'package:material_ui/material_ui.dart';
 
 const String _kIosAppGroupId = 'group.org.lichess.mobileV2.LichessWidgets';
@@ -149,6 +151,8 @@ class _AppState() extends ConsumerState<Application> {
     ref.read(sharedPgnServiceProvider).start();
     ref.read(broadcastServiceProvider).start();
     ref.read(recapServiceProvider).start();
+    // Watches the window's size so the next start opens the same way. Does nothing off Linux.
+    ref.read(windowServiceProvider).start();
 
     if (Platform.isIOS) {
       HomeWidget.setAppGroupId(_kIosAppGroupId);
@@ -252,6 +256,9 @@ class _AppState() extends ConsumerState<Application> {
                   .copyWith(height: isShortVerticalScreen(context) ? 60 : null),
       ),
       home: const MainTabScaffold(),
+      // Above the [Navigator], so that the window's own title bar is not something a dialog can
+      // cover. Draws nothing off Linux; see [buildAppWindow].
+      builder: buildAppWindow,
       scrollBehavior: const AppScrollBehavior(),
       navigatorObservers: [rootNavPageRouteObserver, rootNavRouteStackObserver],
     );

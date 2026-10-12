@@ -46,3 +46,9 @@ doc/api/
 
 # Cache directory created by scripts
 .cache/
+
+# The Pikafish network: 48 MB, one HTTP request away, and fetched by
+# scripts/fetch-pikafish-nnue.sh before every build. Committing it would cost every clone the
+# rest of the project's life, and the script checks what it downloads against the size and the
+# sha256 in lib/src/model/engine/engine_utils.dart, which git could not do better.
+assets/pikafish/

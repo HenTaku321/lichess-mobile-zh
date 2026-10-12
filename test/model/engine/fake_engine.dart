@@ -34,6 +34,9 @@ String _engineNameFor(EngineSpec spec) => switch (spec) {
   StockfishSpec(flavor: StockfishFlavor.light) => 'Stockfish 19',
   StockfishSpec(flavor: StockfishFlavor.latestNoNNUE) => 'Stockfish 19',
   StockfishSpec(flavor: StockfishFlavor.variant) => 'Fairy-Stockfish',
+  // The flavour is an enum with four values and [StockfishSpec]'s own constructors set three of
+  // them, so this arm is unreachable; it is here because the switch has to cover the fourth.
+  StockfishSpec(flavor: StockfishFlavor.pikafish) || PikafishSpec() => 'Pikafish',
   SystemStockfishSpec() => 'Stockfish 19',
   Lc0Spec() => 'Lc0 v0.32.1',
 };

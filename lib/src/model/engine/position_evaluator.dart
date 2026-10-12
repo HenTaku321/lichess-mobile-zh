@@ -74,7 +74,7 @@ StockfishFlavor evaluatorFlavorFor(
 /// the slot settles that: the `latestNoNNUE` → `light` fallback can make this name the wrong
 /// Stockfish, but only a variant or an unplayable material ever resolves to Fairy.
 ///
-/// Where the app bundles no engine, both Stockfish flavors are the one stockfish on the machine,
+/// Where the app ships no engine, both Stockfish flavors are the one stockfish on the machine,
 /// so both answer [EngineSlot.system]. It has to agree with what the evaluator actually resolves a
 /// spec to — see [PositionEvaluator._resolveSpec] — because the answer is what tells an offline
 /// game's opponent whether it is being run on the evaluator's engine or on one of its own.
@@ -85,7 +85,8 @@ EngineSlot evaluatorEngineSlotFor(
   ChessEnginePref? enginePref,
 }) {
   final flavor = evaluatorFlavorFor(ref, variant, position, enginePref: enginePref);
-  if (!ref.read(hasBundledEnginesProvider)) {
+  final engines = ref.read(engineAvailabilityProvider);
+  if (!engines.any) {
     // Fairy-Stockfish is not the machine's stockfish, and there is none: a variant still asks for
     // the engine the app would have had to bundle.
     return flavor == StockfishFlavor.variant ? EngineSlot.fairy : EngineSlot.system;
@@ -93,7 +94,15 @@ EngineSlot evaluatorEngineSlotFor(
   return switch (flavor) {
     StockfishFlavor.variant => EngineSlot.fairy,
     StockfishFlavor.light => EngineSlot.sfLight,
-    StockfishFlavor.latestNoNNUE => EngineSlot.sfLatest,
+    // A machine the full-net engine is not built for runs the light one, which is what the
+    // evaluator resolves the same request to — see [PositionEvaluator._resolveSpec].
+    StockfishFlavor.latestNoNNUE => engines.sfLatest ? EngineSlot.sfLatest : EngineSlot.sfLight,
+    // The flavour asked for here is the chess preference, or Fairy-Stockfish for a variant that
+    // needs it. Pikafish evaluates xiangqi, is reached through `PikafishSpec` from the xiangqi
+    // side, and has no chess preference that could name it — so this arm is a bug, not a choice.
+    StockfishFlavor.pikafish => throw StateError(
+      'Pikafish is the xiangqi engine and does not evaluate a chess variant',
+    ),
   };
 }
 
@@ -434,11 +443,12 @@ class PositionEvaluator(
 
   /// The spec for [flavor], falling back to the light engine when the NNUE file is not on disk.
   Future<EngineSpec> _resolveSpec(StockfishFlavor flavor) async {
-    // Where the app bundles no engine: the one stockfish on the machine, whichever flavor was
+    final engines = ref.read(engineAvailabilityProvider);
+    // Where the app ships no engine: the one stockfish on the machine, whichever flavor was
     // asked for. There is no net to choose between, which is why this needs no look on disk, and
     // why both flavors resolve to one spec — see [evaluatorEngineSlotFor], which says the same
     // thing in the synchronous terms the callers of a search request need.
-    if (!ref.read(hasBundledEnginesProvider)) {
+    if (!engines.any) {
       return flavor == StockfishFlavor.variant
           ? const StockfishSpec.fairy()
           : const SystemStockfishSpec();
@@ -449,11 +459,18 @@ class PositionEvaluator(
       case StockfishFlavor.light:
         return const StockfishSpec.light();
       case StockfishFlavor.latestNoNNUE:
-        if (await _nnueService.checkNNUEFile()) {
+        // Where the full-net engine is not built, there is nothing to download and no file to look
+        // for: the light one is what the flavor resolves to, without saying anything about a net
+        // that was never going to be there.
+        if (engines.sfLatest && await _nnueService.checkNNUEFile()) {
           return StockfishSpec.latest(nnuePath: _nnueService.nnueFile.path);
         }
-        _logger.warning('NNUE file not found or corrupted. Falling back to the light engine.');
+        if (engines.sfLatest) {
+          _logger.warning('NNUE file not found or corrupted. Falling back to the light engine.');
+        }
         return const StockfishSpec.light();
+      case StockfishFlavor.pikafish:
+        throw StateError('Pikafish is the xiangqi engine and does not evaluate a chess variant');
     }
   }
 

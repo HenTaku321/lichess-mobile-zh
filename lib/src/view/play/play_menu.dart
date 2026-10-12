@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/common/perf.dart';
+import 'package:lichess_mobile/src/model/engine/engine_utils.dart';
 import 'package:lichess_mobile/src/network/connectivity.dart';
 import 'package:lichess_mobile/src/styles/icon_extensions.dart';
 import 'package:lichess_mobile/src/styles/lichess_icons.dart';
@@ -10,6 +11,7 @@ import 'package:lichess_mobile/src/view/play/correspondence_challenges_screen.da
 import 'package:lichess_mobile/src/view/play/create_challenge_bottom_sheet.dart';
 import 'package:lichess_mobile/src/view/play/create_game_widget.dart';
 import 'package:lichess_mobile/src/view/tournament/tournament_list_screen.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_game_screen.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -79,6 +81,19 @@ class const PlayMenu() extends ConsumerWidget {
               leading: const Icon(Icons.memory),
               title: Text(context.l10n.playAgainstComputer),
             ),
+            // Offered only where the build has Pikafish, which is the whole of what this screen
+            // plays against: without it the board would take the player's first move and then wait
+            // for an answer that is never coming. See `EngineAvailability.pikafish`.
+            if (ref.watch(engineAvailabilityProvider).pikafish)
+              ListTile(
+                onTap: () {
+                  // Pops the play bottom sheet
+                  Navigator.of(context).popUntil((route) => route is! ModalBottomSheetRoute);
+                  Navigator.of(context, rootNavigator: true).push(XiangqiGameScreen.buildRoute());
+                },
+                leading: const Icon(Icons.grid_on),
+                title: const Text('Xiangqi'),
+              ),
             ListTile(
               onTap: () {
                 // Pops the play bottom sheet

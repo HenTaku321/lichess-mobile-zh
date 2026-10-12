@@ -1,9 +1,6 @@
 #include "my_application.h"
 
 #include <flutter_linux/flutter_linux.h>
-#ifdef GDK_WINDOWING_X11
-#include <gdk/gdkx.h>
-#endif
 
 #include "flutter/generated_plugin_registrant.h"
 
@@ -26,57 +23,24 @@ static void my_application_activate(GApplication* application) {
   GtkWindow* window =
       GTK_WINDOW(gtk_application_window_new(GTK_APPLICATION(application)));
 
-  // Use a header bar when running in GNOME as this is the common style used
-  // by applications and is the setup most users will be using (e.g. Ubuntu
-  // desktop).
-  // If running on X and not using GNOME then just use a traditional title bar
-  // in case the window manager does more exotic layout, e.g. tiling.
-  // If running on Wayland assume the header bar will work (may need changing
-  // if future cases occur).
-  gboolean use_header_bar = TRUE;
-#ifdef GDK_WINDOWING_X11
-  GdkScreen* screen = gtk_window_get_screen(window);
-  if (GDK_IS_X11_SCREEN(screen)) {
-    const gchar* wm_name = gdk_x11_screen_get_window_manager_name(screen);
-    if (g_strcmp0(wm_name, "GNOME Shell") != 0) {
-      use_header_bar = FALSE;
-    }
-  }
-#endif
-  if (use_header_bar) {
-    GtkHeaderBar* header_bar = GTK_HEADER_BAR(gtk_header_bar_new());
-    gtk_widget_show(GTK_WIDGET(header_bar));
-    gtk_header_bar_set_title(header_bar, "Lichess");
-    gtk_header_bar_set_show_close_button(header_bar, TRUE);
-    // show_close_button only says whether there is a close button at all. Which
-    // buttons exist is the decoration layout, which the header bar otherwise
-    // takes from the desktop -- and this app was coming up with a close button
-    // alone. Asking for all three explicitly does not depend on that setting
-    // reaching us.
-    gtk_header_bar_set_decoration_layout(header_bar, ":minimize,maximize,close");
-    gtk_window_set_titlebar(window, GTK_WIDGET(header_bar));
-    // Pin the bar dark. Its color otherwise comes from whatever the GTK theme
-    // resolves to, which is the desktop's business, not the app's, and came out
-    // near-white over a dark app. APPLICATION priority beats the theme, so this
-    // stays dark whatever the theme does.
-    GtkCssProvider* provider = gtk_css_provider_new();
-    gtk_css_provider_load_from_data(
-        provider,
-        "headerbar, headerbar:backdrop {"
-        "  background-image: none;"
-        "  background-color: #262421;"
-        "  color: #e8e6e3;"
-        "  box-shadow: none;"
-        "  border: none;"
-        "}",
-        -1, nullptr);
-    gtk_style_context_add_provider_for_screen(
-        gtk_widget_get_screen(GTK_WIDGET(window)), GTK_STYLE_PROVIDER(provider),
-        GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
-    g_object_unref(provider);
-  } else {
-    gtk_window_set_title(window, "Lichess");
-  }
+  // GTK draws no title bar here: the app draws its own in Flutter, so the strip
+  // at the top of the window follows the app's theme instead of the desktop's.
+  //
+  // The empty box is deliberate. Calling gtk_window_set_titlebar at all is what
+  // marks the window client-decorated, and that is the flag GTK's
+  // update_border_windows() checks before it creates the eight invisible grips
+  // along the edges -- the only way left to resize the window once the title
+  // bar's own decorations are gone. A horizontal box with no children and no
+  // height draws nothing, so the grips are built and nothing is shown.
+  //
+  // gtk_window_set_decorated(window, FALSE) is not a shorter way to do this: it
+  // zeroes the window's shadow width, and that one value is both the drop
+  // shadow's extent and the width of the band those grips are placed in. The
+  // window would lose its shadow and stop resizing from the edges.
+  gtk_window_set_titlebar(window, gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0));
+  // Still the window's title as far as the desktop is concerned -- window
+  // lists, alt-tab, the overview -- even though nothing here renders it.
+  gtk_window_set_title(window, "Lichess");
 
   gtk_window_set_default_size(window, 1280, 720);
 

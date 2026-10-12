@@ -6,6 +6,7 @@ import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:lichess_mobile/src/constants.dart';
 import 'package:lichess_mobile/src/model/auth/auth_controller.dart';
 import 'package:lichess_mobile/src/model/auth/bearer.dart';
 import 'package:lichess_mobile/src/model/common/id.dart';
@@ -307,6 +308,32 @@ void main() {
           'Bearer ${signBearerToken('test-token')}',
         ),
       );
+    });
+
+    test('sends no translation proxy token when the build was given none', () async {
+      final container = await makeContainer(
+        overrides: {
+          httpClientFactoryProvider: httpClientFactoryProvider.overrideWith((ref) {
+            return FakeHttpClientFactory(() => FakeClient());
+          }),
+        },
+      );
+      final client = container.read(lichessClientProvider);
+      await client.get(Uri(path: '/test'));
+      await client.get(Uri.https('explorer.lichess.org', '/test'));
+
+      final requests = FakeClient.verifyRequests();
+      expect(requests, hasLength(2));
+      for (final request in requests) {
+        // This build has no token (`flutter run`, and every test run), and a
+        // build without one must make exactly the requests it made before the
+        // proxy asked for one.
+        expect(
+          request.headers.containsKey(kZhProxyTokenHeader),
+          isFalse,
+          reason: 'a token header was sent to ${request.url.host}',
+        );
+      }
     });
 
     test(

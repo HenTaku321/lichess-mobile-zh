@@ -44,6 +44,12 @@ jobs:
       - name: Code generation
         run: dart run build_runner build
 
+      # The Pikafish network is an asset the repository does not carry (see .gitignore); without
+      # it `flutter build` fails on a missing asset. Dispatched by hand, but a manual run is
+      # exactly the one that should not stop half way for a reason nobody remembers.
+      - name: Fetch the Pikafish network
+        run: ./scripts/fetch-pikafish-nnue.sh
+
       - run: flutter build ${{ matrix.target }}
 
       - name: Upload debug APK

@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:lichess_mobile/src/model/common/chess.dart';
 import 'package:lichess_mobile/src/model/common/id.dart';
 import 'package:lichess_mobile/src/model/common/uci.dart';
+import 'package:lichess_mobile/src/model/engine/engine_availability.dart';
 import 'package:lichess_mobile/src/model/engine/engine_factory.dart';
 import 'package:lichess_mobile/src/model/engine/engine_providers.dart';
 import 'package:lichess_mobile/src/model/engine/engine_slot.dart';
@@ -68,13 +69,20 @@ EvaluationContext makeContext({
 /// not.
 final refProvider = Provider<Ref>((ref) => ref, name: 'TestRefProvider');
 
-/// A container for a desktop, where the app bundles no engine.
+/// A container for a machine the app ships no engine for, where the engines are the ones the system
+/// has.
 ///
 /// The one platform fact the evaluator asks about is read through a provider, so it is overridden
 /// rather than asked of the binding: [TestLichessBinding] answers for a phone, and every other test
 /// in this file is about a phone.
+Future<ProviderContainer> makeNoEnginesContainer() => makeContainer(
+  overrides: {engineAvailabilityProvider: engineAvailabilityProvider.overrideWithValue(.none)},
+);
+
+/// A container for the desktop build, which ships the light Stockfish and Fairy-Stockfish and
+/// nothing else. See [EngineAvailability.desktop].
 Future<ProviderContainer> makeDesktopContainer() => makeContainer(
-  overrides: {hasBundledEnginesProvider: hasBundledEnginesProvider.overrideWithValue(false)},
+  overrides: {engineAvailabilityProvider: engineAvailabilityProvider.overrideWithValue(.desktop)},
 );
 
 /// Chooses the engine the evaluator will use for the official chess variants.
@@ -846,8 +854,8 @@ void main() {
       expect(pinned.state.spec, const StockfishSpec.light());
     });
 
-    test('Runs the stockfish on the machine where the app bundles no engine', () async {
-      final container = await makeDesktopContainer();
+    test('Runs the stockfish on the machine where the app ships no engine', () async {
+      final container = await makeNoEnginesContainer();
       final service = readEvaluator(container);
 
       await service.evaluate(makeWork()).first;
@@ -863,7 +871,7 @@ void main() {
     });
 
     test('Runs the machine stockfish even when the latest engine is preferred', () async {
-      final container = await makeDesktopContainer();
+      final container = await makeNoEnginesContainer();
       await setEnginePref(container, ChessEnginePref.sfLatest);
 
       final service = readEvaluator(container);
@@ -874,6 +882,29 @@ void main() {
       expect(service.state.spec, const SystemStockfishSpec());
       expect(fakeEngine.spec, const SystemStockfishSpec());
     });
+
+    test(
+      'Runs the light Stockfish on the desktop, where the full-net build is not shipped',
+      () async {
+        // The desktop has an engine of the machine's *and* engines of the app's; which one this is
+        // about is the flavour, not the platform. The full-net Stockfish is not built for Linux, so
+        // the preference falls back the same way it does when the net is not on disk — but without
+        // looking, because there is no file it could be in.
+        final container = await makeDesktopContainer();
+        await setEnginePref(container, ChessEnginePref.sfLatest);
+
+        final service = readEvaluator(container);
+        await service.evaluate(makeWork()).first;
+
+        expect(service.state.spec, const StockfishSpec.light());
+        expect(fakeEngine.spec, const StockfishSpec.light());
+
+        // And the synchronous answer the offline opponent compares its own slot against has to name
+        // the light flavour as well, or an opponent sharing this engine would be thought not to.
+        final ref = container.read(refProvider);
+        expect(evaluatorEngineSlotFor(ref, Variant.standard, Chess.initial), EngineSlot.sfLight);
+      },
+    );
 
     test('Falls back to Fairy-Stockfish on material Stockfish will not accept', () async {
       final container = await makeContainer();

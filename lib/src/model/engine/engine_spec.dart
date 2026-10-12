@@ -19,9 +19,28 @@ sealed class const EngineSpec() {
   String get label;
 }
 
+/// An engine the `multistockfish` plugin hosts: a library compiled into the app.
+///
+/// The plugin starts and talks to all of them the same way, so this is the whole of what its
+/// transport needs from a spec — [StockfishSpec] and [PikafishSpec] differ in which engine they
+/// name, not in how it runs.
+///
+/// A step in the hierarchy rather than an interface the two implement. Two reasons, one on each
+/// side: a transport holds what it was created for as an [EngineSpec], so a spec the plugin can
+/// start has to *be* one; and keeping it a class under the sealed [EngineSpec] keeps the factory's
+/// switch exhaustive with an arm per spec, rather than with an extra arm for a type no value is
+/// ever an instance of.
+sealed class const PluginEngineSpec() extends EngineSpec {
+  /// The plugin flavour this spec starts.
+  StockfishFlavor get flavor;
+
+  /// The network the engine loads from disk, or null when it has one built in.
+  String? get nnuePath;
+}
+
 /// A Stockfish engine, in one of the three flavors the app ships.
 @immutable
-final class StockfishSpec extends EngineSpec {
+final class StockfishSpec extends PluginEngineSpec {
   /// Stockfish with a small NNUE network embedded in the binary.
   const new light() : slot = EngineSlot.sfLight, flavor = StockfishFlavor.light, nnuePath = null;
 
@@ -37,12 +56,14 @@ final class StockfishSpec extends EngineSpec {
   final EngineSlot slot;
 
   /// The plugin flavor this spec starts.
+  @override
   final StockfishFlavor flavor;
 
   @override
   String get label => flavor.name;
 
   /// The NNUE network, for [StockfishSpec.latest] only.
+  @override
   final String? nnuePath;
 
   @override
@@ -55,6 +76,36 @@ final class StockfishSpec extends EngineSpec {
 
   @override
   String toString() => 'StockfishSpec(${flavor.name})';
+}
+
+/// Pikafish, the xiangqi engine.
+///
+/// The network is not optional the way it is for [StockfishSpec.latest]: Pikafish embeds none, and
+/// an engine started without one does not refuse — it evaluates a position to noise. The file is
+/// bundled with the app rather than downloaded (see `PikafishNnueService`), so this path is a copy
+/// in the app's own directory, and the file and the library have to be from the same Pikafish:
+/// a version skew between them is rejected without a message, deep inside the first search.
+@immutable
+final class const PikafishSpec({@override required final String nnuePath})
+    extends PluginEngineSpec {
+  @override
+  EngineSlot get slot => EngineSlot.pikafish;
+
+  @override
+  StockfishFlavor get flavor => StockfishFlavor.pikafish;
+
+  @override
+  String get label => 'pikafish';
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) || other is PikafishSpec && other.nnuePath == nnuePath;
+
+  @override
+  int get hashCode => Object.hash(slot, nnuePath);
+
+  @override
+  String toString() => 'PikafishSpec($nnuePath)';
 }
 
 /// The stockfish installed on this machine, run as a child process.

@@ -39,6 +39,7 @@ import 'package:lichess_mobile/src/model/offline_computer/computer_analysis.dart
 import 'package:lichess_mobile/src/model/offline_computer/offline_computer_clock.dart';
 import 'package:lichess_mobile/src/model/offline_computer/offline_computer_game_storage.dart';
 import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
+import 'package:lichess_mobile/src/model/ui_events.dart';
 import 'package:lichess_mobile/src/network/socket.dart';
 import 'package:lichess_mobile/src/service/move_feedback.dart';
 import 'package:logging/logging.dart';
@@ -58,6 +59,14 @@ const _kOpeningPlyThreshold = 30;
 /// The analysis has normally been running for as long as the player was thinking, so this only
 /// bites when the move came faster than the search did.
 const _kPreMoveEvalWait = Duration(seconds: 4);
+
+/// The message for a computer that cannot move at all.
+///
+/// Only ever shown where the engine is the one installed on the machine, and so the likeliest
+/// reason a move never comes is that there is none to run.
+const _kEngineMissingMessage =
+    'The computer could not make a move. Check that a chess engine is installed '
+    '(for example: sudo pacman -S stockfish).';
 
 /// How long the hints wait to become available before the spinner gives up.
 ///
@@ -116,6 +125,13 @@ class OfflineComputerGameController() extends Notifier<OfflineComputerGameState>
   /// different engine — when the game is played on a different variant.
   (OpponentSpec, Variant)? _opponentKey;
 
+  /// Whether the user has already been told that the engine cannot move at all.
+  ///
+  /// A failing engine fails on every one of its turns, and the message is the same each time: said
+  /// once per game, it is an explanation, and said once per move it would be noise on top of a
+  /// board that is already not moving.
+  bool _engineFailureReported = false;
+
   /// Stops whatever the engines are doing for this game: the opponent's search, and any hint or
   /// move evaluation in flight.
   void _stopThinking() {
@@ -143,7 +159,7 @@ class OfflineComputerGameController() extends Notifier<OfflineComputerGameState>
     if (!state.game.casual && !state.game.practiceMode) return false;
     final variant = state.game.meta.variant;
     return state.game.opponentSpec
-            .engineSpecFor(variant, hasBundledEngines: ref.read(hasBundledEnginesProvider))
+            .engineSpecFor(variant, engines: ref.read(engineAvailabilityProvider))
             .slot ==
         evaluatorEngineSlotFor(
           ref,
@@ -677,6 +693,14 @@ class OfflineComputerGameController() extends Notifier<OfflineComputerGameState>
     } catch (e, st) {
       // Unexpected engine error occurred.
       _logger.warning('Failed to play engine move!', e, st);
+      // Said out loud as well as logged: a game where the computer never answers looks like a
+      // freeze, and the log is behind a settings screen. Nothing is said where the app brings its
+      // own engines — a failure there is a bug, and telling the user to install an engine that is
+      // already in the bundle would send them looking for the wrong thing.
+      if (!ref.read(engineAvailabilityProvider).any && !_engineFailureReported) {
+        _engineFailureReported = true;
+        ref.read(uiEventBusProvider).emit(const ShowErrorEvent(_kEngineMissingMessage));
+      }
     } finally {
       if (state.game.playable || state.game.finished) {
         state = state.copyWith(isEngineThinking: false);

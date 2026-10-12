@@ -7,6 +7,12 @@ import 'package:material_ui/material_ui.dart';
 /// On Android and on the desktop platforms, it shows a dialog with radio buttons.
 /// On iOS, it shows a modal action sheet if the number of choices is less than or equal to 10.
 /// Otherwise, it shows a [CupertinoPicker].
+///
+/// [isEnabled] greys out and blocks the choices it says no to. Only the Material
+/// dialog honours it: the Cupertino renderings have no per-item disabled state, and
+/// the one caller that passes a predicate passes one that is true everywhere except
+/// on desktop, where the Cupertino renderings are unreachable. Give this parameter a
+/// meaning on iOS before passing it a predicate that can be false there.
 Future<void> showChoicePicker<T>(
   BuildContext context, {
   Widget? title,
@@ -14,6 +20,7 @@ Future<void> showChoicePicker<T>(
   required T selectedItem,
   required Widget Function(T choice) labelBuilder,
   void Function(T choice)? onSelectedItemChanged,
+  bool Function(T choice)? isEnabled,
 }) {
   switch (Theme.of(context).platform) {
     // The Material radio dialog serves both Android and the desktop platforms:
@@ -38,7 +45,11 @@ Future<void> showChoicePicker<T>(
               builder: (context) {
                 final List<Widget> choiceWidgets = choices
                     .map((value) {
-                      return RadioListTile<T>(title: labelBuilder(value), value: value);
+                      return RadioListTile<T>(
+                        title: labelBuilder(value),
+                        value: value,
+                        enabled: isEnabled?.call(value) ?? true,
+                      );
                     })
                     .toList(growable: false);
                 return RadioGroup(

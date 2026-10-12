@@ -53,25 +53,28 @@ abstract class EngineTransport() {
 }
 
 /// An [EngineTransport] over a `multistockfish` engine handle.
-class StockfishTransport._(@override final StockfishSpec spec, final Stockfish _stockfish)
+///
+/// Every flavour that plugin hosts goes through here, Stockfish and Pikafish alike: the plugin
+/// gives them all the same handle and the same handshake, and a flavour is all that differs.
+class PluginTransport._(@override final PluginEngineSpec spec, final Stockfish _stockfish)
     implements EngineTransport {
   this {
     _controller.onListen = _replayStartupLines;
     _stockfish.state.addListener(_onStockfishStateChange);
   }
 
-  final _logger = Logger('StockfishTransport');
+  final _logger = Logger('PluginTransport');
 
   /// Starts an engine for [spec] and completes when it is ready for commands.
   ///
   /// Throws whatever the plugin throws when the engine will not start — a [TimeoutException] with
   /// the native diagnostics in its message, most often.
-  static Future<StockfishTransport> connect(StockfishSpec spec) async {
+  static Future<PluginTransport> connect(PluginEngineSpec spec) async {
     // The output is collected from before the handle exists, because the plugin runs the `uci`
     // handshake itself: a listener attached afterwards has already missed the engine's name and
     // its option declarations, and those declared defaults are what lets a search be given a
     // complete option set.
-    StockfishTransport? transport;
+    PluginTransport? transport;
     final buffered = <String>[];
 
     final stockfish = await Stockfish.create(
@@ -88,7 +91,7 @@ class StockfishTransport._(@override final StockfishSpec spec, final Stockfish _
       throw StateError('The engine reported ${state.name} instead of becoming ready');
     }
 
-    transport = StockfishTransport._(spec, stockfish);
+    transport = PluginTransport._(spec, stockfish);
     buffered.forEach(transport._receive);
     buffered.clear();
     return transport;

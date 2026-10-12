@@ -91,6 +91,13 @@ jobs:
       - name: Generate translations
         run: ./scripts/gen-translations.sh
 
+      # The Pikafish network is an asset the repository does not carry (see .gitignore), so a
+      # build without this step fails on a missing asset. It is the only thing that makes the
+      # xiangqi opponent on the phone anything but random — and it is fetched here rather than in
+      # the app because the phone may never see a network again after the IPA is installed.
+      - name: Fetch the Pikafish network
+        run: ./scripts/fetch-pikafish-nnue.sh
+
       # `flutter pub get` resets the generated SwiftPM manifest's deployment target to
       # Flutter's default (iOS 13), which makes the archive fail on the Firebase plugins.
       # The fastlane lane notes this; the release build below does not need pub get again.
@@ -112,15 +119,17 @@ jobs:
         run: |
           set -uo pipefail
           touch ios/.skip-crashlytics-upload
-          # PLACEHOLDER_WS_SECRET_DO_NOT_USE is 32 ASCII bytes. It must stay exactly
-          # the length of the value patch-ipa-secret.py swaps in: Dart stores the
+          # PLACEHOLDER_WS_SECRET_DO_NOT_USE is 32 ASCII bytes and
+          # PLACEHOLDER_ZH_PROXY_TOKEN_DO_NOT_USE is 37. Each must stay exactly the
+          # length of the value patch-ipa-secret.py swaps in: Dart stores the
           # character count as a Smi immediately before the characters, and an AOT
           # snapshot object cannot grow in place, so a length change would corrupt
           # every offset after it. Equal length makes the swap a pure byte replace.
           flutter build ios --release --no-codesign \
             --dart-define=LICHESS_HOST=${{ vars.LICHESS_HOST || 'lichess.org' }} \
             --dart-define=LICHESS_WS_HOST=${{ vars.LICHESS_WS_HOST || 'socket.lichess.org' }} \
-            --dart-define=LICHESS_WS_SECRET=PLACEHOLDER_WS_SECRET_DO_NOT_USE &
+            --dart-define=LICHESS_WS_SECRET=PLACEHOLDER_WS_SECRET_DO_NOT_USE \
+            --dart-define=ZH_PROXY_TOKEN=PLACEHOLDER_ZH_PROXY_TOKEN_DO_NOT_USE &
           build_pid=$!
           rc=0
           while kill -0 "$build_pid" 2>/dev/null; do

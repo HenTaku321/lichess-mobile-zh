@@ -61,6 +61,34 @@ Uri lichessUri(String unencodedPath, [Map<String, dynamic>? queryParameters]) =>
 /// CDN, are served by different hosts.
 final _lichessMainHost = lichessUri('/').host;
 
+/// The authority — host *and* port — of the server this build talks to, the way
+/// requests to it are addressed.
+///
+/// [kLichessHost] may carry a port, and a translation proxy has to: it is one
+/// service on a host that serves other things. Comparing authorities rather than
+/// hosts is what keeps `example.org:2053` apart from everything else that shares
+/// the name.
+final _lichessAuthority = lichessUri('/').authority;
+
+/// The headers that identify this build to the translation proxy, or nothing.
+///
+/// The proxy is billed for every request it answers, so it only answers callers
+/// that carry [kZhProxyToken]. The token belongs on requests to *that* proxy and
+/// nowhere else: the CDN, the opening explorer and the tablebase are other
+/// people's hosts, and a secret sent to a host that has no use for it is a
+/// secret handed out. Hence the authority check rather than a check for "not
+/// lichess.org".
+///
+/// A build with no token — `flutter run`, or any build of upstream lichess —
+/// sends nothing at all: exactly the request it made before this existed.
+@visibleForTesting
+Map<String, String> zhProxyHeaders(Uri uri, {String token = kZhProxyToken}) {
+  if (token.isEmpty || uri.authority != _lichessAuthority) {
+    return const {};
+  }
+  return {kZhProxyTokenHeader: token};
+}
+
 /// Creates the appropriate http client for the platform.
 ///
 /// Do not use directly, use [defaultClientProvider] or [lichessClientProvider] instead.
@@ -143,7 +171,8 @@ final httpClientFactoryProvider = Provider<HttpClientFactory>((Ref ref) {
 ///
 /// This client is used for all requests that don't go to the main lichess server, for
 /// example, requests to lichess CDN, or other APIs.
-/// This client does not set any Authorization header.
+/// This client does not set any Authorization header; it carries the translation
+/// proxy token for the one host that asks for it and sends it nowhere else.
 ///
 /// Only one instance of this client is created and kept alive for the whole app.
 final defaultClientProvider = Provider<DefaultClient>((Ref ref) {
@@ -385,6 +414,7 @@ class LichessClient(final Client _inner, final Ref _ref) implements Client {
       final bearer = signBearerToken(authUser.token);
       request.headers['Authorization'] = 'Bearer $bearer';
     }
+    request.headers.addAll(zhProxyHeaders(request.url));
     request.headers['User-Agent'] = makeUserAgent(
       _cachedPackageInfo,
       _cachedDeviceInfo,
@@ -527,6 +557,11 @@ class LichessClient(final Client _inner, final Ref _ref) implements Client {
 class DefaultClient(final Client _inner, {required final String _userAgent}) implements Client {
   @override
   Future<StreamedResponse> send(BaseRequest request) async {
+    // This client serves "everything that is not the main server", which is not
+    // quite the same as "everything that is not the proxy" — so it asks the same
+    // host question the lichess client does, and attaches nothing for any host
+    // that is not this build's server.
+    request.headers.addAll(zhProxyHeaders(request.url));
     request.headers['User-Agent'] = _userAgent;
 
     final quiet = request.headers.remove(kQuietRequestHeader) != null;

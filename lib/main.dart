@@ -9,6 +9,7 @@ import 'package:lichess_mobile/src/init.dart';
 import 'package:lichess_mobile/src/intl.dart';
 import 'package:lichess_mobile/src/service/app_log_service.dart';
 import 'package:lichess_mobile/src/service/sound_service.dart';
+import 'package:lichess_mobile/src/service/window_service.dart';
 import 'package:lichess_mobile/src/utils/riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -32,6 +33,11 @@ Future<void> main() async {
   }
 
   final locale = setupIntl(widgetsBinding);
+
+  // The runner shows the window on the first Flutter frame, so this has to happen before the app
+  // is built: a moment later would be a window that opens at the default size and then jumps.
+  // Does nothing off Linux, and nothing on a first run, where there is no size to go back to.
+  await windowService.restore();
 
   // Background initialization tasks (non-blocking for first frame)
   unawaited(preloadPieceImages());

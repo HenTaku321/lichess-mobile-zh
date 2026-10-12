@@ -5,12 +5,14 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/engine/evaluation_preferences.dart';
+import 'package:lichess_mobile/src/model/offline_computer/offline_computer_game_preferences.dart';
 import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_hint.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_notation.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
+import 'package:lichess_mobile/src/utils/focus_detector.dart';
 import 'package:lichess_mobile/src/utils/immersive_mode.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
@@ -182,95 +184,143 @@ class _BodyState() extends ConsumerState<_Body> {
     final controller = ref.read(xiangqiGameControllerProvider.notifier);
     final orientation = isBoardFlipped ? gameState.playerSide.opposite : gameState.playerSide;
     final hintMove = _hintPosition == gameState.position ? analysisState.hint?.move : null;
+    // The same preference the chess game against the computer reads, because it is the same thing:
+    // a game against the computer, with the pieces taken off the board.
+    final blindfoldMode = ref.watch(
+      offlineComputerGamePreferencesProvider.select((p) => p.blindfoldMode),
+    );
 
-    Widget content = SafeArea(
-      child: XiangqiGameLayout(
-        board: BrightnessHueFilter(
-          brightness: boardPrefs.brightness,
-          hue: boardPrefs.hue,
-          child: XiangqiBoard(
-            position: gameState.position,
-            orientation: orientation,
-            selected: gameState.selected,
-            // The legal moves are the board's own setting, and the last move is the highlights one:
-            // both are things the board draws, so both are taken away by turning them off.
-            moves: boardPrefs.showLegalMoves ? gameState.selectedMoves : const IListConst([]),
-            lastMove: boardPrefs.boardHighlights ? gameState.lastMove : null,
-            onTapSquare: controller.tapSquare,
-            // A drag is the same two taps it would have been, in the order they were made: the piece
-            // is picked up where it was let go of, and put down where it was dropped. A drag that
-            // cannot be played that way moves nothing, because the second tap finds the first one's
-            // piece with nowhere to go and does what a tap on an empty square does.
-            onDragMove: (from, to) {
-              controller.tapSquare(from);
-              controller.tapSquare(to);
-            },
-            animationDuration: boardPrefs.pieceAnimationDuration,
-            showCoordinates: boardPrefs.coordinates,
-            showLastMove: boardPrefs.boardHighlights,
-            showBorder: boardPrefs.showBorder,
-            hint: hintMove,
-            // The board is a citizen of the app's own theming, not a board of its own: it wears the
-            // colours of whichever chessboard theme the player has picked. See
-            // [XiangqiBoardStyle.fromChessboardColorScheme] for the mapping, and what it cannot take.
-            style: XiangqiBoardStyle.fromChessboardColorScheme(boardPrefs.boardTheme.colors),
+    // The engine is the app's own shared one, and leaving the screen does not mean the player wants
+    // it searching: losing focus stops the evaluation, exactly as the chess screen's own detector
+    // does, and regaining it asks for the evaluation again rather than leaving the bar stale.
+    //
+    // The detector reports a widget that has gone invisible on its way out as well as on its way
+    // in, so both callbacks check the context is still mounted before reading anything through the
+    // ref: a read on a state that is being torn down is refused outright.
+    Widget content = FocusDetector(
+      onFocusLost: () {
+        if (!context.mounted) return;
+        _evaluatedPosition = null;
+        if (ref.read(xiangqiEngineAnalysisProvider).isBusy) {
+          ref.read(xiangqiEngineAnalysisProvider.notifier).stopEvaluation();
+        }
+      },
+      onFocusRegained: () {
+        if (!context.mounted) return;
+        _syncEvaluation(ref.read(xiangqiGameControllerProvider));
+      },
+      child: Column(
+        children: [
+          Expanded(
+            child: SafeArea(
+              child: XiangqiGameLayout(
+                board: BrightnessHueFilter(
+                  brightness: boardPrefs.brightness,
+                  hue: boardPrefs.hue,
+                  child: XiangqiBoard(
+                    position: gameState.position,
+                    orientation: orientation,
+                    selected: gameState.selected,
+                    // The legal moves are the board's own setting, and the last move is the
+                    // highlights one: both are things the board draws, so both are taken away by
+                    // turning them off.
+                    moves: boardPrefs.showLegalMoves
+                        ? gameState.selectedMoves
+                        : const IListConst([]),
+                    lastMove: boardPrefs.boardHighlights ? gameState.lastMove : null,
+                    onTapSquare: controller.tapSquare,
+                    // A drag is the same two taps it would have been, in the order they were made:
+                    // the piece is picked up where it was let go of, and put down where it was
+                    // dropped. A drag that cannot be played that way moves nothing, because the
+                    // second tap finds the first one's piece with nowhere to go and does what a tap
+                    // on an empty square does.
+                    onDragMove: (from, to) {
+                      controller.tapSquare(from);
+                      controller.tapSquare(to);
+                    },
+                    animationDuration: boardPrefs.pieceAnimationDuration,
+                    showCoordinates: boardPrefs.coordinates,
+                    showLastMove: boardPrefs.boardHighlights,
+                    showBorder: boardPrefs.showBorder,
+                    hint: hintMove,
+                    blindfoldMode: blindfoldMode,
+                    // The two drag settings the sheet above offers: a dragged piece is magnified or
+                    // not, and the square it is over is marked the way the player asked for.
+                    magnifyDraggedPiece: boardPrefs.magnifyDraggedPiece,
+                    dragTargetKind: boardPrefs.dragTargetKind,
+                    // The board is a citizen of the app's own theming, not a board of its own: it
+                    // wears the colours of whichever chessboard theme the player has picked. See
+                    // [XiangqiBoardStyle.fromChessboardColorScheme] for the mapping, and what it
+                    // cannot take.
+                    style: XiangqiBoardStyle.fromChessboardColorScheme(
+                      boardPrefs.boardTheme.colors,
+                    ),
+                  ),
+                ),
+                topTable: _PlayerRow(
+                  icon: Icons.smart_toy,
+                  // The engine's own name, which is a proper name and the same in every language:
+                  // it is the program that is playing, not a description of it. How hard it is
+                  // playing is a setting, and the sheet is where a setting is read.
+                  name: 'Pikafish',
+                  thinking: gameState.isEngineThinking,
+                  status: '',
+                ),
+                bottomTable: _PlayerRow(
+                  icon: Icons.person,
+                  thinking: false,
+                  status: _statusText(context, gameState),
+                ),
+                evalGauge: evalEnabled
+                    ? XiangqiEvalGauge(
+                        // A bar with nothing to report yet is drawn level rather than left out:
+                        // the engine is about to answer, and a bar that came and went on every
+                        // move would flicker.
+                        redWinProbability: analysisState.evaluation?.redWinProbability ?? 0.5,
+                        orientation: orientation,
+                        evaluation: analysisState.evaluation,
+                      )
+                    : null,
+                moves: xiangqiGameNotation(gameState.positions, gameState.moves),
+                // The game's own counting, which is what the list marks: the controller has no
+                // cursor to point at an earlier move, so the move it marks is always the one just
+                // played.
+                currentMoveIndex: gameState.moves.length,
+                // Nothing to step to — see [XiangqiGameController]: a move can be taken back, but
+                // there is no way to walk the game back and forth, so the list is a list and not a
+                // control.
+                onSelectMove: null,
+                userActionsBar: BottomBar(
+                  children: [
+                    BottomBarButton(
+                      label: context.l10n.mobileNewGame,
+                      onTap: () => _showNewGameSheet(context, ref),
+                      icon: CupertinoIcons.add,
+                    ),
+                    BottomBarButton(
+                      label: context.l10n.takeback,
+                      onTap: gameState.canUndo ? controller.undo : null,
+                      icon: CupertinoIcons.arrow_uturn_left,
+                    ),
+                    BottomBarButton(
+                      label: context.l10n.getAHint,
+                      onTap: _canGetHint(gameState, analysisState)
+                          ? () => _requestHint(gameState)
+                          : null,
+                      icon: CupertinoIcons.lightbulb,
+                      highlighted: hintMove != null,
+                    ),
+                    BottomBarButton(
+                      label: context.l10n.resign,
+                      onTap: gameState.isFinished ? null : _confirmResign,
+                      icon: CupertinoIcons.flag,
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
-        ),
-        topTable: _PlayerRow(
-          icon: Icons.smart_toy,
-          // The engine's own name, which is a proper name and the same in every language: it is the
-          // program that is playing, not a description of it. How hard it is playing is a setting,
-          // and the sheet is where a setting is read.
-          name: 'Pikafish',
-          thinking: gameState.isEngineThinking,
-          status: '',
-        ),
-        bottomTable: _PlayerRow(
-          icon: Icons.person,
-          thinking: false,
-          status: _statusText(context, gameState),
-        ),
-        evalGauge: evalEnabled
-            ? XiangqiEvalGauge(
-                // A bar with nothing to report yet is drawn level rather than left out: the engine
-                // is about to answer, and a bar that came and went on every move would flicker.
-                redWinProbability: analysisState.evaluation?.redWinProbability ?? 0.5,
-                orientation: orientation,
-                evaluation: analysisState.evaluation,
-              )
-            : null,
-        moves: xiangqiGameNotation(gameState.positions, gameState.moves),
-        // The game's own counting, which is what the list marks: the controller has no cursor to
-        // point at an earlier move, so the move it marks is always the one just played.
-        currentMoveIndex: gameState.moves.length,
-        // Nothing to step to — see [XiangqiGameController]: a move can be taken back, but there is
-        // no way to walk the game back and forth, so the list is a list and not a control.
-        onSelectMove: null,
-        userActionsBar: BottomBar(
-          children: [
-            BottomBarButton(
-              label: context.l10n.mobileNewGame,
-              onTap: () => _showNewGameSheet(context, ref),
-              icon: CupertinoIcons.add,
-            ),
-            BottomBarButton(
-              label: context.l10n.takeback,
-              onTap: gameState.canUndo ? controller.undo : null,
-              icon: CupertinoIcons.arrow_uturn_left,
-            ),
-            BottomBarButton(
-              label: context.l10n.getAHint,
-              onTap: _canGetHint(gameState, analysisState) ? () => _requestHint(gameState) : null,
-              icon: CupertinoIcons.lightbulb,
-              highlighted: hintMove != null,
-            ),
-            BottomBarButton(
-              label: context.l10n.resign,
-              onTap: gameState.isFinished ? null : _confirmResign,
-              icon: CupertinoIcons.flag,
-            ),
-          ],
-        ),
+        ],
       ),
     );
 
@@ -406,7 +456,7 @@ class const _PlayerRow({
 /// otherwise what is going on in it. Nothing is said while the computer has the move but has not
 /// started thinking — that is a moment rather than a state, and the board is about to move.
 String _statusText(BuildContext context, XiangqiGameState state) {
-  if (state.end != null) return _resultLabel(state);
+  if (state.end != null) return _resultLabel(context, state);
   if (state.isEngineThinking) return context.l10n.computerThinking;
   if (state.isPlayerTurn) return context.l10n.yourTurn;
   return '';
@@ -418,15 +468,15 @@ String _statusText(BuildContext context, XiangqiGameState state) {
 /// ask: a game is mate because the position to move is mate, not because of how the game arrived
 /// there, so there is no loser here to be passed in or worked out separately.
 ///
-/// The sentences are English and the side is named in English with them, which is what the pieces
-/// are called and what the side labels say — see [XiangqiSide.label].
-String _resultLabel(XiangqiGameState state) => switch (state.end) {
-  .checkmate => '${state.turn.label} is checkmated.',
+/// The sentences are the app's own translated ones, and the side is named by the same localizations
+/// — see [XiangqiSide.label] — so both read in the player's language.
+String _resultLabel(BuildContext context, XiangqiGameState state) => switch (state.end) {
+  .checkmate => context.l10n.mobileXiangqiCheckmated(state.turn.label(context.l10n)),
   // 困毙, and the whole of the difference from chess: a side with no legal move has lost the game,
   // where the same position in chess is a draw.
-  .stalemate => '困毙: ${state.turn.label} has no move to make, and that is a loss.',
-  .threefoldRepetition => 'The same position came back three times, so the game is drawn.',
-  .resign => '${state.resignedBy!.label} resigned.',
+  .stalemate => context.l10n.mobileXiangqiStalemateLoss(state.turn.label(context.l10n)),
+  .threefoldRepetition => context.l10n.mobileXiangqiThreefoldRepetition,
+  .resign => context.l10n.mobileXiangqiResigned(state.resignedBy!.label(context.l10n)),
   // Only ever asked about a game that has ended, and those are all the ways one does.
   null => '',
 };
@@ -449,7 +499,7 @@ class const XiangqiGameResultDialog({
             ? context.l10n.victory
             : context.l10n.gameOver,
       ),
-      content: Text(_resultLabel(state)),
+      content: Text(_resultLabel(context, state)),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: Text(context.l10n.close)),
         TextButton(onPressed: onNewGame, child: Text(context.l10n.mobileNewGame)),
@@ -487,6 +537,10 @@ class _XiangqiGameSettingsSheetState() extends ConsumerState<_XiangqiGameSetting
     final gameState = ref.watch(xiangqiGameControllerProvider);
     final isBoardFlipped = ref.watch(_isBoardFlippedProvider);
     final notifier = ref.read(boardPreferencesProvider.notifier);
+    // The sheet's own switch, reading the same preference the board below it is built from.
+    final blindfoldMode = ref.watch(
+      offlineComputerGamePreferencesProvider.select((p) => p.blindfoldMode),
+    );
 
     return BottomSheetScrollableContainer(
       children: [
@@ -500,7 +554,7 @@ class _XiangqiGameSettingsSheetState() extends ConsumerState<_XiangqiGameSetting
               // Three labels and no numbers: what the levels really are is a search limit — see
               // [XiangqiDifficulty] — and a player choosing between them is choosing how long the
               // computer may think, not what it thinks with.
-              explanation: 'How long the computer is allowed to think.',
+              explanation: context.l10n.mobileXiangqiDifficultyExplanation,
               onTap: () {
                 showChoicePicker<XiangqiDifficulty>(
                   context,
@@ -565,6 +619,29 @@ class _XiangqiGameSettingsSheetState() extends ConsumerState<_XiangqiGameSetting
               value: boardPrefs.coordinates,
               onChanged: (value) {
                 notifier.toggleCoordinates();
+              },
+            ),
+            SwitchSettingTile(
+              title: Text(context.l10n.mobilePrefMagnifyDraggedPiece),
+              value: boardPrefs.magnifyDraggedPiece,
+              onChanged: (value) {
+                notifier.toggleMagnifyDraggedPiece();
+              },
+            ),
+            SettingsListTile(
+              settingsLabel: Text(context.l10n.mobileSettingsDraggedPieceTarget),
+              settingsValue: dragTargetKindLabel(context.l10n, boardPrefs.dragTargetKind),
+              onTap: () {
+                showChoicePicker<DragTargetKind>(
+                  context,
+                  title: Text(context.l10n.mobileSettingsDraggedPieceTarget),
+                  choices: DragTargetKind.values,
+                  selectedItem: boardPrefs.dragTargetKind,
+                  labelBuilder: (kind) => Text(dragTargetKindLabel(context.l10n, kind)),
+                  onSelectedItemChanged: (DragTargetKind? value) {
+                    notifier.setDragTargetKind(value ?? DragTargetKind.circle);
+                  },
+                );
               },
             ),
             SwitchSettingTile(
@@ -655,6 +732,13 @@ class _XiangqiGameSettingsSheetState() extends ConsumerState<_XiangqiGameSetting
                 notifier.toggleHapticFeedback();
               },
             ),
+            SwitchSettingTile(
+              title: Text(context.l10n.preferencesBlindfold),
+              value: blindfoldMode,
+              onChanged: (value) {
+                ref.read(offlineComputerGamePreferencesProvider.notifier).toggleBlindfoldMode();
+              },
+            ),
           ],
         ),
         Padding(
@@ -694,20 +778,18 @@ class _NewGameSheetState() extends ConsumerState<_NewGameSheet> {
           children: [
             SettingsListTile(
               settingsLabel: Text(context.l10n.side),
-              settingsValue: _side.label,
+              settingsValue: _side.label(context.l10n),
               // 让先 is not a setting of its own, because it is not a separate thing: red moves
               // first, so a player who takes black has handed the opening move to the computer. The
               // line is there to say so at the moment the choice is made.
-              explanation: _side == .black
-                  ? 'Red moves first, so the computer opens the game.'
-                  : null,
+              explanation: _side == .black ? context.l10n.mobileXiangqiRedMovesFirst : null,
               onTap: () {
                 showChoicePicker<XiangqiSide>(
                   context,
                   title: Text(context.l10n.side),
                   choices: XiangqiSide.values,
                   selectedItem: _side,
-                  labelBuilder: (side) => Text(side.label),
+                  labelBuilder: (side) => Text(side.label(context.l10n)),
                   onSelectedItemChanged: (side) => setState(() => _side = side),
                 );
               },
@@ -717,7 +799,7 @@ class _NewGameSheetState() extends ConsumerState<_NewGameSheet> {
               // the chess screens use for theirs. See `_OfflineComputerGameScreen`.
               settingsLabel: Text(context.l10n.opponent),
               settingsValue: _difficultyLabel(context, _difficulty),
-              explanation: 'How long the computer is allowed to think.',
+              explanation: context.l10n.mobileXiangqiDifficultyExplanation,
               onTap: () {
                 showChoicePicker<XiangqiDifficulty>(
                   context,

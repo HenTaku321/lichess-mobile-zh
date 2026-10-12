@@ -259,8 +259,16 @@
   <string name="winOrFiftyMoveDraw" comment="Tablebase verdict: the position is won, or drawn by the fifty move rule.">Win or 50 move draw</string>
   <string name="xiangqi" comment="Xiangqi, the Chinese chess variant, as opposed to international chess. Used as a game name in the offline opponent picker and as a screen title.">Xiangqi</string>
   <string name="xiangqiBoardCoordinates" comment="The board coordinates setting, as it appears on the xiangqi game settings sheet. Nine files by ten ranks, unlike the chess board's eight by eight.">Board coordinates (A-I, 0-9)</string>
+  <string name="xiangqiCheckmated" comment="Xiangqi game-end sentence: the side named by %s is checkmated.">%s is checkmated.</string>
+  <string name="xiangqiDifficultyExplanation" comment="Xiangqi game settings sheet: the line under the difficulty setting, saying what a level actually controls.">How long the computer is allowed to think.</string>
   <string name="xiangqiEasy" comment="Xiangqi engine strength: the easiest level.">Easy</string>
   <string name="xiangqiHard" comment="Xiangqi engine strength: the hardest level.">Hard</string>
   <string name="xiangqiMedium" comment="Xiangqi engine strength: the medium level.">Medium</string>
+  <string name="xiangqiRedMovesFirst" comment="Xiangqi new game sheet: the line under the side setting once black is chosen, saying the computer opens the game.">Red moves first, so the computer opens the game.</string>
+  <string name="xiangqiResigned" comment="Xiangqi game-end sentence: the side named by %s resigned.">%s resigned.</string>
+  <string name="xiangqiSideBlack" comment="The black side of a xiangqi game, used as a side name in the game-end sentences.">Black</string>
+  <string name="xiangqiSideRed" comment="The red side of a xiangqi game, used as a side name in the game-end sentences.">Red</string>
+  <string name="xiangqiStalemateLoss" comment="Xiangqi game-end sentence: the side named by %s has no legal move. Unlike chess, where having no move is a draw, in xiangqi it loses the game (困毙).">%s has no legal move, which loses the game.</string>
+  <string name="xiangqiThreefoldRepetition" comment="Xiangqi game-end sentence: the same position occurred three times, drawing the game.">The same position came back three times, so the game is drawn.</string>
   <string name="youCannotChallengeYourself" comment="Error snackbar when trying to challenge yourself from the board editor.">You cannot challenge yourself</string>
 </resources>

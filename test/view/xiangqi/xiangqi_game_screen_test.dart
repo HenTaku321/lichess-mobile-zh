@@ -1,8 +1,11 @@
 import 'dart:convert';
 
+import 'package:chessground/chessground.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:l10n_esperanto/l10n_esperanto.dart';
+import 'package:lichess_mobile/l10n/l10n.dart';
 import 'package:lichess_mobile/src/model/engine/engine.dart';
 import 'package:lichess_mobile/src/model/engine/engine_spec.dart';
 import 'package:lichess_mobile/src/model/engine/evaluation_preferences.dart';
@@ -12,8 +15,10 @@ import 'package:lichess_mobile/src/model/xiangqi/xiangqi_move.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_game_screen.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
+import 'package:lichess_mobile/src/widgets/settings.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_game_layout.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../binding.dart';
 import '../../model/engine/fake_transport.dart';
@@ -34,6 +39,28 @@ XiangqiMove moveAt(String iccs) {
   return move;
 }
 
+/// The app the screen is pumped into when a test asks for a language of its own.
+///
+/// The shared test harness puts the screen into its own [MaterialApp], which declares no languages
+/// and so takes Flutter's default of `[en_US]`: whatever the platform reports, a test runs in
+/// English, which is why every expectation in this file is written in English. Production declares
+/// every language the app has, and passes the one the player chose (see `app.dart`); this is that,
+/// with [locale] standing in for the choice.
+Widget appInLocale(Locale locale, Widget home) => MaterialApp(
+  // Not [AppLocalizations.localizationsDelegates]: the generated list is built on the
+  // `flutter_localizations` delegates, which localize Flutter's own material and cupertino
+  // libraries rather than the `material_ui` and `cupertino_ui` ones the app is built with.
+  localizationsDelegates: const [
+    AppLocalizations.delegate,
+    ...GlobalMaterialLocalizations.delegates,
+    MaterialLocalizationsEo.delegate,
+    CupertinoLocalizationsEo.delegate,
+  ],
+  supportedLocales: AppLocalizations.supportedLocales,
+  locale: locale,
+  home: home,
+);
+
 /// Pumps the game screen with an engine whose transport is fake, and hands that transport back.
 ///
 /// The game's own engine provider is replaced rather than the factory behind it, exactly as the
@@ -47,10 +74,14 @@ XiangqiMove moveAt(String iccs) {
 /// screen shares it between the opponent and the evaluation bar, so an evaluation left running would
 /// take the engine out from under the opponent's search and the commands the tests read — the
 /// `go depth 9` an answer is made of — would belong to the bar instead.
+///
+/// [locale] is the language to run in, and the one test that is about the language the app is
+/// running in passes it; everything else leaves it null and gets the harness's app.
 Future<FakeTransport> pumpGameScreen(
   WidgetTester tester, {
   Size surfaceSize = kTestSurfaceSize,
   bool engineEvaluation = false,
+  Locale? locale,
 }) async {
   final transport = FakeTransport(
     spec: const PikafishSpec(nnuePath: '/test/pikafish.nnue'),
@@ -59,18 +90,32 @@ Future<FakeTransport> pumpGameScreen(
   final engine = Engine(transport);
   addTearDown(engine.dispose);
 
-  await tester.pumpWidget(
-    await makeTestProviderScopeApp(
-      tester,
-      home: const XiangqiGameScreen(),
-      overrides: {xiangqiEngineProvider: xiangqiEngineProvider.overrideWith((Ref ref) => engine)},
-      defaultPreferences: {
-        PrefCategory.engineEvaluation.storageKey: jsonEncode(
-          EngineEvaluationPrefState.defaults.copyWith(isEnabled: engineEvaluation).toJson(),
-        ),
-      },
-      surfaceSize: surfaceSize,
+  const home = XiangqiGameScreen();
+  final overrides = {
+    xiangqiEngineProvider: xiangqiEngineProvider.overrideWith((Ref ref) => engine),
+  };
+  final defaultPreferences = {
+    PrefCategory.engineEvaluation.storageKey: jsonEncode(
+      EngineEvaluationPrefState.defaults.copyWith(isEnabled: engineEvaluation).toJson(),
     ),
+  };
+
+  await tester.pumpWidget(
+    locale == null
+        ? await makeTestProviderScopeApp(
+            tester,
+            home: home,
+            overrides: overrides,
+            defaultPreferences: defaultPreferences,
+            surfaceSize: surfaceSize,
+          )
+        : await makeTestProviderScope(
+            tester,
+            child: appInLocale(locale, home),
+            overrides: overrides,
+            defaultPreferences: defaultPreferences,
+            surfaceSize: surfaceSize,
+          ),
   );
   await tester.pumpAndSettle();
   return transport;
@@ -325,6 +370,79 @@ void main() {
       // What the difficulty is, is how long the computer may think: the three levels are three
       // search limits, because Pikafish has no strength setting to set. See [XiangqiDifficulty].
       expect(transport.takeCommands(), contains('go depth 3'));
+    });
+
+    testWidgets('says how the game ended in the language the app is running in', (tester) async {
+      // The sentences are the app's own translations and the side they name is translated with
+      // them — see [XiangqiSide.label] — so a reader of the Chinese app reads the whole of it in
+      // Chinese, the side named inside it included.
+      await pumpGameScreen(tester, locale: const Locale('zh'));
+
+      await tester.tap(find.byIcon(CupertinoIcons.flag));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('是'));
+      // The result comes half a second after the game ends, as it does in the English tests.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.descendant(of: find.byType(XiangqiGameResultDialog), matching: find.text('红方认输。')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('关闭'));
+      await tester.pumpAndSettle();
+      // And what the game ended as stays on the line under the board.
+      expect(find.text('红方认输。'), findsOneWidget);
+    });
+
+    testWidgets('the settings sheet offers the drag settings and the blindfold switch', (
+      tester,
+    ) async {
+      await pumpGameScreen(tester);
+
+      await tester.tap(find.byIcon(Icons.settings));
+      await tester.pumpAndSettle();
+
+      // The board the screen is building behind the sheet, which is what these settings are for.
+      XiangqiBoard board() => tester.widget<XiangqiBoard>(find.byType(XiangqiBoard));
+
+      // The line under the difficulty setting, which is this game's own: what a level controls is
+      // how long the engine may think, and that is not true of the chess opponent beside it.
+      expect(find.text('How long the computer is allowed to think.'), findsOneWidget);
+
+      // Magnified or plain under the finger.
+      final magnifySwitch = find.descendant(
+        of: find.ancestor(
+          of: find.text('Magnify dragged piece'),
+          matching: find.byType(SwitchSettingTile),
+        ),
+        matching: find.byType(Switch),
+      );
+      await tester.ensureVisible(find.text('Magnify dragged piece'));
+      await tester.tap(magnifySwitch);
+      await tester.pumpAndSettle();
+      expect(board().magnifyDraggedPiece, isFalse);
+
+      // The shape drawn on the square a dragged piece is over.
+      await tester.ensureVisible(find.text('Target of dragged piece'));
+      await tester.tap(find.text('Target of dragged piece'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Square').last);
+      await tester.pumpAndSettle();
+      expect(board().dragTargetKind, DragTargetKind.square);
+
+      // Blindfold, which is the same preference the chess game against the computer keeps: the same
+      // kind of game, with the pieces taken off the board.
+      final blindfoldSwitch = find.descendant(
+        of: find.ancestor(of: find.text('Blindfold'), matching: find.byType(SwitchSettingTile)),
+        matching: find.byType(Switch),
+      );
+      await tester.ensureVisible(find.text('Blindfold'));
+      await tester.tap(blindfoldSwitch);
+      await tester.pumpAndSettle();
+      expect(board().blindfoldMode, isTrue);
     });
   });
 }

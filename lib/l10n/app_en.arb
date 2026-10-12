@@ -290,9 +290,38 @@
   "mobileWinOrFiftyMoveDraw": "Win or 50 move draw",
   "mobileXiangqi": "Xiangqi",
   "mobileXiangqiBoardCoordinates": "Board coordinates (A-I, 0-9)",
+  "mobileXiangqiCheckmated": "{param} is checkmated.",
+  "@mobileXiangqiCheckmated": {
+    "placeholders": {
+      "param": {
+        "type": "String"
+      }
+    }
+  },
+  "mobileXiangqiDifficultyExplanation": "How long the computer is allowed to think.",
   "mobileXiangqiEasy": "Easy",
   "mobileXiangqiHard": "Hard",
   "mobileXiangqiMedium": "Medium",
+  "mobileXiangqiRedMovesFirst": "Red moves first, so the computer opens the game.",
+  "mobileXiangqiResigned": "{param} resigned.",
+  "@mobileXiangqiResigned": {
+    "placeholders": {
+      "param": {
+        "type": "String"
+      }
+    }
+  },
+  "mobileXiangqiSideBlack": "Black",
+  "mobileXiangqiSideRed": "Red",
+  "mobileXiangqiStalemateLoss": "{param} has no legal move, which loses the game.",
+  "@mobileXiangqiStalemateLoss": {
+    "placeholders": {
+      "param": {
+        "type": "String"
+      }
+    }
+  },
+  "mobileXiangqiThreefoldRepetition": "The same position came back three times, so the game is drawn.",
   "mobileYouCannotChallengeYourself": "You cannot challenge yourself",
   "mobilePracticeGoalDefendIn": "{count, plural, =1{Defend for {count} more move} other{Defend for {count} more moves}}",
   "@mobilePracticeGoalDefendIn": {

@@ -1,4 +1,5 @@
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
+import 'package:lichess_mobile/l10n/l10n.dart';
 import 'package:meta/meta.dart';
 
 /// Nine files (a to i) by ten ranks (0 to 9).
@@ -22,12 +23,16 @@ enum XiangqiSide() {
   XiangqiSide get opposite => this == red ? black : red;
 
   /// What the side is called where a player has to be told about it — the side picker, and the
-  /// sentence that says who was mated.
+  /// sentences that say who was mated, who resigned, and which side was left without a move.
   ///
-  /// English, like the piece kinds and like the difficulty labels beside it, and unlike the
-  /// characters on the pieces: those are the game's own letters and cannot be spelled any other way,
-  /// while this is the app talking, and the app's new feature text starts out untranslated.
-  String get label => this == red ? 'Red' : 'Black';
+  /// Translated, unlike the characters on the pieces: those are the game's own letters (帅 and 将,
+  /// 兵 and 卒) and cannot be spelled any other way, while this is the app speaking about a side and
+  /// so is written in the reader's language, exactly as the difficulty labels beside it are
+  /// (`mobileXiangqiEasy` and its neighbours). The localizations are taken as an argument because a
+  /// model cannot read a `BuildContext`; `dragTargetKindLabel` in `board_preferences.dart` takes
+  /// them the same way.
+  String label(AppLocalizations l10n) =>
+      this == red ? l10n.mobileXiangqiSideRed : l10n.mobileXiangqiSideBlack;
 }
 
 /// The seven kinds of piece.

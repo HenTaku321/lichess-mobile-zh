@@ -310,6 +310,9 @@ xiangqiPieceAnimation(XiangqiPosition from, XiangqiPosition to, XiangqiMove? mov
 /// travelling from the square it left to the square it arrived on. The move's [animationDuration]
 /// of zero means no animation at all.
 ///
+/// With [blindfoldMode] on, no piece is drawn at all — the player's own included — while every
+/// other part of the board is drawn as it always is.
+///
 /// The board fills the room it is given, which does not have to be square — see
 /// [XiangqiBoardGeometry.fit].
 class const XiangqiBoard({
@@ -353,8 +356,30 @@ class const XiangqiBoard({
   /// Whether to draw the outer frame around the board.
   final bool showBorder = true,
 
+  /// Whether to leave every piece off the board, the player's own included.
+  ///
+  /// Blindfold is not a board that has gone blank: the squares, the lines, the coordinates, the
+  /// highlights, the legal-move targets, the selection and the hint are all still drawn, and only
+  /// the pieces are gone, so the position has to be remembered rather than read off the board. This
+  /// is what chessground's own blindfold mode does — every one of its piece passes returns early
+  /// while it is set — and the two boards behave the same way here.
+  final bool blindfoldMode = false,
+
   /// A move to hint at, drawn as a translucent circle on the square it would be played from.
   final XiangqiMove? hint,
+
+  /// Whether the piece under the finger is drawn larger than the rest, with a soft shadow, and
+  /// lifted clear of the touch point so that the finger does not cover it.
+  ///
+  /// With this off the piece is drawn at its usual size, with no shadow, exactly under the finger,
+  /// which is what the board has always done. The chess board's setting of the same name governs
+  /// the same two looks there.
+  final bool magnifyDraggedPiece = true,
+
+  /// What is drawn on the square a dragged piece is over, while a drag is in flight: the chess
+  /// board's own choice of a circle twice a square wide, a square the size of one, or nothing at
+  /// all.
+  final DragTargetKind dragTargetKind = .circle,
 
   /// The colours the board is drawn in.
   final XiangqiBoardStyle style = const XiangqiBoardStyle(),
@@ -538,6 +563,9 @@ class _XiangqiBoardState() extends State<XiangqiBoard> with SingleTickerProvider
                 showLastMove: widget.showLastMove,
                 showBorder: widget.showBorder,
                 hint: widget.hint,
+                magnifyDraggedPiece: widget.magnifyDraggedPiece,
+                dragTargetKind: widget.dragTargetKind,
+                blindfoldMode: widget.blindfoldMode,
                 translating: _translating,
                 fading: _fading,
                 translation: _translation,
@@ -570,6 +598,9 @@ class XiangqiBoardPainter({
   required final bool showLastMove,
   required final bool showBorder,
   required final XiangqiMove? hint,
+  required final bool magnifyDraggedPiece,
+  required final DragTargetKind dragTargetKind,
+  required final bool blindfoldMode,
   required final IList<XiangqiTranslatingPiece> _translating,
   required final IList<XiangqiFadingPiece> _fading,
   required final Animation<double> _translation,
@@ -603,6 +634,7 @@ class XiangqiBoardPainter({
     paintTargets(canvas);
     paintSelection(canvas);
     paintHint(canvas);
+    paintDragTarget(canvas);
     paintDraggedPiece(canvas);
   }
 
@@ -785,18 +817,32 @@ class XiangqiBoardPainter({
     }
   }
 
-  void paintPieces(Canvas canvas) {
+  /// The squares whose pieces the board draws from the position itself, in board order: every
+  /// occupied square that the move being drawn and the piece under the finger are not drawing
+  /// somewhere else. Empty while [blindfoldMode] is set.
+  ///
+  /// The pieces are `CustomPaint` output with no key to find them by, so this is the door a test
+  /// has onto them, and it is the same set [paintPieces] walks.
+  @visibleForTesting
+  IList<XiangqiSquare> get drawnPieceSquares {
+    if (blindfoldMode) return const IListConst([]);
     // The two pieces that are being drawn somewhere else this frame: the one arriving on its
     // destination is the translating piece, and the one under the finger is the dragged piece.
     // Drawing them here as well would show two of each.
     final arrivingAt = {for (final moving in _translating) moving.to};
     final dragFrom = this.dragFrom;
-    for (var index = 0; index < kXiangqiSquares; index++) {
-      final square = XiangqiSquare(index);
-      if (arrivingAt.contains(square) || square == dragFrom) continue;
-      final piece = position.board[index];
-      if (piece == null) continue;
-      paintPiece(canvas, geometry.centerOf(square, orientation), piece);
+    return [
+      for (var index = 0; index < kXiangqiSquares; index++)
+        if (!arrivingAt.contains(XiangqiSquare(index)) &&
+            XiangqiSquare(index) != dragFrom &&
+            position.board[index] != null)
+          XiangqiSquare(index),
+    ].lock;
+  }
+
+  void paintPieces(Canvas canvas) {
+    for (final square in drawnPieceSquares) {
+      paintPiece(canvas, geometry.centerOf(square, orientation), position.pieceAt(square)!);
     }
   }
 
@@ -838,6 +884,7 @@ class XiangqiBoardPainter({
   /// square it left and the square it is arriving on. Every other piece is drawn straight from the
   /// position, so this is the only thing the animation moves.
   void paintTranslating(Canvas canvas) {
+    if (blindfoldMode) return;
     final t = _translation.value;
     for (final moving in _translating) {
       paintPiece(
@@ -856,6 +903,7 @@ class XiangqiBoardPainter({
   /// record of the move instead, fading out where it stood while the taking piece arrives on top
   /// of it.
   void paintFading(Canvas canvas) {
+    if (blindfoldMode) return;
     if (_fading.isEmpty) return;
     final opacity = 1 - _fade.value;
     if (opacity <= 0) return;
@@ -918,26 +966,88 @@ class XiangqiBoardPainter({
     );
   }
 
-  /// The piece under the player's finger, a little larger than the rest and lifted off the board by
-  /// a soft shadow.
+  /// The box the drag target fills: two cells across for a [DragTargetKind.circle] and one for a
+  /// [DragTargetKind.square], centred on the point the finger is over. Null when there is no drag
+  /// in flight, the finger is off the board, or [dragTargetKind] is [DragTargetKind.none], and
+  /// nothing is drawn.
+  ///
+  /// Both shapes are described by the box around them, which is what lets a test hold the drawn
+  /// target against the kind and the size the setting asked for with no canvas to read.
+  @visibleForTesting
+  Rect? get dragTargetBounds {
+    final kind = dragTargetKind;
+    final at = dragPosition;
+    if (kind == .none || dragFrom == null || at == null) return null;
+    final square = geometry.squareAt(at, orientation);
+    if (square == null) return null;
+    final side = kind == .circle ? cell * 2 : cell;
+    return Rect.fromCenter(
+      center: geometry.centerOf(square, orientation),
+      width: side,
+      height: side,
+    );
+  }
+
+  /// The highlight on the square a dragged piece is over, under the piece but over the board and
+  /// everything drawn on it, so that the piece still reads as picked up and its destination is
+  /// still marked underneath it.
+  ///
+  /// The colour is the board's own legal-move target, so a destination a piece may be played to is
+  /// marked the same way whether it is being tapped or dragged, and follows the theme with the rest
+  /// of the board rather than being a wash of its own.
+  void paintDragTarget(Canvas canvas) {
+    final bounds = dragTargetBounds;
+    if (bounds == null) return;
+    final paint = Paint()..color = style.target;
+    if (dragTargetKind == .circle) {
+      canvas.drawCircle(bounds.center, bounds.width / 2, paint);
+    } else {
+      canvas.drawRect(bounds, paint);
+    }
+  }
+
+  /// The scale the dragged piece is drawn at: the board's own enlarged size while
+  /// [magnifyDraggedPiece] is set, its usual size otherwise.
+  @visibleForTesting
+  double get draggedPieceScale => magnifyDraggedPiece ? 1.15 : 1.0;
+
+  /// The point the dragged piece is centred on: the touch point itself, or a cell above it while
+  /// the piece is magnified and lifted clear of the finger. Null when no drag is in flight.
+  @visibleForTesting
+  Offset? get draggedPieceCentre {
+    final at = dragPosition;
+    if (at == null || dragFrom == null) return null;
+    return magnifyDraggedPiece ? at - Offset(0, cell) : at;
+  }
+
+  /// The piece under the player's finger: a little larger than the rest and lifted clear of the
+  /// finger, or, with [magnifyDraggedPiece] off, its usual size exactly under the touch.
   ///
   /// A dragged piece is not a translating one. Dragging is the player's hand moving a piece and
   /// animating is the engine drawing a move the board has already been given, and the two are never
   /// happening at once: nothing arrives from a drag until the caller plays it back as a position.
+  ///
+  /// The lift is a whole cell, this board's own square: the chess board lifts the piece under the
+  /// finger by one of its squares, so both games leave the piece clear of the touch point by the
+  /// same one-square step.
   void paintDraggedPiece(Canvas canvas) {
+    if (blindfoldMode) return;
     final from = dragFrom;
-    final at = dragPosition;
-    if (from == null || at == null) return;
+    final centre = draggedPieceCentre;
+    if (from == null || centre == null) return;
     final piece = position.pieceAt(from);
     if (piece == null) return;
-    canvas.drawCircle(
-      at,
-      geometry.pieceRadius * 1.15,
-      Paint()
-        ..color = const Color(0x55000000)
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, cell * 0.08),
-    );
-    paintPiece(canvas, at, piece, scale: 1.15);
+    final scale = draggedPieceScale;
+    if (magnifyDraggedPiece) {
+      canvas.drawCircle(
+        centre,
+        geometry.pieceRadius * scale,
+        Paint()
+          ..color = const Color(0x55000000)
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, cell * 0.08),
+      );
+    }
+    paintPiece(canvas, centre, piece, scale: scale);
   }
 
   /// Writes [text] centred on [centre].
@@ -963,6 +1073,9 @@ class XiangqiBoardPainter({
       oldDelegate.showLastMove != showLastMove ||
       oldDelegate.showBorder != showBorder ||
       oldDelegate.hint != hint ||
+      oldDelegate.magnifyDraggedPiece != magnifyDraggedPiece ||
+      oldDelegate.dragTargetKind != dragTargetKind ||
+      oldDelegate.blindfoldMode != blindfoldMode ||
       oldDelegate.dragFrom != dragFrom ||
       oldDelegate.dragPosition != dragPosition ||
       oldDelegate._translating != _translating ||

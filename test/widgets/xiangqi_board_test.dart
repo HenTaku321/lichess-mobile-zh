@@ -1,3 +1,4 @@
+import 'package:chessground/chessground.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_move.dart';
@@ -506,6 +507,85 @@ void main() {
       expect(painterOf(tester).translating, isEmpty);
       await tester.pumpAndSettle();
     });
+
+    testWidgets('marks the square a dragged piece is over, the way the setting asks', (
+      tester,
+    ) async {
+      final e3 = XiangqiSquare.parse('e3')!;
+      final e4 = XiangqiSquare.parse('e4')!;
+      for (final kind in DragTargetKind.values) {
+        final rect = await pumpBoard(
+          tester,
+          XiangqiBoard(
+            position: XiangqiPosition.initial(),
+            dragTargetKind: kind,
+            onDragMove: (from, to) {},
+          ),
+        );
+        final geometry = XiangqiBoardGeometry.fit(rect.size);
+
+        // Nothing is under a finger yet, so there is no square to mark.
+        expect(painterOf(tester).dragTargetBounds, isNull, reason: '$kind before the drag');
+
+        final gesture = await tester.startGesture(rect.topLeft + geometry.centerOf(e3, .red));
+        await gesture.moveBy(const Offset(0, -40));
+        await tester.pump();
+
+        final bounds = painterOf(tester).dragTargetBounds;
+        if (kind == .none) {
+          expect(bounds, isNull, reason: '$kind draws nothing');
+        } else {
+          // A circle is two squares across and a square is one, both centred on the point the
+          // finger has reached — the soldier's step from e3 up to e4.
+          final side = kind == .circle ? geometry.cell * 2 : geometry.cell;
+          expect(bounds, isNotNull, reason: '$kind draws a target');
+          expect(bounds!.center, geometry.centerOf(e4, .red), reason: '$kind is centred right');
+          expect(bounds.width, side, reason: '$kind is as wide as the setting says');
+          expect(bounds.height, side, reason: '$kind is as tall as the setting says');
+        }
+
+        await gesture.up();
+        await tester.pumpAndSettle();
+      }
+    });
+
+    testWidgets('draws the dragged piece magnified and lifted, or plain under the finger', (
+      tester,
+    ) async {
+      final e3 = XiangqiSquare.parse('e3')!;
+
+      // A drag held open, so the painter can be read while the piece is still under the finger.
+      // The painter is a snapshot, so it stays readable after the finger is lifted.
+      Future<XiangqiBoardPainter> holdDrag({required bool magnify}) async {
+        final rect = await pumpBoard(
+          tester,
+          XiangqiBoard(
+            position: XiangqiPosition.initial(),
+            magnifyDraggedPiece: magnify,
+            onDragMove: (from, to) {},
+          ),
+        );
+        final geometry = XiangqiBoardGeometry.fit(rect.size);
+        final gesture = await tester.startGesture(rect.topLeft + geometry.centerOf(e3, .red));
+        await gesture.moveBy(const Offset(0, -40));
+        await tester.pump();
+        final painter = painterOf(tester);
+        expect(painter.magnifyDraggedPiece, magnify);
+        await gesture.up();
+        await tester.pumpAndSettle();
+        return painter;
+      }
+
+      final magnified = await holdDrag(magnify: true);
+      final plain = await holdDrag(magnify: false);
+
+      // The magnified piece is the larger of the two and is drawn a whole cell above the finger;
+      // the plain one is its usual size, centred exactly on the finger.
+      expect(magnified.draggedPieceScale, 1.15);
+      expect(plain.draggedPieceScale, 1.0);
+      expect(magnified.dragPosition! - magnified.draggedPieceCentre!, Offset(0, magnified.cell));
+      expect(plain.draggedPieceCentre, plain.dragPosition);
+    });
   });
 
   group('XiangqiBoard options', () {
@@ -552,6 +632,82 @@ void main() {
       expect(painter.style, const XiangqiBoardStyle());
       expect(painter.geometry.showCoordinates, isFalse);
       expect(painter.geometry.cell, 40);
+    });
+
+    testWidgets('counts the pieces it draws, and the one in flight is not among them', (
+      tester,
+    ) async {
+      // The initial position is sixteen pieces a side, and the count is of what the board is
+      // drawing right now rather than of what is on it.
+      final before = XiangqiPosition.initial();
+      final move = XiangqiMove.parseIccs('e3e4')!;
+      await pumpBoard(tester, XiangqiBoard(position: before));
+      expect(painterOf(tester).drawnPieceSquares, hasLength(32));
+
+      // Mid-move the pawn is off the board and being drawn travelling instead: the square it is
+      // arriving on is the translating piece's to draw, and the one it left is empty.
+      await pumpBoard(tester, XiangqiBoard(position: play(before, move), lastMove: move));
+      expect(painterOf(tester).translating, hasLength(1));
+      expect(painterOf(tester).drawnPieceSquares, hasLength(31));
+      expect(painterOf(tester).drawnPieceSquares, isNot(contains(XiangqiSquare.parse('e4'))));
+
+      await tester.pumpAndSettle();
+      expect(painterOf(tester).drawnPieceSquares, hasLength(32));
+    });
+
+    testWidgets('draws no piece at all when blindfold is on', (tester) async {
+      await pumpBoard(tester, XiangqiBoard(position: XiangqiPosition.initial()));
+      expect(painterOf(tester).blindfoldMode, isFalse);
+      expect(painterOf(tester).drawnPieceSquares, hasLength(32));
+
+      await pumpBoard(
+        tester,
+        XiangqiBoard(position: XiangqiPosition.initial(), blindfoldMode: true),
+      );
+      expect(painterOf(tester).blindfoldMode, isTrue);
+      expect(painterOf(tester).drawnPieceSquares, isEmpty);
+    });
+
+    testWidgets('leaves everything but the pieces on the blindfolded board', (tester) async {
+      // Blindfold is a position that has to be remembered, not a blank board: the frame, the
+      // coordinates, the marks the last move left and the square a dragged piece is over are all
+      // still drawn, and the pieces are the only thing missing. The two passes that would
+      // otherwise put one back — a move in flight, and a drag under the finger — are both read
+      // here.
+      final before = XiangqiPosition.initial();
+      final move = XiangqiMove.parseIccs('h2e2')!;
+      await pumpBoard(tester, XiangqiBoard(position: before, blindfoldMode: true));
+      final rect = await pumpBoard(
+        tester,
+        XiangqiBoard(
+          position: play(before, move),
+          lastMove: move,
+          showCoordinates: true,
+          blindfoldMode: true,
+          onDragMove: (from, to) {},
+        ),
+        size: const Size(400, 440),
+      );
+      final geometry = XiangqiBoardGeometry.fit(rect.size, showCoordinates: true);
+
+      // The cannon that moved is travelling, and neither it nor anything else is drawn.
+      expect(painterOf(tester).translating, hasLength(1));
+      expect(painterOf(tester).drawnPieceSquares, isEmpty);
+
+      // A piece picked up — black's soldier, black being the side to move — is not drawn either,
+      // while the square under the finger still is.
+      final from = XiangqiSquare.parse('e6')!;
+      final gesture = await tester.startGesture(rect.topLeft + geometry.centerOf(from, .red));
+      await gesture.moveBy(const Offset(0, -40));
+      await tester.pump();
+      expect(painterOf(tester).dragFrom, from);
+      expect(painterOf(tester).drawnPieceSquares, isEmpty);
+      expect(painterOf(tester).dragTargetBounds, isNotNull);
+      expect(tester.takeException(), isNull);
+
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
     });
   });
 }

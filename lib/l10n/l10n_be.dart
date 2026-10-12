@@ -740,6 +740,14 @@ class AppLocalizationsBe extends AppLocalizations {
   String get mobileXiangqiBoardCoordinates => 'Board coordinates (A-I, 0-9)';
 
   @override
+  String mobileXiangqiCheckmated(String param) {
+    return '$param is checkmated.';
+  }
+
+  @override
+  String get mobileXiangqiDifficultyExplanation => 'How long the computer is allowed to think.';
+
+  @override
   String get mobileXiangqiEasy => 'Easy';
 
   @override
@@ -747,6 +755,28 @@ class AppLocalizationsBe extends AppLocalizations {
 
   @override
   String get mobileXiangqiMedium => 'Medium';
+
+  @override
+  String get mobileXiangqiRedMovesFirst => 'Red moves first, so the computer opens the game.';
+
+  @override
+  String mobileXiangqiResigned(String param) {
+    return '$param resigned.';
+  }
+
+  @override
+  String get mobileXiangqiSideBlack => 'Black';
+
+  @override
+  String get mobileXiangqiSideRed => 'Red';
+
+  @override
+  String mobileXiangqiStalemateLoss(String param) {
+    return '$param has no legal move, which loses the game.';
+  }
+
+  @override
+  String get mobileXiangqiThreefoldRepetition => 'The same position came back three times, so the game is drawn.';
 
   @override
   String get mobileYouCannotChallengeYourself => 'You cannot challenge yourself';

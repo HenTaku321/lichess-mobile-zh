@@ -740,6 +740,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mobileXiangqiBoardCoordinates => '棋盘坐标 (A-I, 0-9)';
 
   @override
+  String mobileXiangqiCheckmated(String param) {
+    return '$param被将死。';
+  }
+
+  @override
+  String get mobileXiangqiDifficultyExplanation => '电脑可以思考多久。';
+
+  @override
   String get mobileXiangqiEasy => '简单';
 
   @override
@@ -747,6 +755,28 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get mobileXiangqiMedium => '中等';
+
+  @override
+  String get mobileXiangqiRedMovesFirst => '红方先行，所以电脑先开局。';
+
+  @override
+  String mobileXiangqiResigned(String param) {
+    return '$param认输。';
+  }
+
+  @override
+  String get mobileXiangqiSideBlack => '黑方';
+
+  @override
+  String get mobileXiangqiSideRed => '红方';
+
+  @override
+  String mobileXiangqiStalemateLoss(String param) {
+    return '$param无子可走，困毙判负。';
+  }
+
+  @override
+  String get mobileXiangqiThreefoldRepetition => '同一局面出现三次，判为和棋。';
 
   @override
   String get mobileYouCannotChallengeYourself => '您无法向自己发起挑战';
@@ -8238,6 +8268,14 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get mobileXiangqiBoardCoordinates => '棋盤座標（A-I, 0-9）';
 
   @override
+  String mobileXiangqiCheckmated(String param) {
+    return '$param被將死。';
+  }
+
+  @override
+  String get mobileXiangqiDifficultyExplanation => '電腦可以思考多久。';
+
+  @override
   String get mobileXiangqiEasy => '簡單';
 
   @override
@@ -8245,6 +8283,28 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get mobileXiangqiMedium => '中等';
+
+  @override
+  String get mobileXiangqiRedMovesFirst => '紅方先行，所以電腦先開局。';
+
+  @override
+  String mobileXiangqiResigned(String param) {
+    return '$param認輸。';
+  }
+
+  @override
+  String get mobileXiangqiSideBlack => '黑方';
+
+  @override
+  String get mobileXiangqiSideRed => '紅方';
+
+  @override
+  String mobileXiangqiStalemateLoss(String param) {
+    return '$param無子可走，困斃判負。';
+  }
+
+  @override
+  String get mobileXiangqiThreefoldRepetition => '同一局面出現三次，判為和棋。';
 
   @override
   String get activityActivity => '活動';

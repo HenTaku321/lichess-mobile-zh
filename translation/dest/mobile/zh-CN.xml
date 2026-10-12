@@ -255,7 +255,15 @@
   <string name="youCannotChallengeYourself" comment="Error snackbar when trying to challenge yourself from the board editor.">您无法向自己发起挑战</string>
   <string name="xiangqi" comment="Xiangqi, the Chinese chess variant, as opposed to international chess. Used as a game name in the offline opponent picker and as a screen title.">象棋</string>
   <string name="xiangqiBoardCoordinates" comment="The board coordinates setting, as it appears on the xiangqi game settings sheet. Nine files by ten ranks, unlike the chess board's eight by eight.">棋盘坐标 (A-I, 0-9)</string>
+  <string name="xiangqiCheckmated" comment="Xiangqi game-end sentence: the side named by %s is checkmated.">%s被将死。</string>
+  <string name="xiangqiDifficultyExplanation" comment="Xiangqi game settings sheet: the line under the difficulty setting, saying what a level actually controls.">电脑可以思考多久。</string>
   <string name="xiangqiEasy" comment="Xiangqi engine strength: the easiest level.">简单</string>
   <string name="xiangqiHard" comment="Xiangqi engine strength: the hardest level.">困难</string>
   <string name="xiangqiMedium" comment="Xiangqi engine strength: the medium level.">中等</string>
+  <string name="xiangqiRedMovesFirst" comment="Xiangqi new game sheet: the line under the side setting once black is chosen, saying the computer opens the game.">红方先行，所以电脑先开局。</string>
+  <string name="xiangqiResigned" comment="Xiangqi game-end sentence: the side named by %s resigned.">%s认输。</string>
+  <string name="xiangqiSideBlack" comment="The black side of a xiangqi game, used as a side name in the game-end sentences.">黑方</string>
+  <string name="xiangqiSideRed" comment="The red side of a xiangqi game, used as a side name in the game-end sentences.">红方</string>
+  <string name="xiangqiStalemateLoss" comment="Xiangqi game-end sentence: the side named by %s has no legal move. Unlike chess, where having no move is a draw, in xiangqi it loses the game (困毙).">%s无子可走，困毙判负。</string>
+  <string name="xiangqiThreefoldRepetition" comment="Xiangqi game-end sentence: the same position occurred three times, drawing the game.">同一局面出现三次，判为和棋。</string>
 </resources>

@@ -1630,6 +1630,18 @@ abstract class AppLocalizations {
   /// **'Board coordinates (A-I, 0-9)'**
   String get mobileXiangqiBoardCoordinates;
 
+  /// No description provided for @mobileXiangqiCheckmated.
+  ///
+  /// In en, this message translates to:
+  /// **'{param} is checkmated.'**
+  String mobileXiangqiCheckmated(String param);
+
+  /// No description provided for @mobileXiangqiDifficultyExplanation.
+  ///
+  /// In en, this message translates to:
+  /// **'How long the computer is allowed to think.'**
+  String get mobileXiangqiDifficultyExplanation;
+
   /// No description provided for @mobileXiangqiEasy.
   ///
   /// In en, this message translates to:
@@ -1647,6 +1659,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Medium'**
   String get mobileXiangqiMedium;
+
+  /// No description provided for @mobileXiangqiRedMovesFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Red moves first, so the computer opens the game.'**
+  String get mobileXiangqiRedMovesFirst;
+
+  /// No description provided for @mobileXiangqiResigned.
+  ///
+  /// In en, this message translates to:
+  /// **'{param} resigned.'**
+  String mobileXiangqiResigned(String param);
+
+  /// No description provided for @mobileXiangqiSideBlack.
+  ///
+  /// In en, this message translates to:
+  /// **'Black'**
+  String get mobileXiangqiSideBlack;
+
+  /// No description provided for @mobileXiangqiSideRed.
+  ///
+  /// In en, this message translates to:
+  /// **'Red'**
+  String get mobileXiangqiSideRed;
+
+  /// No description provided for @mobileXiangqiStalemateLoss.
+  ///
+  /// In en, this message translates to:
+  /// **'{param} has no legal move, which loses the game.'**
+  String mobileXiangqiStalemateLoss(String param);
+
+  /// No description provided for @mobileXiangqiThreefoldRepetition.
+  ///
+  /// In en, this message translates to:
+  /// **'The same position came back three times, so the game is drawn.'**
+  String get mobileXiangqiThreefoldRepetition;
 
   /// No description provided for @mobileYouCannotChallengeYourself.
   ///

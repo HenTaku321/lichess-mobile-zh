@@ -49,7 +49,7 @@ class const StreakScreen({super.key}) extends StatelessWidget {
             },
           ),
           actions: const [ToggleSoundButton()],
-          title: const Text('Puzzle Streak'),
+          title: Text(context.l10n.mobilePuzzleStreakTitle),
         ),
         body: const _Load(),
       ),
@@ -468,7 +468,7 @@ class const _BottomBar({
         if (!streak.finished)
           BottomBarButton(
             icon: Icons.info_outline,
-            label: context.l10n.aboutX('Streak'),
+            label: context.l10n.aboutX(context.l10n.mobilePuzzleStreakTitle),
             showLabel: true,
             onTap: () => _streakInfoDialogBuilder(context),
           ),
@@ -547,7 +547,7 @@ class const _BottomBar({
     return showAdaptiveDialog(
       context: context,
       builder: (context) => AlertDialog.adaptive(
-        title: Text(context.l10n.aboutX('Puzzle Streak')),
+        title: Text(context.l10n.aboutX(context.l10n.mobilePuzzleStreakTitle)),
         content: Text(context.l10n.puzzleStreakDescription),
         actions: [
           PlatformDialogAction(

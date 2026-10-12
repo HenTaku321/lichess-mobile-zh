@@ -266,7 +266,7 @@ class const _PuzzleMenu() extends ConsumerWidget {
         _PuzzleMenuListTile(
           enabled: isOnline,
           icon: LichessIcons.streak,
-          title: 'Puzzle Streak',
+          title: context.l10n.mobilePuzzleStreakTitle,
           badgeLabel: switch (ref.watch(savedStreakScoreProvider)) {
             AsyncData(:final value?) => value.toString(),
             _ => null,
@@ -285,7 +285,7 @@ class const _PuzzleMenu() extends ConsumerWidget {
         _PuzzleMenuListTile(
           enabled: isOnline,
           icon: LichessIcons.storm,
-          title: 'Puzzle Storm',
+          title: context.l10n.mobilePuzzleStormTitle,
           subtitle: context.l10n.mobilePuzzleStormSubtitle,
           onTap: isOnline
               ? () {

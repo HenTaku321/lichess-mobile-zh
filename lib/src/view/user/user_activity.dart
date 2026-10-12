@@ -165,14 +165,20 @@ class const UserActivityEntry({
         if (entry.streak != null)
           _UserActivityListTile(
             leading: const Icon(LichessIcons.streak, size: leadingIconSize),
-            title: context.l10n.stormPlayedNbRunsOfPuzzleStorm(entry.streak!.runs, 'Puzzle Streak'),
+            title: context.l10n.stormPlayedNbRunsOfPuzzleStorm(
+              entry.streak!.runs,
+              context.l10n.mobilePuzzleStreakTitle,
+            ),
             subtitle: emptySubtitle,
             trailing: BriefGameResultBox(win: entry.streak!.score, draw: 0, loss: 0),
           ),
         if (entry.storm != null)
           _UserActivityListTile(
             leading: const Icon(LichessIcons.storm, size: leadingIconSize),
-            title: context.l10n.stormPlayedNbRunsOfPuzzleStorm(entry.storm!.runs, 'Puzzle Storm'),
+            title: context.l10n.stormPlayedNbRunsOfPuzzleStorm(
+              entry.storm!.runs,
+              context.l10n.mobilePuzzleStormTitle,
+            ),
             subtitle: emptySubtitle,
             trailing: BriefGameResultBox(win: entry.storm!.score, draw: 0, loss: 0),
           ),

@@ -47,7 +47,10 @@ class _StormScreenState() extends ConsumerState<StormScreen> {
   Widget build(BuildContext context) {
     return WakelockWidget(
       child: Scaffold(
-        appBar: AppBar(actions: const [ToggleSoundButton()], title: const Text('Puzzle Storm')),
+        appBar: AppBar(
+          actions: const [ToggleSoundButton()],
+          title: Text(context.l10n.mobilePuzzleStormTitle),
+        ),
         body: const _Load(),
       ),
     );
@@ -390,7 +393,7 @@ Future<void> _stormInfoDialogBuilder(BuildContext context) {
     context: context,
     builder: (context) {
       return AlertDialog.adaptive(
-        title: Text(context.l10n.aboutX('Puzzle Storm')),
+        title: Text(context.l10n.aboutX(context.l10n.mobilePuzzleStormTitle)),
         content: const SingleChildScrollView(
           child: Text.rich(
             TextSpan(
@@ -681,7 +684,7 @@ class const _BottomBar(final PuzzleStormResponse data) extends ConsumerWidget {
         if (stormState.mode == StormMode.initial)
           BottomBarButton(
             icon: Icons.info_outline,
-            label: context.l10n.aboutX('Storm'),
+            label: context.l10n.aboutX(context.l10n.mobilePuzzleStormTitle),
             showLabel: true,
             onTap: () => _stormInfoDialogBuilder(context),
           ),

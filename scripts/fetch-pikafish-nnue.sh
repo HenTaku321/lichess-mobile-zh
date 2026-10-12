@@ -27,9 +27,21 @@ URL='https://github.com/official-pikafish/Networks/releases/download/master-net/
 SIZE=50244700
 SHA256='10b84dd80bb4e324aa389cab327feeb7b4c44578e35a86105d4fcd5f840c3ac7'
 
+# The digest of $1, printed alone. Both spellings are asked for rather than one: the macOS runner's
+# sha256sum is the BSD one, which computes a digest but has no `-c`, and the workflows run on it as
+# well as on Linux — a check that silently cannot run there would have failed the build on a file
+# that was in fact correct. Both forms take the file as an argument and print `<digest>  <name>`.
+sha256_of() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | cut -d' ' -f1
+  else
+    shasum -a 256 "$1" | cut -d' ' -f1
+  fi
+}
+
 if [ -f "$DEST" ]; then
   actual_size=$(stat -c%s "$DEST" 2>/dev/null || stat -f%z "$DEST")
-  if [ "$actual_size" = "$SIZE" ] && echo "$SHA256  $DEST" | sha256sum -c --status; then
+  if [ "$actual_size" = "$SIZE" ] && [ "$(sha256_of "$DEST")" = "$SHA256" ]; then
     echo "pikafish.nnue is already there and intact ($SIZE bytes)"
     exit 0
   fi
@@ -48,10 +60,11 @@ if [ "$actual_size" != "$SIZE" ]; then
   echo "::error::pikafish.nnue is $actual_size bytes, expected $SIZE" >&2
   exit 1
 fi
-if ! echo "$SHA256  $tmp" | sha256sum -c --status; then
+actual_digest=$(sha256_of "$tmp")
+if [ "$actual_digest" != "$SHA256" ]; then
   echo "::error::pikafish.nnue does not have the expected sha256" >&2
   echo "expected: $SHA256" >&2
-  echo "actual:   $(sha256sum "$tmp" | cut -d' ' -f1)" >&2
+  echo "actual:   $actual_digest" >&2
   exit 1
 fi
 

@@ -181,7 +181,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          # The release *and* its tag both have to be gone before create will take
+          # the tag again. `--cleanup-tag` has been observed to leave the tag
+          # behind, and the create then dies with "a release with the same tag
+          # name already exists: linux-latest" -- which is a failure that looks
+          # like the build and is not. Deleting the ref as well is idempotent:
+          # it is a no-op when the tag is already gone, which is why both lines
+          # are allowed to fail.
           gh release delete linux-latest --yes --cleanup-tag 2>/dev/null || true
+          gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/tags/linux-latest" 2>/dev/null || true
           gh release create linux-latest out/lichess-zh-linux-x86_64.tar.gz \
             --title "Latest zh Linux desktop build" \
             --notes "x86_64 desktop bundle from ${GITHUB_SHA::7}, triggered by ${GITHUB_EVENT_NAME}. Unpack and run lichess-zh/lichess_mobile." \

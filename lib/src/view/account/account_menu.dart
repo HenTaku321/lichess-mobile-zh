@@ -4,12 +4,14 @@ import 'package:flutter_riverpod/experimental/mutation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/account/account_repository.dart';
 import 'package:lichess_mobile/src/model/auth/auth_controller.dart';
+import 'package:lichess_mobile/src/model/common/perf.dart';
 import 'package:lichess_mobile/src/model/common/preloaded_data.dart';
 import 'package:lichess_mobile/src/model/message/message_repository.dart';
 import 'package:lichess_mobile/src/model/team/team_providers.dart';
 import 'package:lichess_mobile/src/model/user/user.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_session.dart';
+import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_user_repository.dart';
 import 'package:lichess_mobile/src/network/connectivity.dart';
 import 'package:lichess_mobile/src/network/http.dart';
 import 'package:lichess_mobile/src/styles/lichess_icons.dart';
@@ -211,12 +213,17 @@ class _AccountMenuScreenState()
                   ),
                   title: Text(context.l10n.mobileXiangqiGuest),
                 ),
-                // A real account: its name, and a sign-out behind a tap. Deliberately no link to
-                // an xiangqi.com profile and no chevron — no profile URL has been verified, and
-                // this row must not look like a door into one.
+                // A real account: its name, its ratings and where it is, and a sign-out behind a
+                // tap. The account endpoint is verified and is what the subtitle is read from, but
+                // the row still carries no chevron and does not open a profile: it is an identity
+                // and a sign-out, not a door into xiangqi.com.
                 final XiangqiSession session => ListTile(
                   leading: const Icon(Icons.grid_on),
                   title: Text(session.name),
+                  subtitle: _xiangqiUserSubtitle(
+                    context,
+                    ref.watch(xiangqiUserProvider(session.name)),
+                  ),
                   enabled: isOnline,
                   onTap: () => _showXiangqiSignOutSheet(context, ref),
                 ),
@@ -334,6 +341,41 @@ class _AccountMenuScreenState()
           },
         ),
       ],
+    );
+  }
+
+  /// The subtitle of the signed-in xiangqi.com row: the account's ratings, then whether it is
+  /// online and where it is.
+  ///
+  /// One line, and only when there is a profile to read: while the lookup is loading and after it
+  /// has failed the row is drawn without a subtitle, so a slow or refused request leaves the name
+  /// where it was rather than a spinner or an error where the ratings go. The ratings are the
+  /// *short* perf labels — `Bullet 543 · Rapid 584 · Corresp. 600 · Puzzle 1235` — because the
+  /// subtitle has one line to say four numbers in, and a speed the account has never played is
+  /// left out rather than shown as a zero.
+  ///
+  /// The perf labels are the lichess ones (`Perf.shortLabel`), reused rather than re-typed: they
+  /// name the same four speeds, and the account row is not the place to say them differently.
+  Widget? _xiangqiUserSubtitle(BuildContext context, AsyncValue<XiangqiUserProfile> profile) {
+    final value = profile.value;
+    if (value == null) return null;
+
+    final l10n = context.l10n;
+    final ratings = [
+      if (value.bulletRating != null) '${Perf.bullet.shortLabel(l10n)} ${value.bulletRating}',
+      if (value.rapidRating != null) '${Perf.rapid.shortLabel(l10n)} ${value.rapidRating}',
+      if (value.dailyRating != null) '${Perf.correspondence.shortLabel(l10n)} ${value.dailyRating}',
+      if (value.puzzleRating != null) '${Perf.puzzle.shortLabel(l10n)} ${value.puzzleRating}',
+    ];
+    final status = [
+      if (value.isOnline) l10n.online else l10n.offline,
+      if (value.countryName != null) value.countryName!,
+    ];
+
+    return Text(
+      [...ratings, status.join(' · ')].join(' · '),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
     );
   }
 

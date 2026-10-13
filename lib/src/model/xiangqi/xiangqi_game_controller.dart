@@ -295,10 +295,15 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
   /// written before the over-the-board screen meant. [XiangqiOpponent.human] is two people at one
   /// board, and then [difficulty] is inert: nobody is searched for, and the side that moves first
   /// is simply the side whose player moves first.
+  ///
+  /// [initialPosition] is where the game starts, and left out it is the standard opening
+  /// ([XiangqiPosition.initial]). The position carries whose move it is, so one that is not [side]'s
+  /// to move hands the opening to the other side, exactly as taking black does.
   void startNewGame({
     required XiangqiSide side,
     required XiangqiDifficulty difficulty,
     XiangqiOpponent opponent = XiangqiOpponent.engine,
+    XiangqiPosition? initialPosition,
   }) {
     _epoch++;
     _search?.stop();
@@ -307,7 +312,7 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
       playerSide: side,
       difficulty: difficulty,
       opponent: opponent,
-      positions: IList([XiangqiPosition.initial()]),
+      positions: IList([initialPosition ?? XiangqiPosition.initial()]),
       moves: const IListConst([]),
     );
     // Over the board it is never the computer's turn, so this never starts a search — see

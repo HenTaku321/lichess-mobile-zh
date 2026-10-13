@@ -78,11 +78,16 @@ Widget appInLocale(Locale locale, Widget home) => MaterialApp(
 ///
 /// [locale] is the language to run in, and the one test that is about the language the app is
 /// running in passes it; everything else leaves it null and gets the harness's app.
+///
+/// [initialFen] is the position to open the screen on, and only the test about opening on one passes
+/// it: a screen given a position is a screen on a game that has not started yet, and its own behaviour
+/// is what that test is about.
 Future<FakeTransport> pumpGameScreen(
   WidgetTester tester, {
   Size surfaceSize = kTestSurfaceSize,
   bool engineEvaluation = false,
   Locale? locale,
+  String? initialFen,
 }) async {
   final transport = FakeTransport(
     spec: const PikafishSpec(nnuePath: '/test/pikafish.nnue'),
@@ -91,7 +96,7 @@ Future<FakeTransport> pumpGameScreen(
   final engine = Engine(transport);
   addTearDown(engine.dispose);
 
-  const home = XiangqiGameScreen();
+  final home = XiangqiGameScreen(initialFen: initialFen);
   final overrides = {
     xiangqiEngineProvider: xiangqiEngineProvider.overrideWith((Ref ref) => engine),
   };
@@ -168,6 +173,14 @@ Future<void> tapSquare(WidgetTester tester, String name) async {
 BottomBarButton barButton(WidgetTester tester, IconData icon) => tester.widget<BottomBarButton>(
   find.ancestor(of: find.byIcon(icon), matching: find.byType(BottomBarButton)),
 );
+
+/// The container the screen is running in, for reading the game's state straight off the tree.
+ProviderContainer containerOf(WidgetTester tester) =>
+    ProviderScope.containerOf(tester.element(find.byType(XiangqiGameScreen)));
+
+/// A well formed position that is not the opening: the standard arrangement, black to move.
+const String kBlackToMoveFen =
+    'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR b - - 0 1';
 
 void main() {
   TestLichessBinding.ensureInitialized();
@@ -447,6 +460,48 @@ void main() {
       await tester.tap(blindfoldSwitch);
       await tester.pumpAndSettle();
       expect(board().blindfoldMode, isTrue);
+    });
+
+    testWidgets('a screen opened on a position offers to set a game up on it', (tester) async {
+      final start = XiangqiPosition.fromFen(kBlackToMoveFen);
+      await pumpGameScreen(tester, initialFen: start.toFen());
+
+      // The sheet comes up by itself: a position handed to the screen is a game to be set up on it,
+      // not a game in progress to be resumed, and the screen does not go looking for a session.
+      expect(find.text('Side'), findsOneWidget);
+
+      // The sheet draws the position above the controls, so what is being set up is read rather than
+      // imagined. Read only: a preview has no callbacks, which is also what tells it apart from the
+      // board behind the sheet.
+      final preview = tester
+          .widgetList<XiangqiBoard>(find.byType(XiangqiBoard))
+          .firstWhere((board) => board.onTapSquare == null);
+      expect(preview.position.toFen(), start.toFen());
+      expect(preview.onDragMove, isNull, reason: 'a preview is not a board to move pieces on');
+      // Nine files by ten ranks with the coordinates off, the same ratio the layout sizes the board
+      // by — see [XiangqiGameLayout].
+      expect(
+        tester.getSize(find.byWidget(preview)).aspectRatio,
+        closeTo(9 / 10, 0.001),
+        reason: 'the preview is the board at its own shape, not whatever room it is given',
+      );
+
+      // The player takes the side the position says is to move — black here, meant to move first —
+      // rather than the game screen's own default of red.
+      expect(find.text('Black'), findsOneWidget);
+      expect(find.text('Red moves first, so the computer opens the game.'), findsOneWidget);
+
+      // The preview makes the sheet taller than the room it is given, so the button at the bottom of
+      // it has to be scrolled to before it can be pressed — the same the settings sheet's own tiles
+      // are.
+      await tester.ensureVisible(find.text('Play'));
+      await tester.tap(find.text('Play'));
+      await tester.pumpAndSettle();
+
+      final state = containerOf(tester).read(xiangqiGameControllerProvider);
+      expect(state.position.toFen(), start.toFen());
+      expect(state.moves, isEmpty, reason: 'a game from a position begins on it');
+      expect(state.playerSide, XiangqiSide.black);
     });
   });
 }

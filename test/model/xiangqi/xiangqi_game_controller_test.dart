@@ -30,6 +30,10 @@ XiangqiMove move(String iccs) {
   return move;
 }
 
+/// The standard arrangement, black to move — a well formed position that is not the opening.
+const String kBlackToMoveFen =
+    'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR b - - 0 1';
+
 /// A game being played: the container it lives in, the engine it is playing, and what the game has
 /// asked the view to say.
 class XiangqiHarness(final ProviderContainer container, final FakeTransport transport) {
@@ -455,6 +459,81 @@ void main() {
       // A game that is over is not one the board takes anything more for.
       harness.controller.tapSquare(square('h2'));
       expect(harness.state.selected, isNull);
+    });
+
+    test('a new game without a position is the standard opening', () async {
+      final harness = await makeHarness();
+      harness.controller.startNewGame(side: .red, difficulty: .level4);
+
+      // The case every no-argument caller takes, and the position no board editor had a hand in:
+      // leaving the position out has to be the opening and not the empty board.
+      expect(harness.state.position, XiangqiPosition.initial());
+      expect(harness.state.moves, isEmpty);
+      expect(harness.state.turn, XiangqiSide.red);
+    });
+
+    test('a new game can start from a given position', () async {
+      final harness = await makeHarness();
+      final start = XiangqiPosition.fromFen(kBlackToMoveFen);
+      harness.controller.startNewGame(side: .red, difficulty: .level4, initialPosition: start);
+
+      // The board is the position given, whole: no move has been played to get there and none is
+      // invented to lead in — a game from a position is a game that begins on it.
+      expect(harness.state.position, start);
+      expect(harness.state.moves, isEmpty);
+      expect(harness.state.turn, XiangqiSide.black);
+    });
+
+    test('a given position the player is not to move in is opened by the computer', () async {
+      final harness = await makeHarness();
+      final start = XiangqiPosition.fromFen(kBlackToMoveFen);
+      // The player has red, but the position says black is to move, so the opening is the
+      // computer's — the same path `side: black` takes through `isPlayerTurn`, with no case of its
+      // own in the controller. This is what a FEN out of a board editor can do that a side choice
+      // cannot, and the reason the position has to carry whose move it is.
+      harness.controller.startNewGame(side: .red, difficulty: .level4, initialPosition: start);
+
+      expect(harness.state.isPlayerTurn, isFalse);
+      expect(harness.state.isEngineThinking, isTrue);
+
+      await pumpEventQueue();
+      harness.transport.takeCommands();
+      harness.transport.emit('readyok');
+      await pumpEventQueue();
+      // The engine is asked about the position on the board and not the opening: a custom start is
+      // searched like any other position, so the move search runs off the given FEN.
+      const level = XiangqiDifficulty.level4;
+      expect(harness.transport.takeCommands(), [
+        'position fen ${start.toFen()}',
+        'go movetime ${level.moveTime.inMilliseconds} depth ${level.depth}',
+      ]);
+
+      harness.transport.emit('bestmove h9g7');
+      await pumpEventQueue();
+      expect(harness.state.moves, IList([move('h9g7')]));
+      expect(harness.state.isPlayerTurn, isTrue);
+    });
+
+    test('over the board a given position is just where the two players start', () async {
+      final harness = await makeHarness();
+      final start = XiangqiPosition.fromFen(kBlackToMoveFen);
+      harness.controller.startNewGame(
+        side: .red,
+        difficulty: .level4,
+        opponent: .human,
+        initialPosition: start,
+      );
+      await pumpEventQueue();
+
+      expect(harness.state.position, start);
+      // Both sides are a person's over the board, so the side the position says is to move may
+      // move — and nothing is searched for, as it never is there.
+      expect(harness.state.isPlayerTurn, isTrue);
+      expect(harness.state.isEngineThinking, isFalse);
+      expect(
+        harness.transport.takeCommands().where((command) => command.startsWith('go ')),
+        isEmpty,
+      );
     });
   });
 

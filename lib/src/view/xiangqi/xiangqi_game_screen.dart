@@ -49,8 +49,17 @@ import 'package:material_ui/material_ui.dart';
 /// Nothing outlives the screen. A chess game against the computer is saved and picked up again on
 /// the next visit; this one starts on the initial position every time, which is what a game played
 /// in one sitting needs and all that this phase asks for.
-class const XiangqiGameScreen() extends ConsumerWidget {
-  static Route<void> buildRoute() => buildScreenRoute(screen: const XiangqiGameScreen());
+class const XiangqiGameScreen({
+  /// The position to set a game up on, or null to open the sheet on the standard one.
+  ///
+  /// A FEN rather than a [XiangqiPosition], because this is the screen's edge and what a board
+  /// editor or a deep link has to hand: it is parsed once, in the sheet, and the model below takes
+  /// the position. Assumed well formed — its only source is [XiangqiPosition.toFen] — so a bad one
+  /// throws rather than being quietly replaced by the opening.
+  final String? initialFen,
+}) extends ConsumerWidget {
+  static Route<void> buildRoute({String? initialFen}) =>
+      buildScreenRoute(screen: XiangqiGameScreen(initialFen: initialFen));
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -73,7 +82,7 @@ class const XiangqiGameScreen() extends ConsumerWidget {
           ),
         ],
       ),
-      body: const _Body(),
+      body: _Body(initialFen: initialFen),
     );
   }
 }
@@ -82,12 +91,20 @@ class const XiangqiGameScreen() extends ConsumerWidget {
 ///
 /// The sheet opens on the game in progress rather than on a default, so that opening it to look
 /// does not quietly mean something else by the time it is dismissed.
-void _showNewGameSheet(BuildContext context, WidgetRef ref) {
+///
+/// [initialFen] is the position the game is to start from, and is only ever given when the screen
+/// was opened with one: the sheet then becomes the way that position is turned into a game. Every
+/// later visit — the settings sheet, the result dialog, the bar's own button — leaves it out, and
+/// starts over from the standard opening.
+void _showNewGameSheet(BuildContext context, WidgetRef ref, {String? initialFen}) {
   final gameState = ref.read(xiangqiGameControllerProvider);
   showModalBottomSheet<void>(
     context: context,
-    builder: (context) =>
-        _NewGameSheet(side: gameState.playerSide, difficulty: gameState.difficulty),
+    builder: (context) => _NewGameSheet(
+      side: gameState.playerSide,
+      difficulty: gameState.difficulty,
+      initialFen: initialFen,
+    ),
   );
 }
 
@@ -155,7 +172,7 @@ class const _XiangqiLevelTile({
   }
 }
 
-class const _Body() extends ConsumerStatefulWidget {
+class const _Body({final String? initialFen}) extends ConsumerStatefulWidget {
   @override
   ConsumerState<_Body> createState() => _BodyState();
 }
@@ -178,9 +195,21 @@ class _BodyState() extends ConsumerState<_Body> {
   @override
   void initState() {
     super.initState();
-    // `ref.listen` never fires for the value that is already there, and the game this screen opens
-    // on is exactly that value: the first evaluation has to be asked for rather than waited for.
+    // A position handed to the screen is a game to be set up on it, not a game to be resumed: the
+    // sheet comes up by itself so the player picks a side and a level against the given board, and
+    // nothing is evaluated until that game exists. See the chess screen's own `_BodyState.initState`,
+    // which treats an initial FEN the same way.
+    //
+    // Without one, the screen opens on a game already in progress and the evaluation is asked for
+    // rather than waited for: `ref.listen` never fires for the value that is already there, and that
+    // game is exactly that value.
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      final initialFen = widget.initialFen;
+      if (initialFen != null) {
+        if (!mounted) return;
+        _showNewGameSheet(context, ref, initialFen: initialFen);
+        return;
+      }
       if (mounted) _syncEvaluation(ref.read(xiangqiGameControllerProvider));
     });
   }
@@ -785,16 +814,32 @@ class _XiangqiGameSettingsSheetState() extends ConsumerState<_XiangqiGameSetting
 }
 
 /// The sheet a game is set up in: which side to take, and how hard the computer plays.
+///
+/// [initialFen] is a position to set up on, and is only ever given when the screen was opened with
+/// one; the sheet then opens on [XiangqiPosition.turn] as the player's own side and draws the
+/// position above the controls, so that what is being set up is read rather than imagined.
 class const _NewGameSheet({
   required final XiangqiSide side,
   required final XiangqiDifficulty difficulty,
+  final String? initialFen,
 }) extends ConsumerStatefulWidget {
   @override
   ConsumerState<_NewGameSheet> createState() => _NewGameSheetState();
 }
 
 class _NewGameSheetState() extends ConsumerState<_NewGameSheet> {
-  late XiangqiSide _side = widget.side;
+  /// The position the game is to start from, or null for the standard opening.
+  ///
+  /// Parsed once here rather than in [build], and likewise for the side below: the FEN is assumed
+  /// well formed, so a good one parses the same way every frame.
+  late final XiangqiPosition? _initialPosition = widget.initialFen == null
+      ? null
+      : XiangqiPosition.fromFen(widget.initialFen!);
+
+  /// The side the player takes, which opens on the side to move in a given position — the player
+  /// meant to move first — and otherwise on the side the game in progress has. See the chess sheet's
+  /// `SideChoice.nextToPlay`, which this is the same question as.
+  late XiangqiSide _side = _initialPosition?.turn ?? widget.side;
   late XiangqiDifficulty _difficulty = widget.difficulty;
 
   @override
@@ -822,6 +867,20 @@ class _NewGameSheetState() extends ConsumerState<_NewGameSheet> {
                 );
               },
             ),
+            // The position being set up, drawn below the side it is drawn for. Read only and with no
+            // callbacks, so a touch on it does nothing; 9:10 is the shape of nine files by ten ranks
+            // with the coordinates off, the same ratio [XiangqiGameLayout] sizes the board by.
+            if (_initialPosition != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16.0),
+                child: Center(
+                  child: SizedBox(
+                    width: 135.0,
+                    height: 150.0,
+                    child: XiangqiBoard(position: _initialPosition),
+                  ),
+                ),
+              ),
             // The computer is the whole of the opponent here, so the control for it is the app's own
             // level control for one. See [_XiangqiLevelTile].
             _XiangqiLevelTile(
@@ -836,7 +895,11 @@ class _NewGameSheetState() extends ConsumerState<_NewGameSheet> {
             onPressed: () {
               ref
                   .read(xiangqiGameControllerProvider.notifier)
-                  .startNewGame(side: _side, difficulty: _difficulty);
+                  .startNewGame(
+                    side: _side,
+                    difficulty: _difficulty,
+                    initialPosition: _initialPosition,
+                  );
               Navigator.pop(context);
             },
             child: Text(context.l10n.play, style: Styles.bold),

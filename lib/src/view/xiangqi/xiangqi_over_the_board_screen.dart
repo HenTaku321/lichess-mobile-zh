@@ -49,8 +49,17 @@ import 'package:material_ui/material_ui.dart';
 /// What it does not have is the bar of engine buttons beside the board: no evaluation, no hint, no
 /// opponent to think about. Neither side is the app's to move, so there is nothing for an engine to
 /// say about the game that the two players cannot see for themselves.
-class const XiangqiOverTheBoardScreen() extends StatelessWidget {
-  static Route<void> buildRoute() => buildScreenRoute(screen: const XiangqiOverTheBoardScreen());
+class const XiangqiOverTheBoardScreen({
+  /// The position to set a game up on, or null to open the sheet on the standard one.
+  ///
+  /// A FEN rather than a [XiangqiPosition], because this is the screen's edge and what a board
+  /// editor or a deep link has to hand: it is parsed once, in the sheet, and the model below takes
+  /// the position. Assumed well formed — its only source is [XiangqiPosition.toFen] — so a bad one
+  /// throws rather than being quietly replaced by the opening.
+  final String? initialFen,
+}) extends StatelessWidget {
+  static Route<void> buildRoute({String? initialFen}) =>
+      buildScreenRoute(screen: XiangqiOverTheBoardScreen(initialFen: initialFen));
 
   @override
   Widget build(BuildContext context) {
@@ -58,12 +67,12 @@ class const XiangqiOverTheBoardScreen() extends StatelessWidget {
       // The same title the chess screen of the same name carries, which is what makes the two equal:
       // they are one way of playing, offered for two games, and neither is a variant of the other.
       appBar: AppBar(title: Text(context.l10n.mobileOverTheBoard)),
-      body: const _Body(),
+      body: _Body(initialFen: initialFen),
     );
   }
 }
 
-class const _Body() extends ConsumerStatefulWidget {
+class const _Body({final String? initialFen}) extends ConsumerStatefulWidget {
   @override
   ConsumerState<_Body> createState() => _BodyState();
 }
@@ -83,8 +92,10 @@ class _BodyState() extends ConsumerState<_Body> {
     // it — setting the time control, and starting the game — are done to the clock this screen is
     // already watching rather than to one that is created and thrown away.
     ref.read(xiangqiClockProvider);
+    // The sheet opens on arrival either way; a position handed to the screen is what the game it
+    // starts from becomes, and is the only thing it carries.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _showConfigureSheet(context);
+      if (mounted) _showConfigureSheet(context, initialFen: widget.initialFen);
     });
   }
 
@@ -375,16 +386,20 @@ class const _XiangqiOtbResultDialog({
 /// strings, because it is the same question about the same kind of game; the sheet is not shared with
 /// it because nothing else is: the chess one also carries a variant and a position, and writes the
 /// choices down as a preference that outlives the game, neither of which this has.
-void _showConfigureSheet(BuildContext context) {
+///
+/// [initialFen] is the position the game is to start from, and like the computer screen's own sheet
+/// it is only ever given when the screen was opened with one: the timing is still the whole of what
+/// the sheet asks, this is only what the game it starts is set up on.
+void _showConfigureSheet(BuildContext context, {String? initialFen}) {
   showModalBottomSheet<void>(
     context: context,
     isDismissible: true,
     isScrollControlled: true,
-    builder: (context) => const _ConfigureXiangqiOtbSheet(),
+    builder: (context) => _ConfigureXiangqiOtbSheet(initialFen: initialFen),
   );
 }
 
-class const _ConfigureXiangqiOtbSheet() extends ConsumerStatefulWidget {
+class const _ConfigureXiangqiOtbSheet({final String? initialFen}) extends ConsumerStatefulWidget {
   @override
   ConsumerState<_ConfigureXiangqiOtbSheet> createState() => _ConfigureXiangqiOtbSheetState();
 }
@@ -503,13 +518,17 @@ class _ConfigureXiangqiOtbSheetState() extends ConsumerState<_ConfigureXiangqiOt
               ref.read(xiangqiClockProvider.notifier).setupClock(timeIncrement);
               // Red, because red moves first and somebody has to be drawn at the bottom: the side is
               // inert over the board — see [XiangqiOpponent.human] — and the board is turned round
-              // from the menu rather than chosen here.
+              // from the menu rather than chosen here. A position handed to the screen is what the
+              // game starts from; without one it is the standard opening.
               ref
                   .read(xiangqiGameControllerProvider.notifier)
                   .startNewGame(
                     side: XiangqiSide.red,
                     difficulty: XiangqiDifficulty.defaultLevel,
                     opponent: XiangqiOpponent.human,
+                    initialPosition: widget.initialFen == null
+                        ? null
+                        : XiangqiPosition.fromFen(widget.initialFen!),
                   );
               Navigator.pop(context);
             },

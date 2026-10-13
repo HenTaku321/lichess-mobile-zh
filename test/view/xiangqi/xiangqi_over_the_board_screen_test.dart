@@ -36,9 +36,15 @@ XiangqiSquare squareAt(String name) {
 /// The screen opens on its setup sheet, so the game does not exist until the sheet's own button has
 /// been pressed: every test below starts from a game on the screen's default time control, which is
 /// the one thing the sheet is asked for here.
+///
+/// [initialFen] is the position to open the screen on, and only the test about opening on one passes
+/// it. [startGame] is false for that test alone, which is about the sheet and not the game behind it,
+/// and so leaves the sheet up rather than pressing its button.
 Future<FakeTransport> pumpOtbScreen(
   WidgetTester tester, {
   Size surfaceSize = kTestSurfaceSize,
+  String? initialFen,
+  bool startGame = true,
 }) async {
   final transport = FakeTransport(
     spec: const PikafishSpec(nnuePath: '/test/pikafish.nnue'),
@@ -50,14 +56,16 @@ Future<FakeTransport> pumpOtbScreen(
   await tester.pumpWidget(
     await makeTestProviderScopeApp(
       tester,
-      home: const XiangqiOverTheBoardScreen(),
+      home: XiangqiOverTheBoardScreen(initialFen: initialFen),
       overrides: {xiangqiEngineProvider: xiangqiEngineProvider.overrideWith((Ref ref) => engine)},
       surfaceSize: surfaceSize,
     ),
   );
   await tester.pumpAndSettle();
-  await tester.tap(find.text('Play'));
-  await tester.pumpAndSettle();
+  if (startGame) {
+    await tester.tap(find.text('Play'));
+    await tester.pumpAndSettle();
+  }
 
   return transport;
 }
@@ -194,6 +202,30 @@ void main() {
       expect(container.read(xiangqiGameControllerProvider).isFinished, isFalse);
       expect(find.byIcon(CupertinoIcons.pause), findsNothing);
       expect(find.byIcon(CupertinoIcons.play), findsNothing);
+    });
+
+    testWidgets('a screen opened on a position sets the game up on it', (tester) async {
+      // The standard arrangement, black to move — a well formed position that is not the opening.
+      final start = XiangqiPosition.fromFen(
+        'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR b - - 0 1',
+      );
+      await pumpOtbScreen(tester, initialFen: start.toFen(), startGame: false);
+
+      // The setup sheet is the screen's own, and nothing is added to it: a position only changes
+      // where the game starts, so the sheet still offers the one thing it is asked for here.
+      expect(find.text('Time control'), findsOneWidget);
+      // No preview is drawn — the sheet is the same whether or not a position came with the screen —
+      // so the board behind it is the only one on the tree.
+      expect(find.byType(XiangqiBoard), findsOneWidget);
+
+      await tester.tap(find.text('Play'));
+      await tester.pumpAndSettle();
+
+      final state = containerOf(tester).read(xiangqiGameControllerProvider);
+      expect(state.position.toFen(), start.toFen());
+      expect(state.moves, isEmpty, reason: 'a game from a position begins on it');
+      // Both sides are a person's over the board, whatever the position says about whose move it is.
+      expect(state.opponent, XiangqiOpponent.human);
     });
   });
 }

@@ -70,17 +70,21 @@ Map<String, String> evaluationPreferences({required bool isEnabled}) => {
 /// The evaluation is on by default, which is also what the app's own default preference says: an
 /// analysis board with no engine on it is a move list, and the tests that are about the board alone
 /// turn it off so that the engine is out of the way.
+///
+/// [initialFen] is the position to open the board on, and only the test about opening on one passes
+/// it: the screen sets it before starting the engine, which is what that test's command log is about.
 Future<FakeTransport> pumpAnalysisScreen(
   WidgetTester tester, {
   Size surfaceSize = kTestSurfaceSize,
   bool engineEvaluation = true,
+  String? initialFen,
 }) async {
   final (:engine, :transport) = fakeXiangqiEngine();
 
   await tester.pumpWidget(
     await makeTestProviderScopeApp(
       tester,
-      home: const XiangqiAnalysisScreen(),
+      home: XiangqiAnalysisScreen(initialFen: initialFen),
       overrides: {xiangqiEngineProvider: xiangqiEngineProvider.overrideWith((Ref ref) => engine)},
       defaultPreferences: evaluationPreferences(isEnabled: engineEvaluation),
       surfaceSize: surfaceSize,
@@ -438,6 +442,31 @@ void main() {
       expect(find.byType(InlineMoveItem), findsNothing);
       expect(board(tester).position, XiangqiPosition.initial());
       expect(barButton(tester, CupertinoIcons.chevron_back).onTap, isNull);
+    });
+
+    testWidgets('a screen opened on a position analyses that position', (tester) async {
+      // The standard arrangement, black to move — a well formed position that is not the opening, and
+      // not the one the screen would otherwise open on.
+      final start = XiangqiPosition.fromFen(
+        'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR b - - 0 1',
+      );
+      final transport = await pumpAnalysisScreen(tester, initialFen: start.toFen());
+
+      // The board is the position handed over and not the opening the screen first opened on: the
+      // position is set before the engine is started, so there is no search of the opening for the
+      // engine to be stopped and restarted on — the log below has one position in it, not two.
+      expect(board(tester).position.toFen(), start.toFen());
+
+      // A fresh engine, so its first search is a new game, and it is asked to get ready before it is
+      // given the position to search.
+      expect(transport.takeCommands(), ['ucinewgame', 'isready']);
+      await startSearch(tester, transport);
+
+      expect(transport.takeCommands(), [
+        'setoption name MultiPV value 3',
+        'position fen ${start.toFen()}',
+        'go infinite',
+      ]);
     });
   });
 

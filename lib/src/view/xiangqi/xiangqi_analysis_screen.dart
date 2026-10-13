@@ -46,8 +46,17 @@ const double _kEngineLineFontSize = 11.0;
 /// with a move of its own. It also survives being left and come back to — see
 /// [xiangqiAnalysisControllerProvider] — which is the one way it is more like the chess analysis
 /// board than the xiangqi game screen beside it is.
-class const XiangqiAnalysisScreen() extends ConsumerWidget {
-  static Route<void> buildRoute() => buildScreenRoute(screen: const XiangqiAnalysisScreen());
+class const XiangqiAnalysisScreen({
+  /// The position to open the board on, or null to open on whatever the last session left.
+  ///
+  /// A FEN rather than a [XiangqiPosition], because this is the screen's edge and what a board
+  /// editor or a deep link has to hand: it goes to the controller's own `setFen`, which parses it.
+  /// Assumed well formed — its only source is [XiangqiPosition.toFen] — so a bad one throws rather
+  /// than being quietly replaced by the opening.
+  final String? initialFen,
+}) extends ConsumerWidget {
+  static Route<void> buildRoute({String? initialFen}) =>
+      buildScreenRoute(screen: XiangqiAnalysisScreen(initialFen: initialFen));
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -68,12 +77,12 @@ class const XiangqiAnalysisScreen() extends ConsumerWidget {
           ),
         ],
       ),
-      body: const _Body(),
+      body: _Body(initialFen: initialFen),
     );
   }
 }
 
-class const _Body() extends ConsumerStatefulWidget {
+class const _Body({final String? initialFen}) extends ConsumerStatefulWidget {
   @override
   ConsumerState<_Body> createState() => _BodyState();
 }
@@ -93,8 +102,19 @@ class _BodyState() extends ConsumerState<_Body> {
     // The engine is started by hand rather than watched into life: `ref.listen` never fires for the
     // value that is already there, and a screen opened with the evaluation on is exactly that value.
     // After the first frame, because the provider is read and written through the ref.
+    //
+    // A position handed to the screen is put on the board before the engine is started, not after:
+    // the engine is asked to search the position that is on the board, and starting it first would
+    // begin a search on the session the screen opened on — one that the very next line throws away.
+    // Waiting for the frame also lets the controller's own [build] finish, session restore and all,
+    // so this is the last word on what the board holds.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _syncEngine();
+      if (!mounted) return;
+      final initialFen = widget.initialFen;
+      if (initialFen != null) {
+        ref.read(xiangqiAnalysisControllerProvider.notifier).setFen(initialFen);
+      }
+      _syncEngine();
     });
   }
 

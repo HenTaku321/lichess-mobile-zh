@@ -7,6 +7,11 @@
 //
 // The lookup is stubbed at the HTTP layer, per AGENTS.md, so the provider under it is the real one:
 // the row is reading a real `xiangqiUserProvider`, over a fake transport.
+//
+// The last group is about the other half of the same question: which of the two accounts, if
+// either, the menu's one avatar slot is filled from. The rule is that it is the lichess account and
+// only the lichess account — a xiangqi account is an identity of its own, drawn in its own row, and
+// never dressed up as the app's account.
 
 import 'dart:async';
 import 'dart:convert';
@@ -21,6 +26,8 @@ import 'package:lichess_mobile/src/view/account/account_menu.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../binding.dart';
+import '../../mock_server_responses.dart';
+import '../../model/auth/fake_auth_storage.dart';
 import '../../model/xiangqi/online/xiangqi_online_game_fixture.dart' as fx;
 import '../../network/fake_http_client_factory.dart';
 import '../../test_provider_scope.dart';
@@ -203,6 +210,107 @@ void main() {
       expect(titleOf(row), xiangqiAccountUsername);
       expect(subtitleOf(row), isNull);
       expect(find.textContaining('Exception'), findsNothing);
+    });
+  });
+
+  group('the avatar slot', () {
+    /// The one avatar the app bar button draws, or fails if it drew a number of them other than
+    /// one.
+    ///
+    /// The slot is a single thing: the button is either showing the lichess account's avatar or the
+    /// anonymous placeholder, and never two of either.
+    CircleAvatar avatarOf(WidgetTester tester) {
+      final avatars = find.descendant(
+        of: find.byType(AccountMenuButton),
+        matching: find.byType(CircleAvatar),
+      );
+      expect(avatars, findsOneWidget);
+      return tester.widget<CircleAvatar>(avatars);
+    }
+
+    testWidgets(
+      'with a lichess account it is that account, and a xiangqi account does not touch it',
+      (tester) async {
+        await tester.pumpWidget(
+          await makeTestProviderScopeApp(
+            tester,
+            home: const AccountMenuButton(),
+            authUser: fakeAuthUser,
+            overrides: {
+              xiangqiAuthStorageProvider: xiangqiAuthStorageProvider.overrideWith(
+                (ref) => fx.FakeXiangqiAuthStorage(xiangqiSession(isGuest: false)),
+              ),
+              httpClientFactoryProvider: httpClientFactoryProvider.overrideWith(
+                (ref) => FakeHttpClientFactory(
+                  () => MockClient(
+                    (request) => Future.value(
+                      request.url.path == '/api/account'
+                          ? utf8Response(mockApiAccountResponse(fakeAuthUser.user.name), 200)
+                          : utf8Response('', 404),
+                    ),
+                  ),
+                ),
+              ),
+            },
+          ),
+        );
+        await tester.pump();
+
+        // The slot is the lichess account's: its initials, and nothing of the xiangqi account that is
+        // signed in beside it.
+        expect((avatarOf(tester).child! as Text).data, 'T');
+        expect(find.text(xiangqiAccountUsername), findsNothing);
+        expect(find.text('起'), findsNothing);
+      },
+    );
+
+    testWidgets('with no lichess account it stays the anonymous placeholder, xiangqi or not', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        await makeTestProviderScopeApp(
+          tester,
+          home: const AccountMenuButton(),
+          overrides: {
+            xiangqiAuthStorageProvider: xiangqiAuthStorageProvider.overrideWith(
+              (ref) => fx.FakeXiangqiAuthStorage(xiangqiSession(isGuest: false)),
+            ),
+          },
+        ),
+      );
+      await tester.pump();
+
+      // A xiangqi account is not a lichess account, so the slot is still "nobody is signed in":
+      // the placeholder, exactly as it is with no account anywhere. It is never filled from the
+      // xiangqi session, which is a separate identity with a separate name.
+      final button = find.byType(AccountMenuButton);
+      expect(find.descendant(of: button, matching: find.byType(CircleAvatar)), findsNothing);
+      expect(
+        find.descendant(of: button, matching: find.byIcon(Icons.account_circle_outlined)),
+        findsOneWidget,
+      );
+      expect(find.text(xiangqiAccountUsername), findsNothing);
+      expect(find.text('起'), findsNothing);
+    });
+
+    testWidgets('the menu screen draws no avatar at all when there is no lichess account', (
+      tester,
+    ) async {
+      await pumpAccountMenu(
+        tester,
+        session: xiangqiSession(isGuest: false),
+        client: MockClient((request) => Future.value(utf8Response('', 404))),
+      );
+
+      // The lichess identity block — the one place the menu screen has an avatar — is not drawn,
+      // and nothing takes its place: the xiangqi account is an identity of its own, in its own row,
+      // and does not get promoted into it.
+      expect(find.byType(CircleAvatar), findsNothing);
+      expect(find.byIcon(Icons.account_circle_outlined), findsNothing);
+
+      // The xiangqi account is still there, and still only in the xiangqi row.
+      final row = xiangqiRow(tester);
+      expect(titleOf(row), xiangqiAccountUsername);
     });
   });
 }

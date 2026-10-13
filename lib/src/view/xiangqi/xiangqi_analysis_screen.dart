@@ -16,6 +16,7 @@ import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/focus_detector.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_board_editor_screen.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
@@ -67,6 +68,25 @@ class const XiangqiAnalysisScreen({
       appBar: AppBar(
         title: AppBarTitleText('${context.l10n.mobileXiangqi} · ${context.l10n.analysis}'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.edit_outlined),
+            tooltip: context.l10n.boardEditor,
+            // What is on the board, handed over as a FEN, which is the one thing an editor and an
+            // analysis board both speak. This is the way in that opens on the position being looked
+            // at; the More tab's row opens the same editor on the starting position, and the chess
+            // analysis board reaches its own editor through its menu.
+            //
+            // Read rather than watched: the app bar is the screen's and the position is the
+            // controller's, which the body watches, and this only has to be right at the moment the
+            // button is pressed. It is a position and nothing else, so the board opens red at the
+            // bottom whatever way up this screen's own board is drawn — which way up a board is drawn
+            // is the screen's business and is not a fact about the position.
+            onPressed: () => Navigator.of(context).push(
+              XiangqiBoardEditorScreen.buildRoute(
+                initialFen: ref.read(xiangqiAnalysisControllerProvider).position.toFen(),
+              ),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.restart_alt),
             tooltip: context.l10n.reset,

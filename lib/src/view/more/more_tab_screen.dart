@@ -26,6 +26,7 @@ import 'package:lichess_mobile/src/view/settings/settings_screen.dart';
 import 'package:lichess_mobile/src/view/team/team_updates_screen.dart';
 import 'package:lichess_mobile/src/view/user/player_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_analysis_screen.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_board_editor_screen.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_choice_picker.dart';
 import 'package:lichess_mobile/src/widgets/feedback.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
@@ -176,13 +177,51 @@ class const _Body() extends ConsumerWidget {
                     ? const CupertinoListTileChevron()
                     : null,
                 title: Text(context.l10n.boardEditor),
-                onTap: () => Navigator.of(context, rootNavigator: true).push(
-                  BoardEditorScreen.buildRoute((
-                    initialVariant: Variant.standard,
-                    initialFen: null,
-                    initialOrientation: null,
-                  )),
-                ),
+                onTap: () async {
+                  // Chess and xiangqi share this one row for the reason the Analysis row above shares
+                  // its own: a board to put pieces on is the same tool in either game, and a row each
+                  // would say one of them was the lesser. See that row for the whole of it.
+                  //
+                  // Both are offered in every build, which is where this row parts company with the
+                  // one above. An analysis board is the engine's, so a build without Pikafish has no
+                  // xiangqi analysis to offer; an editor is a board and a FEN, and can be left with
+                  // one without an engine ever starting — the same reason the play menu's
+                  // over-the-board row is ungated. The edge is the xiangqi editor's "continue to
+                  // analysis" exit, which would not open in a build without Pikafish: two of its three
+                  // exits are still fine, no build that exists today is without it (both
+                  // `EngineAvailability` values declare it), and if one ever appears the exit is what
+                  // to fix rather than this row.
+                  final choices = [_EditorGame.chess, _EditorGame.xiangqi];
+                  _EditorGame? choice;
+                  await showChoicePicker<_EditorGame?>(
+                    context,
+                    title: Text(context.l10n.boardEditor),
+                    choices: choices,
+                    // Left unticked, as the Analysis picker's is: a question with two answers rather
+                    // than a setting being looked at, and the Material dialog's radios ignore a tap
+                    // on the choice that is already selected.
+                    selectedItem: null,
+                    labelBuilder: (game) => Text(switch (game) {
+                      .chess => context.l10n.mobileChess,
+                      .xiangqi => context.l10n.mobileXiangqi,
+                      // Never built, but the picker is instantiated at a nullable type and the
+                      // switch has to answer for the null.
+                      null => '',
+                    }),
+                    onSelectedItemChanged: (game) => choice = game,
+                  );
+                  if (!context.mounted) return;
+                  final selected = choice;
+                  if (selected == null) return;
+                  Navigator.of(context, rootNavigator: true).push(switch (selected) {
+                    .chess => BoardEditorScreen.buildRoute((
+                      initialVariant: Variant.standard,
+                      initialFen: null,
+                      initialOrientation: null,
+                    )),
+                    .xiangqi => XiangqiBoardEditorScreen.buildRoute(),
+                  });
+                },
               ),
               ListTile(
                 leading: const Icon(Icons.alarm_outlined),
@@ -335,6 +374,17 @@ class const _AccountSection() extends ConsumerWidget {
 /// is ticked when it opens, as in the play menu's own two pickers: each of them asks a question with
 /// two answers, and neither has a default to give.
 enum _AnalysisGame() {
+  chess,
+  xiangqi,
+}
+
+/// The two games this app will build a position in.
+///
+/// The Board editor row offers both rather than a row each, for the reason [_AnalysisGame] above
+/// does: a board to put pieces on is the same tool in either game. Unlike that one, neither is ever
+/// left out — see the row's own comment — so this enum has the two choices it names and nothing to
+/// say about which of them a build can offer.
+enum _EditorGame() {
   chess,
   xiangqi,
 }

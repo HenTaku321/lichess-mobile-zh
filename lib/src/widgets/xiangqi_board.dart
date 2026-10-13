@@ -294,6 +294,65 @@ xiangqiPieceAnimation(XiangqiPosition from, XiangqiPosition to, XiangqiMove? mov
   );
 }
 
+/// One piece drawn at [centre], the way a board draws it: face, ring, inner ring and character.
+///
+/// A top-level function rather than a method of [XiangqiBoardPainter], because a piece is not drawn
+/// only on a board. The board editor's palette draws the same pieces to be picked from, and a palette
+/// that drew them any other way would be offering the player a piece the board would not then show.
+/// Both go through here, so the two cannot drift apart.
+///
+/// [cell] is the board's own cell — see [XiangqiBoardGeometry] — and every dimension below is a
+/// multiple of it, so a piece is the same piece at any size. [scale] enlarges it about [centre],
+/// which is what a board does to the piece under the player's finger.
+void paintXiangqiPiece(
+  Canvas canvas,
+  Offset centre,
+  XiangqiPiece piece, {
+  required double cell,
+  required XiangqiBoardStyle style,
+  double scale = 1,
+}) {
+  final radius = cell * 0.44 * scale;
+  final ink = piece.side == .red ? style.redInk : style.blackInk;
+  canvas.drawCircle(centre, radius, Paint()..color = style.pieceFace);
+  canvas.drawCircle(
+    centre,
+    radius - cell * 0.0225 * scale,
+    Paint()
+      ..color = style.pieceRing
+      ..style = .stroke
+      ..strokeWidth = cell * 0.045 * scale,
+  );
+  canvas.drawCircle(
+    centre,
+    radius * 0.84,
+    Paint()
+      ..color = ink
+      ..style = .stroke
+      ..strokeWidth = cell * 0.014 * scale,
+  );
+  _paintXiangqiText(
+    canvas,
+    piece.glyph,
+    TextStyle(
+      color: ink,
+      fontSize: cell * 0.6 * scale,
+      fontWeight: FontWeight.bold,
+      fontFamilyFallback: _cjkFallback,
+    ),
+    centre,
+  );
+}
+
+/// Writes [text] centred on [centre]: the one place a board or a palette draws text.
+void _paintXiangqiText(Canvas canvas, String text, TextStyle style, Offset centre) {
+  final painter = TextPainter(
+    text: TextSpan(text: text, style: style),
+    textDirection: TextDirection.ltr,
+  )..layout();
+  painter.paint(canvas, centre - Offset(painter.width / 2, painter.height / 2));
+}
+
 /// A xiangqi board, drawn rather than assembled, and played by hand.
 ///
 /// This is a picture and not a tree of boxes: nine files crossing ten ranks at ninety points, which
@@ -342,6 +401,15 @@ class const XiangqiBoard({
   /// This is also what makes the board draggable: with no handler there is nothing a drag could
   /// report, so the board does not pick a piece up at all.
   final void Function(XiangqiSquare from, XiangqiSquare to)? onDragMove,
+
+  /// Whether a drag may pick a piece of either side up, rather than only the side to move.
+  ///
+  /// Off is what a game wants: a player moves their own pieces, and the other side's are refused.
+  /// On is for the board editor, where both sides are the same person's and a piece of either
+  /// colour has to be movable. Which side may be moved is chess-rule logic and not geometry logic —
+  /// the editor is legitimately asking the board for something a game refuses to do — which is why
+  /// it is a flag here rather than something the board works out for itself.
+  final bool dragAnyPiece = false,
 
   /// How long a move takes to be drawn travelling. [Duration.zero] draws it already arrived.
   final Duration animationDuration = const Duration(milliseconds: 150),
@@ -473,14 +541,15 @@ class _XiangqiBoardState() extends State<XiangqiBoard> with SingleTickerProvider
     _controller.forward(from: 0.0);
   }
 
-  /// Begins a drag if the finger has come down on a piece of the side to move. Which moves are
-  /// legal is the caller's business: the board does not know the rules, and a square with a piece
-  /// of your own on it is the only thing it can be sure of.
+  /// Begins a drag if the finger has come down on a piece the board may pick up: one of the side to
+  /// move, or, with [XiangqiBoard.dragAnyPiece] set, either side's. Which moves are legal is the
+  /// caller's business: the board does not know the rules, and a square with a piece on it is the
+  /// only thing it can be sure of.
   void _startDrag(XiangqiBoardGeometry geometry, Offset local) {
     final square = geometry.squareAt(local, widget.orientation);
     if (square == null) return;
     final piece = widget.position.pieceAt(square);
-    if (piece == null || piece.side != widget.position.turn) return;
+    if (piece == null || (!widget.dragAnyPiece && piece.side != widget.position.turn)) return;
     setState(() {
       _dragFrom = square;
       _dragPosition = local;
@@ -847,38 +916,12 @@ class XiangqiBoardPainter({
   }
 
   /// One piece, centred on [centre] and drawn at [scale] of its usual size.
-  void paintPiece(Canvas canvas, Offset centre, XiangqiPiece piece, {double scale = 1}) {
-    final radius = geometry.pieceRadius * scale;
-    final ink = piece.side == .red ? style.redInk : style.blackInk;
-    canvas.drawCircle(centre, radius, Paint()..color = style.pieceFace);
-    canvas.drawCircle(
-      centre,
-      radius - cell * 0.0225 * scale,
-      Paint()
-        ..color = style.pieceRing
-        ..style = .stroke
-        ..strokeWidth = cell * 0.045 * scale,
-    );
-    canvas.drawCircle(
-      centre,
-      radius * 0.84,
-      Paint()
-        ..color = ink
-        ..style = .stroke
-        ..strokeWidth = cell * 0.014 * scale,
-    );
-    paintText(
-      canvas,
-      piece.glyph,
-      TextStyle(
-        color: ink,
-        fontSize: cell * 0.6 * scale,
-        fontWeight: FontWeight.bold,
-        fontFamilyFallback: _cjkFallback,
-      ),
-      centre,
-    );
-  }
+  ///
+  /// A one-line delegate to [paintXiangqiPiece], which is where the drawing lives: the board editor's
+  /// palette draws pieces too, and a palette that drew them any other way would be showing the player
+  /// a piece the board would not.
+  void paintPiece(Canvas canvas, Offset centre, XiangqiPiece piece, {double scale = 1}) =>
+      paintXiangqiPiece(canvas, centre, piece, cell: cell, style: style, scale: scale);
 
   /// The pieces a move has travelling: each is the one piece that moved, drawn partway between the
   /// square it left and the square it is arriving on. Every other piece is drawn straight from the
@@ -1051,13 +1094,8 @@ class XiangqiBoardPainter({
   }
 
   /// Writes [text] centred on [centre].
-  void paintText(Canvas canvas, String text, TextStyle style, Offset centre) {
-    final painter = TextPainter(
-      text: TextSpan(text: text, style: style),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    painter.paint(canvas, centre - Offset(painter.width / 2, painter.height / 2));
-  }
+  void paintText(Canvas canvas, String text, TextStyle style, Offset centre) =>
+      _paintXiangqiText(canvas, text, style, centre);
 
   @override
   bool shouldRepaint(covariant XiangqiBoardPainter oldDelegate) =>

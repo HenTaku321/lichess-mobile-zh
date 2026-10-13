@@ -1697,6 +1697,10 @@ void main() {
     // Navigate to board editor
     await tester.tap(find.text('Board editor'));
     await tester.pumpAndSettle();
+    // Chess and xiangqi share the Board editor row, so the tap opens a picker rather than a board;
+    // the chess one is what this test is about.
+    await tester.tap(find.text('Chess'));
+    await tester.pumpAndSettle();
 
     //make moves that result in a different position than the previous analysis
     await dragFromTo(tester, 'd2', 'd4');

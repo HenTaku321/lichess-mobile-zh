@@ -300,7 +300,9 @@
   },
   "mobileXiangqiDifficultyExplanation": "How long the computer is allowed to think.",
   "mobileXiangqiEasy": "Easy",
+  "mobileXiangqiGuest": "Guest",
   "mobileXiangqiHard": "Hard",
+  "mobileXiangqiInvalidCredentials": "Wrong email or password.",
   "mobileXiangqiMedium": "Medium",
   "mobileXiangqiRanOutOfTime": "{param} ran out of time.",
   "@mobileXiangqiRanOutOfTime": {
@@ -321,6 +323,7 @@
   },
   "mobileXiangqiSideBlack": "Black",
   "mobileXiangqiSideRed": "Red",
+  "mobileXiangqiSignIn": "Sign in to xiangqi.com",
   "mobileXiangqiStalemateLoss": "{param} has no legal move, which loses the game.",
   "@mobileXiangqiStalemateLoss": {
     "placeholders": {

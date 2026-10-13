@@ -1648,11 +1648,23 @@ abstract class AppLocalizations {
   /// **'Easy'**
   String get mobileXiangqiEasy;
 
+  /// No description provided for @mobileXiangqiGuest.
+  ///
+  /// In en, this message translates to:
+  /// **'Guest'**
+  String get mobileXiangqiGuest;
+
   /// No description provided for @mobileXiangqiHard.
   ///
   /// In en, this message translates to:
   /// **'Hard'**
   String get mobileXiangqiHard;
+
+  /// No description provided for @mobileXiangqiInvalidCredentials.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrong email or password.'**
+  String get mobileXiangqiInvalidCredentials;
 
   /// No description provided for @mobileXiangqiMedium.
   ///
@@ -1689,6 +1701,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Red'**
   String get mobileXiangqiSideRed;
+
+  /// No description provided for @mobileXiangqiSignIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to xiangqi.com'**
+  String get mobileXiangqiSignIn;
 
   /// No description provided for @mobileXiangqiStalemateLoss.
   ///

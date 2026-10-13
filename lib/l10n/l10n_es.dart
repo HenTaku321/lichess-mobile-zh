@@ -751,7 +751,13 @@ class AppLocalizationsEs extends AppLocalizations {
   String get mobileXiangqiEasy => 'Easy';
 
   @override
+  String get mobileXiangqiGuest => 'Guest';
+
+  @override
   String get mobileXiangqiHard => 'Hard';
+
+  @override
+  String get mobileXiangqiInvalidCredentials => 'Wrong email or password.';
 
   @override
   String get mobileXiangqiMedium => 'Medium';
@@ -774,6 +780,9 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get mobileXiangqiSideRed => 'Red';
+
+  @override
+  String get mobileXiangqiSignIn => 'Sign in to xiangqi.com';
 
   @override
   String mobileXiangqiStalemateLoss(String param) {

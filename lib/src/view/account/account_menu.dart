@@ -8,6 +8,8 @@ import 'package:lichess_mobile/src/model/common/preloaded_data.dart';
 import 'package:lichess_mobile/src/model/message/message_repository.dart';
 import 'package:lichess_mobile/src/model/team/team_providers.dart';
 import 'package:lichess_mobile/src/model/user/user.dart';
+import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
+import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_session.dart';
 import 'package:lichess_mobile/src/network/connectivity.dart';
 import 'package:lichess_mobile/src/network/http.dart';
 import 'package:lichess_mobile/src/styles/lichess_icons.dart';
@@ -19,6 +21,7 @@ import 'package:lichess_mobile/src/utils/navigation.dart';
 import 'package:lichess_mobile/src/view/account/profile_screen.dart';
 import 'package:lichess_mobile/src/view/auth/sign_in_error.dart';
 import 'package:lichess_mobile/src/view/auth/sign_in_options.dart';
+import 'package:lichess_mobile/src/view/auth/xiangqi_login_screen.dart';
 import 'package:lichess_mobile/src/view/message/contacts_screen.dart';
 import 'package:lichess_mobile/src/view/settings/settings_screen.dart';
 import 'package:lichess_mobile/src/view/team/team_updates_screen.dart';
@@ -92,6 +95,7 @@ class _AccountMenuScreenState()
     ref.listen(signInMutation, (_, next) => showSignInErrorSnackBar(context, next));
     final account = ref.watch(accountProvider);
     final authUser = ref.watch(authControllerProvider);
+    final xiangqiSession = ref.watch(xiangqiAuthControllerProvider);
     final kidMode = account.value?.kid ?? false;
     final LightUser? user = account.value?.lightUser ?? authUser?.user;
     final unreadMessages = ref.watch(unreadMessagesProvider).value?.unread ?? 0;
@@ -180,6 +184,45 @@ class _AccountMenuScreenState()
               ),
             ),
           ],
+          // The xiangqi.com identity, kept as its own section so it reads beside the lichess one
+          // above rather than inside the "things you can do" list below.
+          ListSection(
+            children: [
+              switch (xiangqiSession) {
+                // No session yet: the row is the way in.
+                null => ListTile(
+                  leading: const Icon(Icons.grid_on),
+                  trailing: Theme.of(context).platform == TargetPlatform.iOS
+                      ? const CupertinoListTileChevron()
+                      : null,
+                  title: Text(context.l10n.mobileXiangqiSignIn),
+                  enabled: isOnline,
+                  onTap: () => _navigate(context, XiangqiLoginScreen.buildRoute()),
+                ),
+                // A guest is not a signed-in account, so the row says who it is and offers the way
+                // to a real one at the end.
+                final XiangqiSession session when session.isGuest => ListTile(
+                  leading: const Icon(Icons.grid_on),
+                  trailing: TextButton(
+                    onPressed: isOnline
+                        ? () => _navigate(context, XiangqiLoginScreen.buildRoute())
+                        : null,
+                    child: Text(context.l10n.signIn),
+                  ),
+                  title: Text(context.l10n.mobileXiangqiGuest),
+                ),
+                // A real account: its name, and a sign-out behind a tap. Deliberately no link to
+                // an xiangqi.com profile and no chevron — no profile URL has been verified, and
+                // this row must not look like a door into one.
+                final XiangqiSession session => ListTile(
+                  leading: const Icon(Icons.grid_on),
+                  title: Text(session.name),
+                  enabled: isOnline,
+                  onTap: () => _showXiangqiSignOutSheet(context, ref),
+                ),
+              },
+            ],
+          ),
           ListSection(
             children: [
               if (user != null && account.hasValue && !kidMode) ...[
@@ -272,6 +315,26 @@ class _AccountMenuScreenState()
 
   void _navigate(BuildContext context, Route<dynamic> route) {
     Navigator.of(context).push(route);
+  }
+
+  /// Confirms signing out of the xiangqi.com account.
+  ///
+  /// Reuses the lichess "log out" wording (`context.l10n.logOut`) rather than inventing a new word
+  /// for the same act, and drops straight through: unlike a lichess sign-out there is no
+  /// server-side token to revoke, so there is nothing to wait on.
+  void _showXiangqiSignOutSheet(BuildContext context, WidgetRef ref) {
+    showAdaptiveActionSheet<void>(
+      context: context,
+      actions: [
+        BottomSheetAction(
+          makeLabel: (context) => Text(context.l10n.logOut),
+          isDestructiveAction: true,
+          onPressed: () async {
+            await ref.read(xiangqiAuthControllerProvider.notifier).signOut();
+          },
+        ),
+      ],
+    );
   }
 
   void _showSignOutConfirmDialog(BuildContext context, WidgetRef ref) {

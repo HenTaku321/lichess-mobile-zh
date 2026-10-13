@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/auth/auth_controller.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/view/auth/email_login_screen.dart';
+import 'package:lichess_mobile/src/view/auth/xiangqi_login_screen.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_action_sheet.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -34,6 +35,13 @@ Future<void> showSignInOptions(BuildContext context, WidgetRef ref) {
         leading: const Icon(Icons.mail_outline),
         onPressed: () {
           navigator.push(EmailLoginScreen.buildRoute());
+        },
+      ),
+      BottomSheetAction(
+        makeLabel: (context) => Text(context.l10n.mobileXiangqiSignIn),
+        leading: const Icon(Icons.grid_on),
+        onPressed: () {
+          navigator.push(XiangqiLoginScreen.buildRoute());
         },
       ),
     ],

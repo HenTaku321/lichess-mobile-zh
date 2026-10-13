@@ -89,13 +89,16 @@
   <string name="xiangqiCheckmated" comment="Xiangqi game-end sentence: the side named by %s is checkmated.">%s被將死。</string>
   <string name="xiangqiDifficultyExplanation" comment="Xiangqi game settings sheet: the line under the difficulty setting, saying what a level actually controls.">電腦可以思考多久。</string>
   <string name="xiangqiEasy" comment="Xiangqi engine strength: the easiest level.">簡單</string>
+  <string name="xiangqiGuest" comment="The xiangqi.com account shown on the account screen while the session is the anonymous one the app made for a visitor. Not a signed-in xiangqi.com account, and not the lichess name either.">訪客</string>
   <string name="xiangqiHard" comment="Xiangqi engine strength: the hardest level.">困難</string>
+  <string name="xiangqiInvalidCredentials" comment="Error shown when a xiangqi.com email and password match no account.">電子郵件或密碼不正確。</string>
   <string name="xiangqiMedium" comment="Xiangqi engine strength: the medium level.">中等</string>
   <string name="xiangqiRanOutOfTime" comment="Xiangqi game-end sentence: the side named by %s used up its clock and lost. Chess says the same thing with its own white/black pair, which a xiangqi game cannot use.">%s逾時判負。</string>
   <string name="xiangqiRedMovesFirst" comment="Xiangqi new game sheet: the line under the side setting once black is chosen, saying the computer opens the game.">紅方先行，所以電腦先開局。</string>
   <string name="xiangqiResigned" comment="Xiangqi game-end sentence: the side named by %s resigned.">%s認輸。</string>
   <string name="xiangqiSideBlack" comment="The black side of a xiangqi game, used as a side name in the game-end sentences.">黑方</string>
   <string name="xiangqiSideRed" comment="The red side of a xiangqi game, used as a side name in the game-end sentences.">紅方</string>
+  <string name="xiangqiSignIn" comment="The entry that starts the xiangqi.com sign-in, and the title of the screen it opens. Named after the service, so that it does not read as a third way of signing in to lichess.">登入象棋帳號</string>
   <string name="xiangqiStalemateLoss" comment="Xiangqi game-end sentence: the side named by %s has no legal move. Unlike chess, where having no move is a draw, in xiangqi it loses the game (困毙).">%s無子可走，困斃判負。</string>
   <string name="xiangqiThreefoldRepetition" comment="Xiangqi game-end sentence: the same position occurred three times, drawing the game.">同一局面出現三次，判為和棋。</string>
 </resources>

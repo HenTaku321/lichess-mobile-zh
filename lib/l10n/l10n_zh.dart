@@ -751,7 +751,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mobileXiangqiEasy => '简单';
 
   @override
+  String get mobileXiangqiGuest => '游客';
+
+  @override
   String get mobileXiangqiHard => '困难';
+
+  @override
+  String get mobileXiangqiInvalidCredentials => '邮箱或密码不正确。';
 
   @override
   String get mobileXiangqiMedium => '中等';
@@ -774,6 +780,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get mobileXiangqiSideRed => '红方';
+
+  @override
+  String get mobileXiangqiSignIn => '登录象棋账号';
 
   @override
   String mobileXiangqiStalemateLoss(String param) {
@@ -8284,7 +8293,13 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get mobileXiangqiEasy => '簡單';
 
   @override
+  String get mobileXiangqiGuest => '訪客';
+
+  @override
   String get mobileXiangqiHard => '困難';
+
+  @override
+  String get mobileXiangqiInvalidCredentials => '電子郵件或密碼不正確。';
 
   @override
   String get mobileXiangqiMedium => '中等';
@@ -8307,6 +8322,9 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get mobileXiangqiSideRed => '紅方';
+
+  @override
+  String get mobileXiangqiSignIn => '登入象棋帳號';
 
   @override
   String mobileXiangqiStalemateLoss(String param) {

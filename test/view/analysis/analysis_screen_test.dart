@@ -1542,6 +1542,10 @@ void main() {
     // Tap on "Analysis" button in More tab
     await tester.tap(find.text('Analysis board'));
     await tester.pumpAndSettle();
+    // Chess and xiangqi share the Analysis row, so the tap opens a picker rather than a board; the
+    // chess one is what this test is about.
+    await tester.tap(find.text('Chess'));
+    await tester.pumpAndSettle();
 
     // Change variant to Racing Kings to verify that variant is also saved/restored correctly
     await tester.tap(find.bySemanticsLabel('Menu'));
@@ -1581,6 +1585,8 @@ void main() {
     // Navigate to board analysis again
     await tester.tap(find.text('Analysis board'));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Chess'));
+    await tester.pumpAndSettle();
 
     // Verify moves are still present and session was restored
     expect(find.textContaining('Nd4'), findsOneWidget);
@@ -1608,6 +1614,8 @@ void main() {
 
     // Open analysis board
     await tester.tap(find.text('Analysis board'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Chess'));
     await tester.pumpAndSettle();
 
     // Make some moves
@@ -1640,6 +1648,8 @@ void main() {
     // Navigate to board analysis again
     await tester.tap(find.text('Analysis board'));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Chess'));
+    await tester.pumpAndSettle();
 
     // Verify moves are no longer present and analysis was cleared
     expect(find.textContaining('e4'), findsNothing);
@@ -1664,6 +1674,8 @@ void main() {
 
     // Open analysis board
     await tester.tap(find.text('Analysis board'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Chess'));
     await tester.pumpAndSettle();
 
     // Make some moves

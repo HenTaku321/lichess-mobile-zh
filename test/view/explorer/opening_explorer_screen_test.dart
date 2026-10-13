@@ -202,6 +202,9 @@ void main() {
       await tester.pumpWidget(app);
 
       await tester.tap(find.text('Analysis board'));
+      await tester.pumpAndSettle(); // wait for the chess/xiangqi picker to open
+      // Chess and xiangqi share the Analysis row; this test is about the chess board.
+      await tester.tap(find.text('Chess'));
       await tester.pumpAndSettle(); // wait for analysis screen to open
 
       await playMove(tester, 'e2', 'e4');

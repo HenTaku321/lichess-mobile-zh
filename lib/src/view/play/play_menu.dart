@@ -89,14 +89,26 @@ class const PlayMenu() extends ConsumerWidget {
                 // The picker has to come before the sheet is popped: the sheet's context is still
                 // alive to host it, and a player who dismisses it without choosing is left where
                 // they were, with nothing to navigate to.
-                await showChoicePicker<_OfflineOpponent>(
+                //
+                // Nothing is ticked before the player ticks it, and the type is nullable to say so.
+                // A default here would be a choice that cannot be made: the Material dialog's radios
+                // ignore a tap on the choice that is already selected (see `RadioListTile`'s
+                // `_handleListTileTap`, which returns early when the tile is checked and not
+                // toggleable), so a pre-ticked chess would leave a player who wants chess with
+                // nothing to tap and only a cancel that goes nowhere. This is a question with two
+                // answers rather than a setting being looked at, which is why it carries no default
+                // where the settings pickers elsewhere do.
+                await showChoicePicker<_OfflineOpponent?>(
                   context,
                   title: Text(context.l10n.playAgainstComputer),
                   choices: choices,
-                  selectedItem: .chess,
+                  selectedItem: null,
                   labelBuilder: (opponent) => Text(switch (opponent) {
                     .chess => context.l10n.mobileChess,
                     .xiangqi => context.l10n.mobileXiangqi,
+                    // Never built — the choices are the two games — but the picker is instantiated
+                    // at a nullable type, so the switch has to answer for the null.
+                    null => '',
                   }),
                   onSelectedItemChanged: (opponent) => choice = opponent,
                 );
@@ -123,15 +135,21 @@ class const PlayMenu() extends ConsumerWidget {
                 // without Pikafish plays this one as well as any other.
                 _OtbGame? choice;
                 // As above, the picker comes before the sheet is popped so that the sheet's own
-                // context can host it, and a player who dismisses it is left where they were.
-                await showChoicePicker<_OtbGame>(
+                // context can host it, and a player who dismisses it is left where they were — and
+                // as above nothing is ticked before the player ticks it, for the same reason: a
+                // pre-ticked chess would be a choice that cannot be made, since the Material dialog
+                // ignores a tap on the option that is already selected.
+                await showChoicePicker<_OtbGame?>(
                   context,
                   title: Text(context.l10n.mobileOverTheBoard),
                   choices: _OtbGame.values,
-                  selectedItem: .chess,
+                  selectedItem: null,
                   labelBuilder: (game) => Text(switch (game) {
                     .chess => context.l10n.mobileChess,
                     .xiangqi => context.l10n.mobileXiangqi,
+                    // Never built — the choices are the two games — but the picker is instantiated
+                    // at a nullable type, so the switch has to answer for the null.
+                    null => '',
                   }),
                   onSelectedItemChanged: (game) => choice = game,
                 );

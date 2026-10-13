@@ -6,6 +6,7 @@ import 'package:lichess_mobile/src/model/analysis/analysis_controller.dart';
 import 'package:lichess_mobile/src/model/auth/auth_controller.dart';
 import 'package:lichess_mobile/src/model/common/chess.dart';
 import 'package:lichess_mobile/src/model/common/id.dart';
+import 'package:lichess_mobile/src/model/engine/engine_utils.dart';
 import 'package:lichess_mobile/src/model/message/message_repository.dart';
 import 'package:lichess_mobile/src/model/team/team_providers.dart';
 import 'package:lichess_mobile/src/network/connectivity.dart';
@@ -24,6 +25,8 @@ import 'package:lichess_mobile/src/view/relation/friend_screen.dart';
 import 'package:lichess_mobile/src/view/settings/settings_screen.dart';
 import 'package:lichess_mobile/src/view/team/team_updates_screen.dart';
 import 'package:lichess_mobile/src/view/user/player_screen.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_analysis_screen.dart';
+import 'package:lichess_mobile/src/widgets/adaptive_choice_picker.dart';
 import 'package:lichess_mobile/src/widgets/feedback.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
@@ -67,6 +70,9 @@ class const _Body() extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isOnline = ref.watch(isDeviceOnlineProvider);
     final authUser = ref.watch(authControllerProvider);
+    // Xiangqi's analysis board runs Pikafish and nothing else, so it is offered only where the build
+    // has it. See the Analysis row below, and `EngineAvailability.pikafish`.
+    final xiangqiAvailable = ref.watch(engineAvailabilityProvider).pikafish;
 
     return ListTileTheme.merge(
       iconColor: Theme.of(context).colorScheme.primary,
@@ -91,11 +97,52 @@ class const _Body() extends ConsumerWidget {
                     ? const CupertinoListTileChevron()
                     : null,
                 title: Text(context.l10n.analysis),
-                onTap: () => Navigator.of(context, rootNavigator: true).push(
-                  AnalysisScreen.buildRoute(
-                    const AnalysisOptions.standalone(variant: Variant.standard),
-                  ),
-                ),
+                onTap: () async {
+                  // Chess and xiangqi share this one row, and the picker below decides which of
+                  // them is analysed: they are two games of equal standing, and giving xiangqi a row
+                  // of its own would say it was the lesser one. See the play menu's two rows for the
+                  // same arrangement — `lib/src/view/play/play_menu.dart`.
+                  //
+                  // Xiangqi is offered only where the build has Pikafish, which is the whole of what
+                  // an analysis board's engine is there: chess's own engine ships with the app, and a
+                  // xiangqi board whose engine could not start would open onto an error and a verdict
+                  // that never comes. The gate sits on the picker's choices rather than on a row of
+                  // its own, so that a build without Pikafish still analyses chess.
+                  final choices = [
+                    _AnalysisGame.chess,
+                    if (xiangqiAvailable) _AnalysisGame.xiangqi,
+                  ];
+                  _AnalysisGame? choice;
+                  await showChoicePicker<_AnalysisGame?>(
+                    context,
+                    title: Text(context.l10n.analysis),
+                    choices: choices,
+                    // Nothing is ticked before the player ticks it, and the type is nullable to say
+                    // so: this picker is a question with two answers rather than a setting being
+                    // looked at, and the Material dialog's radios ignore a tap on the choice that is
+                    // already selected — a default here would be an answer that could not be given.
+                    // The play menu's pickers are the same kind of question, and are left unticked
+                    // for the same reason.
+                    selectedItem: null,
+                    labelBuilder: (game) => Text(switch (game) {
+                      .chess => context.l10n.mobileChess,
+                      .xiangqi => context.l10n.mobileXiangqi,
+                      // Never built — the choices are the two games — but the picker is instantiated
+                      // at a nullable type, so the switch has to answer for the null.
+                      null => '',
+                    }),
+                    onSelectedItemChanged: (game) => choice = game,
+                  );
+                  if (!context.mounted) return;
+                  final selected = choice;
+                  if (selected == null) return;
+                  Navigator.of(context, rootNavigator: true).push(switch (selected) {
+                    .chess => AnalysisScreen.buildRoute(
+                      const AnalysisOptions.standalone(variant: Variant.standard),
+                    ),
+                    .xiangqi => XiangqiAnalysisScreen.buildRoute(),
+                  });
+                },
               ),
               ListTile(
                 leading: const Icon(Icons.explore_outlined),
@@ -279,4 +326,15 @@ class const _AccountSection() extends ConsumerWidget {
       ],
     );
   }
+}
+
+/// The two games this app will take a position apart on.
+///
+/// The Analysis row offers both rather than a row each: a board to analyse on is the same tool in
+/// either game, and the chess one is no more of an analysis board than the xiangqi one is. Nothing
+/// is ticked when it opens, as in the play menu's own two pickers: each of them asks a question with
+/// two answers, and neither has a default to give.
+enum _AnalysisGame() {
+  chess,
+  xiangqi,
 }

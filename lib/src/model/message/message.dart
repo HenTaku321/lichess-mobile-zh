@@ -78,9 +78,38 @@ sealed class LastMessage with _$LastMessage {
   }) = _LastMessage;
 }
 
+/// What a [Contact] row needs in order to be a xiangqi.com conversation rather than a lichess one.
+///
+/// [Contact] is a lichess shape — a user and one last message — and the chat list reads exactly
+/// those two things off it whatever backend the row came from. Everything else a conversation needs
+/// is written here instead of being forced into the lichess fields: the chat id, which the lichess
+/// shape has nowhere to keep and which the conversation screen cannot ask for again, and the unread
+/// count, which the row's unread dot is decided by.
+///
+/// The unread dot is where the two backends genuinely differ, and it is why this is data rather
+/// than a flag: lichess marks a message read with a boolean and its own id, while xiangqi.com keeps
+/// a per-conversation count of unread messages. A count of zero is read; anything else is not. That
+/// is a comparison of the peer's count against zero and never against this user's id, which is what
+/// makes it correct for a guest as well — a guest's id is a string (`guest7zuq8`) that could never
+/// equal a numeric `user_id` in the first place.
+@freezed
+sealed class const XiangqiConversation._() with _$XiangqiConversation {
+  const factory({required String chatId, required int peerId, required int unreadMessages}) =
+      _XiangqiConversation;
+}
+
 @freezed
 sealed class Contact with _$Contact {
-  const factory({required LightUser user, required LastMessage lastMessage}) = _Contact;
+  const factory({
+    required LightUser user,
+    required LastMessage lastMessage,
+
+    /// Non-null exactly when this row is a xiangqi.com conversation.
+    ///
+    /// The chat list dispatches on this field and on nothing else — in particular not on
+    /// `BackendSource`, which is a model-layer concept that must not reach a widget.
+    XiangqiConversation? xiangqi,
+  }) = _Contact;
 
   factory fromServerJson(Map<String, dynamic> json) {
     return Contact.fromPick(pick(json).required());

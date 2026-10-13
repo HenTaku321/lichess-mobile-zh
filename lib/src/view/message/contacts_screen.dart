@@ -10,6 +10,7 @@ import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
 import 'package:lichess_mobile/src/utils/rate_limit.dart';
 import 'package:lichess_mobile/src/view/message/conversation_screen.dart';
+import 'package:lichess_mobile/src/view/message/xiangqi_conversation_screen.dart';
 import 'package:lichess_mobile/src/widgets/haptic_refresh_indicator.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:lichess_mobile/src/widgets/platform_search_bar.dart';
@@ -53,11 +54,35 @@ class _ContactsScreenState() extends ConsumerState<ContactsScreen> {
     super.dispose();
   }
 
-  Future<void> pushConversationScreen(LightUser user) async {
+  /// Opens the conversation a row points at.
+  ///
+  /// Which screen that is comes from the row's own data — the nullable xiangqi payload — and never
+  /// from which backend is "which". One [ContactTile] still leads to one conversation screen; the
+  /// only thing that differs is which one, and the row carries everything the screen needs.
+  Future<void> pushConversationScreen(Contact contact) async {
+    final xiangqi = contact.xiangqi;
+    await Navigator.of(context, rootNavigator: true).push(
+      xiangqi == null
+          ? ConversationScreen.buildRoute(user: contact.user)
+          : XiangqiConversationScreen.buildRoute(
+              chatId: xiangqi.chatId,
+              peerId: xiangqi.peerId,
+              peer: contact.user,
+            ),
+    );
+    _refreshAfterConversation();
+  }
+
+  /// Opens a lichess conversation for a user reached as a search result rather than as a row.
+  Future<void> pushUserConversation(LightUser user) async {
     await Navigator.of(
       context,
       rootNavigator: true,
     ).push(ConversationScreen.buildRoute(user: user));
+    _refreshAfterConversation();
+  }
+
+  void _refreshAfterConversation() {
     ref.invalidate(contactsProvider);
     ref.read(messageSearchQueryProvider.notifier).state = '';
     controller.clear();
@@ -101,11 +126,9 @@ class _ContactsScreenState() extends ConsumerState<ContactsScreen> {
                     (contact) => ContactTile(contact, me, openConvo: pushConversationScreen),
                   ),
                   if (result.friends.isNotEmpty) _SearchCategoryTitle(context.l10n.friends),
-                  ...result.friends.map(
-                    (user) => UserTile(user, openConvo: pushConversationScreen),
-                  ),
+                  ...result.friends.map((user) => UserTile(user, openConvo: pushUserConversation)),
                   if (result.users.isNotEmpty) _SearchCategoryTitle(context.l10n.players),
-                  ...result.users.map((user) => UserTile(user, openConvo: pushConversationScreen)),
+                  ...result.users.map((user) => UserTile(user, openConvo: pushUserConversation)),
                 ],
               ),
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -129,7 +152,7 @@ class const _SearchCategoryTitle(final String title) extends StatelessWidget {
   }
 }
 
-class const ContactsListView({required final void Function(LightUser user) openConvo, super.key})
+class const ContactsListView({required final void Function(Contact contact) openConvo, super.key})
     extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -164,7 +187,7 @@ class const ContactsListView({required final void Function(LightUser user) openC
 class const ContactTile(
   final Contact contact,
   final LightUser me, {
-  required final void Function(LightUser user) openConvo,
+  required final void Function(Contact contact) openConvo,
   super.key,
 }) extends StatelessWidget {
   @override
@@ -173,7 +196,21 @@ class const ContactTile(
       color: ColorScheme.of(context).primary,
       fontWeight: FontWeight.bold,
     );
-    final isRead = contact.lastMessage.read || contact.lastMessage.userId == me.id;
+    final xiangqi = contact.xiangqi;
+    // Two backends, two definitions of "read", and they are not interchangeable.
+    //
+    // A xiangqi conversation is read when the peer's unread message count has reached zero. That
+    // count is the only read state xiangqi.com sends, and turning it into a bit involves no
+    // identity at all — which is exactly why it is the right test here.
+    //
+    // The lichess test beside it is the original one: a message carries its own read flag, and a
+    // message this user sent counts as read because they have obviously seen it. That test reads
+    // this user's id, and it is wrong for a xiangqi row — a guest's id is a non-numeric string
+    // (`guest7zuq8`) that can never equal a numeric xiangqi `user_id`, so it would leave every
+    // guest row permanently unread.
+    final isRead = xiangqi != null
+        ? xiangqi.unreadMessages == 0
+        : contact.lastMessage.read || contact.lastMessage.userId == me.id;
 
     return ListTile(
       contentPadding: Theme.of(context).listTileTheme.contentPadding
@@ -202,7 +239,7 @@ class const ContactTile(
           ],
         ],
       ),
-      onTap: () => openConvo(contact.user),
+      onTap: () => openConvo(contact),
     );
   }
 }

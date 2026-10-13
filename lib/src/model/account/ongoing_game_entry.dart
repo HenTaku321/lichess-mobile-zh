@@ -28,6 +28,16 @@ sealed class OngoingGameEntry() {
   /// Seconds left on this user's clock, or `null` for a game without a running
   /// clock (correspondence).
   int? get secondsLeft;
+
+  /// Whether this is a live game rather than a correspondence one.
+  ///
+  /// This belongs on the sealed type and not on either backend's own game
+  /// object because the home carousel sorts real-time games ahead of
+  /// correspondence ones, and it sorts a *merged* list. By the time the order is
+  /// decided the two backends' rows are one list of these, and a chess game's own
+  /// `isRealTime` — which is the only place the concept is spelled out — is no
+  /// longer reachable from the row being sorted.
+  bool get isRealTime;
 }
 
 /// An ongoing game on lichess.
@@ -43,6 +53,9 @@ final class ChessOngoingGame(final OngoingGame game) extends OngoingGameEntry {
 
   @override
   int? get secondsLeft => game.secondsLeft;
+
+  @override
+  bool get isRealTime => game.isRealTime;
 }
 
 /// An ongoing game on xiangqi.com.
@@ -59,4 +72,14 @@ final class XiangqiOngoingGame(final XiangqiOpenGame game) extends OngoingGameEn
   @override
   int? get secondsLeft =>
       game.mySide == XiangqiSide.red ? game.redSecondsLeft : game.blackSecondsLeft;
+
+  /// Every game xiangqi.com hands this list is a live one.
+  ///
+  /// This is not read off the game, because [XiangqiOpenGame] has no speed to read:
+  /// xiangqi.com does have a daily/correspondence form, so the backend is not
+  /// missing the concept — it is behind an activated account, and the guest path
+  /// this app plays through cannot reach it, so a correspondence xiangqi row is
+  /// not a shape that can arrive here today.
+  @override
+  bool get isRealTime => true;
 }

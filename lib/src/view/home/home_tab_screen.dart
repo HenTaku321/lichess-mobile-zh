@@ -53,6 +53,8 @@ import 'package:lichess_mobile/src/view/play/quick_game_matrix.dart';
 import 'package:lichess_mobile/src/view/tournament/tournament_list_screen.dart';
 import 'package:lichess_mobile/src/view/user/challenge_requests_screen.dart';
 import 'package:lichess_mobile/src/view/user/recent_games.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_ongoing_game_preview.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_online_game_screen.dart';
 import 'package:lichess_mobile/src/widgets/buttons.dart';
 import 'package:lichess_mobile/src/widgets/feedback.dart';
 import 'package:lichess_mobile/src/widgets/haptic_refresh_indicator.dart';
@@ -748,16 +750,16 @@ class const _BlogCarouselWidget(
   }
 }
 
-/// The chess rows of the merged ongoing-games list, real-time games first.
+/// The merged ongoing-games list, real-time games first.
 ///
-/// The list is merged across backends, but only the chess rows can be rendered
-/// today: a xiangqi row needs a xiangqi board preview, which no widget provides
-/// yet (a later agent's job). Until then the xiangqi rows are simply not shown
-/// here; this wave's xiangqi source returns nothing, so the drop is invisible.
-IList<OngoingGame> _chessGamesRealTimeFirst(IList<OngoingGameEntry> entries) {
-  final chess = entries.whereType<ChessOngoingGame>().map((e) => e.game).toIList();
-  final realTime = chess.where((game) => game.isRealTime);
-  final correspondence = chess.where((game) => !game.isRealTime);
+/// Both backends' rows stay in it: the list is one list, and every row in it now
+/// has something to render it with. Sorting is by [OngoingGameEntry.isRealTime],
+/// which is what the sealed type carries for exactly this — by the time the order
+/// is decided the rows are of both backends, and a chess game's own speed is no
+/// longer the thing in hand. The incoming order is kept within each group.
+IList<OngoingGameEntry> _ongoingGamesRealTimeFirst(IList<OngoingGameEntry> entries) {
+  final realTime = entries.where((entry) => entry.isRealTime);
+  final correspondence = entries.where((entry) => !entry.isRealTime);
   return [...realTime, ...correspondence].lock;
 }
 
@@ -769,27 +771,40 @@ class const _OngoingGamesCarousel(
   Widget build(BuildContext context, WidgetRef ref) {
     switch (games) {
       case AsyncData(:final value):
-        final list = _chessGamesRealTimeFirst(value);
+        final list = _ongoingGamesRealTimeFirst(value);
         if (list.isEmpty) {
           return const SizedBox.shrink();
         }
-        return GamesCarousel<OngoingGame>(
+        return GamesCarousel<OngoingGameEntry>(
           list: list,
+          // Both switches below are on the sealed row type — the only thing that
+          // says which backend a row came from. Not on [BackendSource]: that is a
+          // model-layer concept and is never branched on in the view.
           onTap: (index) {
-            final game = list[index];
-            Navigator.of(context, rootNavigator: true).push(
-              GameScreen.buildRoute(
-                source: ExistingGameSource(game.fullId),
-                loadingPosition: (
-                  variant: game.variant,
-                  fen: game.fen,
-                  orientation: game.orientation,
-                  lastMove: game.lastMove,
-                ),
-              ),
-            );
+            switch (list[index]) {
+              case ChessOngoingGame(:final game):
+                Navigator.of(context, rootNavigator: true).push(
+                  GameScreen.buildRoute(
+                    source: ExistingGameSource(game.fullId),
+                    loadingPosition: (
+                      variant: game.variant,
+                      fen: game.fen,
+                      orientation: game.orientation,
+                      lastMove: game.lastMove,
+                    ),
+                  ),
+                );
+              case XiangqiOngoingGame(:final game):
+                Navigator.of(
+                  context,
+                  rootNavigator: true,
+                ).push(XiangqiOnlineGameScreen.buildRoute(game.id));
+            }
           },
-          builder: (game) => OngoingGameCarouselItem(game: game),
+          builder: (entry) => switch (entry) {
+            ChessOngoingGame(:final game) => OngoingGameCarouselItem(game: game),
+            XiangqiOngoingGame(:final game) => XiangqiOngoingGameCarouselItem(game: game),
+          },
           moreScreenRouteBuilder: (context) => OngoingGamesScreen.buildRoute(),
           maxGamesToShow: maxGamesToShow,
         );
@@ -853,7 +868,7 @@ class const _OngoingGamesPreview(
   Widget build(BuildContext context, WidgetRef ref) {
     switch (games) {
       case AsyncData(:final value):
-        final list = _chessGamesRealTimeFirst(value);
+        final list = _ongoingGamesRealTimeFirst(value);
         if (list.isEmpty) {
           return const SizedBox.shrink();
         }
@@ -861,8 +876,18 @@ class const _OngoingGamesPreview(
         return PreviewGameList(
           list: list,
           maxGamesToShow: maxGamesToShow,
-          builder: (el) =>
-              OngoingGamePreview(game: el, padding: const EdgeInsets.symmetric(vertical: 8.0)),
+          // Switched on the sealed row type, never on [BackendSource] — see the
+          // carousel above.
+          builder: (entry) => switch (entry) {
+            ChessOngoingGame(:final game) => OngoingGamePreview(
+              game: game,
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+            ),
+            XiangqiOngoingGame(:final game) => XiangqiOngoingGamePreview(
+              game: game,
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+            ),
+          },
           moreScreenRouteBuilder: (context) => OngoingGamesScreen.buildRoute(),
         );
       case _:

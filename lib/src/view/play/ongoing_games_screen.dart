@@ -9,6 +9,7 @@ import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
 import 'package:lichess_mobile/src/view/game/game_screen.dart';
 import 'package:lichess_mobile/src/view/game/game_screen_providers.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_ongoing_game_preview.dart';
 import 'package:lichess_mobile/src/widgets/board_preview.dart';
 import 'package:lichess_mobile/src/widgets/user.dart';
 import 'package:material_ui/material_ui.dart';
@@ -41,11 +42,14 @@ class const _Body() extends ConsumerWidget {
       data: (data) => ListView(
         children: [
           const SizedBox(height: 8.0),
-          // The merged list also carries [XiangqiOngoingGame] rows; rendering them needs a
-          // xiangqi board preview, which no widget provides yet (a later agent's job). Until
-          // then only the chess rows are listed. This wave's xiangqi source returns nothing,
-          // so nothing is dropped in practice.
-          ...data.whereType<ChessOngoingGame>().map((e) => OngoingGamePreview(game: e.game)),
+          // One row per entry, in the merged list's own order. The switch is on the sealed
+          // row type, which is the only thing that says which backend's game this is — not on
+          // [BackendSource], which is a model-layer concept and is never branched on here.
+          for (final entry in data)
+            switch (entry) {
+              ChessOngoingGame(:final game) => OngoingGamePreview(game: game),
+              XiangqiOngoingGame(:final game) => XiangqiOngoingGamePreview(game: game),
+            },
         ],
       ),
       orElse: () => const SizedBox.shrink(),

@@ -34,7 +34,8 @@ sealed class const XiangqiUserProfile._() with _$XiangqiUserProfile {
     /// When the account was created, from `member_since`.
     ///
     /// Nullable although the wire does send it: the value is an RFC-1123 HTTP-date
-    /// (`"Tue, 11 Aug 2026 10:46:26 GMT"`, measured on 2026-08-30) and a value this app cannot read
+    /// (`"Tue, 14 Nov 2023 22:13:20 GMT"`, the shape measured on 2026-08-30) and a value this app
+    /// cannot read
     /// is dropped rather than turned into a made-up instant.
     DateTime? memberSince,
   }) = _XiangqiUserProfile;
@@ -103,7 +104,7 @@ XiangqiUserProfile xiangqiUserProfileFromJson(
 /// The instant `last_online` names, or null if it cannot be read.
 ///
 /// The wire value is neither a JSON number nor an ISO-8601 string. It is a Python `bytes` literal
-/// wrapped around a Unix epoch in **seconds**, and it arrives as the JSON string `"b'1788179925'"`
+/// wrapped around a Unix epoch in **seconds**, and it arrives as the JSON string `"b'1600000000'"`
 /// — the exact form measured on `GET /api/users/account/<username>` on 2026-08-30, and the same
 /// shape the account payload carries for every account seen. `int.parse` and `DateTime.parse` both
 /// reject it, so the `b'` prefix and the closing `'` are stripped first and the remainder is read

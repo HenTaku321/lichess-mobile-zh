@@ -1,10 +1,11 @@
 // Tests for the xiangqi.com private-message protocol layer.
 //
-// The payloads below are the measured ones: they are copied from the 2026-08-30 capture of a real
-// inbox session (`主动私信.har`, entry 5), so the shapes are the server's — a chat row's `user_id` is
-// a JSON number, a message's `created_on` is an ISO-8601 string with no timezone designator, and
-// every frame nests what it has to say one level down under `data`. What is asserted is the reading
-// of those shapes, not the numbers inside them.
+// The payloads below are the measured ones: their shapes are copied from the 2026-08-30 capture of
+// a real inbox session (`主动私信.har`, entry 5), so the shapes are the server's — a chat row's
+// `user_id` is a JSON number, a message's `created_on` is an ISO-8601 string with no timezone
+// designator, and every frame nests what it has to say one level down under `data`. What is
+// asserted is the reading of those shapes, not the values inside them: every id, name and instant
+// here is a stand-in, and none of them is the capture's.
 //
 // Two of the rules under test are not visible in any single frame, and both are the reason this
 // layer exists at all: that at most one `inbox.chat.user` is ever in flight (a response names no
@@ -21,25 +22,25 @@ import 'package:lichess_mobile/src/network/xiangqi_socket.dart';
 
 import '../xiangqi/online/xiangqi_online_game_fixture.dart' as fx;
 
-/// The account the capture's own frames belong to.
+/// The account the fixture's own frames belong to.
 ///
 /// Every capture of the inbox is of a signed-in account, not a guest: the `sender_id` on its frames
-/// is `484155` and its token's `sub` is the same number.
-const xiangqiAccountId = '484155';
+/// is a JSON number and its token's `sub` is the same number. The number here is a stand-in.
+const xiangqiAccountId = '100001';
 
-/// The first conversation of the capture: its id, and the peer it is with.
-const xiangqiFirstChatId = 'qAG5KR';
-const xiangqiFirstPeerId = 487593;
+/// The first conversation: its id, and the peer it is with.
+const xiangqiFirstChatId = 'qAAAAA';
+const xiangqiFirstPeerId = 200001;
 const xiangqiFirstPeerName = '象棋高手阿豹';
 
-/// The second conversation of the capture.
-const xiangqiSecondChatId = 'o9Dk3R';
+/// The second conversation.
+const xiangqiSecondChatId = 'qBBBBB';
 
-/// One `inbox.chats` row, exactly as the capture wrote it.
+/// One `inbox.chats` row, in the shape the capture wrote.
 const xiangqiFirstChatRow = <String, Object?>{
   'chat_id': xiangqiFirstChatId,
   'last_message': 'c',
-  'last_seen': '2026-08-30T04:42:25.594449',
+  'last_seen': '2024-05-06T09:12:33.123456',
   'profile_image': null,
   'unread_messages': 0,
   'user_id': xiangqiFirstPeerId,
@@ -50,11 +51,11 @@ const xiangqiFirstChatRow = <String, Object?>{
 const xiangqiSecondChatRow = <String, Object?>{
   'chat_id': xiangqiSecondChatId,
   'last_message': '哈哈哈',
-  'last_seen': '2026-08-28T08:27:32.228955',
+  'last_seen': '2024-05-04T18:03:11.654321',
   'profile_image': null,
   'unread_messages': 0,
-  'user_id': 470141,
-  'username': 'islands',
+  'user_id': 200002,
+  'username': 'riverbend',
 };
 
 /// The row an `inbox.new.chat` frame carries, which is the measured shape of an *unread* chat.
@@ -64,20 +65,20 @@ const xiangqiSecondChatRow = <String, Object?>{
 /// the capture received when the peer replied (entry 69), with its `is_friend` field dropped because
 /// nothing here reads it.
 const xiangqiUnreadChatRow = <String, Object?>{
-  'chat_id': 'oja7ZR',
+  'chat_id': 'qCCCCC',
   'last_message': 'Hi',
-  'last_seen': '2026-08-31T12:39:16.076841',
+  'last_seen': '2024-05-07T21:47:05.987654',
   'profile_image': null,
   'unread_messages': 1,
-  'user_id': 472818,
-  'username': '王千丰',
+  'user_id': 200003,
+  'username': '棋友甲',
 };
 
-/// One `inbox.chat.user.messages` item, as the capture wrote it.
+/// One `inbox.chat.user.messages` item, in the shape the capture wrote.
 Map<String, Object?> xiangqiMessageRow(
   String text, {
-  int senderId = 484155,
-  String createdOn = '2026-08-30T04:42:25.594449',
+  int senderId = 100001,
+  String createdOn = '2024-05-06T09:12:33.123456',
 }) => {'created_on': createdOn, 'message': text, 'read': false, 'sender_id': senderId};
 
 /// A page payload — the envelope every list frame in this protocol shares — carrying [rows].
@@ -191,7 +192,7 @@ void main() {
       // keeps an integer xiangqi id from ever colliding with a lichess one.
       expect(first.user.id.value, 'xq:$xiangqiFirstPeerId');
       expect(first.lastMessage.text, 'c');
-      expect(first.lastMessage.date, DateTime(2026, 8, 30, 4, 42, 25, 594, 449));
+      expect(first.lastMessage.date, DateTime(2024, 5, 6, 9, 12, 33, 123, 456));
       expect(first.xiangqi?.chatId, xiangqiFirstChatId);
       expect(first.xiangqi?.peerId, xiangqiFirstPeerId);
       expect(first.xiangqi?.unreadMessages, 0);
@@ -206,7 +207,7 @@ void main() {
       expect(row.lastMessage.read, isFalse);
       // The peer is the only other party a 1:1 chat can have, so it is what the lichess-shaped
       // `userId` is filled with — not this device's own id, which the row never carries.
-      expect(row.lastMessage.userId.value, 'xq:472818');
+      expect(row.lastMessage.userId.value, 'xq:200003');
     });
 
     test('drops a row it cannot read rather than inventing a field', () {
@@ -239,14 +240,14 @@ void main() {
       final messages = xiangqiMessagesFromPayload(
         xiangqiPagePayload([
           xiangqiMessageRow('c'),
-          xiangqiMessageRow('b', createdOn: '2026-08-29T16:10:00.177564'),
-          xiangqiMessageRow('a', createdOn: '2026-08-29T13:59:32.685699'),
+          xiangqiMessageRow('b', createdOn: '2024-05-05T11:22:44.222222'),
+          xiangqiMessageRow('a', createdOn: '2024-05-05T08:41:19.333333'),
         ]),
       );
 
       expect(messages.map((m) => m.text), ['c', 'b', 'a']);
       expect(messages.first.userId.value, 'xq:$xiangqiAccountId');
-      expect(messages.first.date, DateTime(2026, 8, 30, 4, 42, 25, 594, 449));
+      expect(messages.first.date, DateTime(2024, 5, 6, 9, 12, 33, 123, 456));
     });
 
     test('reads a single message object, which is what msg.success carries once unwrapped', () {
@@ -263,7 +264,7 @@ void main() {
       expect(
         xiangqiMessageFromPayload(const {
           'sender_id': 1,
-          'created_on': '2026-08-30T04:42:25.594449',
+          'created_on': '2024-05-06T09:12:33.123456',
         }),
         isNull,
       );
@@ -318,7 +319,7 @@ void main() {
       expect(harness.emits.last.data, {'chat_id': xiangqiSecondChatId});
 
       harness.channel.fromServer(
-        xiangqiMessagesFrame([xiangqiMessageRow('哈哈哈', senderId: 470141)]),
+        xiangqiMessagesFrame([xiangqiMessageRow('哈哈哈', senderId: 200002)]),
       );
       await pumpEventQueue();
       expect((await second).single.text, '哈哈哈');
@@ -362,8 +363,8 @@ void main() {
       final harness = await makeHarness();
       final send = harness.repository.sendMessage(
         chatId: '',
-        peerId: 472818,
-        peerName: '王千丰',
+        peerId: 200003,
+        peerName: '棋友甲',
         text: 'hi',
       );
       await completeHandshake(harness);
@@ -372,8 +373,8 @@ void main() {
       expect(harness.events, [kXiangqiInboxNewMessageEvent]);
       expect(harness.payloadOf(kXiangqiInboxNewMessageEvent), {
         'sender_id': int.parse(xiangqiAccountId),
-        'receiver_username': '王千丰',
-        'receiver_id': 472818,
+        'receiver_username': '棋友甲',
+        'receiver_id': 200003,
         'message': 'hi',
         // No conversation yet, and the server wants a literal null for that: the capture's first
         // message to a stranger carries one, and the send is what creates the chat.

@@ -1,17 +1,18 @@
 // Tests for the xiangqi.com account lookup behind the account row's subtitle.
 //
-// The payload below is the measured one: it is copied from the 2026-08-30 capture of a real
-// account (`主动私信.har`, the `GET /api/users/account/%E8%B5%B7%E5%8F%B8%E3%85%A4` entry), so the
-// shapes are the server's. Two of them are the reason this file exists at all:
+// The payload below is the measured one: its shapes are copied from the 2026-08-30 capture of a
+// real account (`主动私信.har`, the `GET /api/users/account/<username>` entry), so the shapes are
+// the server's. Two of them are the reason this file exists at all:
 //
 //   * `last_online` is not a JSON number. It is a Python `bytes` literal around a Unix epoch in
-//     seconds, and it arrives as the string `"b'1788179925'"` — a value `int.parse` and
+//     seconds, and it arrives as the string `"b'1600000000'"` — a value `int.parse` and
 //     `DateTime.parse` both reject.
 //   * `member_since` is an RFC-1123 HTTP-date, which `DateTime.parse` also rejects and `HttpDate`
 //     reads.
 //
-// What is asserted is the reading of those shapes, not the numbers inside them: the fixtures below
-// keep the measured field names and replace the values with round ones.
+// What is asserted is the reading of those shapes, not the values inside them: the fixtures below
+// keep the measured field names and replace every value with a stand-in, including the account's
+// own id, name and email.
 
 import 'dart:convert';
 
@@ -26,16 +27,24 @@ import 'package:lichess_mobile/src/network/http.dart';
 import '../../../network/fake_http_client_factory.dart';
 import '../../../test_container.dart';
 
-/// The username every fixture is asked for, and the one the capture's own payload carries.
-const xiangqiAccountUsername = '起司ㅤ';
-
-/// The measured payload, with its numbers rounded and its badges dropped.
+/// The username every fixture is asked for.
 ///
-/// Every field name is the wire's; the ratings are 500/600/700/1200 rather than the capture's own,
-/// and the two dates are kept in the exact shapes the capture wrote them in.
+/// The capture asked for the real account's name; this is a stand-in. It is deliberately non-ASCII
+/// and deliberately not the capture's own: a username here has to be non-ASCII for the
+/// percent-encoding test below to mean anything, and it must not be the account the capture was
+/// taken of.
+const xiangqiAccountUsername = '测试用户';
+
+/// The measured payload, with its identity fields and its numbers replaced.
+///
+/// Every field name is the wire's; what is in them is not. The ratings are round numbers rather
+/// than the capture's own, the two dates are kept in the exact shapes the capture wrote them in
+/// with different instants inside, and the account's own identifiers — its id, its name, its
+/// previous name, its email — are stand-ins, so that a test file is not a copy of a real person's
+/// profile.
 Map<String, Object?> xiangqiAccountPayload({
-  Object? lastOnline = "b'1788179925'",
-  Object? memberSince = 'Tue, 11 Aug 2026 10:46:26 GMT',
+  Object? lastOnline = "b'1600000000'",
+  Object? memberSince = 'Tue, 14 Nov 2023 22:13:20 GMT',
   Object? country = const {'id': 226, 'code': 'US', 'name': 'United States'},
   Object? bulletRating = 500,
   Object? rapidRating = 600,
@@ -43,9 +52,9 @@ Map<String, Object?> xiangqiAccountPayload({
   Object? puzzleRating = 1200,
   Object? isOnline = true,
 }) => {
-  'id': 484155,
+  'id': 100001,
   'username': xiangqiAccountUsername,
-  'prev_username': '棋手起司',
+  'prev_username': '旧用户名',
   'identity': xiangqiAccountUsername,
   'type': 1,
   'active': true,
@@ -61,7 +70,7 @@ Map<String, Object?> xiangqiAccountPayload({
   'member_since': memberSince,
   'friend_count': 4,
   'flair': null,
-  'email': 'mail@customdom.eu.org',
+  'email': 'user@example.com',
   'badges': const <Object?>[],
   'is_friend': false,
   'games_access': '2',
@@ -110,21 +119,21 @@ void main() {
   group('xiangqiLastOnlineFromJson', () {
     test('reads the Python bytes literal the wire really sends', () {
       // The measured form, quoted: neither a JSON number nor an ISO-8601 string.
-      final instant = xiangqiLastOnlineFromJson("b'1788179925'");
+      final instant = xiangqiLastOnlineFromJson("b'1600000000'");
 
       expect(instant, isNotNull);
       expect(instant!.isUtc, isTrue);
-      expect(instant, DateTime.fromMillisecondsSinceEpoch(1788179925 * 1000, isUtc: true));
-      expect(instant, DateTime.utc(2026, 8, 31, 12, 38, 45));
+      expect(instant, DateTime.fromMillisecondsSinceEpoch(1600000000 * 1000, isUtc: true));
+      expect(instant, DateTime.utc(2020, 9, 13, 12, 26, 40));
     });
 
     test('reads a bare epoch too, which is the same value without the wrapper', () {
-      expect(xiangqiLastOnlineFromJson('1788179925'), xiangqiLastOnlineFromJson("b'1788179925'"));
+      expect(xiangqiLastOnlineFromJson('1600000000'), xiangqiLastOnlineFromJson("b'1600000000'"));
     });
 
     test('a value it cannot read is null rather than a made-up instant', () {
       expect(xiangqiLastOnlineFromJson(null), isNull);
-      expect(xiangqiLastOnlineFromJson(1788179925), isNull, reason: 'a number is not the shape');
+      expect(xiangqiLastOnlineFromJson(1600000000), isNull, reason: 'a number is not the shape');
       expect(xiangqiLastOnlineFromJson('not a date'), isNull);
       expect(xiangqiLastOnlineFromJson("b'not-a-number'"), isNull);
       expect(xiangqiLastOnlineFromJson(''), isNull);
@@ -145,7 +154,7 @@ void main() {
       expect(profile.puzzleRating, 1200);
       expect(profile.isOnline, isTrue);
       expect(profile.countryName, 'United States');
-      expect(profile.memberSince, DateTime.utc(2026, 8, 11, 10, 46, 26));
+      expect(profile.memberSince, DateTime.utc(2023, 11, 14, 22, 13, 20));
     });
 
     test('a rating the account does not have is null, not a zero', () {
@@ -234,11 +243,12 @@ void main() {
 
       await container.read(xiangqiUserProvider(xiangqiAccountUsername).future);
 
-      // The capture's own URL, byte for byte: `Uri.https` encodes the path itself, so the raw
-      // username is what has to be handed to it.
+      // The username's own encoding, byte for byte: `Uri.https` encodes the path itself, so the raw
+      // username is what has to be handed to it. Encoding it before the URI is built is what would
+      // double it, and the `%` of a double-encoded segment is what this catches.
       expect(
         sent!.url.toString(),
-        'https://api.xiangqi.com/api/users/account/%E8%B5%B7%E5%8F%B8%E3%85%A4',
+        'https://api.xiangqi.com/api/users/account/%E6%B5%8B%E8%AF%95%E7%94%A8%E6%88%B7',
       );
     });
 

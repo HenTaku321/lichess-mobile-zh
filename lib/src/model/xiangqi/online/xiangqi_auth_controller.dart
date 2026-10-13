@@ -241,7 +241,7 @@ class XiangqiAuthController() extends Notifier<XiangqiSession?> {
 ///
 /// The payload segment is base64url-decoded and read without checking the signature: this is our
 /// own token, handed to us over TLS, so it is not a trust boundary — the same call `auth.rs:307-333`
-/// makes. The `sub` is a number for a real account (`484155`) and a string for a guest
+/// makes. The `sub` is a number for a real account (`100001`) and a string for a guest
 /// (`guest7zuq8`), so both are accepted and normalised to a string.
 String? _userIdFromToken(String token) {
   final segments = token.split('.');

@@ -104,7 +104,7 @@ const kXiangqiInboxResponseTimeout = Duration(seconds: 20);
 /// The prefix every xiangqi.com user id is given before it enters this app's id space.
 ///
 /// [LightUser.id] is a lichess-shaped [UserId] — a string — and xiangqi.com's ids are integers
-/// (`user_id: 487593`). Namespacing does two things at once: it lets an integer id live in a
+/// (`user_id: 200001`). Namespacing does two things at once: it lets an integer id live in a
 /// string-typed field, and it is the implementation of "alice on lichess is not alice on
 /// xiangqi.com" — the same display name on the two services produces two different ids, and
 /// nothing in this file ever compares the two by name.
@@ -690,7 +690,7 @@ List<Object?> _itemsOf(Object? payload) {
 
 /// xiangqi.com's timestamps, as `DateTime.parse` reads them.
 ///
-/// The server writes ISO-8601 with no timezone designator (`2026-08-30T04:42:25.594449`), where
+/// The server writes ISO-8601 with no timezone designator (`2024-05-06T09:12:33.123456`), where
 /// lichess writes epoch milliseconds — which is why the chess mapper's date reader
 /// (`asDateTimeFromMillisecondsOrThrow`) cannot read one of these. Whether the server means UTC is
 /// **not established** — no frame in the capture says, and nothing here ever compares one of these
@@ -700,7 +700,7 @@ DateTime? _parseXiangqiDate(Object? value) => value is String ? DateTime.tryPars
 
 /// [id] as the JSON number it is for an account, or the string it is for a guest.
 ///
-/// A guest's `sub` is a string (`guest7zuq8`) and an account's is a number (`484155`); the capture
+/// A guest's `sub` is a string (`guest7zuq8`) and an account's is a number (`100001`); the capture
 /// only ever shows the number, because every capture of the inbox is from an account. Writing the
 /// string back for a guest is the honest thing to send — it is the value the token itself carries,
 /// and the alternative is to invent a number for it.

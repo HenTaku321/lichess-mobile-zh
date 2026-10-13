@@ -45,15 +45,17 @@ const lichessInboxJson = '''
 ''';
 
 /// The xiangqi conversation the screen is given, and the id its row opens.
-const xiangqiChatId = 'qAG5KR';
-const xiangqiPeerId = 487593;
+///
+/// The shape is the capture's; the ids are stand-ins.
+const xiangqiChatId = 'qAAAAA';
+const xiangqiPeerId = 200001;
 const xiangqiPeerName = '象棋高手阿豹';
 
-/// One `inbox.chats` row, exactly as the capture wrote it.
+/// One `inbox.chats` row, in the shape the capture wrote.
 const xiangqiChatRow = <String, Object?>{
   'chat_id': xiangqiChatId,
   'last_message': 'c',
-  'last_seen': '2026-08-30T04:42:25.594449',
+  'last_seen': '2024-05-06T09:12:33.123456',
   'profile_image': null,
   'unread_messages': 0,
   'user_id': xiangqiPeerId,
@@ -188,7 +190,7 @@ void main() {
               'has_next_page': false,
               'items': [
                 {
-                  'created_on': '2026-08-30T04:42:25.594449',
+                  'created_on': '2024-05-06T09:12:33.123456',
                   'message': 'c',
                   'read': false,
                   'sender_id': xiangqiPeerId,

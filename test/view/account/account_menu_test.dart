@@ -33,12 +33,17 @@ import '../../network/fake_http_client_factory.dart';
 import '../../test_provider_scope.dart';
 
 /// The account the real-session fixtures sign in as, and the name the row is titled with.
-const xiangqiAccountUsername = '起司ㅤ';
+///
+/// A stand-in, not the account the capture was taken of — but deliberately non-ASCII, because the
+/// row has to survive a name that is not a Latin string.
+const xiangqiAccountUsername = '测试用户';
 
 /// The account lookup's answer, in the measured shape: the ratings are plain numbers and the
 /// country is a nested object.
+///
+/// The field names are the wire's; the account's own identifiers and its instants are stand-ins.
 Map<String, Object?> xiangqiAccountPayload() => {
-  'id': 484155,
+  'id': 100001,
   'username': xiangqiAccountUsername,
   'country': const {'id': 226, 'code': 'US', 'name': 'United States'},
   'bullet_rating': 500,
@@ -46,8 +51,8 @@ Map<String, Object?> xiangqiAccountPayload() => {
   'daily_rating': 700,
   'puzzle_rating': 1200,
   'is_online': true,
-  'last_online': "b'1788179925'",
-  'member_since': 'Tue, 11 Aug 2026 10:46:26 GMT',
+  'last_online': "b'1600000000'",
+  'member_since': 'Tue, 14 Nov 2023 22:13:20 GMT',
 };
 
 /// The subtitle the payload above is expected to produce.
@@ -73,9 +78,9 @@ String? subtitleOf(ListTile row) => (row.subtitle as Text?)?.data;
 
 /// A session for the row to be built from.
 XiangqiSession xiangqiSession({required bool isGuest}) => XiangqiSession(
-  userId: '484155',
+  userId: '100001',
   name: xiangqiAccountUsername,
-  accessToken: fx.xiangqiTestToken('484155'),
+  accessToken: fx.xiangqiTestToken('100001'),
   isGuest: isGuest,
 );
 
@@ -260,7 +265,7 @@ void main() {
         // signed in beside it.
         expect((avatarOf(tester).child! as Text).data, 'T');
         expect(find.text(xiangqiAccountUsername), findsNothing);
-        expect(find.text('起'), findsNothing);
+        expect(find.text('测'), findsNothing);
       },
     );
 
@@ -290,7 +295,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.text(xiangqiAccountUsername), findsNothing);
-      expect(find.text('起'), findsNothing);
+      expect(find.text('测'), findsNothing);
     });
 
     testWidgets('the menu screen draws no avatar at all when there is no lichess account', (

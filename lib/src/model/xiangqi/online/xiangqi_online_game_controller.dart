@@ -872,7 +872,7 @@ bool? _asBool(Object? value) => value is bool ? value : null;
 ///
 /// The payload segment is base64url-decoded and read without checking the signature: this is our own
 /// token, handed to us over TLS by the service we are talking to, so it is not a trust boundary. A
-/// real account's `sub` is a number (`484155`) and a guest's is a string (`guest7zuq8`), so both are
+/// real account's `sub` is a number (`100001`) and a guest's is a string (`guest7zuq8`), so both are
 /// accepted and normalised to a string.
 ///
 /// The same decode `xiangqi_auth_controller.dart:246` makes, written out again rather than reached

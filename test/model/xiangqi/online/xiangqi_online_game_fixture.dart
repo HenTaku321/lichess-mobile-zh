@@ -44,7 +44,7 @@ const xiangqiTestSpectatorId = 'guestzzzzz';
 
 /// The ids of the two seats. Red is this device; black is the other player.
 const xiangqiTestRedId = xiangqiTestViewerId;
-const xiangqiTestBlackId = '484155';
+const xiangqiTestBlackId = '100001';
 
 /// The names and ratings the snapshot reports. Red is a guest and has no rating, which is also what
 /// the snapshot for a guest seat really looks like.

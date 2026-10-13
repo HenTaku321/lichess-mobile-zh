@@ -65,7 +65,9 @@ MockClient signInClient(String body, {int status = 200, void Function(http.Reque
 }
 
 /// The access and refresh tokens a proxy server would recognise, in a real-looking JWT.
-String get _accessToken => jwt(const {'sub': 484155, 'type': 'access'});
+///
+/// The `sub` is a stand-in account id; what the tests read is that it comes back as a string.
+String get _accessToken => jwt(const {'sub': 100001, 'type': 'access'});
 
 void main() {
   group('signInWithPassword', () {
@@ -98,7 +100,7 @@ void main() {
       expect(session, isNotNull);
       expect(session!.accessToken, _accessToken);
       expect(session.refreshToken, 'the-refresh-token');
-      expect(session.userId, '484155');
+      expect(session.userId, '100001');
       expect(session.name, 'alice');
       expect(session.isGuest, isFalse);
       // The session is on disk, not only in memory.
@@ -155,7 +157,7 @@ void main() {
           .read(xiangqiAuthControllerProvider.notifier)
           .signInWithPassword(email: 'a@b.c', password: 'pw');
 
-      expect(container.read(xiangqiAuthControllerProvider)?.name, '484155');
+      expect(container.read(xiangqiAuthControllerProvider)?.name, '100001');
     });
 
     for (final status in const [401, 400]) {

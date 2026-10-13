@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/account/ongoing_game.dart';
+import 'package:lichess_mobile/src/model/account/ongoing_game_entry.dart';
 import 'package:lichess_mobile/src/model/account/ongoing_games_notifier.dart';
 import 'package:lichess_mobile/src/styles/icon_extensions.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
@@ -40,7 +41,11 @@ class const _Body() extends ConsumerWidget {
       data: (data) => ListView(
         children: [
           const SizedBox(height: 8.0),
-          ...data.map((game) => OngoingGamePreview(game: game)),
+          // The merged list also carries [XiangqiOngoingGame] rows; rendering them needs a
+          // xiangqi board preview, which no widget provides yet (a later agent's job). Until
+          // then only the chess rows are listed. This wave's xiangqi source returns nothing,
+          // so nothing is dropped in practice.
+          ...data.whereType<ChessOngoingGame>().map((e) => OngoingGamePreview(game: e.game)),
         ],
       ),
       orElse: () => const SizedBox.shrink(),

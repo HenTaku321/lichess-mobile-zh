@@ -244,6 +244,7 @@
   "mobileXiangqiEasy": "简单",
   "mobileXiangqiHard": "困难",
   "mobileXiangqiMedium": "中等",
+  "mobileXiangqiRanOutOfTime": "{param}超时判负。",
   "mobileXiangqiRedMovesFirst": "红方先行，所以电脑先开局。",
   "mobileXiangqiResigned": "{param}认输。",
   "mobileXiangqiSideBlack": "黑方",

@@ -336,7 +336,7 @@ class AppLinksService(final Ref ref, {AppLinks? appLinks}) {
           final ongoingGames = await ref.read(accountRepositoryProvider).getOngoingGames(nb: 3);
           final ongoing = ongoingGames.firstWhereOrNull((g) => g.id == gameId);
           if (ongoing != null) {
-            ref.invalidate(ongoingGamesProvider);
+            ref.invalidate(lichessOngoingGamesProvider);
             return [
               GameScreen.buildRoute(
                 source: ExistingGameSource(ongoing.fullId),

@@ -12,6 +12,7 @@ import 'package:lichess_mobile/src/view/play/create_challenge_bottom_sheet.dart'
 import 'package:lichess_mobile/src/view/play/create_game_widget.dart';
 import 'package:lichess_mobile/src/view/tournament/tournament_list_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_game_screen.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_over_the_board_screen.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_choice_picker.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:material_ui/material_ui.dart';
@@ -113,10 +114,36 @@ class const PlayMenu() extends ConsumerWidget {
               title: Text(context.l10n.playAgainstComputer),
             ),
             ListTile(
-              onTap: () {
+              onTap: () async {
+                // Chess and xiangqi share this row exactly as they share the one above it, and for
+                // the same reason: playing over the board is a way of playing rather than a game,
+                // so it is offered for both instead of owned by either. Unlike the computer row,
+                // the choice is *not* gated on `engineAvailabilityProvider.pikafish`: over the
+                // board both sides are a person's, nothing is ever searched for, and a build
+                // without Pikafish plays this one as well as any other.
+                _OtbGame? choice;
+                // As above, the picker comes before the sheet is popped so that the sheet's own
+                // context can host it, and a player who dismisses it is left where they were.
+                await showChoicePicker<_OtbGame>(
+                  context,
+                  title: Text(context.l10n.mobileOverTheBoard),
+                  choices: _OtbGame.values,
+                  selectedItem: .chess,
+                  labelBuilder: (game) => Text(switch (game) {
+                    .chess => context.l10n.mobileChess,
+                    .xiangqi => context.l10n.mobileXiangqi,
+                  }),
+                  onSelectedItemChanged: (game) => choice = game,
+                );
+                if (!context.mounted) return;
+                final selected = choice;
+                if (selected == null) return;
                 // Pops the play bottom sheet
                 Navigator.of(context).popUntil((route) => route is! ModalBottomSheetRoute);
-                Navigator.of(context, rootNavigator: true).push(OverTheBoardScreen.buildRoute());
+                Navigator.of(context, rootNavigator: true).push(switch (selected) {
+                  .chess => OverTheBoardScreen.buildRoute(),
+                  .xiangqi => XiangqiOverTheBoardScreen.buildRoute(),
+                });
               },
               leading: const Icon(Icons.table_restaurant_outlined),
               title: Text(context.l10n.mobileOverTheBoard),
@@ -141,6 +168,16 @@ class const _Section({required final List<Widget> children}) extends StatelessWi
 /// as the app's main game and the other as an extra: the game is a choice inside the entry, not a
 /// property of it.
 enum _OfflineOpponent() {
+  chess,
+  xiangqi,
+}
+
+/// Which game the over-the-board screen is set up for.
+///
+/// The same two, offered by the same one entry and in the same way: playing over the board is a way
+/// of playing rather than a game of its own, so which game it is set up for is a choice inside the
+/// entry here too.
+enum _OtbGame() {
   chess,
   xiangqi,
 }

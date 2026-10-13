@@ -757,6 +757,11 @@ class AppLocalizationsGl extends AppLocalizations {
   String get mobileXiangqiMedium => 'Medium';
 
   @override
+  String mobileXiangqiRanOutOfTime(String param) {
+    return '$param ran out of time.';
+  }
+
+  @override
   String get mobileXiangqiRedMovesFirst => 'Red moves first, so the computer opens the game.';
 
   @override

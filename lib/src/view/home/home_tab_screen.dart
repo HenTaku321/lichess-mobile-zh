@@ -9,6 +9,7 @@ import 'package:lichess_mobile/src/model/account/account_repository.dart';
 import 'package:lichess_mobile/src/model/account/home_preferences.dart';
 import 'package:lichess_mobile/src/model/account/home_widgets.dart';
 import 'package:lichess_mobile/src/model/account/ongoing_game.dart';
+import 'package:lichess_mobile/src/model/account/ongoing_game_entry.dart';
 import 'package:lichess_mobile/src/model/account/ongoing_games_notifier.dart';
 import 'package:lichess_mobile/src/model/auth/auth_controller.dart';
 import 'package:lichess_mobile/src/model/blog/blog.dart';
@@ -489,7 +490,7 @@ class _HomeScreenState() extends ConsumerState<HomeTabScreen> {
         if (isOnline) ref.refresh(challengesProvider.future),
         if (isOnline) ref.refresh(unreadMessagesProvider.future),
         if (isOnline) ref.refresh(accountProvider.future),
-        if (isOnline) ref.refresh(ongoingGamesProvider.future),
+        if (isOnline) ref.refresh(lichessOngoingGamesProvider.future),
         if (isOnline) ref.refresh(featuredTournamentsProvider.future),
         if (isOnline) ref.refresh(followingCarouselProvider.future),
       ]);
@@ -747,20 +748,31 @@ class const _BlogCarouselWidget(
   }
 }
 
+/// The chess rows of the merged ongoing-games list, real-time games first.
+///
+/// The list is merged across backends, but only the chess rows can be rendered
+/// today: a xiangqi row needs a xiangqi board preview, which no widget provides
+/// yet (a later agent's job). Until then the xiangqi rows are simply not shown
+/// here; this wave's xiangqi source returns nothing, so the drop is invisible.
+IList<OngoingGame> _chessGamesRealTimeFirst(IList<OngoingGameEntry> entries) {
+  final chess = entries.whereType<ChessOngoingGame>().map((e) => e.game).toIList();
+  final realTime = chess.where((game) => game.isRealTime);
+  final correspondence = chess.where((game) => !game.isRealTime);
+  return [...realTime, ...correspondence].lock;
+}
+
 class const _OngoingGamesCarousel(
-  final AsyncValue<IList<OngoingGame>> games, {
+  final AsyncValue<IList<OngoingGameEntry>> games, {
   required final int maxGamesToShow,
 }) extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     switch (games) {
       case AsyncData(:final value):
-        if (value.isEmpty) {
+        final list = _chessGamesRealTimeFirst(value);
+        if (list.isEmpty) {
           return const SizedBox.shrink();
         }
-        final realTime = value.where((game) => game.isRealTime);
-        final correspondence = value.where((game) => !game.isRealTime);
-        final list = [...realTime, ...correspondence].lock;
         return GamesCarousel<OngoingGame>(
           list: list,
           onTap: (index) {
@@ -834,19 +846,17 @@ class const _OfflineCorrespondenceCarousel(
 }
 
 class const _OngoingGamesPreview(
-  final AsyncValue<IList<OngoingGame>> games, {
+  final AsyncValue<IList<OngoingGameEntry>> games, {
   required final int maxGamesToShow,
 }) extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     switch (games) {
       case AsyncData(:final value):
-        if (value.isEmpty) {
+        final list = _chessGamesRealTimeFirst(value);
+        if (list.isEmpty) {
           return const SizedBox.shrink();
         }
-        final realTime = value.where((game) => game.isRealTime);
-        final correspondence = value.where((game) => !game.isRealTime);
-        final list = [...realTime, ...correspondence].lock;
 
         return PreviewGameList(
           list: list,

@@ -196,7 +196,7 @@ class _AppState() extends ConsumerState<Application> {
       if (prevWasOffline && currentIsOnline) {
         final nbMovesPlayed = await ref.read(correspondenceServiceProvider).playRegisteredMoves();
         if (nbMovesPlayed > 0) {
-          ref.invalidate(ongoingGamesProvider);
+          ref.invalidate(lichessOngoingGamesProvider);
         }
       }
 

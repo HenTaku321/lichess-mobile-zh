@@ -90,6 +90,7 @@
   "mobileXiangqiEasy": "簡單",
   "mobileXiangqiHard": "困難",
   "mobileXiangqiMedium": "中等",
+  "mobileXiangqiRanOutOfTime": "{param}逾時判負。",
   "mobileXiangqiRedMovesFirst": "紅方先行，所以電腦先開局。",
   "mobileXiangqiResigned": "{param}認輸。",
   "mobileXiangqiSideBlack": "黑方",

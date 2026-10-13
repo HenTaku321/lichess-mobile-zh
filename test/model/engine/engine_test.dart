@@ -13,6 +13,7 @@ SearchRequest makeRequest({
   IList<UCIMove> moves = const IListConst([]),
   IMap<String, String> options = const IMapConst({}),
   Duration searchTime = const Duration(seconds: 1),
+  SearchLimit? limit,
   String? fenOverride,
   int multiPv = 1,
   int threads = 1,
@@ -21,7 +22,7 @@ SearchRequest makeRequest({
   initialPosition: Chess.initial,
   moves: moves,
   variant: variant,
-  limit: SearchLimit.movetime(searchTime),
+  limit: limit ?? SearchLimit.movetime(searchTime),
   fenOverride: fenOverride,
   multiPv: multiPv,
   threads: threads,
@@ -73,6 +74,35 @@ void main() {
         'go movetime 1000',
       ]);
       expect(engine.isSearching.value, isTrue);
+    });
+
+    test('a search can be given a deadline and a depth at once', () async {
+      final transport = FakeTransport();
+      final engine = Engine(transport);
+      addTearDown(engine.dispose);
+      await pumpEventQueue();
+
+      await startSearch(
+        engine,
+        transport,
+        makeRequest(
+          limit: const SearchLimit.movetimeAndDepth(
+            duration: Duration(milliseconds: 250),
+            depth: 12,
+          ),
+        ),
+      );
+
+      // One `go` with both clauses in it: the engine is told how long it may think and how deep it
+      // may go, and it stops at whichever it reaches first. The order is the ladder's, and the two
+      // clauses are one command because `go` takes one of each kind of limit.
+      expect(transport.takeCommands(), [
+        'ucinewgame',
+        'isready',
+        'setoption name UCI_Chess960 value true',
+        'position fen ${Chess.initial.fen}',
+        'go movetime 250 depth 12',
+      ]);
     });
 
     test('options already at their declared value are not sent again', () async {

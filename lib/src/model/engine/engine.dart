@@ -46,6 +46,16 @@ sealed class const SearchLimit() {
   const factory nodes(int nodes) = NodesLimit;
   const factory depth(int depth) = DepthLimit;
   const factory infinite() = InfiniteLimit;
+
+  /// A search given both a deadline and a depth cap, and allowed to reach whichever comes first.
+  ///
+  /// `go` takes one clause per kind of limit, so asking for both is a single command — `movetime N
+  /// depth D`, which is what it looks like written by hand and what UCI accepts. Neither clause
+  /// alone says this: a bare `movetime` lets a shallow engine spend its whole budget on a depth it
+  /// will never reach, and a bare `depth` lets a deep one run past the time it was given. A ladder
+  /// whose rungs are "a search budget" wants both ends at once, and this is that.
+  const factory movetimeAndDepth({required Duration duration, required int depth}) =
+      MoveTimeAndDepthLimit;
 }
 
 final class const MoveTimeLimit(final Duration duration) extends SearchLimit;
@@ -55,6 +65,11 @@ final class const NodesLimit(final int nodes) extends SearchLimit;
 final class const DepthLimit(final int depth) extends SearchLimit;
 
 final class const InfiniteLimit() extends SearchLimit;
+
+final class const MoveTimeAndDepthLimit({
+  required final Duration duration,
+  required final int depth,
+}) extends SearchLimit;
 
 /// Everything a search needs, and nothing about why it was asked for.
 @immutable
@@ -520,6 +535,8 @@ class Engine(
     NodesLimit(:final nodes) => 'nodes $nodes',
     DepthLimit(:final depth) => 'depth $depth',
     InfiniteLimit() => 'infinite',
+    MoveTimeAndDepthLimit(:final duration, :final depth) =>
+      'movetime ${duration.inMilliseconds} depth $depth',
   };
 }
 

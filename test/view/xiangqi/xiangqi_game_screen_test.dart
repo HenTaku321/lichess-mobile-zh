@@ -15,6 +15,7 @@ import 'package:lichess_mobile/src/model/xiangqi/xiangqi_move.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_game_screen.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
+import 'package:lichess_mobile/src/widgets/non_linear_slider.dart';
 import 'package:lichess_mobile/src/widgets/settings.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_game_layout.dart';
@@ -73,7 +74,7 @@ Widget appInLocale(Locale locale, Widget home) => MaterialApp(
 /// The evaluation is off unless [engineEvaluation] asks for it. The engine is one engine and the
 /// screen shares it between the opponent and the evaluation bar, so an evaluation left running would
 /// take the engine out from under the opponent's search and the commands the tests read — the
-/// `go depth 9` an answer is made of — would belong to the bar instead.
+/// `go` an answer is made of — would belong to the bar instead.
 ///
 /// [locale] is the language to run in, and the one test that is about the language the app is
 /// running in passes it; everything else leaves it null and gets the harness's app.
@@ -318,10 +319,11 @@ void main() {
 
       expect(find.text('Side'), findsOneWidget);
       expect(find.text('Red'), findsOneWidget);
-      // The opponent is the computer and nothing else here, so the row is named with the app's own
-      // word for one rather than a word of this screen's inventing.
-      expect(find.text('Opponent'), findsOneWidget);
-      expect(find.text('Medium'), findsOneWidget);
+      // The computer is the whole of the opponent here, so the control for it is the app's own level
+      // control for one, and its title is the app's own word for a level rather than a word of this
+      // screen's inventing: a level is a search budget, and there are no words that could say which
+      // of two budgets is the stronger. See [_XiangqiLevelTile].
+      expect(find.text('Level: ${XiangqiDifficulty.defaultLevel.level}'), findsOneWidget);
     });
 
     testWidgets('taking black hands the opening move to the computer, and says so', (tester) async {
@@ -354,11 +356,13 @@ void main() {
 
       await tester.tap(find.byIcon(CupertinoIcons.add));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Medium'));
+      expect(find.text('Level: ${XiangqiDifficulty.defaultLevel.level}'), findsOneWidget);
+
+      // The control is a slider over the levels, so it is moved the way the widget itself moves it:
+      // what it hands back is the level's number, not the slider's own index.
+      tester.widget<NonLinearSlider>(find.byType(NonLinearSlider)).onChangeEnd!(1);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Easy').last);
-      await tester.pumpAndSettle();
-      expect(find.text('Easy'), findsOneWidget);
+      expect(find.text('Level: 1'), findsOneWidget);
 
       await tester.tap(find.text('Play'));
       await tester.pumpAndSettle();
@@ -367,9 +371,9 @@ void main() {
       await tapSquare(tester, 'e2');
       await startSearch(tester, transport);
 
-      // What the difficulty is, is how long the computer may think: the three levels are three
-      // search limits, because Pikafish has no strength setting to set. See [XiangqiDifficulty].
-      expect(transport.takeCommands(), contains('go depth 3'));
+      // What the difficulty is, is how much the computer is allowed to think: six levels, six search
+      // budgets, because Pikafish has no strength setting to set. See [XiangqiDifficulty].
+      expect(transport.takeCommands(), contains('go movetime 1 depth 1'));
     });
 
     testWidgets('says how the game ended in the language the app is running in', (tester) async {

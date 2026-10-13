@@ -97,7 +97,7 @@ class CorrespondenceService(final Logger _log, {required final Ref ref}) {
 
     try {
       final gameRepository = ref.read(gameRepositoryProvider);
-      final ongoingGames = await ref.read(ongoingGamesProvider.future);
+      final ongoingGames = await ref.read(lichessOngoingGamesProvider.future);
       for (final sg in storedOngoingGames) {
         final game = ongoingGames.firstWhereOrNull((e) => e.id == sg.$2.id);
         if (game == null) {

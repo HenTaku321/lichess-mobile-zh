@@ -1660,6 +1660,12 @@ abstract class AppLocalizations {
   /// **'Medium'**
   String get mobileXiangqiMedium;
 
+  /// No description provided for @mobileXiangqiRanOutOfTime.
+  ///
+  /// In en, this message translates to:
+  /// **'{param} ran out of time.'**
+  String mobileXiangqiRanOutOfTime(String param);
+
   /// No description provided for @mobileXiangqiRedMovesFirst.
   ///
   /// In en, this message translates to:

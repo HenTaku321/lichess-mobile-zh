@@ -260,6 +260,7 @@
   <string name="xiangqiEasy" comment="Xiangqi engine strength: the easiest level.">简单</string>
   <string name="xiangqiHard" comment="Xiangqi engine strength: the hardest level.">困难</string>
   <string name="xiangqiMedium" comment="Xiangqi engine strength: the medium level.">中等</string>
+  <string name="xiangqiRanOutOfTime" comment="Xiangqi game-end sentence: the side named by %s used up its clock and lost. Chess says the same thing with its own white/black pair, which a xiangqi game cannot use.">%s超时判负。</string>
   <string name="xiangqiRedMovesFirst" comment="Xiangqi new game sheet: the line under the side setting once black is chosen, saying the computer opens the game.">红方先行，所以电脑先开局。</string>
   <string name="xiangqiResigned" comment="Xiangqi game-end sentence: the side named by %s resigned.">%s认输。</string>
   <string name="xiangqiSideBlack" comment="The black side of a xiangqi game, used as a side name in the game-end sentences.">黑方</string>

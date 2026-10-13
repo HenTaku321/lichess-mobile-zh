@@ -666,7 +666,7 @@ class const _GameBottomBar({
 }) extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final ongoingGames = ref.watch(ongoingGamesProvider);
+    final ongoingGames = ref.watch(lichessOngoingGamesProvider);
     final gamePrefs = ref.watch(gamePreferencesProvider);
     final boardPreferences = ref.watch(boardPreferencesProvider);
     final kidModeAsync = ref.watch(kidModeProvider);

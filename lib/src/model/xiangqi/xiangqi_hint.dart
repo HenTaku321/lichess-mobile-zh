@@ -23,12 +23,14 @@ const _kEngineFailedMessage =
 
 /// How hard a hint and an evaluation search think.
 ///
-/// The controller's own middle difficulty, [XiangqiDifficulty.medium] — `depth 9` — reused rather
-/// than invented: a hint that thought longer than the opponent's own move would be one nobody waits
-/// for, and a bounded search is also the only safe kind on an engine the opponent is sharing. The
-/// enum's own limit object is held rather than a second `depth 9` written out, so the two cannot
-/// drift apart.
-final xiangqiAnalysisLimit = XiangqiDifficulty.medium.limit;
+/// A depth of nine, written out here rather than taken from the controller's ladder.
+///
+/// The ladder is a player's control — six numbered rungs, with no middle rung to point at — and this
+/// is not one: what a hint and the evaluation bar are given has been this depth since before the
+/// ladder was numbered. It stays bounded for the reasons it always was, a hint that thought longer
+/// than the opponent's own move being one nobody waits for, and a search on an engine the opponent
+/// is sharing being only safe as a short one.
+const xiangqiAnalysisLimit = SearchLimit.depth(9);
 
 /// A move the engine suggests, with the verdict the search that found it ended on.
 @freezed

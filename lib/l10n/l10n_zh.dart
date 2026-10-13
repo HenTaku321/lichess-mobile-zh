@@ -757,6 +757,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mobileXiangqiMedium => '中等';
 
   @override
+  String mobileXiangqiRanOutOfTime(String param) {
+    return '$param超时判负。';
+  }
+
+  @override
   String get mobileXiangqiRedMovesFirst => '红方先行，所以电脑先开局。';
 
   @override
@@ -8283,6 +8288,11 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get mobileXiangqiMedium => '中等';
+
+  @override
+  String mobileXiangqiRanOutOfTime(String param) {
+    return '$param逾時判負。';
+  }
 
   @override
   String get mobileXiangqiRedMovesFirst => '紅方先行，所以電腦先開局。';

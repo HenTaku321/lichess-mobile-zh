@@ -32,25 +32,64 @@ const kXiangqiRepetitionDraw = 3;
 const _kEngineFailedMessage =
     'The computer could not answer with a move. Start a new game to try again.';
 
-/// How hard the computer plays.
+/// How hard the computer plays: six levels, each of them a search budget rather than a strength
+/// setting.
 ///
-/// Three levels, and each one is a search limit rather than a strength setting, because Pikafish has
-/// no strength setting: it declares no `Skill Level` and no `UCI_LimitStrength` — unlike
-/// Fairy-Stockfish, whose negative skill levels are how the app's weakest chess opponents are made —
-/// so the only dial the engine offers is how long it may think.
+/// Six and not the chess game's twelve, because the dial is not the same dial. Chess's levels rest
+/// on Stockfish's `Skill Level`, which walks down to a genuinely weaker opponent — Fairy-Stockfish's
+/// negative levels are how the app's weakest chess opponents are made. Pikafish has no such setting:
+/// its complete UCI option list is Debug Log File, NumaPolicy, Threads, Hash, Clear Hash, Ponder,
+/// MultiPV, Move Overhead, nodestime, UCI_ShowWDL and EvalFile, and there is no `Skill Level`, no
+/// `UCI_LimitStrength` and no `UCI_Elo` among them. The only thing a level can change here is how the
+/// search is budgeted, and on that axis `depth 1` is already a search that will take anything —
+/// nothing weaker exists. The upper half of a twelve-step ladder would be a knob that turns without
+/// changing anything, so the ladder is as long as its one real axis holds: six.
 ///
-/// The three limits are measured, from the opening position, on the Pikafish this app ships:
-/// `depth 3` answers after 160 nodes and a millisecond, `depth 9` after 9450 nodes and 90 ms, and
-/// `movetime 2000` reaches depth 17 over 202116 nodes. The first two are therefore a move back in an
-/// instant and a move in a blink, and only the third costs the computer the two seconds it is given
-/// — which is why it is the only one a player can feel.
-/// Each level is named by the view, which is the only place that can: the three names are the app's
-/// own translated ones (`mobileXiangqiEasy` and its neighbours) and a model cannot read a
-/// `BuildContext`. What the model owns is the limit, which is what a level actually is.
-enum XiangqiDifficulty(final SearchLimit limit) {
-  easy(SearchLimit.depth(3)),
-  medium(SearchLimit.depth(9)),
-  hard(SearchLimit.movetime(Duration(seconds: 2))),
+/// The curve is xiangqi.com's own, re-sampled. Their ten levels are a `(depth, move_time, skill,
+/// multi_pv)` table, and their first three share a depth and a move time and differ only in MultiPV —
+/// a column this app does not use — so on a search-budget-only axis the table has eight points, and
+/// these six rungs are every other one of them with both ends kept: their level 1 is level 1 here,
+/// their level 10 is level 6, and the four between are their fourth, sixth, eighth and ninth. Both
+/// columns rise strictly from end to end, which is the whole point: the rungs are ordered, and no
+/// level is ever weaker than the one under it. The spacing between neighbouring rungs is a starting
+/// point and may be re-tuned by feel; the ordering and the two ends are not.
+///
+/// A rung is both a deadline and a depth cap at once — see [SearchLimit.movetimeAndDepth] — because
+/// on its own neither says what a level is. The other limits are untouched: a depth-only or a
+/// movetime-only search is still exactly what an analysis screen or a hint asks for elsewhere.
+///
+/// What a level is called is the view's business, not the model's: a model cannot read a
+/// `BuildContext`, so it owns the number and the view puts it on screen.
+enum XiangqiDifficulty(final int depth, final Duration moveTime) {
+  level1(1, Duration(milliseconds: 1)),
+  level2(2, Duration(milliseconds: 10)),
+  level3(4, Duration(milliseconds: 30)),
+  level4(6, Duration(milliseconds: 50)),
+  level5(8, Duration(milliseconds: 100)),
+  level6(15, Duration(milliseconds: 500));
+
+  /// The level as a number, 1 to 6 — how the view writes it, and what the slider moves along.
+  int get level => index + 1;
+
+  /// The search this level is.
+  SearchLimit get limit => SearchLimit.movetimeAndDepth(duration: moveTime, depth: depth);
+
+  /// The level a new game starts at.
+  static const defaultLevel = XiangqiDifficulty.level4;
+}
+
+/// Who is sitting on the other side of the board.
+///
+/// Two seats, and the difference is not difficulty but who may move. [engine] is the game the app
+/// has always played: one human side against Pikafish, which answers. [human] is two people at one
+/// board, where whoever is to move may move and no search is ever started — the over-the-board
+/// screen is the only thing that sets it.
+///
+/// Defaulted everywhere to [engine] so that every call site written before this existed goes on
+/// meaning exactly what it meant.
+enum XiangqiOpponent() {
+  engine,
+  human,
 }
 
 /// How the game ended, if it has.
@@ -63,6 +102,10 @@ enum XiangqiGameEnd() {
   stalemate,
   threefoldRepetition,
   resign,
+
+  /// A clock ran out. Which side is the side that lost, and it is remembered rather than derived —
+  /// see [XiangqiGameState.flaggedSide].
+  timeout,
 }
 
 /// The xiangqi engine, started on demand and kept up for as long as the game wants it.
@@ -94,6 +137,9 @@ sealed class const XiangqiGameState._() with _$XiangqiGameState {
     required XiangqiSide playerSide,
     required XiangqiDifficulty difficulty,
 
+    /// Who is on the other side: Pikafish, or a second person at the same board.
+    @Default(XiangqiOpponent.engine) XiangqiOpponent opponent,
+
     /// Every position the game has been in, the initial one first — so this is one longer than
     /// [moves], and the one at the end is the game as it stands.
     required IList<XiangqiPosition> positions,
@@ -106,6 +152,13 @@ sealed class const XiangqiGameState._() with _$XiangqiGameState {
 
     /// The side that gave up, if the game ended that way.
     XiangqiSide? resignedBy,
+
+    /// The side whose clock ran out, if the game ended that way.
+    ///
+    /// Remembered rather than worked out from which clock reads zero, because a move and a flag can
+    /// land in the same frame: the clock knows whose time it was when it stopped being, but by the
+    /// time anyone asks, the turn may have moved on to the other side.
+    XiangqiSide? flaggedSide,
   }) = _XiangqiGameState;
 
   /// The game as it stands.
@@ -114,7 +167,12 @@ sealed class const XiangqiGameState._() with _$XiangqiGameState {
   /// Whose move it is.
   XiangqiSide get turn => position.turn;
 
-  bool get isPlayerTurn => turn == playerSide;
+  /// Whether the side to move is one a person at this board may move.
+  ///
+  /// Against the engine it is the player's own side. Over the board both sides are a person's, so
+  /// whoever is to move may move. This is the one question the rest of the game asks before a touch
+  /// does anything, and before the engine is given a turn at all.
+  bool get isPlayerTurn => opponent == .human || turn == playerSide;
 
   XiangqiMove? get lastMove => moves.isEmpty ? null : moves.last;
 
@@ -128,7 +186,11 @@ sealed class const XiangqiGameState._() with _$XiangqiGameState {
   /// is the whole of the answer: a game is mate because the side to move is mated, and not because
   /// of how it got there.
   XiangqiGameEnd? get end {
+    // A resignation and a flag are events rather than questions about the board — the position left
+    // after either one is still a position that can be played — so they are asked first. Both are
+    // remembered as which side it was, which is the only thing about them the position cannot say.
     if (resignedBy != null) return .resign;
+    if (flaggedSide != null) return .timeout;
     if (isCheckmate(position)) return .checkmate;
     // 困毙: not in check, and no move to make. A loss, not a draw — see [XiangqiGameEnd].
     if (isStalemate(position)) return .stalemate;
@@ -147,6 +209,9 @@ sealed class const XiangqiGameState._() with _$XiangqiGameState {
       turn.opposite,
     .threefoldRepetition => null,
     .resign => resignedBy!.opposite,
+    // Running out of time is losing, exactly as resigning is, and the side that flagged is the side
+    // that lost. See [flaggedSide] for why it is the recorded side and not the side to move.
+    .timeout => flaggedSide!.opposite,
     null => null,
   };
 
@@ -159,7 +224,11 @@ sealed class const XiangqiGameState._() with _$XiangqiGameState {
   /// Their own last move, whether or not the engine has answered it: one ply back while the computer
   /// is still thinking, two once it has replied. A player who took black has nothing to take back
   /// until the engine has opened, which is what finding no such position means.
+  ///
+  /// Over the board there is no engine to leave out of it: both sides were played at this board, so
+  /// the position to come back to is simply the one before the last move — always one ply.
   int? get undoIndex {
+    if (opponent == .human) return positions.length >= 2 ? positions.length - 2 : null;
     for (var i = positions.length - 2; i >= 0; i--) {
       if (positions[i].turn == playerSide) return i;
     }
@@ -214,23 +283,35 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
 
     return XiangqiGameState(
       playerSide: XiangqiSide.red,
-      difficulty: XiangqiDifficulty.medium,
+      difficulty: XiangqiDifficulty.defaultLevel,
       positions: IList([XiangqiPosition.initial()]),
       moves: const IListConst([]),
     );
   }
 
   /// Starts over, with the player on [side] against a computer of [difficulty].
-  void startNewGame({required XiangqiSide side, required XiangqiDifficulty difficulty}) {
+  ///
+  /// [opponent] is who is on the other side, and left out it is the engine — what every caller
+  /// written before the over-the-board screen meant. [XiangqiOpponent.human] is two people at one
+  /// board, and then [difficulty] is inert: nobody is searched for, and the side that moves first
+  /// is simply the side whose player moves first.
+  void startNewGame({
+    required XiangqiSide side,
+    required XiangqiDifficulty difficulty,
+    XiangqiOpponent opponent = XiangqiOpponent.engine,
+  }) {
     _epoch++;
     _search?.stop();
     _search = null;
     state = XiangqiGameState(
       playerSide: side,
       difficulty: difficulty,
+      opponent: opponent,
       positions: IList([XiangqiPosition.initial()]),
       moves: const IListConst([]),
     );
+    // Over the board it is never the computer's turn, so this never starts a search — see
+    // [XiangqiGameState.isPlayerTurn].
     if (!state.isPlayerTurn) unawaited(_playEngineMove());
   }
 
@@ -275,9 +356,26 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
     state = state.copyWith(resignedBy: state.playerSide, isEngineThinking: false, selected: null);
   }
 
+  /// The clock has run out for [side], and the game is over.
+  ///
+  /// [side] is taken as an argument rather than read off the clock here, because a move and a flag
+  /// can land in the same frame: by the time this runs the turn may already have moved on, and the
+  /// side that lost is the side whose clock it was, not the side now to move. It ends the game the
+  /// way a resignation does — the side that flagged has lost.
+  void onFlag(XiangqiSide side) {
+    if (state.isFinished) return;
+    _epoch++;
+    _search?.stop();
+    _search = null;
+    state = state.copyWith(flaggedSide: side, isEngineThinking: false, selected: null);
+  }
+
   bool _isPlayerPiece(XiangqiSquare square) {
     final piece = state.position.pieceAt(square);
-    return piece != null && piece.side == state.playerSide;
+    // The piece the side to move owns. Against the engine the side to move is only ever the
+    // player's, so this is the player's piece; over the board it is whichever side's turn it is,
+    // which is the side whose player is at the board.
+    return piece != null && piece.side == state.turn;
   }
 
   /// Makes [move] and, if the game is still running, hands the turn to the engine.

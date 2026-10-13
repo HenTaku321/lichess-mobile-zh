@@ -123,7 +123,7 @@ void main() {
   group('XiangqiGameController', () {
     test('the player moves, and the computer is asked to answer', () async {
       final harness = await makeHarness();
-      harness.controller.startNewGame(side: .red, difficulty: .medium);
+      harness.controller.startNewGame(side: .red, difficulty: .level4);
       expect(harness.state.isPlayerTurn, isTrue);
 
       harness.controller.tapSquare(square('h2'));
@@ -148,7 +148,9 @@ void main() {
       // option the app would set for this.
       expect(harness.transport.takeCommands(), [
         'position fen ${play(XiangqiPosition.initial(), move('h2e2')).toFen()}',
-        'go depth 9',
+        // The default level, which is both a deadline and a cap: Pikafish has no strength to set,
+        // so how hard it plays is the whole of how it is asked to search. See [XiangqiDifficulty].
+        'go movetime 50 depth 6',
       ]);
 
       harness.transport.emit('bestmove h9g7 ponder b0c2');
@@ -163,7 +165,7 @@ void main() {
     test('a move is heard as it is played, and a piece picked up is not', () async {
       final sound = RecordingSoundService();
       final harness = await makeHarness(soundService: sound);
-      harness.controller.startNewGame(side: .red, difficulty: .medium);
+      harness.controller.startNewGame(side: .red, difficulty: .level4);
       // A player on red is not asked for anything of the engine's, so whatever is heard from here
       // is the player's own doing.
       expect(sound.sounds, isEmpty);
@@ -175,25 +177,52 @@ void main() {
       expect(sound.sounds, [Sound.move]);
     });
 
-    test('the difficulty is how long the computer is allowed to think', () async {
-      for (final (:difficulty, :go) in [
-        (difficulty: XiangqiDifficulty.easy, go: 'go depth 3'),
-        (difficulty: XiangqiDifficulty.medium, go: 'go depth 9'),
-        (difficulty: XiangqiDifficulty.hard, go: 'go movetime 2000'),
-      ]) {
+    test('the ladder is six levels, and both of its columns rise from end to end', () {
+      const levels = XiangqiDifficulty.values;
+
+      // Six rather than the chess game's twelve, because there is no strength setting behind the
+      // dial here — see [XiangqiDifficulty] — and on a budget-only axis six is as far as it goes.
+      expect(levels.length, 6);
+      expect(levels.map((level) => level.level), [1, 2, 3, 4, 5, 6]);
+      // The two ends are pinned; the spacing between them is a starting point and may be re-tuned,
+      // but nothing may move an end or turn two rungs the same way round.
+      expect(levels.first.depth, 1);
+      expect(levels.first.moveTime, const Duration(milliseconds: 1));
+      expect(levels.last.depth, 15);
+      expect(levels.last.moveTime, const Duration(milliseconds: 500));
+      for (var i = 1; i < levels.length; i++) {
+        expect(
+          levels[i].depth,
+          greaterThan(levels[i - 1].depth),
+          reason: 'the depth of ${levels[i]} against ${levels[i - 1]}',
+        );
+        expect(
+          levels[i].moveTime,
+          greaterThan(levels[i - 1].moveTime),
+          reason: 'the move time of ${levels[i]} against ${levels[i - 1]}',
+        );
+      }
+
+      expect(XiangqiDifficulty.defaultLevel, XiangqiDifficulty.level4);
+    });
+
+    test('a level is asked for as the search budget it is', () async {
+      for (final difficulty in XiangqiDifficulty.values) {
         // A player who took black: red moves first, so the computer opens and the search happens
         // without a move of the player's to trigger it.
         final harness = await makeHarness();
         harness.controller.startNewGame(side: .black, difficulty: difficulty);
-        expect(harness.state.isEngineThinking, isTrue);
+        expect(harness.state.isEngineThinking, isTrue, reason: 'for $difficulty');
 
         await pumpEventQueue();
         harness.transport.takeCommands();
         harness.transport.emit('readyok');
         await pumpEventQueue();
+        // Both halves of the rung reach the engine: a level is a deadline and a cap at once, since
+        // on its own neither says what the level is.
         expect(harness.transport.takeCommands(), [
           'position fen $kXiangqiInitialFen',
-          go,
+          'go movetime ${difficulty.moveTime.inMilliseconds} depth ${difficulty.depth}',
         ], reason: 'for $difficulty');
 
         harness.transport.emit('bestmove h2e2');
@@ -205,7 +234,7 @@ void main() {
 
     test('the board takes nothing while the computer is thinking', () async {
       final harness = await makeHarness();
-      harness.controller.startNewGame(side: .black, difficulty: .medium);
+      harness.controller.startNewGame(side: .black, difficulty: .level4);
       await pumpEventQueue();
 
       // A red chariot, and it is the computer's to move.
@@ -222,7 +251,7 @@ void main() {
 
     test('a move taken back while the computer is thinking stops it answering', () async {
       final harness = await makeHarness();
-      harness.controller.startNewGame(side: .red, difficulty: .medium);
+      harness.controller.startNewGame(side: .red, difficulty: .level4);
       harness.controller.tapSquare(square('h2'));
       harness.controller.tapSquare(square('e2'));
       await pumpEventQueue();
@@ -253,7 +282,7 @@ void main() {
 
     test('a move taken back after the computer has replied takes them both back', () async {
       final harness = await makeHarness();
-      harness.controller.startNewGame(side: .red, difficulty: .medium);
+      harness.controller.startNewGame(side: .red, difficulty: .level4);
       harness.controller.tapSquare(square('h2'));
       harness.controller.tapSquare(square('e2'));
       await answer(harness.transport, 'h9g7');
@@ -268,7 +297,7 @@ void main() {
 
     test("a player who took black takes their own move back, not the computer's", () async {
       final harness = await makeHarness();
-      harness.controller.startNewGame(side: .black, difficulty: .medium);
+      harness.controller.startNewGame(side: .black, difficulty: .level4);
       await answer(harness.transport, 'h2e2');
       expect(harness.state.isPlayerTurn, isTrue);
 
@@ -289,7 +318,7 @@ void main() {
 
     test('resigning ends the game, and a late answer cannot un-end it', () async {
       final harness = await makeHarness();
-      harness.controller.startNewGame(side: .red, difficulty: .medium);
+      harness.controller.startNewGame(side: .red, difficulty: .level4);
       harness.controller.tapSquare(square('h2'));
       harness.controller.tapSquare(square('e2'));
       await pumpEventQueue();
@@ -317,7 +346,7 @@ void main() {
 
     test('an answer the board cannot play is reported, and no result is invented', () async {
       final harness = await makeHarness();
-      harness.controller.startNewGame(side: .red, difficulty: .medium);
+      harness.controller.startNewGame(side: .red, difficulty: .level4);
       harness.controller.tapSquare(square('h2'));
       harness.controller.tapSquare(square('e2'));
       await pumpEventQueue();
@@ -334,7 +363,7 @@ void main() {
 
     test('the same position three times is a draw', () async {
       final harness = await makeHarness();
-      harness.controller.startNewGame(side: .red, difficulty: .easy);
+      harness.controller.startNewGame(side: .red, difficulty: .level1);
 
       // Both chariots shuffle out and back. Four plies is the shortest that brings a position round:
       // one chariot moving out and in again is not the same position, because the other has moved in
@@ -362,6 +391,71 @@ void main() {
       expect(harness.state.isEngineThinking, isFalse);
       expect(harness.state.canUndo, isFalse);
     });
+
+    test('over the board both sides move, and the engine is never asked', () async {
+      final harness = await makeHarness();
+      harness.controller.startNewGame(side: .red, difficulty: .level4, opponent: .human);
+      await pumpEventQueue();
+
+      // Red, and then black: the side to move is the side a person is sitting behind, whichever it
+      // is, so both of the board's ends are the board's to take.
+      expect(harness.state.isPlayerTurn, isTrue);
+      harness.controller.tapSquare(square('h2'));
+      harness.controller.tapSquare(square('e2'));
+      expect(harness.state.moves, IList([move('h2e2')]));
+      expect(harness.state.turn, XiangqiSide.black);
+      expect(harness.state.isPlayerTurn, isTrue);
+      expect(harness.state.isEngineThinking, isFalse);
+
+      harness.controller.tapSquare(square('h9'));
+      harness.controller.tapSquare(square('g7'));
+      expect(harness.state.moves, IList([move('h2e2'), move('h9g7')]));
+      expect(harness.state.turn, XiangqiSide.red);
+      expect(harness.state.isPlayerTurn, isTrue);
+
+      // Nothing was ever searched for: there is no other side for a search to belong to, and the
+      // engine that is up behind the controller was never given a turn.
+      await pumpEventQueue();
+      expect(
+        harness.transport.takeCommands().where((command) => command.startsWith('go ')),
+        isEmpty,
+      );
+    });
+
+    test('over the board a takeback is one ply, the engine move not being left out', () async {
+      final harness = await makeHarness();
+      harness.controller.startNewGame(side: .red, difficulty: .level4, opponent: .human);
+      harness.controller.tapSquare(square('h2'));
+      harness.controller.tapSquare(square('e2'));
+      harness.controller.tapSquare(square('h9'));
+      harness.controller.tapSquare(square('g7'));
+      expect(harness.state.moves.length, 2);
+
+      harness.controller.undo();
+
+      // Both plies were played at this board, so the position to come back to is the one before the
+      // last of them and no search has to be taken into account.
+      expect(harness.state.moves, IList([move('h2e2')]));
+      expect(harness.state.turn, XiangqiSide.black);
+      expect(harness.state.canUndo, isTrue);
+    });
+
+    test('a flag ends the game, and the side that ran out has lost', () async {
+      final harness = await makeHarness();
+      harness.controller.startNewGame(side: .red, difficulty: .level4, opponent: .human);
+
+      harness.controller.onFlag(XiangqiSide.black);
+
+      expect(harness.state.end, XiangqiGameEnd.timeout);
+      expect(harness.state.flaggedSide, XiangqiSide.black);
+      expect(harness.state.winner, XiangqiSide.red);
+      expect(harness.state.isFinished, isTrue);
+      expect(harness.state.canUndo, isFalse);
+
+      // A game that is over is not one the board takes anything more for.
+      harness.controller.tapSquare(square('h2'));
+      expect(harness.state.selected, isNull);
+    });
   });
 
   group('the verdict on a position', () {
@@ -369,7 +463,7 @@ void main() {
     // got here is not part of the answer, and neither is anything the game is asked afterwards.
     XiangqiGameState stateOf(String fen) => XiangqiGameState(
       playerSide: .red,
-      difficulty: .medium,
+      difficulty: .level4,
       positions: IList([XiangqiPosition.fromFen(fen)]),
       moves: const IListConst([]),
     );

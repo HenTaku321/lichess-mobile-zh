@@ -302,6 +302,14 @@
   "mobileXiangqiEasy": "Easy",
   "mobileXiangqiHard": "Hard",
   "mobileXiangqiMedium": "Medium",
+  "mobileXiangqiRanOutOfTime": "{param} ran out of time.",
+  "@mobileXiangqiRanOutOfTime": {
+    "placeholders": {
+      "param": {
+        "type": "String"
+      }
+    }
+  },
   "mobileXiangqiRedMovesFirst": "Red moves first, so the computer opens the game.",
   "mobileXiangqiResigned": "{param} resigned.",
   "@mobileXiangqiResigned": {

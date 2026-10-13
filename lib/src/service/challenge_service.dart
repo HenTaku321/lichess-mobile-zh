@@ -191,7 +191,7 @@ class ChallengeService(final Ref ref) {
       return showSnackBar(context, 'Failed to accept challenge', type: SnackBarType.error);
     }
 
-    ref.invalidate(ongoingGamesProvider);
+    ref.invalidate(lichessOngoingGamesProvider);
 
     _onChallengeAccepted(fullId);
   }

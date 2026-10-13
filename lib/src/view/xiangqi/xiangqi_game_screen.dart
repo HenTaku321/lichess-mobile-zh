@@ -22,6 +22,7 @@ import 'package:lichess_mobile/src/widgets/adaptive_choice_picker.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
+import 'package:lichess_mobile/src/widgets/non_linear_slider.dart';
 import 'package:lichess_mobile/src/widgets/settings.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_game_layout.dart';
@@ -111,15 +112,48 @@ class _IsBoardFlippedNotifier() extends Notifier<bool> {
   }
 }
 
-/// How hard the computer plays, as the app's own words for it.
+/// How hard the computer plays, picked with a slider across the levels.
 ///
-/// The three names are the view's to say and not the model's — see [XiangqiDifficulty] — and this is
-/// the one place any of them is turned into text.
-String _difficultyLabel(BuildContext context, XiangqiDifficulty difficulty) => switch (difficulty) {
-  .easy => context.l10n.mobileXiangqiEasy,
-  .medium => context.l10n.mobileXiangqiMedium,
-  .hard => context.l10n.mobileXiangqiHard,
-};
+/// The chess opponent picker's own control — see `_StockfishLevelTile` in `opponent_picker.dart` —
+/// because it is the same question asked about the same kind of thing: a number over a slider, not a
+/// list of words. The words were what could not be written here anyway. A level is a search budget
+/// (see [XiangqiDifficulty]), and "Level: 3" says that where three names could not say which of them
+/// was stronger; the one thing a word did say, that the level is how long the engine may think, is
+/// still said, in the line under the slider.
+class const _XiangqiLevelTile({
+  required final XiangqiDifficulty difficulty,
+  required final ValueChanged<XiangqiDifficulty> onChanged,
+}) extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: const Icon(Icons.smart_toy),
+      title: Text.rich(
+        TextSpan(
+          text: '${context.l10n.level}: ',
+          children: [
+            TextSpan(
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              text: '${difficulty.level}',
+            ),
+          ],
+        ),
+      ),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(context.l10n.mobileXiangqiDifficultyExplanation),
+          NonLinearSlider(
+            value: difficulty.level,
+            values: XiangqiDifficulty.values.map((d) => d.level).toList(),
+            onChange: (value) => onChanged(XiangqiDifficulty.values[value.toInt() - 1]),
+            onChangeEnd: (value) => onChanged(XiangqiDifficulty.values[value.toInt() - 1]),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class const _Body() extends ConsumerStatefulWidget {
   @override
@@ -456,7 +490,7 @@ class const _PlayerRow({
 /// otherwise what is going on in it. Nothing is said while the computer has the move but has not
 /// started thinking — that is a moment rather than a state, and the board is about to move.
 String _statusText(BuildContext context, XiangqiGameState state) {
-  if (state.end != null) return _resultLabel(context, state);
+  if (state.end != null) return xiangqiResultLabel(context, state);
   if (state.isEngineThinking) return context.l10n.computerThinking;
   if (state.isPlayerTurn) return context.l10n.yourTurn;
   return '';
@@ -466,17 +500,26 @@ String _statusText(BuildContext context, XiangqiGameState state) {
 ///
 /// The side that is mated or stuck is the side to move, because that is the only question the rules
 /// ask: a game is mate because the position to move is mate, not because of how the game arrived
-/// there, so there is no loser here to be passed in or worked out separately.
+/// there, so there is no loser here to be passed in or worked out separately. A resignation and a
+/// flag are the other way round — they are events rather than positions — so the side that gave up
+/// and the side that ran out of time are both carried on the state.
 ///
 /// The sentences are the app's own translated ones, and the side is named by the same localizations
 /// — see [XiangqiSide.label] — so both read in the player's language.
-String _resultLabel(BuildContext context, XiangqiGameState state) => switch (state.end) {
+///
+/// Public because the over-the-board screen shows the same sentences for the same reasons, and a
+/// second copy of this switch would be a second thing to keep in step with [XiangqiGameEnd].
+String xiangqiResultLabel(BuildContext context, XiangqiGameState state) => switch (state.end) {
   .checkmate => context.l10n.mobileXiangqiCheckmated(state.turn.label(context.l10n)),
   // 困毙, and the whole of the difference from chess: a side with no legal move has lost the game,
   // where the same position in chess is a draw.
   .stalemate => context.l10n.mobileXiangqiStalemateLoss(state.turn.label(context.l10n)),
   .threefoldRepetition => context.l10n.mobileXiangqiThreefoldRepetition,
   .resign => context.l10n.mobileXiangqiResigned(state.resignedBy!.label(context.l10n)),
+  // Losing on time is losing, exactly as a resignation is, and the side named is the side that
+  // flagged — the one recorded on the state, not the side to move. A move and a flag can land in
+  // the same frame, and by the time this is read the turn may already have changed hands.
+  .timeout => context.l10n.mobileXiangqiRanOutOfTime(state.flaggedSide!.label(context.l10n)),
   // Only ever asked about a game that has ended, and those are all the ways one does.
   null => '',
 };
@@ -499,7 +542,7 @@ class const XiangqiGameResultDialog({
             ? context.l10n.victory
             : context.l10n.gameOver,
       ),
-      content: Text(_resultLabel(context, state)),
+      content: Text(xiangqiResultLabel(context, state)),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: Text(context.l10n.close)),
         TextButton(onPressed: onNewGame, child: Text(context.l10n.mobileNewGame)),
@@ -517,7 +560,7 @@ class const XiangqiGameResultDialog({
 /// board twice over, so the tile is left without a subtitle rather than given a lie.
 ///
 /// The three things that are this game's own are the opponent — which here is only ever Pikafish at
-/// one of three difficulties — the way the board is turned, and the way to start another game.
+/// one of its levels — the way the board is turned, and the way to start another game.
 class const _XiangqiGameSettingsSheet({required final VoidCallback onNewGame})
     extends ConsumerStatefulWidget {
   @override
@@ -547,31 +590,16 @@ class _XiangqiGameSettingsSheetState() extends ConsumerState<_XiangqiGameSetting
         ListSection(
           materialFilledCard: true,
           children: [
-            SettingsListTile(
-              icon: const Icon(Icons.smart_toy),
-              settingsLabel: Text(context.l10n.opponent),
-              settingsValue: _difficultyLabel(context, gameState.difficulty),
-              // Three labels and no numbers: what the levels really are is a search limit — see
-              // [XiangqiDifficulty] — and a player choosing between them is choosing how long the
-              // computer may think, not what it thinks with.
-              explanation: context.l10n.mobileXiangqiDifficultyExplanation,
-              onTap: () {
-                showChoicePicker<XiangqiDifficulty>(
-                  context,
-                  title: Text(context.l10n.opponent),
-                  choices: XiangqiDifficulty.values,
-                  selectedItem: gameState.difficulty,
-                  labelBuilder: (difficulty) => Text(_difficultyLabel(context, difficulty)),
-                  // A difficulty is not a setting that can be changed under a game in progress:
-                  // what the level is, is how long the engine may think about the moves it is
-                  // being asked for now, so choosing one starts the game over at it. The side is
-                  // carried over, because choosing how hard to play is not choosing a side.
-                  onSelectedItemChanged: (difficulty) {
-                    ref
-                        .read(xiangqiGameControllerProvider.notifier)
-                        .startNewGame(side: gameState.playerSide, difficulty: difficulty);
-                  },
-                );
+            // A difficulty is not a setting that can be changed under a game in progress: what the
+            // level is, is how long the engine may think about the moves it is being asked for now,
+            // so choosing one starts the game over at it. The side is carried over, because choosing
+            // how hard to play is not choosing a side.
+            _XiangqiLevelTile(
+              difficulty: gameState.difficulty,
+              onChanged: (difficulty) {
+                ref
+                    .read(xiangqiGameControllerProvider.notifier)
+                    .startNewGame(side: gameState.playerSide, difficulty: difficulty);
               },
             ),
             SwitchSettingTile(
@@ -794,22 +822,11 @@ class _NewGameSheetState() extends ConsumerState<_NewGameSheet> {
                 );
               },
             ),
-            SettingsListTile(
-              // The computer is the whole of the opponent here, so the word for the row is the one
-              // the chess screens use for theirs. See `_OfflineComputerGameScreen`.
-              settingsLabel: Text(context.l10n.opponent),
-              settingsValue: _difficultyLabel(context, _difficulty),
-              explanation: context.l10n.mobileXiangqiDifficultyExplanation,
-              onTap: () {
-                showChoicePicker<XiangqiDifficulty>(
-                  context,
-                  title: Text(context.l10n.opponent),
-                  choices: XiangqiDifficulty.values,
-                  selectedItem: _difficulty,
-                  labelBuilder: (difficulty) => Text(_difficultyLabel(context, difficulty)),
-                  onSelectedItemChanged: (difficulty) => setState(() => _difficulty = difficulty),
-                );
-              },
+            // The computer is the whole of the opponent here, so the control for it is the app's own
+            // level control for one. See [_XiangqiLevelTile].
+            _XiangqiLevelTile(
+              difficulty: _difficulty,
+              onChanged: (difficulty) => setState(() => _difficulty = difficulty),
             ),
           ],
         ),

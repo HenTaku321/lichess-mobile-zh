@@ -213,8 +213,9 @@ void main() {
 
       harness.transport.emit('readyok');
       await pumpEventQueue();
-      // The position as a FEN, and the controller's middle difficulty as the limit — a hint thinks
-      // as long as the opponent's own move does, and no longer.
+      // The position as a FEN, and a depth of nine as the limit: the analysis limit, which is a
+      // bounded search because the engine is one the opponent is sharing. It is not a rung of the
+      // difficulty ladder — a hint is not a level of opponent — so it does not move with one.
       expect(harness.transport.takeCommands(), ['position fen ${position.toFen()}', 'go depth 9']);
 
       harness.transport.emit('info depth 9 score cp 34 nodes 9450 time 90 pv h2e2');

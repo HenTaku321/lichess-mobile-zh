@@ -92,6 +92,15 @@ jobs:
       - name: Fetch the Pikafish network
         run: ./scripts/fetch-pikafish-nnue.sh
 
+      # The engine refuses a network whose architecture hash is not the one its own headers compute,
+      # and it refuses it by exiting from inside the first search, which in a library beside a Dart
+      # VM deadlocks instead of reporting anything. No test can catch that — every engine test runs
+      # on a fake transport and every nnuePath in them is a literal that does not exist — so the
+      # pairing is checked here, against the vendored headers, before anything is built. Needs the
+      # `flutter pub get` above: it finds the snapshot through .dart_tool/package_config.json.
+      - name: Check the network matches the vendored engine
+        run: dart run scripts/pikafish_net_hash.dart --check
+
       - name: Verify formatting
         run: |
           dart format --output=none --set-exit-if-changed $(find lib/src -name "*.dart" -not \( -name "*.*freezed.dart" -o -name "*.*g.dart" -o -name "*lichess_icons.dart" \) )

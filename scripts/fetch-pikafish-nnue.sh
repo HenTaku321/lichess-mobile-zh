@@ -12,20 +12,35 @@
 # once. The size and the hash are checked because the file decides how strong the opponent is and
 # the app has no way to tell a truncated download from a complete one.
 #
-# The URL is the `master-net` release of official-pikafish/Networks, which is the network the
-# vendored Pikafish snapshot in the `multistockfish_pikafish` package is paired with. A network
-# from a different Pikafish is not rejected with a message, it is rejected deep inside the first
-# search — so if the vendored commit is ever bumped, this URL, the hash below, and the constants in
-# `lib/src/model/engine/engine_utils.dart` all move together.
+# The URL and the two values it is checked against come from `scripts/pikafish-net.json`, which is
+# the one place the network is described. The URL is a fixed release on the fork that also carries
+# the vendored Pikafish snapshot, and deliberately not the `master-net` release of
+# official-pikafish/Networks: that one is a rolling release whose asset is replaced in place, so a
+# build pinned to it breaks the day upstream ships a new network, which is what happened on
+# 2026-10-14. A network from a different Pikafish is not rejected with a message, it is rejected
+# deep inside the first search — so if the vendored commit is ever bumped, the manifest's URL, hash
+# and archHash, and the constants in `lib/src/model/engine/engine_utils.dart`, all move together.
 
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEST="$REPO_DIR/assets/pikafish/pikafish.nnue"
+MANIFEST="$REPO_DIR/scripts/pikafish-net.json"
 
-URL='https://github.com/official-pikafish/Networks/releases/download/master-net/pikafish.nnue'
-SIZE=50244700
-SHA256='10b84dd80bb4e324aa389cab327feeb7b4c44578e35a86105d4fcd5f840c3ac7'
+# Read with python3 rather than jq: python3 is on both the ubuntu and the macOS runners and is
+# already a dependency of scripts/update-pikafish-net.sh, while jq is not guaranteed to be there.
+# Three bare values on three lines, so SIZE stays an integer the arithmetic below can use.
+if [ ! -f "$MANIFEST" ]; then
+  echo "::error::$MANIFEST is missing — it is the source of the URL and the checks below" >&2
+  exit 1
+fi
+{ read -r URL; read -r SIZE; read -r SHA256; } < <(
+  python3 -c 'import json, sys
+m = json.load(open(sys.argv[1]))
+print(m["url"])
+print(m["size"])
+print(m["sha256"])' "$MANIFEST"
+)
 
 # The digest of $1, printed alone. Both spellings are asked for rather than one: the macOS runner's
 # sha256sum is the BSD one, which computes a digest but has no `-c`, and the workflows run on it as

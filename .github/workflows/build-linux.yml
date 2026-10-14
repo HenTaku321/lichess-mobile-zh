@@ -154,8 +154,12 @@ jobs:
 
           nnue=build/linux/x64/release/bundle/data/flutter_assets/assets/pikafish/pikafish.nnue
           size=$(stat -c%s "$nnue" 2>/dev/null || echo 0)
-          if [ "$size" != 50244700 ]; then
-            echo "::error::$nnue is $size bytes, expected 50244700 — the network is missing or truncated"
+          # The expected size comes from the manifest, not a literal here: a second copy of the
+          # number is a second thing to forget when the network moves.
+          expected=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["size"])' \
+            scripts/pikafish-net.json)
+          if [ "$size" != "$expected" ]; then
+            echo "::error::$nnue is $size bytes, expected $expected — the network is missing or truncated"
             exit 1
           fi
           ls -l "$nnue"

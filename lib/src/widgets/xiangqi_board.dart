@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:chessground/chessground.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
@@ -10,11 +11,10 @@ import 'package:material_ui/material_ui.dart';
 
 /// The colours a board is drawn in.
 ///
-/// The set is the wooden board this widget has always drawn — a board that looks the same in a
-/// light room and a dark one, so none of these comes from the theme — lifted out of the painter so
-/// that a caller can recolour it. Every member has a default equal to the colour it replaced, so
-/// `const XiangqiBoardStyle()` renders exactly the board of old. A board can instead be dressed in
-/// one of the app's chessboard themes: see [XiangqiBoardStyle.fromChessboardColorScheme].
+/// The defaults are the wooden board this widget has always drawn — a board that looks the same
+/// in a light room and a dark one, so none of these comes from the theme — lifted out of the
+/// painter so that a caller can recolour it. A board can instead be dressed in one of the app's
+/// chessboard themes: see [XiangqiBoardStyle.fromChessboardColorScheme].
 @immutable
 final class const XiangqiBoardStyle({
   /// The light field the grid is drawn on.
@@ -29,8 +29,16 @@ final class const XiangqiBoardStyle({
   /// 楚河 and 汉界, printed more faintly than the grid.
   final Color riverInk = const Color(0xFFA98A55),
 
-  /// The face of a piece.
+  /// The face of a piece, at its centre: the face shades from this to [pieceFaceEnd] at the rim,
+  /// the way a turned wooden disc catches the light at its middle.
   final Color pieceFace = const Color(0xFFFDF3DC),
+
+  /// The face of a piece at its rim, the shade [pieceFace] darkens to at the edge.
+  final Color pieceFaceEnd = const Color(0xFFF4E4BC),
+
+  /// The soft shadow a piece casts on the field under it, drawn a touch lower than the piece so
+  /// that the disc reads as sitting above the board rather than printed on it.
+  final Color pieceShadow = const Color(0x33000000),
 
   /// The ring around a piece's face.
   final Color pieceRing = const Color(0xFF7A5326),
@@ -51,11 +59,13 @@ final class const XiangqiBoardStyle({
   /// take.
   final Color target = const Color(0x66333A2B),
 
-  /// The wash behind a general that is in check.
-  final Color check = const Color(0x33D0342C),
+  /// The glow at the centre of the mark behind a general that is in check, shading out to nothing
+  /// at the rim: a glow rather than a flat wash, the way the chess board's own check mark is a
+  /// blurred radial gradient and not a disc.
+  final Color checkGlow = const Color(0x80D0342C),
 
   /// The ring around a general that is in check.
-  final Color checkRing = const Color(0xE6D0342C),
+  final Color checkRing = const Color(0x99D0342C),
 
   /// The circle drawn on the square a hinted move would be played from. Blue rather than a colour
   /// from the board's own palette, because a hint is the app speaking and not part of the board.
@@ -72,6 +82,14 @@ final class const XiangqiBoardStyle({
   /// where it does not — `horsey` draws them as images alone, with no colour to read. [target] is the
   /// theme's valid-move colour.
   ///
+  /// The pieces follow the field: [pieceFace] is the field lifted towards white (a disc cut from
+  /// the board's own wood, polished) and its rim shade [pieceFaceEnd] a touch darker; [pieceRing]
+  /// is the ink faded towards the field. [redInk] and
+  /// [blackInk] are not taken from any theme — the two armies' colours are part of the game itself,
+  /// not of the decoration. [checkGlow], [checkRing] and [hint] keep this board's own defaults too:
+  /// a theme has no check colour to read, and a hint is the app speaking, not part of the board.
+  /// [pieceShadow] is a shadow, so it stays black at the same faintness on every board.
+  ///
   /// Only the colours are taken. Twenty of the app's twenty-four themes paint their squares from a
   /// photograph, which the chessboard shows through an image background; this board is a `CustomPaint`
   /// of one colour and some lines, with no grid for a wood grain or a marble vein to align to, so it
@@ -80,11 +98,16 @@ final class const XiangqiBoardStyle({
   factory fromChessboardColorScheme(ChessboardColorScheme colorScheme) {
     const plain = XiangqiBoardStyle();
     final ink = colorScheme.darkSquare;
+    final surface = colorScheme.lightSquare;
+    final pieceFace = Color.lerp(surface, const Color(0xFFFFFFFF), 0.85)!;
     return XiangqiBoardStyle(
-      surface: colorScheme.lightSquare,
+      surface: surface,
       frame: ink,
       ink: ink,
-      riverInk: Color.lerp(ink, colorScheme.lightSquare, 0.45)!,
+      riverInk: Color.lerp(ink, surface, 0.45)!,
+      pieceFace: pieceFace,
+      pieceFaceEnd: Color.lerp(pieceFace, const Color(0xFF000000), 0.06)!,
+      pieceRing: Color.lerp(ink, surface, 0.3)!,
       lastMove: colorScheme.lastMove.solidColor ?? plain.lastMove,
       selected: colorScheme.selected.solidColor ?? plain.selected,
       target: colorScheme.validMoves,
@@ -100,13 +123,15 @@ final class const XiangqiBoardStyle({
           other.ink == ink &&
           other.riverInk == riverInk &&
           other.pieceFace == pieceFace &&
+          other.pieceFaceEnd == pieceFaceEnd &&
+          other.pieceShadow == pieceShadow &&
           other.pieceRing == pieceRing &&
           other.redInk == redInk &&
           other.blackInk == blackInk &&
           other.lastMove == lastMove &&
           other.selected == selected &&
           other.target == target &&
-          other.check == check &&
+          other.checkGlow == checkGlow &&
           other.checkRing == checkRing &&
           other.hint == hint;
 
@@ -117,13 +142,15 @@ final class const XiangqiBoardStyle({
     ink,
     riverInk,
     pieceFace,
+    pieceFaceEnd,
+    pieceShadow,
     pieceRing,
     redInk,
     blackInk,
     lastMove,
     selected,
     target,
-    check,
+    checkGlow,
     checkRing,
     hint,
   );
@@ -133,6 +160,12 @@ final class const XiangqiBoardStyle({
 /// resort. A serif face is what a board is printed in; the platform's own CJK font, whatever it
 /// turns out to be, draws them if none of these is installed. The order is only a preference.
 const _cjkFallback = ['Noto Serif CJK SC', 'Source Han Serif SC', 'Songti SC', 'SimSun'];
+
+/// A piece lifted by the finger is drawn larger and casts a deeper, softer shadow than the resting
+/// pieces — it is further from the board than any of them.
+const _draggedScale = 1.15;
+const _dragShadowColor = Color(0x55000000);
+const _dragShadowBlur = 0.08;
 
 /// The points the board prints its little corner brackets around: the cannons' and the soldiers'
 /// starting points, the same four and ten on each side of the river.
@@ -303,7 +336,9 @@ xiangqiPieceAnimation(XiangqiPosition from, XiangqiPosition to, XiangqiMove? mov
 ///
 /// [cell] is the board's own cell — see [XiangqiBoardGeometry] — and every dimension below is a
 /// multiple of it, so a piece is the same piece at any size. [scale] enlarges it about [centre],
-/// which is what a board does to the piece under the player's finger.
+/// which is what a board does to the piece under the player's finger. [dropShadow] is the piece's
+/// resting shadow; the board turns it off for the dragged piece, which casts a deeper shadow of
+/// its own instead.
 void paintXiangqiPiece(
   Canvas canvas,
   Offset centre,
@@ -311,10 +346,30 @@ void paintXiangqiPiece(
   required double cell,
   required XiangqiBoardStyle style,
   double scale = 1,
+  bool dropShadow = true,
 }) {
   final radius = cell * 0.44 * scale;
   final ink = piece.side == .red ? style.redInk : style.blackInk;
-  canvas.drawCircle(centre, radius, Paint()..color = style.pieceFace);
+  // The piece sits above the board rather than on it: a soft shadow dropped a little below, the
+  // face shading from a lit centre to a darker rim like a turned wooden disc.
+  if (dropShadow) {
+    canvas.drawCircle(
+      centre.translate(0, cell * 0.02 * scale),
+      radius,
+      Paint()
+        ..color = style.pieceShadow
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, cell * 0.03 * scale),
+    );
+  }
+  canvas.drawCircle(
+    centre,
+    radius,
+    Paint()
+      ..shader = ui.Gradient.radial(centre - Offset(radius * 0.25, radius * 0.25), radius * 1.15, [
+        style.pieceFace,
+        style.pieceFaceEnd,
+      ]),
+  );
   canvas.drawCircle(
     centre,
     radius - cell * 0.0225 * scale,
@@ -336,9 +391,10 @@ void paintXiangqiPiece(
     piece.glyph,
     TextStyle(
       color: ink,
-      fontSize: cell * 0.6 * scale,
-      fontWeight: FontWeight.bold,
+      fontSize: cell * 0.58 * scale,
+      fontWeight: FontWeight.w600,
       fontFamilyFallback: _cjkFallback,
+      shadows: const [Shadow(color: Color(0x14000000), offset: Offset(0, 1), blurRadius: 1)],
     ),
     centre,
   );
@@ -865,21 +921,32 @@ class XiangqiBoardPainter({
     }
   }
 
-  /// A red ring around the general that is in check, and a wash of the same red behind it.
+  /// A red glow behind the general that is in check — bright at the piece and fading out — with a
+  /// fine ring at its rim. The glow is the chess board's own blurred radial check mark, translated
+  /// into this board's palette.
   void paintCheck(Canvas canvas) {
     if (!isCheck) return;
     final king = XiangqiPiece(position.turn, .king);
     for (var index = 0; index < kXiangqiSquares; index++) {
       if (position.board[index] == king) {
         final centre = geometry.centerOf(XiangqiSquare(index), orientation);
-        canvas.drawCircle(centre, geometry.pieceRadius * 1.2, Paint()..color = style.check);
+        final radius = geometry.pieceRadius * 1.2;
         canvas.drawCircle(
           centre,
-          geometry.pieceRadius * 1.2,
+          radius,
+          Paint()
+            ..shader = ui.Gradient.radial(centre, radius, [
+              style.checkGlow,
+              style.checkGlow.withValues(alpha: 0),
+            ]),
+        );
+        canvas.drawCircle(
+          centre,
+          radius,
           Paint()
             ..color = style.checkRing
             ..style = .stroke
-            ..strokeWidth = cell * 0.06,
+            ..strokeWidth = cell * 0.03,
         );
         return;
       }
@@ -920,8 +987,21 @@ class XiangqiBoardPainter({
   /// A one-line delegate to [paintXiangqiPiece], which is where the drawing lives: the board editor's
   /// palette draws pieces too, and a palette that drew them any other way would be showing the player
   /// a piece the board would not.
-  void paintPiece(Canvas canvas, Offset centre, XiangqiPiece piece, {double scale = 1}) =>
-      paintXiangqiPiece(canvas, centre, piece, cell: cell, style: style, scale: scale);
+  void paintPiece(
+    Canvas canvas,
+    Offset centre,
+    XiangqiPiece piece, {
+    double scale = 1,
+    bool dropShadow = true,
+  }) => paintXiangqiPiece(
+    canvas,
+    centre,
+    piece,
+    cell: cell,
+    style: style,
+    scale: scale,
+    dropShadow: dropShadow,
+  );
 
   /// The pieces a move has travelling: each is the one piece that moved, drawn partway between the
   /// square it left and the square it is arriving on. Every other piece is drawn straight from the
@@ -1052,7 +1132,7 @@ class XiangqiBoardPainter({
   /// The scale the dragged piece is drawn at: the board's own enlarged size while
   /// [magnifyDraggedPiece] is set, its usual size otherwise.
   @visibleForTesting
-  double get draggedPieceScale => magnifyDraggedPiece ? 1.15 : 1.0;
+  double get draggedPieceScale => magnifyDraggedPiece ? _draggedScale : 1.0;
 
   /// The point the dragged piece is centred on: the touch point itself, or a cell above it while
   /// the piece is magnified and lifted clear of the finger. Null when no drag is in flight.
@@ -1086,11 +1166,13 @@ class XiangqiBoardPainter({
         centre,
         geometry.pieceRadius * scale,
         Paint()
-          ..color = const Color(0x55000000)
-          ..maskFilter = MaskFilter.blur(BlurStyle.normal, cell * 0.08),
+          ..color = _dragShadowColor
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, cell * _dragShadowBlur),
       );
     }
-    paintPiece(canvas, centre, piece, scale: scale);
+    // The lifted piece casts the deeper shadow above; its resting shadow is left off so the two
+    // never stack.
+    paintPiece(canvas, centre, piece, scale: scale, dropShadow: !magnifyDraggedPiece);
   }
 
   /// Writes [text] centred on [centre].

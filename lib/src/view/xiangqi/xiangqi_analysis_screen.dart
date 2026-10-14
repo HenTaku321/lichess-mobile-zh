@@ -284,7 +284,7 @@ class const _AnalysisDepth({required final int depth}) extends StatelessWidget {
       alignment: Alignment.bottomLeft,
       child: Text(
         context.l10n.depthX('$depth'),
-        style: TextStyle(color: textShade(context, 0.6), fontSize: 12),
+        style: TextTheme.of(context).bodySmall?.copyWith(color: textShade(context, 0.6)),
       ),
     );
   }
@@ -334,13 +334,18 @@ class const _EngineLineRow({
     final moves = line.moves;
     final notation = xiangqiMovesExport(position, moves);
     // Red ahead fills the badge with the colour the evaluation bar has claimed, exactly as the
-    // chess analysis's own engine lines fill theirs from the side that is winning. The text on it is
-    // then chosen by which of the two fills it is, not by the theme: the fill follows the theme and
-    // the text has to follow the fill.
+    // chess analysis's own engine lines fill theirs from the side that is winning. The text on it
+    // is chosen the same way the bar's own label is: whichever of the scheme's ink pair reads on
+    // the fill the badge was given. See [XiangqiEvalGauge].
     final redIsAhead = line.evaluation.redWinProbability >= 0.5;
     final background = redIsAhead
         ? XiangqiEvalGauge.valueColor(context)
         : XiangqiEvalGauge.backgroundColor(context);
+    final scheme = ColorScheme.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final inkOnBackground = redIsAhead
+        ? (isDark ? scheme.surface : scheme.onSurface)
+        : (isDark ? scheme.onSurface : scheme.surface);
 
     return InkWell(
       onTap: moves.isEmpty ? null : () => onPlay(moves.first),
@@ -354,13 +359,13 @@ class const _EngineLineRow({
               Container(
                 decoration: BoxDecoration(
                   color: background,
-                  borderRadius: BorderRadius.circular(4.0),
+                  borderRadius: Styles.boardBorderRadius,
                 ),
                 padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 2.0),
                 child: Text(
                   _scoreLabel(line.evaluation),
                   style: TextStyle(
-                    color: redIsAhead ? Colors.black : Colors.white,
+                    color: inkOnBackground,
                     fontSize: _kEngineLineFontSize,
                     fontWeight: FontWeight.w600,
                     fontFeatures: const [FontFeature.tabularFigures()],

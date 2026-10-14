@@ -78,6 +78,15 @@ class const XiangqiGameLayout({
   /// Called with a move's index when it is tapped, in the same counting as [currentMoveIndex].
   final void Function(int moveIndex)? onSelectMove,
 
+  /// The rounding the board is drawn as a card with, or null for it to sit flush to the edge.
+  ///
+  /// A card is what the chess screens draw whenever the board is not the whole width of the
+  /// screen — a tablet, or any landscape — and a flush board is what they draw on a portrait
+  /// phone. That split is made here (`Styles.boardBorderRadius` on a tablet or in landscape,
+  /// none on a portrait phone) unless this overrides it; the judgement is made here rather than
+  /// by each screen, so no screen can disagree with another about it.
+  final BorderRadius? boardRadius,
+
   /// The bar of actions under everything else.
   final Widget? userActionsBar,
 
@@ -90,6 +99,15 @@ class const XiangqiGameLayout({
 
   super.key,
 }) extends ConsumerWidget {
+  /// Wraps [board] in the card the chess screens put their board in: the shared radius's rounding
+  /// with the shared shadows under it, clipped so nothing the board draws spills past the corner.
+  Widget _boardCard(Widget board, BorderRadius radius) {
+    return Container(
+      decoration: BoxDecoration(borderRadius: radius, boxShadow: boardShadows),
+      child: ClipRRect(borderRadius: radius, child: board),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final boardPrefs = ref.watch(boardPreferencesProvider);
@@ -102,6 +120,8 @@ class const XiangqiGameLayout({
     return LayoutBuilder(
       builder: (context, constraints) {
         final isLandscape = constraints.maxWidth > constraints.maxHeight;
+        final radius = boardRadius ?? (isTablet || isLandscape ? Styles.boardBorderRadius : null);
+        final boardInCard = radius != null ? _boardCard(board, radius) : board;
 
         if (isLandscape) {
           final maxBoardHeight = constraints.maxHeight - kTabletBoardTableSidePadding * 2;
@@ -121,7 +141,7 @@ class const XiangqiGameLayout({
               },
               mainAxisSize: MainAxisSize.max,
               children: [
-                SizedBox(width: boardWidth, height: boardHeight, child: board),
+                SizedBox(width: boardWidth, height: boardHeight, child: boardInCard),
                 if (evalGauge != null) ...[
                   const SizedBox(width: 4.0),
                   SizedBox(width: gaugeWidth, height: boardHeight, child: evalGauge),
@@ -205,7 +225,7 @@ class const XiangqiGameLayout({
                   SizedBox(width: gaugeWidth, height: boardHeight, child: evalGauge),
                   const SizedBox(width: 4.0),
                 ],
-                SizedBox(width: boardWidth, height: boardHeight, child: board),
+                SizedBox(width: boardWidth, height: boardHeight, child: boardInCard),
               ],
             ),
             Expanded(
@@ -259,8 +279,15 @@ class const XiangqiEvalGauge({
     final redIsAhead = redWinProbability >= 0.5;
     final label = _scoreLabel(evaluation);
 
+    // The label sits at the end the advantage is on: on the claimed half of the bar when ahead,
+    // on the unclaimed one behind it. The claimed half is the lighter tone of the theme and the
+    // unclaimed the darker, so the ink is whichever of the scheme's pair reads on that half.
+    final scheme = ColorScheme.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final style = TextStyle(
-      color: redIsAhead ? Colors.black54 : Colors.white70,
+      color: redIsAhead
+          ? (isDark ? scheme.surface : scheme.onSurface).withValues(alpha: 0.7)
+          : (isDark ? scheme.onSurface : scheme.surface).withValues(alpha: 0.8),
       fontSize: xiangqiEvalGaugeFontSize(context),
       letterSpacing: -0.8,
       fontWeight: FontWeight.bold,

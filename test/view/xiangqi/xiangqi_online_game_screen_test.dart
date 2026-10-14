@@ -19,7 +19,9 @@ import 'package:lichess_mobile/src/network/xiangqi_http.dart' show xiangqiAuthSt
 import 'package:lichess_mobile/src/network/xiangqi_socket.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_online_game_screen.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
+import 'package:lichess_mobile/src/widgets/clock.dart';
 import 'package:lichess_mobile/src/widgets/move_list.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_avatar.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
 
 import '../../binding.dart';
@@ -160,6 +162,25 @@ void main() {
       expect(barButton(CupertinoIcons.flag), findsOneWidget);
       expect(board(tester).onTapSquare, isNotNull);
       expect(board(tester).onDragMove, isNotNull);
+    });
+
+    testWidgets('each seat shows its general as its avatar, and its clock as a Clock', (
+      tester,
+    ) async {
+      final factory = await pumpGame(tester, token: fx.xiangqiTestToken(fx.xiangqiTestViewerId));
+      await receive(tester, factory, fx.xiangqiSnapshotFrame());
+
+      // One avatar per seat, and which general is which seat's.
+      final avatars = tester.widgetList<XiangqiPieceAvatar>(find.byType(XiangqiPieceAvatar));
+      expect(avatars, hasLength(2));
+      expect(avatars.map((a) => a.side), containsAll([XiangqiSide.red, XiangqiSide.black]));
+
+      // And the clocks are the app's own clock widget: the one on move is the active one, and the
+      // emergency reading is the same half-minute the chess screens' clocks are given.
+      final clocks = tester.widgetList<Clock>(find.byType(Clock)).toList();
+      expect(clocks, hasLength(2));
+      expect(clocks.where((c) => c.active), hasLength(1));
+      expect(clocks.map((c) => c.emergencyThreshold), everyElement(const Duration(seconds: 30)));
     });
 
     testWidgets('the move list fills in as the server sends the moves', (tester) async {

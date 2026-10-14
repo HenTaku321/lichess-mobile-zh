@@ -193,9 +193,9 @@ class const _Palette(
     );
 
     return ColoredBox(
-      // The theme's disabled colour, which is what the chess editor paints its own palettes in: a
-      // strip that reads as something to take pieces off rather than as part of the board.
-      color: Theme.of(context).disabledColor,
+      // A strip a step above the surface, which is what the chess editor paints its own palettes
+      // in: something to take pieces off rather than a part of the board.
+      color: ColorScheme.of(context).surfaceContainerHighest,
       child: Flex(
         direction: direction,
         mainAxisAlignment: MainAxisAlignment.center,
@@ -242,15 +242,28 @@ class const _PalettePiece({
 }) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    // The piece in hand is marked rather than flooded: the scheme's primary as a wash and a ring,
+    // with the button's own rounding, and a ripple so the touch is answered.
+    final primary = ColorScheme.of(context).primary;
+    const radius = BorderRadius.all(Radius.circular(8));
+
     return SizedBox(
+      key: Key('piece-button-${piece.side.name}-${piece.type.name}'),
       width: cell,
       height: cell,
-      child: ColoredBox(
-        key: Key('piece-button-${piece.side.name}-${piece.type.name}'),
-        color: active ? ColorScheme.of(context).primary : Colors.transparent,
-        child: GestureDetector(
-          onTap: onTap,
-          child: CustomPaint(painter: _PalettePiecePainter(piece, cell, style)),
+      child: Material(
+        type: MaterialType.transparency,
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            color: active ? primary.withValues(alpha: 0.18) : null,
+            border: active ? Border.all(color: primary) : null,
+          ),
+          child: InkWell(
+            borderRadius: radius,
+            onTap: onTap,
+            child: CustomPaint(painter: _PalettePiecePainter(piece, cell, style)),
+          ),
         ),
       ),
     );
@@ -273,14 +286,26 @@ class const _ToolButton({
 }) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    // Lit the same way a piece in hand is lit: the tool's own colour as a wash and a ring, with a
+    // ripple so the touch is answered.
+    const radius = BorderRadius.all(Radius.circular(8));
+
     return SizedBox(
       width: size,
       height: size,
-      child: ColoredBox(
-        color: active ? color : Colors.transparent,
-        child: GestureDetector(
-          onTap: onTap,
-          child: Icon(icon, size: 0.9 * size),
+      child: Material(
+        type: MaterialType.transparency,
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            color: active ? color.withValues(alpha: 0.18) : null,
+            border: active ? Border.all(color: color) : null,
+          ),
+          child: InkWell(
+            borderRadius: radius,
+            onTap: onTap,
+            child: Icon(icon, size: 0.9 * size, color: active ? color : null),
+          ),
         ),
       ),
     );
@@ -446,6 +471,7 @@ class _FenDialogState() extends State<_FenDialog> {
         readOnly: true,
         onTap: _pasteFromClipboard,
         decoration: InputDecoration(
+          border: const OutlineInputBorder(),
           hintText: context.l10n.pasteTheFenStringHere,
           suffixIcon: IconButton(
             icon: const Icon(Icons.paste),

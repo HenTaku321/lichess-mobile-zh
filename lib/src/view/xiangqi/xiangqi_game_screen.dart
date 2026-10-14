@@ -24,6 +24,7 @@ import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
 import 'package:lichess_mobile/src/widgets/non_linear_slider.dart';
 import 'package:lichess_mobile/src/widgets/settings.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_avatar.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_game_layout.dart';
 import 'package:lichess_mobile/src/widgets/yes_no_dialog.dart';
@@ -322,6 +323,8 @@ class _BodyState() extends ConsumerState<_Body> {
                 ),
                 topTable: _PlayerRow(
                   icon: Icons.smart_toy,
+                  side: orientation.opposite,
+                  style: XiangqiBoardStyle.fromChessboardColorScheme(boardPrefs.boardTheme.colors),
                   // The engine's own name, which is a proper name and the same in every language:
                   // it is the program that is playing, not a description of it. How hard it is
                   // playing is a setting, and the sheet is where a setting is read.
@@ -331,6 +334,8 @@ class _BodyState() extends ConsumerState<_Body> {
                 ),
                 bottomTable: _PlayerRow(
                   icon: Icons.person,
+                  side: orientation,
+                  style: XiangqiBoardStyle.fromChessboardColorScheme(boardPrefs.boardTheme.colors),
                   thinking: false,
                   status: _statusText(context, gameState),
                 ),
@@ -462,6 +467,10 @@ class _BodyState() extends ConsumerState<_Body> {
   }
 }
 
+/// The size a player's name is printed at: the chess screens' own `playerFontSize`, so that the
+/// two games' player rows read at the same size.
+const double _kPlayerNameFontSize = 15.0;
+
 /// One of the two rows beside the board: the computer above it, and the player below.
 ///
 /// Neither row has a clock or a material count to show — a xiangqi game here is played untimed, and
@@ -470,6 +479,12 @@ class _BodyState() extends ConsumerState<_Body> {
 /// say on its own.
 class const _PlayerRow({
   required final IconData icon,
+
+  /// The side the row's seat plays, which is the side its avatar's general is.
+  required final XiangqiSide side,
+
+  /// The board's own colours, so the avatar is the same piece the board is playing with.
+  required final XiangqiBoardStyle style,
 
   /// The name to print, or null for a row that has none of its own — the player's.
   final String? name,
@@ -486,7 +501,18 @@ class const _PlayerRow({
 
     return Row(
       children: [
-        Icon(icon, size: 32, color: textShade(context, 0.5)),
+        // The seat's mark is the side's general, drawn the way the board draws it; the little icon
+        // in the corner says which kind of player is sitting there, not which piece.
+        Stack(
+          children: [
+            XiangqiPieceAvatar(side: side, size: 36, style: style),
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: Icon(icon, size: 14, color: textShade(context, 0.5)),
+            ),
+          ],
+        ),
         const SizedBox(width: 8),
         Expanded(
           child: Column(
@@ -496,7 +522,14 @@ class const _PlayerRow({
             children: [
               Row(
                 children: [
-                  if (name != null) Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                  if (name != null)
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        fontSize: _kPlayerNameFontSize,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   if (thinking) ...const [SizedBox(width: 8), Icon(Icons.hourglass_top, size: 16)],
                 ],
               ),

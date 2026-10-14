@@ -73,6 +73,23 @@ void main() {
     expect(find.byType(XiangqiLoginScreen), findsOneWidget);
   });
 
+  testWidgets('the password starts hidden, and the eye opens it', (tester) async {
+    final app = await makeApp(tester, (request) => mockResponse('', 404));
+    await tester.pumpWidget(app);
+
+    // The field starts as dots, and the toggle that says so is the closed eye.
+    TextField passwordField() =>
+        tester.widget<TextField>(find.widgetWithText(TextField, 'Password'));
+    expect(passwordField().obscureText, isTrue);
+    expect(find.byIcon(Icons.visibility), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.visibility));
+    await tester.pump();
+
+    expect(passwordField().obscureText, isFalse);
+    expect(find.byIcon(Icons.visibility_off), findsOneWidget);
+  });
+
   testWidgets('signs in and pops when the credentials are right', (tester) async {
     http.Request? sent;
     final app = await makeApp(tester, (request) {

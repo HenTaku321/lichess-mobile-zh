@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:chessground/chessground.dart';
-import 'package:clock/clock.dart';
+import 'package:clock/clock.dart' as clock;
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,8 +15,10 @@ import 'package:lichess_mobile/src/utils/focus_detector.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
+import 'package:lichess_mobile/src/widgets/clock.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
 import 'package:lichess_mobile/src/widgets/platform_alert_dialog.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_avatar.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_game_layout.dart';
 import 'package:lichess_mobile/src/widgets/yes_no_dialog.dart';
@@ -59,7 +61,7 @@ class _XiangqiOnlineGameScreenState() extends ConsumerState<XiangqiOnlineGameScr
   bool _isFlipped = false;
 
   /// The instant the clocks are counted from. Ticked by [_ticker], read by the two rows.
-  late DateTime _now = clock.now();
+  late DateTime _now = clock.clock.now();
 
   Timer? _ticker;
 
@@ -88,7 +90,7 @@ class _XiangqiOnlineGameScreenState() extends ConsumerState<XiangqiOnlineGameScr
     if (!mounted) return;
     final state = ref.read(xiangqiOnlineGameControllerProvider(widget.gameId)).value;
     if (state == null || state.isFinished) return;
-    setState(() => _now = clock.now());
+    setState(() => _now = clock.clock.now());
   }
 
   @override
@@ -119,7 +121,7 @@ class _XiangqiOnlineGameScreenState() extends ConsumerState<XiangqiOnlineGameScr
           AsyncData(:final value) => _game(context, value, boardPrefs),
           AsyncError(:final error) => Center(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: Styles.bodySectionPadding,
               child: Text(error.toString(), textAlign: TextAlign.center),
             ),
           ),
@@ -272,9 +274,8 @@ class _XiangqiOnlineGameScreenState() extends ConsumerState<XiangqiOnlineGameScr
 /// of the board: the only differences between them are which seat they are given, and which of the
 /// two clocks is running.
 ///
-/// The avatar carries the side's own general — 帅 for red and 将 for black, taken from
-/// [XiangqiPiece.glyph] rather than written here, so the two characters on the two rows are the same
-/// two the board draws its generals with.
+/// The avatar is the side's own general, drawn by [XiangqiPieceAvatar] — the same piece the board
+/// draws, so the mark by the name and the pieces in play cannot drift apart.
 ///
 /// The clock is [secondsLeft] as the state counted it at the moment the screen last drew, or null
 /// for an untimed game, which is a row with no clock rather than a row showing zero.
@@ -303,17 +304,10 @@ class const XiangqiOnlinePlayerRow({
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final seconds = secondsLeft;
-    final ink = side == XiangqiSide.red ? style.redInk : style.blackInk;
 
     return Row(
       children: [
-        CircleAvatar(
-          backgroundColor: ink,
-          child: Text(
-            XiangqiPiece(side, XiangqiPieceType.king).glyph,
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-          ),
-        ),
+        XiangqiPieceAvatar(side: side, size: 40, style: style),
         const SizedBox(width: 8),
         Expanded(
           child: Row(
@@ -336,7 +330,12 @@ class const XiangqiOnlinePlayerRow({
               ),
               if (player.rating != null) ...[
                 const SizedBox(width: 4),
-                Text('(${player.rating})', style: TextStyle(color: textShade(context, 0.6))),
+                // The rating the chess players' rows show, at the size and shade those rows show
+                // it at — see `GamePlayer`.
+                Text(
+                  '${player.rating}',
+                  style: TextStyle(fontSize: 14, color: textShade(context, 0.7)),
+                ),
               ],
               if (isMe) ...[
                 const SizedBox(width: 4),
@@ -347,14 +346,14 @@ class const XiangqiOnlinePlayerRow({
         ),
         if (seconds != null)
           Padding(
+            // The chess screens' own clock, at the same emergency reading: the seconds below ten
+            // count in tenths, and half a minute left is when the clock starts looking worried.
             padding: const EdgeInsets.only(left: 8),
-            child: Text(
-              _clockText(seconds),
-              style: TextStyle(
-                fontFeatures: const [FontFeature.tabularFigures()],
-                fontWeight: isTurn ? FontWeight.w700 : FontWeight.w400,
-                color: isTurn ? null : textShade(context, 0.6),
-              ),
+            child: Clock(
+              timeLeft: Duration(seconds: seconds),
+              active: isTurn,
+              emergencyThreshold: const Duration(seconds: 30),
+              clockTenths: .lessThan10s,
             ),
           ),
       ],
@@ -421,16 +420,4 @@ class const XiangqiOnlineResultDialog({required final XiangqiOnlineGameState sta
       ],
     );
   }
-}
-
-/// A clock as a player reads one: whole minutes, and the seconds always two digits.
-///
-/// Not the chess screens' own clock widget, which is typed to a lichess `GameState` and its
-/// increment handling from its constructor down, and none of that crosses over — xiangqi.com counts
-/// down one number per side with no increment to add on. This is the same shape at the same
-/// resolution: what is left, and nothing about how it got there.
-String _clockText(int seconds) {
-  final minutes = seconds ~/ 60;
-  final rest = seconds % 60;
-  return '$minutes:${rest.toString().padLeft(2, '0')}';
 }

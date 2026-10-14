@@ -1,11 +1,20 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart' show XiangqiSide;
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
 import 'package:lichess_mobile/src/widgets/feedback.dart';
 import 'package:lichess_mobile/src/widgets/platform.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_avatar.dart';
 import 'package:material_ui/material_ui.dart';
+
+/// The gaps in the form: between its blocks, and between two fields of one block.
+const double _kSectionGap = 24.0;
+const double _kFieldGap = 16.0;
+
+/// The size of the general at the head of the form.
+const double _kBrandPieceSize = 64.0;
 
 /// Signs the user in to their xiangqi.com account, with an email and a password.
 ///
@@ -27,6 +36,10 @@ class _XiangqiLoginScreenState() extends ConsumerState<XiangqiLoginScreen> {
   final _passwordController = TextEditingController();
 
   bool _submitting = false;
+
+  /// Whether the password field is drawing dots rather than letters. It starts that way, and the
+  /// eye at the end of the field is how it is opened.
+  bool _obscurePassword = true;
 
   /// Whether the last attempt was refused over the email/password pair.
   ///
@@ -79,8 +92,17 @@ class _XiangqiLoginScreenState() extends ConsumerState<XiangqiLoginScreen> {
         child: ListView(
           padding: Styles.bodySectionPadding,
           children: [
-            Text(context.l10n.mobileXiangqiSignIn),
-            const SizedBox(height: 24.0),
+            const SizedBox(height: _kSectionGap),
+            // The service's own mark: a red general, the piece every xiangqi board opens with.
+            const Center(
+              child: XiangqiPieceAvatar(side: XiangqiSide.red, size: _kBrandPieceSize),
+            ),
+            const SizedBox(height: _kSectionGap),
+            Text(
+              context.l10n.mobileXiangqiSignIn,
+              style: TextTheme.of(context).bodyMedium?.copyWith(color: textShade(context, 0.7)),
+            ),
+            const SizedBox(height: _kSectionGap),
             TextField(
               controller: _emailController,
               autofocus: true,
@@ -95,10 +117,10 @@ class _XiangqiLoginScreenState() extends ConsumerState<XiangqiLoginScreen> {
                 border: const OutlineInputBorder(),
               ),
             ),
-            const SizedBox(height: 16.0),
+            const SizedBox(height: _kFieldGap),
             TextField(
               controller: _passwordController,
-              obscureText: true,
+              obscureText: _obscurePassword,
               autofillHints: const [AutofillHints.password],
               textInputAction: TextInputAction.done,
               autocorrect: false,
@@ -106,18 +128,22 @@ class _XiangqiLoginScreenState() extends ConsumerState<XiangqiLoginScreen> {
               decoration: InputDecoration(
                 labelText: context.l10n.password,
                 border: const OutlineInputBorder(),
+                suffixIcon: IconButton(
+                  icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
+                  onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                ),
               ),
               onSubmitted: (_) => _submit(),
             ),
             if (_invalidCredentials) ...[
-              const SizedBox(height: 16.0),
+              const SizedBox(height: _kFieldGap),
               Text(
                 context.l10n.mobileXiangqiInvalidCredentials,
                 style: TextTheme.of(context).bodyMedium
                     ?.copyWith(color: ColorScheme.of(context).error),
               ),
             ],
-            const SizedBox(height: 24.0),
+            const SizedBox(height: _kSectionGap),
             FilledButton(
               onPressed: _submitting ? null : _submit,
               child: _submitting ? const ButtonLoadingIndicator() : Text(context.l10n.signIn),

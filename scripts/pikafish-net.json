@@ -21,14 +21,37 @@
     "different commit in a different repository. The network and the engine are a pair; bumping one",
     "without the other is the failure this file exists to make loud.",
     "",
+    "`source` is where scripts/sync-pikafish-net.sh looks for a newer network. It is the engine",
+    "repository's *dated* releases, not `master-net`: those tags and their assets' digests cannot",
+    "move. `notBefore` is a floor, and it is load-bearing -- the newest dated release (2026-09-06)",
+    "predates the vendored snapshot (2026-10-11), so taking the newest unconditionally would",
+    "downgrade the network on the first run and weaken every shipped build without anything",
+    "failing. `tag` records which release the current bytes came from, and is empty for the",
+    "hand-published first one.",
+    "",
+    "`difficultyCalibratedFor` is the sha256 of the network the six levels in",
+    "lib/src/model/xiangqi/xiangqi_game_controller.dart were tuned against. A different network",
+    "plays differently, so when this stops matching `sha256` the curve needs re-tuning by hand.",
+    "Nothing enforces it; it exists so the drift is visible in the diff instead of silent.",
+    "",
     "KNOWN GAP, not hidden: CI can prove `headers -> archHash` (pikafish_net_hash.dart --check) and",
     "`bytes -> sha256` (the fetch script), but it cannot prove `bytes -> archHash`, because no",
     "runner has zstd. A manifest whose sha256 and archHash were edited to contradict each other",
-    "would pass CI. Only scripts/update-pikafish-net.sh, run locally, ties those two together."
+    "would pass CI. Only the local tools, scripts/update-pikafish-net.sh and",
+    "scripts/sync-pikafish-net.sh, tie those two together."
   ],
   "url": "https://github.com/HenTaku321/dart-multistockfish/releases/download/pikafish-net-532c3ff216/pikafish.nnue",
   "size": 50244700,
   "sha256": "10b84dd80bb4e324aa389cab327feeb7b4c44578e35a86105d4fcd5f840c3ac7",
   "archHash": "0x40C70FA6",
-  "engineCommit": "532c3ff216"
+  "engineCommit": "532c3ff216",
+  "source": {
+    "repo": "official-pikafish/Pikafish",
+    "assetPattern": "Pikafish\\..*\\.7z",
+    "member": "pikafish.nnue",
+    "notBefore": "2026-10-11",
+    "tag": "",
+    "publishRepo": "HenTaku321/dart-multistockfish"
+  },
+  "difficultyCalibratedFor": "10b84dd80bb4e324aa389cab327feeb7b4c44578e35a86105d4fcd5f840c3ac7"
 }

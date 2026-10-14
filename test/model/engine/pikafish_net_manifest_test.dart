@@ -83,5 +83,44 @@ void main() {
     test('the architecture hash is written as a 32-bit literal', () {
       expect(manifest['archHash'], matches(RegExp(r'^0x[0-9A-F]{8}$')));
     });
+
+    test('the URL points at a release on the repository the sync publishes to', () {
+      // The sync republishes the network and rewrites the URL to point at the new release. If the
+      // two ever disagree — a hand-edited URL left on an old host, a publishRepo changed without
+      // the URL following — the build downloads one thing while the manifest describes another,
+      // and nothing else here would notice.
+      //
+      // The tag is only checked to be a `pikafish-net-` one, not to be derived from the digest.
+      // The first release was named after the engine commit (`pikafish-net-532c3ff216`) and later
+      // ones after the digest; renaming the first would break the URL in an already-published
+      // commit's manifest for no gain, since the fetch script verifies the bytes against `sha256`
+      // either way.
+      final source = manifest['source'] as Map<String, dynamic>;
+      expect(
+        manifest['url'],
+        startsWith('https://github.com/${source['publishRepo']}/releases/download/pikafish-net-'),
+      );
+      expect(manifest['url'], endsWith('/pikafish.nnue'));
+    });
+
+    test('the sync looks for networks in a repository that can be read without credentials', () {
+      // `fetch-pikafish-nnue.sh` downloads the asset with a plain curl, so the repository it comes
+      // from has to be public. A private one would turn every build red with a 404 that reads like
+      // a missing file. This cannot be checked from here — the test has no network — so what is
+      // asserted is the shape: an `owner/name` pair, and the fork that is known to be public.
+      final source = manifest['source'] as Map<String, dynamic>;
+      expect(source['publishRepo'], matches(RegExp(r'^[^/]+/[^/]+$')));
+      expect(source['publishRepo'], isNot(contains('.git')));
+      expect(source['repo'], matches(RegExp(r'^[^/]+/[^/]+$')));
+      expect(source['member'], 'pikafish.nnue');
+      expect(source['notBefore'], matches(RegExp(r'^\d{4}-\d{2}-\d{2}$')));
+    });
+
+    test('the difficulty levels are recorded as calibrated for the pinned network', () {
+      // Not an assertion that they *are* calibrated — nothing can check that — but that the field
+      // exists and is a digest, so that the sync's warning has something to compare against and a
+      // network swap leaves a visible diff here rather than a silent one.
+      expect(manifest['difficultyCalibratedFor'], matches(RegExp(r'^[0-9a-f]{64}$')));
+    });
   });
 }

@@ -1,0 +1,128 @@
+name: Sync the Pikafish network
+
+# Keeps the network the app ships in step with upstream, unattended.
+#
+# Why this is a workflow and not a note in a README. The network is an asset the repository does
+# not carry (48 MB, fetched at build time — see scripts/fetch-pikafish-nnue.sh), and the engine
+# refuses one whose architecture hash is not the one its own headers compute. It refuses it by
+# calling exit(EXIT_FAILURE) from inside the first search, which beside a Dart VM deadlocks the
+# waiting threads instead of reporting anything, and no test can catch it. So the pairing has to be
+# checked where the bytes are, and the bytes have to be re-pinned when upstream moves.
+#
+# What it does, in order: resolve the newest upstream release at or after the manifest's floor,
+# download it, verify its size and sha256 against the release's own digest, extract the network,
+# verify its architecture against the vendored headers, republish it under a tag derived from its
+# own digest, rewrite scripts/pikafish-net.json and the two constants in
+# lib/src/model/engine/engine_utils.dart, and push. The push is what makes the rest happen: the
+# Tests workflow runs on the same paths and re-checks the pairing, and the two build workflows are
+# dispatched below.
+#
+# It is a no-op on almost every run. The floor in the manifest is the vendored engine snapshot's
+# date, and upstream's newest dated release predates it, so today it finds nothing and exits 0.
+# That is the correct steady state, not a broken workflow.
+#
+# The one thing it cannot do is recalibrate the six difficulty levels: a different network plays
+# differently, so the curve in lib/src/model/xiangqi/xiangqi_game_controller.dart has to be re-tuned
+# by hand. The script emits a ::warning:: on every run where the manifest's
+# `difficultyCalibratedFor` no longer matches the pinned network — including runs that change
+# nothing — so the drift stays visible until a person clears it.
+
+on:
+  schedule:
+    # Weekly. Upstream publishes a dated engine release every few months, so anything faster is
+    # wasted API calls; anything slower and a new network sits unnoticed for a season.
+    - cron: '23 6 * * 1'
+  # Manual, for when upstream is known to have moved and the wait is not wanted.
+  workflow_dispatch:
+
+# Not per-ref: a scheduled run and a manual run at the same moment would both try to push, and the
+# second would fail on a non-fast-forward. Serialize them instead, and never cancel one in flight —
+# a cancelled run can leave the manifest rewritten and the push not yet made.
+concurrency:
+  group: sync-pikafish-net
+  cancel-in-progress: false
+
+permissions:
+  contents: write # push the manifest and the constants
+  issues: write # report an architecture mismatch, which is not retryable
+  actions: write # dispatch the two build workflows, whose own triggers are manual
+
+jobs:
+  sync:
+    name: Sync the network
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Full history, because the commit this job may make is pushed back to the branch the
+          # other workflows watch, and a shallow clone cannot tell a fast-forward from a rewrite.
+          # The sync itself only reads the origin URL.
+          fetch-depth: 0
+
+      - name: 🐦 Install flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          cache: true
+          flutter-version-file: pubspec.yaml
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # The architecture check computes Network::hash from the vendored engine's headers, and finds
+      # them through .dart_tool/package_config.json — so it needs the `flutter pub get` above, and
+      # it needs the engine source, which is a git dependency resolved into the pub cache.
+      - name: Install the archive tools the sync needs
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq zstd p7zip-full
+
+      - name: Sync
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./scripts/sync-pikafish-net.sh
+
+      # Nothing to commit is the expected outcome of most runs, so it is not a failure and not a
+      # reason to stop — the calibration warning above still had to be emitted.
+      - name: Commit and push
+        id: commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- scripts/pikafish-net.json lib/src/model/engine/engine_utils.dart
+          if git diff --cached --quiet; then
+            echo "The network is already current; nothing to commit."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          # One `-m` per paragraph, not a single multi-line string: the body lines of a quoted
+          # string would have to start at column 0, which ends this `run: |` block scalar early and
+          # makes the whole file unparseable. Each `-m` argument stays indented with the rest of the
+          # script.
+          git commit \
+            -m "chore(engine): sync the Pikafish network to the newest upstream release" \
+            -m "The manifest and the app's constants move together, and the bytes are republished under a tag derived from their own digest, so the pin cannot move underneath a build." \
+            -m "The six difficulty levels are NOT recalibrated by this commit: they are a hand-tuned curve on depth and movetime, and a different network plays differently. scripts/pikafish-net.json records the network they were last tuned against, and the sync warns until that is brought up to date." \
+            -- scripts/pikafish-net.json lib/src/model/engine/engine_utils.dart
+          git push
+
+      # The push above is what triggers Tests, which re-checks the pairing on the same paths. These
+      # two are dispatched by hand because their own triggers are manual — see their headers.
+      #
+      # Gated on the commit, because this workflow runs weekly and is a no-op on almost every run:
+      # dispatching unconditionally would spend a macOS runner every Monday to rebuild artifacts
+      # byte-identical to the ones already published.
+      - name: Rebuild the installable artifacts
+        if: steps.commit.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh workflow run build-linux.yml --ref "${GITHUB_REF_NAME}"
+          gh workflow run build-ios-unsigned.yml --ref "${GITHUB_REF_NAME}"

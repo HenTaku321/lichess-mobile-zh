@@ -70,6 +70,9 @@ final class const XiangqiBoardStyle({
   /// The circle drawn on the square a hinted move would be played from. Blue rather than a colour
   /// from the board's own palette, because a hint is the app speaking and not part of the board.
   final Color hint = const Color(0x990099C8),
+
+  /// The photographic background image asset for the board, if any.
+  final ImageProvider? backgroundImage,
 }) {
   /// The colours of [colorScheme], one of the app's chessboard themes, laid over this board.
   ///
@@ -99,18 +102,25 @@ final class const XiangqiBoardStyle({
     const plain = XiangqiBoardStyle();
     final ink = colorScheme.darkSquare;
     final surface = colorScheme.lightSquare;
-    final pieceFace = Color.lerp(surface, const Color(0xFFFFFFFF), 0.85)!;
+
+    ImageProvider? backgroundImage;
+    final bg = colorScheme.background;
+    if (bg is ImageChessboardBackground) {
+      backgroundImage = bg.image;
+    }
+
     return XiangqiBoardStyle(
       surface: surface,
       frame: ink,
       ink: ink,
       riverInk: Color.lerp(ink, surface, 0.45)!,
-      pieceFace: pieceFace,
-      pieceFaceEnd: Color.lerp(pieceFace, const Color(0xFF000000), 0.06)!,
+      pieceFace: plain.pieceFace,
+      pieceFaceEnd: plain.pieceFaceEnd,
       pieceRing: plain.pieceRing,
       lastMove: colorScheme.lastMove.solidColor ?? plain.lastMove,
       selected: colorScheme.selected.solidColor ?? plain.selected,
       target: colorScheme.validMoves,
+      backgroundImage: backgroundImage,
     );
   }
 
@@ -133,7 +143,8 @@ final class const XiangqiBoardStyle({
           other.target == target &&
           other.checkGlow == checkGlow &&
           other.checkRing == checkRing &&
-          other.hint == hint;
+          other.hint == hint &&
+          other.backgroundImage == backgroundImage;
 
   @override
   int get hashCode => Object.hash(
@@ -153,6 +164,7 @@ final class const XiangqiBoardStyle({
     checkGlow,
     checkRing,
     hint,
+    backgroundImage,
   );
 }
 
@@ -357,41 +369,52 @@ void paintXiangqiPiece(
       centre.translate(0, cell * 0.012 * scale),
       radius,
       Paint()
-        ..color = const Color(0x24000000)
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, cell * 0.015 * scale),
+        ..color = const Color(0x28000000)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, cell * 0.014 * scale),
     );
     canvas.drawCircle(
       centre.translate(0, cell * 0.035 * scale),
       radius,
       Paint()
         ..color = const Color(0x1F000000)
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, cell * 0.06 * scale),
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, cell * 0.055 * scale),
     );
   }
   canvas.drawCircle(
     centre,
     radius,
     Paint()
-      ..shader = ui.Gradient.radial(centre - Offset(radius * 0.28, radius * 0.28), radius * 1.25, [
+      ..shader = ui.Gradient.radial(centre - Offset(radius * 0.28, radius * 0.28), radius * 1.3, [
         style.pieceFace,
         style.pieceFaceEnd,
       ]),
   );
   canvas.drawCircle(
     centre,
-    radius - cell * 0.015 * scale,
+    radius - cell * 0.012 * scale,
     Paint()
-      ..color = style.pieceRing.withValues(alpha: 0.6)
+      ..color = style.pieceRing.withValues(alpha: 0.45)
       ..style = .stroke
-      ..strokeWidth = cell * 0.03 * scale,
+      ..strokeWidth = cell * 0.024 * scale,
   );
   canvas.drawCircle(
     centre,
-    radius * 0.84,
+    radius * 0.82,
     Paint()
-      ..color = ink.withValues(alpha: 0.85)
+      ..color = ink.withValues(alpha: 0.8)
       ..style = .stroke
       ..strokeWidth = cell * 0.016 * scale,
+  );
+  _paintXiangqiText(
+    canvas,
+    piece.glyph,
+    TextStyle(
+      color: ink.withValues(alpha: 0.22),
+      fontSize: cell * 0.58 * scale,
+      fontWeight: FontWeight.w600,
+      fontFamilyFallback: _cjkFallback,
+    ),
+    centre.translate(0, cell * 0.008 * scale),
   );
   _paintXiangqiText(
     canvas,
@@ -680,31 +703,48 @@ class _XiangqiBoardState() extends State<XiangqiBoard> with SingleTickerProvider
             onPanUpdate: drag == null ? null : (details) => _updateDrag(details.localPosition),
             onPanEnd: drag == null ? null : (details) => _endDrag(geometry),
             onPanCancel: drag == null ? null : _cancelDrag,
-            child: CustomPaint(
-              size: Size(geometry.width, geometry.height),
-              painter: XiangqiBoardPainter(
-                geometry: geometry,
-                position: widget.position,
-                orientation: widget.orientation,
-                selected: widget.selected,
-                moves: widget.moves,
-                lastMove: widget.lastMove,
-                isCheck: isCheck(widget.position),
-                style: widget.style,
-                showLastMove: widget.showLastMove,
-                showBorder: widget.showBorder,
-                hint: widget.hint,
-                magnifyDraggedPiece: widget.magnifyDraggedPiece,
-                dragTargetKind: widget.dragTargetKind,
-                blindfoldMode: widget.blindfoldMode,
-                translating: _translating,
-                fading: _fading,
-                translation: _translation,
-                fade: _fade,
-                dragFrom: _dragFrom,
-                dragPosition: _dragPosition,
-              ),
-            ),
+            child: () {
+              final boardWidget = CustomPaint(
+                size: Size(geometry.width, geometry.height),
+                painter: XiangqiBoardPainter(
+                  geometry: geometry,
+                  position: widget.position,
+                  orientation: widget.orientation,
+                  selected: widget.selected,
+                  moves: widget.moves,
+                  lastMove: widget.lastMove,
+                  isCheck: isCheck(widget.position),
+                  style: widget.style,
+                  showLastMove: widget.showLastMove,
+                  showBorder: widget.showBorder,
+                  hint: widget.hint,
+                  magnifyDraggedPiece: widget.magnifyDraggedPiece,
+                  dragTargetKind: widget.dragTargetKind,
+                  blindfoldMode: widget.blindfoldMode,
+                  translating: _translating,
+                  fading: _fading,
+                  translation: _translation,
+                  fade: _fade,
+                  dragFrom: _dragFrom,
+                  dragPosition: _dragPosition,
+                ),
+              );
+              final bgImage = widget.style.backgroundImage;
+              if (bgImage != null) {
+                return ClipRRect(
+                  borderRadius: BorderRadius.circular(widget.showBorder ? geometry.cell * 0.16 : 0),
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: Image(image: bgImage, fit: BoxFit.cover),
+                      ),
+                      boardWidget,
+                    ],
+                  ),
+                );
+              }
+              return boardWidget;
+            }(),
           ),
         );
       },
@@ -776,6 +816,22 @@ class XiangqiBoardPainter({
       Rect.fromLTWH(0, 0, geometry.width, geometry.height),
       Radius.circular(cell * 0.16),
     );
+    if (style.backgroundImage != null) {
+      final isLight = style.surface.computeLuminance() > 0.4;
+      final washColor = isLight ? const Color(0x18FFFFFF) : const Color(0x1A000000);
+      canvas.drawRRect(board, Paint()..color = washColor);
+      if (showBorder) {
+        canvas.drawRRect(
+          board,
+          Paint()
+            ..color = style.frame.withValues(alpha: 0.45)
+            ..style = .stroke
+            ..strokeWidth = math.max(1.5, cell * 0.05),
+        );
+      }
+      return;
+    }
+
     if (!showBorder) {
       canvas.drawRRect(board, Paint()..color = style.surface);
       return;
@@ -911,10 +967,31 @@ class XiangqiBoardPainter({
   void paintLastMove(Canvas canvas) {
     final move = lastMove;
     if (!showLastMove || move == null) return;
-    final paint = Paint()..color = style.lastMove;
-    for (final square in [move.from, move.to]) {
-      canvas.drawCircle(geometry.centerOf(square, orientation), geometry.pieceRadius * 1.05, paint);
-    }
+    final fromCenter = geometry.centerOf(move.from, orientation);
+    canvas.drawCircle(
+      fromCenter,
+      geometry.pieceRadius * 1.05,
+      Paint()..color = style.lastMove.withValues(alpha: 0.22),
+    );
+    canvas.drawCircle(
+      fromCenter,
+      geometry.pieceRadius * 0.85,
+      Paint()
+        ..color = style.lastMove.withValues(alpha: 0.18)
+        ..style = .stroke
+        ..strokeWidth = cell * 0.02,
+    );
+
+    final toCenter = geometry.centerOf(move.to, orientation);
+    canvas.drawCircle(toCenter, geometry.pieceRadius * 1.08, Paint()..color = style.lastMove);
+    canvas.drawCircle(
+      toCenter,
+      geometry.pieceRadius * 1.08,
+      Paint()
+        ..color = style.lastMove.withValues(alpha: 0.6)
+        ..style = .stroke
+        ..strokeWidth = cell * 0.025,
+    );
   }
 
   /// A red glow behind the general that is in check — bright at the piece and fading out — with a
@@ -926,7 +1003,7 @@ class XiangqiBoardPainter({
     for (var index = 0; index < kXiangqiSquares; index++) {
       if (position.board[index] == king) {
         final centre = geometry.centerOf(XiangqiSquare(index), orientation);
-        final radius = geometry.pieceRadius * 1.2;
+        final radius = geometry.pieceRadius * 1.25;
         canvas.drawCircle(
           centre,
           radius,
@@ -938,11 +1015,19 @@ class XiangqiBoardPainter({
         );
         canvas.drawCircle(
           centre,
-          radius,
+          geometry.pieceRadius * 1.08,
           Paint()
             ..color = style.checkRing
             ..style = .stroke
-            ..strokeWidth = cell * 0.03,
+            ..strokeWidth = cell * 0.025,
+        );
+        canvas.drawCircle(
+          centre,
+          radius,
+          Paint()
+            ..color = style.checkRing.withValues(alpha: 0.4)
+            ..style = .stroke
+            ..strokeWidth = cell * 0.012,
         );
         return;
       }
@@ -1042,16 +1127,45 @@ class XiangqiBoardPainter({
     for (final move in moves) {
       final centre = geometry.centerOf(move.to, orientation);
       if (position.pieceAt(move.to) == null) {
-        canvas.drawCircle(centre, cell * 0.13, Paint()..color = style.target);
-      } else {
         canvas.drawCircle(
           centre,
-          geometry.pieceRadius * 1.08,
+          cell * 0.16,
           Paint()
-            ..color = style.target
-            ..style = .stroke
-            ..strokeWidth = cell * 0.07,
+            ..shader = ui.Gradient.radial(centre, cell * 0.16, [
+              style.target.withValues(alpha: 0.5),
+              style.target.withValues(alpha: 0.0),
+            ]),
         );
+        canvas.drawCircle(
+          centre,
+          cell * 0.05,
+          Paint()..color = style.target.withValues(alpha: 0.95),
+        );
+      } else {
+        final radius = geometry.pieceRadius;
+        final dist = radius * 1.06;
+        final arm = cell * 0.13;
+        final bracketPaint = Paint()
+          ..color = style.target.withValues(alpha: 0.95)
+          ..strokeWidth = cell * 0.026
+          ..strokeCap = StrokeCap.round;
+
+        canvas.drawCircle(
+          centre,
+          dist,
+          Paint()
+            ..color = style.target.withValues(alpha: 0.22)
+            ..style = .stroke
+            ..strokeWidth = cell * 0.015,
+        );
+
+        for (final (dx, dy) in const [(-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)]) {
+          final vx = centre.dx + dx * dist;
+          final vy = centre.dy + dy * dist;
+          final vertex = Offset(vx, vy);
+          canvas.drawLine(vertex, Offset(vx - dx * arm, vy), bracketPaint);
+          canvas.drawLine(vertex, Offset(vx, vy - dy * arm), bracketPaint);
+        }
       }
     }
   }
@@ -1059,13 +1173,37 @@ class XiangqiBoardPainter({
   /// The ring around the picked-up piece, and around the square a drag was picked up on: both say
   /// the same thing, that this is the piece the player is holding.
   void paintSelection(Canvas canvas) {
-    final paint = Paint()
-      ..color = style.selected
-      ..style = .stroke
-      ..strokeWidth = cell * 0.07;
     for (final square in [selected, dragFrom]) {
       if (square == null) continue;
-      canvas.drawCircle(geometry.centerOf(square, orientation), geometry.pieceRadius * 1.1, paint);
+      final centre = geometry.centerOf(square, orientation);
+      final radius = geometry.pieceRadius;
+
+      canvas.drawCircle(
+        centre,
+        radius * 1.25,
+        Paint()
+          ..shader = ui.Gradient.radial(centre, radius * 1.25, [
+            style.selected.withValues(alpha: 0.35),
+            style.selected.withValues(alpha: 0.0),
+          ]),
+      );
+
+      canvas.drawCircle(
+        centre,
+        radius * 1.06,
+        Paint()
+          ..color = style.selected.withValues(alpha: 0.9)
+          ..style = .stroke
+          ..strokeWidth = cell * 0.026,
+      );
+      canvas.drawCircle(
+        centre,
+        radius * 1.14,
+        Paint()
+          ..color = style.selected.withValues(alpha: 0.45)
+          ..style = .stroke
+          ..strokeWidth = cell * 0.012,
+      );
     }
   }
 
@@ -1078,10 +1216,24 @@ class XiangqiBoardPainter({
   void paintHint(Canvas canvas) {
     final hint = this.hint;
     if (hint == null) return;
+    final centre = geometry.centerOf(hint.from, orientation);
+    final radius = geometry.pieceRadius * 1.18;
     canvas.drawCircle(
-      geometry.centerOf(hint.from, orientation),
-      cell * 0.45,
-      Paint()..color = style.hint,
+      centre,
+      radius,
+      Paint()
+        ..shader = ui.Gradient.radial(centre, radius, [
+          style.hint.withValues(alpha: 0.35),
+          style.hint.withValues(alpha: 0.0),
+        ]),
+    );
+    canvas.drawCircle(
+      centre,
+      geometry.pieceRadius * 1.08,
+      Paint()
+        ..color = style.hint
+        ..style = .stroke
+        ..strokeWidth = cell * 0.03,
     );
   }
 
@@ -1117,12 +1269,38 @@ class XiangqiBoardPainter({
   void paintDragTarget(Canvas canvas) {
     final bounds = dragTargetBounds;
     if (bounds == null) return;
-    final paint = Paint()..color = style.target;
-    if (dragTargetKind == .circle) {
-      canvas.drawCircle(bounds.center, bounds.width / 2, paint);
-    } else {
-      canvas.drawRect(bounds, paint);
-    }
+    final centre = bounds.center;
+    canvas.drawCircle(
+      centre,
+      cell * 0.46,
+      Paint()
+        ..shader = ui.Gradient.radial(centre, cell * 0.46, [
+          style.target.withValues(alpha: 0.3),
+          style.target.withValues(alpha: 0.0),
+        ]),
+    );
+    canvas.drawCircle(
+      centre,
+      cell * 0.44,
+      Paint()
+        ..color = style.target.withValues(alpha: 0.6)
+        ..style = .stroke
+        ..strokeWidth = cell * 0.02,
+    );
+    final arm = cell * 0.15;
+    final linePaint = Paint()
+      ..color = style.target.withValues(alpha: 0.7)
+      ..strokeWidth = cell * 0.02;
+    canvas.drawLine(
+      Offset(centre.dx - arm, centre.dy),
+      Offset(centre.dx + arm, centre.dy),
+      linePaint,
+    );
+    canvas.drawLine(
+      Offset(centre.dx, centre.dy - arm),
+      Offset(centre.dx, centre.dy + arm),
+      linePaint,
+    );
   }
 
   /// The scale the dragged piece is drawn at: the board's own enlarged size while

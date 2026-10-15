@@ -710,4 +710,21 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   });
+
+  group('XiangqiBoardStyle', () {
+    test(
+      'extracts photographic background from textured chessboard themes and leaves solid ones null',
+      () {
+        final marbleStyle = XiangqiBoardStyle.fromChessboardColorScheme(
+          ChessboardColorScheme.marble,
+        );
+        expect(marbleStyle.backgroundImage, isNotNull);
+        expect(marbleStyle.pieceFace, const Color(0xFFFDFBF7));
+
+        final brownStyle = XiangqiBoardStyle.fromChessboardColorScheme(ChessboardColorScheme.brown);
+        expect(brownStyle.backgroundImage, isNull);
+        expect(brownStyle.pieceFace, const Color(0xFFFDFBF7));
+      },
+    );
+  });
 }

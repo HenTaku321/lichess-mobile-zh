@@ -306,11 +306,13 @@ class const XiangqiOnlinePlayerRow({
     final seconds = secondsLeft;
 
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         XiangqiPieceAvatar(side: side, size: 40, style: style),
         const SizedBox(width: 8),
         Expanded(
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Flexible(
                 // An empty seat is still a row: the game is on the board before both players have

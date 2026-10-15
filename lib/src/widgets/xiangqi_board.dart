@@ -18,51 +18,51 @@ import 'package:material_ui/material_ui.dart';
 @immutable
 final class const XiangqiBoardStyle({
   /// The light field the grid is drawn on.
-  final Color surface = const Color(0xFFF1DCB0),
+  final Color surface = const Color(0xFFEFE4CF),
 
   /// The darker frame around the field.
-  final Color frame = const Color(0xFF8A5A2B),
+  final Color frame = const Color(0xFF6A4524),
 
   /// The grid's lines and the board's printed marks.
-  final Color ink = const Color(0xFF6B4A20),
+  final Color ink = const Color(0xFF4E3723),
 
   /// 楚河 and 汉界, printed more faintly than the grid.
-  final Color riverInk = const Color(0xFFA98A55),
+  final Color riverInk = const Color(0xFF9E845A),
 
   /// The face of a piece, at its centre: the face shades from this to [pieceFaceEnd] at the rim,
   /// the way a turned wooden disc catches the light at its middle.
-  final Color pieceFace = const Color(0xFFFDF3DC),
+  final Color pieceFace = const Color(0xFFFDFBF7),
 
   /// The face of a piece at its rim, the shade [pieceFace] darkens to at the edge.
-  final Color pieceFaceEnd = const Color(0xFFF4E4BC),
+  final Color pieceFaceEnd = const Color(0xFFF5EBD7),
 
   /// The soft shadow a piece casts on the field under it, drawn a touch lower than the piece so
   /// that the disc reads as sitting above the board rather than printed on it.
   final Color pieceShadow = const Color(0x33000000),
 
   /// The ring around a piece's face.
-  final Color pieceRing = const Color(0xFF7A5326),
+  final Color pieceRing = const Color(0xFF7D5936),
 
   /// The character and inner ring of red's pieces.
-  final Color redInk = const Color(0xFFB7282E),
+  final Color redInk = const Color(0xFFB8282E),
 
   /// The character and inner ring of black's pieces.
-  final Color blackInk = const Color(0xFF23262B),
+  final Color blackInk = const Color(0xFF1D2024),
 
   /// The two squares a move was played between.
-  final Color lastMove = const Color(0x59D98A18),
+  final Color lastMove = const Color(0x3DE69826),
 
   /// The ring around the picked-up piece, and around the square a drag began on.
-  final Color selected = const Color(0xCCD98A18),
+  final Color selected = const Color(0xCCE69826),
 
   /// The dot on an empty point a selected piece may play to, and the ring around a piece it may
   /// take.
-  final Color target = const Color(0x66333A2B),
+  final Color target = const Color(0x594E3723),
 
   /// The glow at the centre of the mark behind a general that is in check, shading out to nothing
   /// at the rim: a glow rather than a flat wash, the way the chess board's own check mark is a
   /// blurred radial gradient and not a disc.
-  final Color checkGlow = const Color(0x80D0342C),
+  final Color checkGlow = const Color(0x66D0342C),
 
   /// The ring around a general that is in check.
   final Color checkRing = const Color(0x99D0342C),
@@ -107,7 +107,7 @@ final class const XiangqiBoardStyle({
       riverInk: Color.lerp(ink, surface, 0.45)!,
       pieceFace: pieceFace,
       pieceFaceEnd: Color.lerp(pieceFace, const Color(0xFF000000), 0.06)!,
-      pieceRing: Color.lerp(ink, surface, 0.3)!,
+      pieceRing: plain.pieceRing,
       lastMove: colorScheme.lastMove.solidColor ?? plain.lastMove,
       selected: colorScheme.selected.solidColor ?? plain.selected,
       target: colorScheme.validMoves,
@@ -354,37 +354,44 @@ void paintXiangqiPiece(
   // face shading from a lit centre to a darker rim like a turned wooden disc.
   if (dropShadow) {
     canvas.drawCircle(
-      centre.translate(0, cell * 0.02 * scale),
+      centre.translate(0, cell * 0.012 * scale),
       radius,
       Paint()
-        ..color = style.pieceShadow
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, cell * 0.03 * scale),
+        ..color = const Color(0x24000000)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, cell * 0.015 * scale),
+    );
+    canvas.drawCircle(
+      centre.translate(0, cell * 0.035 * scale),
+      radius,
+      Paint()
+        ..color = const Color(0x1F000000)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, cell * 0.06 * scale),
     );
   }
   canvas.drawCircle(
     centre,
     radius,
     Paint()
-      ..shader = ui.Gradient.radial(centre - Offset(radius * 0.25, radius * 0.25), radius * 1.15, [
+      ..shader = ui.Gradient.radial(centre - Offset(radius * 0.28, radius * 0.28), radius * 1.25, [
         style.pieceFace,
         style.pieceFaceEnd,
       ]),
   );
   canvas.drawCircle(
     centre,
-    radius - cell * 0.0225 * scale,
+    radius - cell * 0.015 * scale,
     Paint()
-      ..color = style.pieceRing
+      ..color = style.pieceRing.withValues(alpha: 0.6)
       ..style = .stroke
-      ..strokeWidth = cell * 0.045 * scale,
+      ..strokeWidth = cell * 0.03 * scale,
   );
   canvas.drawCircle(
     centre,
     radius * 0.84,
     Paint()
-      ..color = ink
+      ..color = ink.withValues(alpha: 0.85)
       ..style = .stroke
-      ..strokeWidth = cell * 0.014 * scale,
+      ..strokeWidth = cell * 0.016 * scale,
   );
   _paintXiangqiText(
     canvas,
@@ -394,7 +401,6 @@ void paintXiangqiPiece(
       fontSize: cell * 0.58 * scale,
       fontWeight: FontWeight.w600,
       fontFamilyFallback: _cjkFallback,
-      shadows: const [Shadow(color: Color(0x14000000), offset: Offset(0, 1), blurRadius: 1)],
     ),
     centre,
   );
@@ -907,17 +913,7 @@ class XiangqiBoardPainter({
     if (!showLastMove || move == null) return;
     final paint = Paint()..color = style.lastMove;
     for (final square in [move.from, move.to]) {
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromCenter(
-            center: geometry.centerOf(square, orientation),
-            width: cell * 0.9,
-            height: cell * 0.9,
-          ),
-          Radius.circular(cell * 0.12),
-        ),
-        paint,
-      );
+      canvas.drawCircle(geometry.centerOf(square, orientation), geometry.pieceRadius * 1.05, paint);
     }
   }
 

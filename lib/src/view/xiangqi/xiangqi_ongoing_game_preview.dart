@@ -51,7 +51,7 @@ class const XiangqiOngoingGamePreview({
             child: Row(
               children: [
                 SizedBox(
-                  width: boardSize,
+                  width: boardSize * 0.9,
                   height: boardSize,
                   child: ClipRRect(
                     // The same corner treatment the chess preview gives its board.

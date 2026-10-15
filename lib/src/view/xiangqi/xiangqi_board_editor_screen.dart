@@ -257,7 +257,7 @@ class const _PalettePiece({
           decoration: BoxDecoration(
             borderRadius: radius,
             color: active ? primary.withValues(alpha: 0.18) : null,
-            border: active ? Border.all(color: primary) : null,
+            border: active ? Border.all(color: primary, width: 1.5) : null,
           ),
           child: InkWell(
             borderRadius: radius,
@@ -299,12 +299,12 @@ class const _ToolButton({
           decoration: BoxDecoration(
             borderRadius: radius,
             color: active ? color.withValues(alpha: 0.18) : null,
-            border: active ? Border.all(color: color) : null,
+            border: active ? Border.all(color: color, width: 1.5) : null,
           ),
           child: InkWell(
             borderRadius: radius,
             onTap: onTap,
-            child: Icon(icon, size: 0.9 * size, color: active ? color : null),
+            child: Icon(icon, size: 0.85 * size, color: active ? color : null),
           ),
         ),
       ),

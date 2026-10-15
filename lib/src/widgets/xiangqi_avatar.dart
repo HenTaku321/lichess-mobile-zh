@@ -26,12 +26,7 @@ class const XiangqiPieceAvatar({
   Widget build(BuildContext context) {
     return SizedBox.square(
       dimension: size,
-      // A circle backdrop keeps the piece's own shadow from being drawn onto nothing; the piece
-      // itself is laid on top by the same painter the board uses, so the two cannot drift apart.
-      child: DecoratedBox(
-        decoration: BoxDecoration(shape: BoxShape.circle, color: style.surface),
-        child: CustomPaint(painter: _XiangqiPieceAvatarPainter(side, style)),
-      ),
+      child: CustomPaint(painter: _XiangqiPieceAvatarPainter(side, style)),
     );
   }
 }

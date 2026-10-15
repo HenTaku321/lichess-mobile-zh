@@ -4,6 +4,7 @@ import 'package:chessground/chessground.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lichess_mobile/src/model/auth/auth_controller.dart';
 import 'package:lichess_mobile/src/model/engine/evaluation_preferences.dart';
 import 'package:lichess_mobile/src/model/offline_computer/offline_computer_game_preferences.dart';
 import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
@@ -247,6 +248,8 @@ class _BodyState() extends ConsumerState<_Body> {
 
     final controller = ref.read(xiangqiGameControllerProvider.notifier);
     final orientation = isBoardFlipped ? gameState.playerSide.opposite : gameState.playerSide;
+    final authUser = ref.watch(authControllerProvider);
+    final playerName = authUser?.user.name ?? orientation.label(context.l10n);
     final hintMove = _hintPosition == gameState.position ? analysisState.hint?.move : null;
     // The same preference the chess game against the computer reads, because it is the same thing:
     // a game against the computer, with the pieces taken off the board.
@@ -322,20 +325,20 @@ class _BodyState() extends ConsumerState<_Body> {
                   ),
                 ),
                 topTable: _PlayerRow(
-                  icon: Icons.smart_toy,
                   side: orientation.opposite,
                   style: XiangqiBoardStyle.fromChessboardColorScheme(boardPrefs.boardTheme.colors),
                   // The engine's own name, which is a proper name and the same in every language:
                   // it is the program that is playing, not a description of it. How hard it is
                   // playing is a setting, and the sheet is where a setting is read.
                   name: 'Pikafish',
+                  isBot: true,
                   thinking: gameState.isEngineThinking,
                   status: '',
                 ),
                 bottomTable: _PlayerRow(
-                  icon: Icons.person,
                   side: orientation,
                   style: XiangqiBoardStyle.fromChessboardColorScheme(boardPrefs.boardTheme.colors),
+                  name: playerName,
                   thinking: false,
                   status: _statusText(context, gameState),
                 ),
@@ -478,16 +481,17 @@ const double _kPlayerNameFontSize = 15.0;
 /// of whoever is to move and what the game is doing, which is what the line under the board used to
 /// say on its own.
 class const _PlayerRow({
-  required final IconData icon,
-
   /// The side the row's seat plays, which is the side its avatar's general is.
   required final XiangqiSide side,
 
   /// The board's own colours, so the avatar is the same piece the board is playing with.
   required final XiangqiBoardStyle style,
 
-  /// The name to print, or null for a row that has none of its own — the player's.
+  /// The name to print, or null for a row that has none of its own.
   final String? name,
+
+  /// Whether this player is an engine / bot.
+  final bool isBot = false,
 
   /// Whether to show the hourglass that says the computer has the move and is thinking about it.
   final bool thinking = false,
@@ -501,18 +505,7 @@ class const _PlayerRow({
 
     return Row(
       children: [
-        // The seat's mark is the side's general, drawn the way the board draws it; the little icon
-        // in the corner says which kind of player is sitting there, not which piece.
-        Stack(
-          children: [
-            XiangqiPieceAvatar(side: side, size: 36, style: style),
-            Positioned(
-              right: 0,
-              bottom: 0,
-              child: Icon(icon, size: 14, color: textShade(context, 0.5)),
-            ),
-          ],
-        ),
+        XiangqiPieceAvatar(side: side, size: 36, style: style),
         const SizedBox(width: 8),
         Expanded(
           child: Column(
@@ -530,6 +523,25 @@ class const _PlayerRow({
                         fontWeight: FontWeight.w600,
                       ),
                     ),
+                  if (isBot) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: context.lichessColors.fancy,
+                        borderRadius: const BorderRadius.all(Radius.circular(3)),
+                      ),
+                      child: const Text(
+                        'BOT',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ],
                   if (thinking) ...const [SizedBox(width: 8), Icon(Icons.hourglass_top, size: 16)],
                 ],
               ),

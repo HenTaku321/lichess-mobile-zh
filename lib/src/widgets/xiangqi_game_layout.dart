@@ -357,10 +357,21 @@ class const _XiangqiEvalGaugePainter({
     // Red's share grows from red's own end of the bar. The board turns around under the player and
     // the bar turns with it, so red is always at the end of the screen red is at.
     final height = value.clamp(0.0, 1.0) * size.height;
-    if (height == 0.0) return;
-    canvas.drawRect(
-      (isRedAtBottom ? Offset(0.0, size.height - height) : Offset.zero) & Size(size.width, height),
-      paint,
+    if (height > 0.0) {
+      canvas.drawRect(
+        (isRedAtBottom ? Offset(0.0, size.height - height) : Offset.zero) &
+            Size(size.width, height),
+        paint,
+      );
+    }
+
+    final midY = size.height / 2;
+    canvas.drawLine(
+      Offset(0, midY),
+      Offset(size.width, midY),
+      Paint()
+        ..color = (value >= 0.5 ? backgroundColor : valueColor).withValues(alpha: 0.35)
+        ..strokeWidth = 1.0,
     );
   }
 

@@ -28,6 +28,7 @@ import 'package:lichess_mobile/src/widgets/clock.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:lichess_mobile/src/widgets/non_linear_slider.dart';
 import 'package:lichess_mobile/src/widgets/settings.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_avatar.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_game_layout.dart';
 import 'package:material_ui/material_ui.dart';
@@ -259,10 +260,12 @@ class const _OtbPlayer({required final XiangqiSide side, required final Key cloc
     // neither side has anything else to be told — there is no "your turn" when both sides are at the
     // board.
     final isToMove = gameState.turn == side && !gameState.isFinished;
+    final boardPrefs = ref.watch(boardPreferencesProvider);
+    final style = XiangqiBoardStyle.fromChessboardColorScheme(boardPrefs.boardTheme.colors);
 
     return Row(
       children: [
-        Icon(Icons.person, size: 32, color: textShade(context, 0.5)),
+        XiangqiPieceAvatar(side: side, size: 32, style: style),
         const SizedBox(width: 8),
         Expanded(
           child: Text(

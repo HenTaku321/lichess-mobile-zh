@@ -374,17 +374,26 @@ class const _BoardPreview({
             // Nine files by ten ranks — ten cells of height for nine of width, plus half a cell of
             // frame around each — so the box that lets the board fill it exactly is nine tenths as
             // wide as it is tall.
-            SizedBox(
+            Container(
               width: size * 0.9,
               height: size,
-              child: BrightnessHueFilter(
-                brightness: brightness,
-                hue: hue,
-                child: XiangqiBoard(
-                  position: play(XiangqiPosition.initial(), opening),
-                  lastMove: opening,
-                  showBorder: boardPrefs.showBorder,
-                  style: XiangqiBoardStyle.fromChessboardColorScheme(boardPrefs.boardTheme.colors),
+              decoration: BoxDecoration(
+                borderRadius: Styles.boardBorderRadius,
+                boxShadow: boardShadows,
+              ),
+              child: ClipRRect(
+                borderRadius: Styles.boardBorderRadius,
+                child: BrightnessHueFilter(
+                  brightness: brightness,
+                  hue: hue,
+                  child: XiangqiBoard(
+                    position: play(XiangqiPosition.initial(), opening),
+                    lastMove: opening,
+                    showBorder: boardPrefs.showBorder,
+                    style: XiangqiBoardStyle.fromChessboardColorScheme(
+                      boardPrefs.boardTheme.colors,
+                    ),
+                  ),
                 ),
               ),
             ),

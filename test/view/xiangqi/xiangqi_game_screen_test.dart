@@ -40,6 +40,15 @@ XiangqiMove moveAt(String iccs) {
   return move;
 }
 
+/// The new game sheet's own side setting: the tile that says which side the player takes.
+///
+/// Scoped to the tile rather than looked for by its text alone, because the board's player row
+/// prints the side's name too — `Red` is the value in this tile and also the name printed under the
+/// board's own red general — so a bare `find.text('Red')` would find both and a tap on it would be
+/// ambiguous.
+Finder sideSettingTile() =>
+    find.ancestor(of: find.text('Side'), matching: find.byType(SettingsListTile));
+
 /// The app the screen is pumped into when a test asks for a language of its own.
 ///
 /// The shared test harness puts the screen into its own [MaterialApp], which declares no languages
@@ -324,6 +333,23 @@ void main() {
       expect(barButton(tester, CupertinoIcons.flag).onTap, isNotNull);
     });
 
+    testWidgets('names both seats: the engine with its badge, the player with their side', (
+      tester,
+    ) async {
+      await pumpGameScreen(tester);
+
+      // The engine's own name, and the badge that says the seat is a program rather than a person —
+      // the same badge the chess screens put on an engine's row.
+      expect(find.text('Pikafish'), findsOneWidget);
+      expect(find.text('BOT'), findsOneWidget);
+
+      // Nobody is signed in here, so the player's row falls back to the side they are playing,
+      // which is how the online row names a seat nobody has taken yet. The row's own name is the
+      // only one on the screen: the sheet that also prints a side is not open.
+      expect(find.text('Red'), findsOneWidget);
+      expect(find.text('Your turn'), findsOneWidget);
+    });
+
     testWidgets('the new game sheet opens on the game in progress', (tester) async {
       await pumpGameScreen(tester);
 
@@ -331,7 +357,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Side'), findsOneWidget);
-      expect(find.text('Red'), findsOneWidget);
+      expect(find.descendant(of: sideSettingTile(), matching: find.text('Red')), findsOneWidget);
       // The computer is the whole of the opponent here, so the control for it is the app's own level
       // control for one, and its title is the app's own word for a level rather than a word of this
       // screen's inventing: a level is a search budget, and there are no words that could say which
@@ -345,7 +371,7 @@ void main() {
       await tester.tap(find.byIcon(CupertinoIcons.add));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Red'));
+      await tester.tap(find.descendant(of: sideSettingTile(), matching: find.text('Red')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Black').last);
       await tester.pumpAndSettle();

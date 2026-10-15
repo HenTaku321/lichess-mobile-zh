@@ -712,19 +712,41 @@ void main() {
   });
 
   group('XiangqiBoardStyle', () {
-    test(
-      'extracts photographic background from textured chessboard themes and leaves solid ones null',
-      () {
-        final marbleStyle = XiangqiBoardStyle.fromChessboardColorScheme(
-          ChessboardColorScheme.marble,
-        );
-        expect(marbleStyle.backgroundImage, isNotNull);
-        expect(marbleStyle.pieceFace, const Color(0xFFFDFBF7));
+    test("wears a textured theme's own photograph, and a flat theme's own colours", () {
+      // Marble paints its squares from a photograph, so the xiangqi board wears that photograph
+      // too: the theme's material whole, rather than a flat colour standing in for it.
+      final marble = XiangqiBoardStyle.fromChessboardColorScheme(ChessboardColorScheme.marble);
+      expect(marble.backgroundImage, isNotNull);
+      expect(marble.surface, ChessboardColorScheme.marble.lightSquare);
 
-        final brownStyle = XiangqiBoardStyle.fromChessboardColorScheme(ChessboardColorScheme.brown);
-        expect(brownStyle.backgroundImage, isNull);
-        expect(brownStyle.pieceFace, const Color(0xFFFDFBF7));
-      },
-    );
+      // Brown is a flat colour and has no photograph to wear.
+      final brown = XiangqiBoardStyle.fromChessboardColorScheme(ChessboardColorScheme.brown);
+      expect(brown.backgroundImage, isNull);
+      expect(brown.ink, ChessboardColorScheme.brown.darkSquare);
+    });
+
+    test('deepens the ink over a photograph, and leaves it alone over a flat colour', () {
+      // A photograph has no grid drawn on it, so the printed marks have to be able to sit on one.
+      final marble = XiangqiBoardStyle.fromChessboardColorScheme(ChessboardColorScheme.marble);
+      expect(
+        marble.ink.computeLuminance(),
+        lessThan(ChessboardColorScheme.marble.darkSquare.computeLuminance()),
+      );
+      expect(marble.riverInk.computeLuminance(), greaterThan(marble.ink.computeLuminance()));
+    });
+
+    test("keeps the pieces' material the board's own on every theme", () {
+      // The armies' colours and the discs they are cut from are part of the game and not of the
+      // decoration: a green cloth theme must not turn a wooden piece green.
+      const plain = XiangqiBoardStyle();
+      for (final scheme in [ChessboardColorScheme.marble, ChessboardColorScheme.brown]) {
+        final style = XiangqiBoardStyle.fromChessboardColorScheme(scheme);
+        expect(style.pieceFace, plain.pieceFace);
+        expect(style.pieceFaceEnd, plain.pieceFaceEnd);
+        expect(style.pieceRing, plain.pieceRing);
+        expect(style.redInk, plain.redInk);
+        expect(style.blackInk, plain.blackInk);
+      }
+    });
   });
 }

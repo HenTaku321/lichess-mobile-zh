@@ -93,15 +93,22 @@ final class const XiangqiBoardStyle({
   /// a theme has no check colour to read, and a hint is the app speaking, not part of the board.
   /// [pieceShadow] is a shadow, so it stays black at the same faintness on every board.
   ///
-  /// Only the colours are taken. Twenty of the app's twenty-four themes paint their squares from a
-  /// photograph, which the chessboard shows through an image background; this board is a `CustomPaint`
-  /// of one colour and some lines, with no grid for a wood grain or a marble vein to align to, so it
-  /// can wear no more than the theme's two flat colours and stays flat. That is an accepted loss: the
-  /// colour follows the theme, the texture does not.
+  /// The theme's material is taken whole where it has one. Twenty of the app's twenty-four themes
+  /// paint their squares from a photograph — marble, four woods, canvas, leather and the rest — and
+  /// the chessboard shows that photograph through an image background. This board shows the same
+  /// photograph the same way, through [backgroundImage]: the field is the theme's own material and
+  /// not a flat colour standing in for it, so a board in marble is marble and a board in walnut is
+  /// walnut. The remaining themes are flat colours and are drawn as flat colours, which is what they
+  /// are.
+  ///
+  /// A photograph has no grid drawn on it, so the printed marks have to be able to sit on one: over
+  /// an image theme the ink is deepened away from the theme's own dark square, which is picked to
+  /// read against a chequered board and not against a busy photograph. The two armies' colours, the
+  /// pieces' material and the check and hint marks are this board's own on every theme, as above.
   factory fromChessboardColorScheme(ChessboardColorScheme colorScheme) {
     const plain = XiangqiBoardStyle();
-    final ink = colorScheme.darkSquare;
     final surface = colorScheme.lightSquare;
+    final dark = colorScheme.darkSquare;
 
     ImageProvider? backgroundImage;
     final bg = colorScheme.background;
@@ -109,9 +116,15 @@ final class const XiangqiBoardStyle({
       backgroundImage = bg.image;
     }
 
+    // Over a photograph the grid is read against grain and veining rather than against a flat
+    // colour, so it is drawn darker than the theme's dark square; over a flat colour the theme's own
+    // dark square is already the most legible ink the theme offers and is left alone.
+    final ink = backgroundImage == null ? dark : Color.lerp(dark, const Color(0xFF000000), 0.34)!;
+    final frame = backgroundImage == null ? dark : Color.lerp(dark, const Color(0xFF000000), 0.5)!;
+
     return XiangqiBoardStyle(
       surface: surface,
-      frame: ink,
+      frame: frame,
       ink: ink,
       riverInk: Color.lerp(ink, surface, 0.45)!,
       pieceFace: plain.pieceFace,
@@ -816,15 +829,16 @@ class XiangqiBoardPainter({
       Rect.fromLTWH(0, 0, geometry.width, geometry.height),
       Radius.circular(cell * 0.16),
     );
+    // A theme with a photograph is the board's own material and is left showing: nothing is laid
+    // over it but the lines, exactly as the chessboard shows the same photograph behind its pieces.
+    // The frame is the one thing added, a line around the edge so the board has a border of its own
+    // rather than the photograph running off it.
     if (style.backgroundImage != null) {
-      final isLight = style.surface.computeLuminance() > 0.4;
-      final washColor = isLight ? const Color(0x18FFFFFF) : const Color(0x1A000000);
-      canvas.drawRRect(board, Paint()..color = washColor);
       if (showBorder) {
         canvas.drawRRect(
           board,
           Paint()
-            ..color = style.frame.withValues(alpha: 0.45)
+            ..color = style.frame.withValues(alpha: 0.75)
             ..style = .stroke
             ..strokeWidth = math.max(1.5, cell * 0.05),
         );

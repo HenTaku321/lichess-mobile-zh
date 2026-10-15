@@ -110,6 +110,27 @@ Map<String, Object?> capturedSignInBody(String accessToken) => {
   'muted_users': <Object?>[],
 };
 
+/// The body `POST /api/users/signin` really answered with when the password did not match.
+///
+/// Captured on 2026-10-15 against a real account. This one is a `401`, and it carries no `errors`
+/// object at all — the status is the whole of the answer, which is why nothing here reads the
+/// message.
+const capturedWrongPasswordBody = '{"message":"Invalid password"}';
+
+/// The body the same endpoint answered with for a username nobody holds.
+///
+/// Captured the same day, and this one is a `400` rather than a `401` — which is the entire reason
+/// the reader treats both statuses as the credentials and nothing else. The `errors` object repeats
+/// the message; nothing reads it.
+///
+/// The one space after the first comma is the only edit to the capture: JSON ignores whitespace
+/// between tokens, and a line break in the literal there would read as a missing space rather than
+/// as the punctuation it is.
+const capturedUnknownUserBody =
+    '{"message":"Email or username does not exist. Please enter the valid email or username", '
+    '"errors":{"error_msg":"Email or username does not exist. Please enter the valid email or '
+    'username"}}';
+
 void main() {
   group('signInWithPassword', () {
     test('posts the email and password and stores the session', () async {
@@ -170,8 +191,9 @@ void main() {
       expect(session.isGuest, isFalse);
     });
 
-    // The response field names are the candidate set read out of the shipped bundle and have not
-    // been measured against the server (`auth.rs:3-6`); each candidate must be accepted on its own.
+    // `access_token` and `refresh_token` are the measured names — see [capturedSignInBody] — and
+    // the rest of each list is the bundle's suggestion, kept as a fallback. Each candidate has to
+    // be accepted on its own, because a response that carries only one of them is still a sign-in.
     for (final field in const ['access_token', 'jwt', 'token', 'accessToken']) {
       test('reads the access token from "$field"', () async {
         final container = await makeControllerContainer(
@@ -224,11 +246,40 @@ void main() {
     });
 
     for (final status in const [401, 400]) {
-      test('throws XiangqiInvalidCredentialsException on HTTP $status', () async {
+      test(
+        'throws XiangqiInvalidCredentialsException on HTTP $status with no body at all',
+        () async {
+          final storage = FakeXiangqiAuthStorage();
+          final container = await makeControllerContainer(
+            storage: storage,
+            client: signInClient('', status: status),
+          );
+          container.listen(xiangqiAuthControllerProvider, (_, _) {});
+          await container.pump();
+
+          await expectLater(
+            container
+                .read(xiangqiAuthControllerProvider.notifier)
+                .signInWithPassword(email: 'a@b.c', password: 'wrong'),
+            throwsA(isA<XiangqiInvalidCredentialsException>()),
+          );
+          expect(container.read(xiangqiAuthControllerProvider), isNull);
+          expect(storage.session, isNull);
+        },
+      );
+    }
+
+    // The two refusals as the server really words them. The empty-body loop above proves the status
+    // alone is enough; these prove the bodies that come with the statuses do not change the answer.
+    for (final (status, body, what) in const <(int, String, String)>[
+      (401, capturedWrongPasswordBody, 'a password that does not match'),
+      (400, capturedUnknownUserBody, 'a username nobody holds'),
+    ]) {
+      test('$what is reported as wrong credentials, not as a server failure', () async {
         final storage = FakeXiangqiAuthStorage();
         final container = await makeControllerContainer(
           storage: storage,
-          client: signInClient('', status: status),
+          client: signInClient(body, status: status),
         );
         container.listen(xiangqiAuthControllerProvider, (_, _) {});
         await container.pump();

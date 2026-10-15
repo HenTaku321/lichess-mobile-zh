@@ -79,8 +79,15 @@ class XiangqiAuthController() extends Notifier<XiangqiSession?> {
       body: jsonEncode({'email': email, 'password': password}),
     );
 
-    // A wrong pair is a 401; xiangqi.com also answers 400 for the same thing on some shapes. Both
-    // mean the credentials, and nothing else does.
+    // Measured on 2026-10-15 against the live server, both ways a pair can be wrong:
+    //
+    // * a password that does not match is a `401 {"message": "Invalid password"}`;
+    // * a username or email nobody holds is a `400 {"message": "Email or username does not exist.
+    //   Please enter the valid email or username"}`.
+    //
+    // Both are the credentials and nothing else is, so both are reported as such. The server also
+    // answers 400 for a body that is missing a field, which is not the credentials — but this call
+    // always sends both, so that shape cannot be reached from here.
     if (response.statusCode == 401 || response.statusCode == 400) {
       throw const XiangqiInvalidCredentialsException();
     }
@@ -95,10 +102,12 @@ class XiangqiAuthController() extends Notifier<XiangqiSession?> {
 
     final json = _decodeObject(_bodyText(response));
 
-    // The field names below are the candidate set read out of the shipped xiangqi.com JS bundle.
-    // They have **not** been measured against the live server — `auth.rs:3-6` says as much — so the
-    // first non-empty one wins rather than any single name being trusted on its own. The order is
-    // the same one `auth.rs:139-142` uses.
+    // Measured on 2026-10-15 against the live server: the response carries `access_token`,
+    // `refresh_token`, `user.username` and `user.id`, and the access token's `sub` is the numeric
+    // account id. `access_token` and `refresh_token` are the names that are really there; the rest
+    // of each candidate list is what the shipped JS bundle suggested, kept because a second name
+    // costs nothing and a wrong single guess costs a sign-in. The order is the same one
+    // `auth.rs:139-142` uses.
     final accessToken = _pick(json, const ['access_token', 'jwt', 'token', 'accessToken']);
     if (accessToken == null) {
       throw const FormatException('The xiangqi.com sign-in response carried no access token.');
@@ -227,6 +236,10 @@ class XiangqiAuthController() extends Notifier<XiangqiSession?> {
   }
 
   /// The username from the `user` object of a sign-in response, or null.
+  ///
+  /// `user.username` is the measured name; `user.identity` carries the same string on every account
+  /// seen so far, but nothing here reads it, because the one field the server documents by using it
+  /// is the one to read.
   static String? _username(Map<String, dynamic> json) {
     final user = json['user'];
     if (user is Map<String, dynamic>) {

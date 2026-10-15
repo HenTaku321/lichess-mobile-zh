@@ -82,6 +82,46 @@ Map<String, dynamic> entry({
   'end_reason': ?endReason,
 };
 
+/// The entry `GET /api/v2/games/my-games` really answered with, on 2026-10-15.
+///
+/// Captured with a signed-in account (id `536174`) and one private game of its own waiting for an
+/// opponent. It is quoted here as it came off the wire, with only the fields this reader does not
+/// read dropped — no value is changed and no key is renamed. This is the one test in this file that
+/// is not built from a shape someone reasoned about: it is the shape the server sent.
+///
+/// The four things it pins, each of which the reader could have got wrong: `bplayer` is `null`
+/// rather than an empty object, there is no `fen` and no `turn_now`, `game_timer: 10` agrees with
+/// `rplayer.seconds: 600` (so the timer is minutes), and a game still being played carries no
+/// `end_reason` key at all.
+const Map<String, dynamic> capturedEntry = {
+  'id': 'YKeIzcBbtY',
+  'rplayer': {
+    'id': 536174,
+    'username': 'astralisxq',
+    'identity': 'astralisxq',
+    'rating': 900,
+    'seconds': 600,
+    'side': 1,
+    'p_type': 10,
+    'factor': 0,
+    'result': -10,
+    'hidden_username': false,
+    'hidden_profile_icon': false,
+    'profile_image': null,
+    'profile_link_token': null,
+    'country': {'name': 'Hong Kong, China', 'code': 'HK'},
+  },
+  'bplayer': null,
+  'game_timer': 10,
+  'increment': 0,
+  'move_timer': 2,
+  'moves_count': 0,
+  'is_timed': true,
+  'is_rated': false,
+  'timestamp': '2026-10-15T14:06:20.089295',
+  'last_move_time': null,
+};
+
 void main() {
   group('a full entry', () {
     test('is read field for field', () {
@@ -290,6 +330,44 @@ void main() {
 
       expect(game, isNotNull);
       expect(game!.gameTimeSeconds, 0);
+    });
+  });
+
+  group('the entry the server really sent', () {
+    test('is read whole', () {
+      final game = xiangqiOpenGameFromJson(capturedEntry, myUserId: '536174');
+
+      expect(game, isNotNull);
+      expect(game!.id, 'YKeIzcBbtY');
+      expect(game.mySide, XiangqiSide.red);
+      expect(game.isRated, isFalse);
+      expect(game.gameTimeSeconds, 600);
+      expect(game.incrementSeconds, 0);
+      expect(game.movesCount, 0);
+      expect(game.redSecondsLeft, 600);
+      expect(game.blackSecondsLeft, isNull);
+    });
+
+    test('a null bplayer is a seat nobody has taken, not a crash and not an opponent', () {
+      final game = xiangqiOpenGameFromJson(capturedEntry, myUserId: '536174');
+
+      expect(game!.opponent, isNull);
+      expect(game.opponentRating, isNull);
+    });
+
+    test("a game waiting for an opponent is nobody's move", () {
+      // The entry carries no `turn_now` and `moves_count: 0`, which on its own would read as red to
+      // move — and red is the side this device holds. There is no opponent to move against, so the
+      // row must not claim it is this user's turn.
+      expect(xiangqiOpenGameFromJson(capturedEntry, myUserId: '536174')!.isMyTurn, isFalse);
+    });
+
+    test('carries no position, so the row falls back to the starting one', () {
+      expect(xiangqiOpenGameFromJson(capturedEntry, myUserId: '536174')!.fen, kXiangqiInitialFen);
+    });
+
+    test('is dropped for a device that is not in either seat', () {
+      expect(xiangqiOpenGameFromJson(capturedEntry, myUserId: '999999'), isNull);
     });
   });
 

@@ -69,6 +69,47 @@ MockClient signInClient(String body, {int status = 200, void Function(http.Reque
 /// The `sub` is a stand-in account id; what the tests read is that it comes back as a string.
 String get _accessToken => jwt(const {'sub': 100001, 'type': 'access'});
 
+/// The body `POST /api/users/signin` really answered with, on 2026-10-15.
+///
+/// Captured against a real account (id `536174`, created through the site's own signup flow). The
+/// tokens are replaced with this file's own [jwt] output and the account's email is replaced with a
+/// stand-in; every other key and value is the server's, including `last_online`'s `"None"` string
+/// and the `blocked_users`/`muted_users` lists, which nothing here reads but which are part of the
+/// shape. This is the one case in this file that is not a body someone reasoned about.
+///
+/// It pins what the reader actually needs: the access token is under `access_token` (not `jwt`,
+/// `token` or `accessToken`), the refresh token under `refresh_token`, and the username at
+/// `user.username` — the three candidates the bundle suggested, now measured.
+Map<String, Object?> capturedSignInBody(String accessToken) => {
+  'message': 'Logged in as alice',
+  'access_token': accessToken,
+  'refresh_token': 'the-refresh-token',
+  'user': {
+    'id': 536174,
+    'username': 'alice',
+    'identity': 'alice',
+    'email': 'alice@example.com',
+    'type': 1,
+    'muted': false,
+    'banned': false,
+    'hidden_username': false,
+    'hidden_profile_icon': false,
+    'profile_link_token': null,
+    'active': true,
+    'country': {'id': 96, 'code': 'HK', 'name': 'Hong Kong, China'},
+    'locale': 'zh_Hans',
+    'bullet_rating': 900,
+    'rapid_rating': 900,
+    'daily_rating': 900,
+    'is_premium': false,
+    'cancelled': false,
+    'created_on': '2026-10-15 14:05:19.710483',
+    'last_online': 'None',
+  },
+  'blocked_users': <Object?>[],
+  'muted_users': <Object?>[],
+};
+
 void main() {
   group('signInWithPassword', () {
     test('posts the email and password and stores the session', () async {
@@ -105,6 +146,28 @@ void main() {
       expect(session.isGuest, isFalse);
       // The session is on disk, not only in memory.
       expect(storage.session, session);
+    });
+
+    test('reads the body the server really answered with', () async {
+      final storage = FakeXiangqiAuthStorage();
+      final container = await makeControllerContainer(
+        storage: storage,
+        client: signInClient(jsonEncode(capturedSignInBody(_accessToken))),
+      );
+      container.listen(xiangqiAuthControllerProvider, (_, _) {});
+      await container.pump();
+
+      await container
+          .read(xiangqiAuthControllerProvider.notifier)
+          .signInWithPassword(email: 'alice@example.com', password: 'hunter2');
+
+      final session = container.read(xiangqiAuthControllerProvider);
+      expect(session, isNotNull);
+      expect(session!.accessToken, _accessToken);
+      expect(session.refreshToken, 'the-refresh-token');
+      expect(session.userId, '100001', reason: "the sub of the token, not the payload's id");
+      expect(session.name, 'alice');
+      expect(session.isGuest, isFalse);
     });
 
     // The response field names are the candidate set read out of the shipped bundle and have not

@@ -68,34 +68,63 @@ IList<XiangqiOpenGame> xiangqiOpenGamesFromJson(Object? json, {required String? 
 
 /// One entry of that array, or null when it cannot be placed.
 ///
-/// ## What is measured, and what is not
+/// ## The entry, as it was measured
 ///
-/// The field names here are the ones xiangqi.com's own client reads out of a list entry, and they
-/// were read off the shipped bundle rather than guessed: the lobby's game row takes `timestamp`,
-/// `rplayer`, `bplayer`, `invitee`, `is_challenge`, `game_timer`, `move_timer`, `increment` and
-/// `is_rated` off the object, and the client's own model of a game adds `id`, `fen`, `turn_now`,
-/// `moves_count`, `is_timed`, `end_reason` and `timers`.
+/// A real entry, captured on 2026-10-15 from `GET /api/v2/games/my-games` with a signed-in account
+/// and a private game of its own waiting for an opponent. Fields this reader does not use are
+/// dropped from the quote; nothing else is changed:
 ///
-/// What is measured *live* is the sibling projection `GET /api/v2/games/active`, which the watch
-/// page lists: an entry there carries `id`, `rplayer`/`bplayer` (each with `id`, `username`,
-/// `rating`, `seconds`), `game_timer`, `increment`, `is_rated`, `is_timed`, `moves_count`,
-/// `move_timer`, `timestamp` and `last_move_time`, and no `fen` and no `turn_now`. `game_timer` is
-/// in **minutes** and `increment` in seconds — a `game_timer: 15, increment: 5` game was listed
-/// with 577 s and 660 s left on its two clocks 841 s after it started, which is 15 minutes plus the
-/// increments, so it is minutes and not seconds.
+/// ```json
+/// {
+///   "id": "YKeIzcBbtY",
+///   "rplayer": {
+///     "id": 536174, "username": "astralisxq", "identity": "astralisxq",
+///     "rating": 900, "seconds": 600, "side": 1, "p_type": 10, "factor": 0, "result": -10,
+///     "country": {"name": "Hong Kong, China", "code": "HK"}
+///   },
+///   "bplayer": null,
+///   "game_timer": 10, "increment": 0, "move_timer": 2, "moves_count": 0,
+///   "is_timed": true, "is_rated": false,
+///   "timestamp": "2026-10-15T14:06:20.089295", "last_move_time": null
+/// }
+/// ```
 ///
-/// `v2/games/my-games` itself could not be measured with a game in it: a guest session is refused
-/// an account of its own (`POST /api/v2/games/create-custom` answers `400 You need to activate your
-/// account to perform this action`), so the only body this endpoint has been seen to answer is the
-/// empty one. The `fen` and `turn_now` reads below are therefore the client's own field names
-/// rather than a capture, and each of them has a fallback that does not invent anything:
+/// Four things about that shape are worth stating outright, because each of them is a way this
+/// reader could have been wrong:
 ///
-/// * [isMyTurn] falls back to `moves_count` parity, which is the rule the server's own `turn_now`
-///   follows (red opens every game and the sides alternate).
-/// * [fen] falls back to the starting position, and says so in the log, because a row whose payload
-///   carries no position is a row whose board cannot be drawn as it really is. If that warning ever
-///   fires in the field, the fix is to ask the socket for the game's snapshot — the position is not
-///   in the list, and the list is not the place to invent it.
+/// * **`bplayer` is `null`, not an empty object.** A seat nobody has taken is the key with a null
+///   value, and there is no `username: ""` to read. [_seat] answers an empty seat for both, which
+///   is what makes the waiting-for-an-opponent row work.
+/// * **There is no `fen` and no `turn_now`.** The list is a summary of the two clocks and the move
+///   count; the position is not in it. Nothing in this file assumes otherwise — see below.
+/// * **`game_timer` is minutes and `increment` is seconds.** This entry reads `game_timer: 10` and
+///   `rplayer.seconds: 600`, which is the same game: ten minutes is six hundred seconds. The
+///   sibling `GET /api/v2/games/active` projection agrees — a `game_timer: 15, increment: 5` game
+///   was listed with 577 s and 660 s left on its clocks 841 s after it started, which is fifteen
+///   minutes plus the increments and not fifteen seconds plus them.
+/// * **There is no `end_reason` key at all** on a game still being played. Measured separately on
+///   `GET /api/users/games/<username>`, the same key is `null` on the one live game in that list
+///   and a code on every finished one.
+///
+/// ## The position, and why this reader does not have one
+///
+/// No REST endpoint of xiangqi.com carries a game's position. `v2/games/my-games`,
+/// `v2/games/active` and `users/games/<username>` were each measured with a game in them, and none
+/// of the three has a `fen`; the shapes `v2/games/<id>`, `v2/game/<id>`, `games/<id>` and four more
+/// spellings of the same idea all answer `404`. The only place a position exists is the socket's
+/// `game.get.success` snapshot.
+///
+/// So [XiangqiOpenGame.fen] is the starting position on every row this reader builds, and the log
+/// line below says so at [Level.FINE] rather than as a warning: it is not an anomaly to be
+/// investigated, it is the shape of the endpoint. A row that needs the real position has to ask the
+/// socket for that game's snapshot, and that is a different call from this one.
+///
+/// ## The two reads that are the client's own field names
+///
+/// [isMyTurn] prefers `turn_now` — the field the server names the side to move in on the socket —
+/// and falls back to `moves_count` parity when the list does not carry it, which is every row
+/// measured so far. The parity rule is the server's own: red opens every game and the sides
+/// alternate, so an even number of plies played means red is to move.
 XiangqiOpenGame? xiangqiOpenGameFromJson(Map<String, dynamic> json, {required String? myUserId}) {
   final id = _string(json['id']);
   if (id == null) return null;
@@ -122,9 +151,11 @@ XiangqiOpenGame? xiangqiOpenGameFromJson(Map<String, dynamic> json, {required St
       ? otherSeat
       : (invitee.isTaken && invitee.id != myUserId ? invitee : null);
 
+  // Expected, not exceptional: no REST list of xiangqi.com carries a position, so every row this
+  // reader builds falls back here. See the doc comment on this function.
   final fen = _string(json['fen']);
   if (fen == null) {
-    _logger.warning('The xiangqi.com list entry for game $id carried no position.');
+    _logger.fine('The xiangqi.com list entry for game $id carried no position.');
   }
 
   return XiangqiOpenGame(

@@ -114,6 +114,38 @@ void main() {
       expect(game.state.end, isNull);
     });
 
+    test('a snapshot nested under data is read the same as a top-level one', () async {
+      // The shape the server really sends: the whole snapshot one level down, under `data`. Every
+      // other frame is nested that way, and this one is too — measured on 2026-10-15 against a
+      // signed-in account. The top-level form the rest of this file sends is the controller's other
+      // branch, and both have to work.
+      final game = await makeHarness(fx.xiangqiTestToken(fx.xiangqiTestViewerId));
+
+      await game.send(fx.xiangqiNestedSnapshotFrame());
+
+      expect(game.state.isLoaded, isTrue);
+      expect(game.state.mySide, XiangqiSide.red);
+      expect(game.state.red.name, fx.xiangqiTestRedName);
+      expect(game.state.black.name, fx.xiangqiTestBlackName);
+      expect(game.state.black.rating, fx.xiangqiTestBlackRating);
+      expect(game.state.isRated, isTrue);
+      expect(game.state.isMyTurn, isTrue);
+    });
+
+    test('a nested snapshot carrying moves replays them', () async {
+      final game = await makeHarness(fx.xiangqiTestToken(fx.xiangqiTestViewerId));
+
+      await game.send(fx.xiangqiNestedSnapshotFrame(plies: fx.xiangqiTestMoveUcis.length));
+
+      expect(game.state.isLoaded, isTrue);
+      expect(game.state.moves, hasLength(fx.xiangqiTestMoveUcis.length));
+      expect(
+        game.state.position.toFen(),
+        fx.xiangqiTestPositions.last.toFen(),
+        reason: 'the position is the one the moves make, not the one the payload claims',
+      );
+    });
+
     test('a device in neither seat is watching, not playing', () async {
       final game = await makeHarness(fx.xiangqiTestToken(fx.xiangqiTestSpectatorId));
 

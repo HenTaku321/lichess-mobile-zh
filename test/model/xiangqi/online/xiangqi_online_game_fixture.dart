@@ -150,8 +150,26 @@ Map<String, Object?> xiangqiSnapshotPayload({int plies = 0, bool ended = false})
 };
 
 /// A `game.get.success` snapshot of the game after the first [plies] moves.
+///
+/// The payload is at the top level of the frame, which is the shape this file has always built and
+/// which [XiangqiOnlineGameController] reads. It is **not** the shape the server was measured
+/// sending — see [xiangqiNestedSnapshotFrame], which is, and which the controller also reads. Both
+/// are kept because both are handled, and a test that only ever sent one of them would leave the
+/// other path unexercised.
 String xiangqiSnapshotFrame({int plies = 0, bool ended = false}) =>
     xiangqiEventFrame('game.get.success', xiangqiSnapshotPayload(plies: plies, ended: ended));
+
+/// The same snapshot, nested under `data` — the shape `game.get.success` really arrives in.
+///
+/// Measured on 2026-10-15 against a signed-in account and a game of its own: the frame is
+/// `42/xiangqi,["game.get.success",{"data":{...}}]`, with the whole snapshot one level down. Every
+/// other frame this file builds is nested that way already (`game.move.*` and `game.server.end`
+/// both carry `data`), so the top-level form above is the odd one out and this is the one the
+/// server sends.
+String xiangqiNestedSnapshotFrame({int plies = 0, bool ended = false}) => xiangqiEventFrame(
+  'game.get.success',
+  {'data': xiangqiSnapshotPayload(plies: plies, ended: ended)},
+);
 
 /// The same snapshot under the name a *finished* game is asked for.
 ///

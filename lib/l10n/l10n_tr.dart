@@ -810,6 +810,53 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
+  String get mobileXiangqiReview => 'Game review';
+
+  @override
+  String get mobileXiangqiReviewAccuracy => 'Accuracy';
+
+  @override
+  String get mobileXiangqiReviewBrilliant => 'Brilliant';
+
+  @override
+  String get mobileXiangqiReviewBest => 'Best';
+
+  @override
+  String get mobileXiangqiReviewExcellent => 'Excellent';
+
+  @override
+  String get mobileXiangqiReviewGood => 'Good';
+
+  @override
+  String get mobileXiangqiReviewInaccuracy => 'Inaccuracy';
+
+  @override
+  String get mobileXiangqiReviewMistake => 'Mistake';
+
+  @override
+  String get mobileXiangqiReviewBlunder => 'Blunder';
+
+  @override
+  String mobileXiangqiReviewBestMoveWas(String param) {
+    return 'Best was $param.';
+  }
+
+  @override
+  String get mobileXiangqiReviewNoAnalysis => 'The server did not analyse this game.';
+
+  @override
+  String get mobileXiangqiReviewFailed => 'The review could not be loaded.';
+
+  @override
+  String get mobileXiangqiReviewOffline => 'You are offline. The review is the server\'s, so it needs a connection.';
+
+  @override
+  String get mobileXiangqiReviewPrevious => 'Previous move';
+
+  @override
+  String get mobileXiangqiReviewNext => 'Next move';
+
+  @override
   String get mobileXiangqiSideBlack => 'Black';
 
   @override

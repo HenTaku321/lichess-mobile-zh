@@ -115,4 +115,19 @@
   <plurals name="xiangqiWatchMoves" comment="Xiangqi watch screen: how far along a game is, in the pairs of moves a player counts rather than the plies the server does. %s is the number of moves.">
     <item quantity="other">%s 回合</item>
   </plurals>
+  <string name="xiangqiReview" comment="The name of the game review feature, as the button that opens one and as the screen title.">複盤</string>
+  <string name="xiangqiReviewAccuracy" comment="The game review's own word for how well a side played, from 0 to 100. xiangqi.com's Chinese uses 表现.">表現</string>
+  <string name="xiangqiReviewBrilliant" comment="Move classification, best of seven: a move that is both the engine's first choice and hard to find.">妙手</string>
+  <string name="xiangqiReviewBest" comment="Move classification, second of seven: the engine's first choice.">正著</string>
+  <string name="xiangqiReviewExcellent" comment="Move classification, third of seven.">優秀</string>
+  <string name="xiangqiReviewGood" comment="Move classification, fourth of seven.">良好</string>
+  <string name="xiangqiReviewInaccuracy" comment="Move classification, fifth of seven.">軟招</string>
+  <string name="xiangqiReviewMistake" comment="Move classification, sixth of seven.">錯招</string>
+  <string name="xiangqiReviewBlunder" comment="Move classification, worst of seven.">漏著</string>
+  <string name="xiangqiReviewBestMoveWas" comment="Game review: the move the engine would have played instead. %s is a move in the game notation.">最佳著法是 %s。</string>
+  <string name="xiangqiReviewNoAnalysis" comment="Game review: shown when the server answered the review request with nothing to draw.">伺服器沒有分析這局棋。</string>
+  <string name="xiangqiReviewFailed" comment="Game review: shown when the review could not be loaded at all.">複盤載入失敗。</string>
+  <string name="xiangqiReviewOffline" comment="Game review: shown when the device is offline, since the analysis is the server's.">目前離線。複盤由伺服器分析，需要連線。</string>
+  <string name="xiangqiReviewPrevious" comment="Game review: the bar button that steps back one move.">上一步</string>
+  <string name="xiangqiReviewNext" comment="Game review: the bar button that steps forward one move.">下一步</string>
 </resources>

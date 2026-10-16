@@ -348,6 +348,28 @@
       }
     }
   },
+  "mobileXiangqiReview": "Game review",
+  "mobileXiangqiReviewAccuracy": "Accuracy",
+  "mobileXiangqiReviewBrilliant": "Brilliant",
+  "mobileXiangqiReviewBest": "Best",
+  "mobileXiangqiReviewExcellent": "Excellent",
+  "mobileXiangqiReviewGood": "Good",
+  "mobileXiangqiReviewInaccuracy": "Inaccuracy",
+  "mobileXiangqiReviewMistake": "Mistake",
+  "mobileXiangqiReviewBlunder": "Blunder",
+  "mobileXiangqiReviewBestMoveWas": "Best was {param}.",
+  "@mobileXiangqiReviewBestMoveWas": {
+    "placeholders": {
+      "param": {
+        "type": "String"
+      }
+    }
+  },
+  "mobileXiangqiReviewNoAnalysis": "The server did not analyse this game.",
+  "mobileXiangqiReviewFailed": "The review could not be loaded.",
+  "mobileXiangqiReviewOffline": "You are offline. The review is the server's, so it needs a connection.",
+  "mobileXiangqiReviewPrevious": "Previous move",
+  "mobileXiangqiReviewNext": "Next move",
   "mobileXiangqiSideBlack": "Black",
   "mobileXiangqiSideRed": "Red",
   "mobileXiangqiSignIn": "Sign in to xiangqi.com",

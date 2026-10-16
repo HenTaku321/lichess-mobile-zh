@@ -171,13 +171,13 @@ XiangqiLiveGame? xiangqiLiveGameFromJson(Map<String, dynamic> json) {
   final id = _string(json['id']);
   if (id == null) return null;
 
-  final red = _player(json['rplayer']);
-  final black = _player(json['bplayer']);
+  final red = xiangqiLivePlayerFromJson(json['rplayer']);
+  final black = xiangqiLivePlayerFromJson(json['bplayer']);
   // A game with a seat nobody is in is not a game being played. The live list has not been measured
   // with one — all twenty rows had both seats filled — but an empty seat is a shape this reader
   // knows from `my-games`, and a row that drew "Red vs Black" for two empty seats would be worse
   // than no row at all.
-  if (!red.isTaken || !black.isTaken) return null;
+  if (red == null || black == null) return null;
 
   return XiangqiLiveGame(
     id: id,
@@ -186,40 +186,37 @@ XiangqiLiveGame? xiangqiLiveGameFromJson(Map<String, dynamic> json) {
     incrementSeconds: _int(json['increment']) ?? 0,
     moveTimeSeconds: (_int(json['move_timer']) ?? 0) * 60,
     movesCount: _int(json['moves_count']) ?? 0,
-    red: red.player,
-    black: black.player,
+    red: red,
+    black: black,
     startedAt: _dateTime(json['timestamp']),
     lastMoveAt: _dateTime(json['last_move_time']),
   );
 }
 
-/// One seat, and whether anybody is in it.
+/// The seat [value] describes, or null when nobody is in it.
 ///
 /// A seat nobody has taken is not a seat with an empty name — it is a seat whose fields are absent,
-/// or the key with a null value — so [isTaken] is asked of both the id and the name rather than of
-/// either alone. This is the same rule `xiangqi_open_game.dart` follows, restated here because the
-/// two files do not share their private helpers.
-typedef _Seat = ({XiangqiLivePlayer player, bool isTaken});
-
-/// The seat [value] describes, or an empty one when it describes none.
-_Seat _player(Object? value) {
-  if (value is! Map<String, dynamic>) {
-    return (player: const XiangqiLivePlayer(id: '', name: '', isBot: false), isTaken: false);
-  }
+/// or the key with a null value — so an empty seat is one where both the id and the name are
+/// missing. This is the same rule `xiangqi_open_game.dart` follows, restated here because the two
+/// files do not share their private helpers.
+///
+/// Public because a seat is the same shape wherever a game is written down: the live list and the
+/// archived snapshot a review is built from carry the very same object, and reading it twice would
+/// be two chances to read it differently.
+XiangqiLivePlayer? xiangqiLivePlayerFromJson(Object? value) {
+  if (value is! Map<String, dynamic>) return null;
   final id = _string(value['id']) ?? '';
   final name = _string(value['identity']) ?? _string(value['username']) ?? '';
+  if (id.isEmpty && name.isEmpty) return null;
   final country = value['country'];
-  return (
-    player: XiangqiLivePlayer(
-      id: id,
-      name: name,
-      rating: _int(value['rating']),
-      secondsLeft: _int(value['seconds']),
-      isBot: const {30, 40}.contains(_int(value['p_type'])),
-      countryName: country is Map<String, dynamic> ? _string(country['name']) : null,
-      countryCode: country is Map<String, dynamic> ? _string(country['code']) : null,
-    ),
-    isTaken: id.isNotEmpty || name.isNotEmpty,
+  return XiangqiLivePlayer(
+    id: id,
+    name: name,
+    rating: _int(value['rating']),
+    secondsLeft: _int(value['seconds']),
+    isBot: const {30, 40}.contains(_int(value['p_type'])),
+    countryName: country is Map<String, dynamic> ? _string(country['name']) : null,
+    countryCode: country is Map<String, dynamic> ? _string(country['code']) : null,
   );
 }
 

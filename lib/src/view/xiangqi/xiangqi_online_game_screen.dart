@@ -14,6 +14,7 @@ import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/focus_detector.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_review_screen.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
 import 'package:lichess_mobile/src/widgets/clock.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
@@ -238,6 +239,18 @@ class _XiangqiOnlineGameScreenState() extends ConsumerState<XiangqiOnlineGameScr
                 label: l10n.resign,
                 onTap: state.isFinished ? null : () => _confirmResign(context, controller),
                 icon: CupertinoIcons.flag,
+              ),
+            // A game that is over can be gone through move by move. Offered to a spectator as well
+            // as to a player: what a review is, is the game read back, and that is the same
+            // question for the two of them.
+            if (state.isFinished)
+              BottomBarButton(
+                label: l10n.mobileXiangqiReview,
+                onTap: () => Navigator.of(
+                  context,
+                  rootNavigator: true,
+                ).push(XiangqiReviewScreen.buildRoute(widget.gameId)),
+                icon: CupertinoIcons.chart_bar_alt_fill,
               ),
             BottomBarButton(
               label: l10n.close,

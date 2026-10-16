@@ -1750,6 +1750,96 @@ abstract class AppLocalizations {
   /// **'{param} resigned.'**
   String mobileXiangqiResigned(String param);
 
+  /// No description provided for @mobileXiangqiReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Game review'**
+  String get mobileXiangqiReview;
+
+  /// No description provided for @mobileXiangqiReviewAccuracy.
+  ///
+  /// In en, this message translates to:
+  /// **'Accuracy'**
+  String get mobileXiangqiReviewAccuracy;
+
+  /// No description provided for @mobileXiangqiReviewBrilliant.
+  ///
+  /// In en, this message translates to:
+  /// **'Brilliant'**
+  String get mobileXiangqiReviewBrilliant;
+
+  /// No description provided for @mobileXiangqiReviewBest.
+  ///
+  /// In en, this message translates to:
+  /// **'Best'**
+  String get mobileXiangqiReviewBest;
+
+  /// No description provided for @mobileXiangqiReviewExcellent.
+  ///
+  /// In en, this message translates to:
+  /// **'Excellent'**
+  String get mobileXiangqiReviewExcellent;
+
+  /// No description provided for @mobileXiangqiReviewGood.
+  ///
+  /// In en, this message translates to:
+  /// **'Good'**
+  String get mobileXiangqiReviewGood;
+
+  /// No description provided for @mobileXiangqiReviewInaccuracy.
+  ///
+  /// In en, this message translates to:
+  /// **'Inaccuracy'**
+  String get mobileXiangqiReviewInaccuracy;
+
+  /// No description provided for @mobileXiangqiReviewMistake.
+  ///
+  /// In en, this message translates to:
+  /// **'Mistake'**
+  String get mobileXiangqiReviewMistake;
+
+  /// No description provided for @mobileXiangqiReviewBlunder.
+  ///
+  /// In en, this message translates to:
+  /// **'Blunder'**
+  String get mobileXiangqiReviewBlunder;
+
+  /// No description provided for @mobileXiangqiReviewBestMoveWas.
+  ///
+  /// In en, this message translates to:
+  /// **'Best was {param}.'**
+  String mobileXiangqiReviewBestMoveWas(String param);
+
+  /// No description provided for @mobileXiangqiReviewNoAnalysis.
+  ///
+  /// In en, this message translates to:
+  /// **'The server did not analyse this game.'**
+  String get mobileXiangqiReviewNoAnalysis;
+
+  /// No description provided for @mobileXiangqiReviewFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The review could not be loaded.'**
+  String get mobileXiangqiReviewFailed;
+
+  /// No description provided for @mobileXiangqiReviewOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'You are offline. The review is the server\'s, so it needs a connection.'**
+  String get mobileXiangqiReviewOffline;
+
+  /// No description provided for @mobileXiangqiReviewPrevious.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous move'**
+  String get mobileXiangqiReviewPrevious;
+
+  /// No description provided for @mobileXiangqiReviewNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Next move'**
+  String get mobileXiangqiReviewNext;
+
   /// No description provided for @mobileXiangqiSideBlack.
   ///
   /// In en, this message translates to:

@@ -810,6 +810,53 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get mobileXiangqiReview => '复盘';
+
+  @override
+  String get mobileXiangqiReviewAccuracy => '表现';
+
+  @override
+  String get mobileXiangqiReviewBrilliant => '妙手';
+
+  @override
+  String get mobileXiangqiReviewBest => '正着';
+
+  @override
+  String get mobileXiangqiReviewExcellent => '优秀';
+
+  @override
+  String get mobileXiangqiReviewGood => '良好';
+
+  @override
+  String get mobileXiangqiReviewInaccuracy => '软招';
+
+  @override
+  String get mobileXiangqiReviewMistake => '错招';
+
+  @override
+  String get mobileXiangqiReviewBlunder => '漏着';
+
+  @override
+  String mobileXiangqiReviewBestMoveWas(String param) {
+    return '最佳着法是 $param。';
+  }
+
+  @override
+  String get mobileXiangqiReviewNoAnalysis => '服务端没有分析这局棋。';
+
+  @override
+  String get mobileXiangqiReviewFailed => '复盘加载失败。';
+
+  @override
+  String get mobileXiangqiReviewOffline => '当前离线。复盘由服务端分析，需要联网。';
+
+  @override
+  String get mobileXiangqiReviewPrevious => '上一步';
+
+  @override
+  String get mobileXiangqiReviewNext => '下一步';
+
+  @override
   String get mobileXiangqiSideBlack => '黑方';
 
   @override
@@ -8397,6 +8444,53 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String mobileXiangqiResigned(String param) {
     return '$param認輸。';
   }
+
+  @override
+  String get mobileXiangqiReview => '複盤';
+
+  @override
+  String get mobileXiangqiReviewAccuracy => '表現';
+
+  @override
+  String get mobileXiangqiReviewBrilliant => '妙手';
+
+  @override
+  String get mobileXiangqiReviewBest => '正著';
+
+  @override
+  String get mobileXiangqiReviewExcellent => '優秀';
+
+  @override
+  String get mobileXiangqiReviewGood => '良好';
+
+  @override
+  String get mobileXiangqiReviewInaccuracy => '軟招';
+
+  @override
+  String get mobileXiangqiReviewMistake => '錯招';
+
+  @override
+  String get mobileXiangqiReviewBlunder => '漏著';
+
+  @override
+  String mobileXiangqiReviewBestMoveWas(String param) {
+    return '最佳著法是 $param。';
+  }
+
+  @override
+  String get mobileXiangqiReviewNoAnalysis => '伺服器沒有分析這局棋。';
+
+  @override
+  String get mobileXiangqiReviewFailed => '複盤載入失敗。';
+
+  @override
+  String get mobileXiangqiReviewOffline => '目前離線。複盤由伺服器分析，需要連線。';
+
+  @override
+  String get mobileXiangqiReviewPrevious => '上一步';
+
+  @override
+  String get mobileXiangqiReviewNext => '下一步';
 
   @override
   String get mobileXiangqiSideBlack => '黑方';

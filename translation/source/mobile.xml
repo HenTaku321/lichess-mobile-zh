@@ -279,6 +279,21 @@
   <string name="xiangqiRanOutOfTime" comment="Xiangqi game-end sentence: the side named by %s used up its clock and lost. Chess says the same thing with its own white/black pair, which a xiangqi game cannot use.">%s ran out of time.</string>
   <string name="xiangqiRedMovesFirst" comment="Xiangqi new game sheet: the line under the side setting once black is chosen, saying the computer opens the game.">Red moves first, so the computer opens the game.</string>
   <string name="xiangqiResigned" comment="Xiangqi game-end sentence: the side named by %s resigned.">%s resigned.</string>
+  <string name="xiangqiReview" comment="The name of the game review feature, as the button that opens one and as the screen title.">Game review</string>
+  <string name="xiangqiReviewAccuracy" comment="The game review's own word for how well a side played, from 0 to 100. xiangqi.com's Chinese uses 表现.">Accuracy</string>
+  <string name="xiangqiReviewBrilliant" comment="Move classification, best of seven: a move that is both the engine's first choice and hard to find.">Brilliant</string>
+  <string name="xiangqiReviewBest" comment="Move classification, second of seven: the engine's first choice.">Best</string>
+  <string name="xiangqiReviewExcellent" comment="Move classification, third of seven.">Excellent</string>
+  <string name="xiangqiReviewGood" comment="Move classification, fourth of seven.">Good</string>
+  <string name="xiangqiReviewInaccuracy" comment="Move classification, fifth of seven.">Inaccuracy</string>
+  <string name="xiangqiReviewMistake" comment="Move classification, sixth of seven.">Mistake</string>
+  <string name="xiangqiReviewBlunder" comment="Move classification, worst of seven.">Blunder</string>
+  <string name="xiangqiReviewBestMoveWas" comment="Game review: the move the engine would have played instead. %s is a move in the game notation.">Best was %s.</string>
+  <string name="xiangqiReviewNoAnalysis" comment="Game review: shown when the server answered the review request with nothing to draw.">The server did not analyse this game.</string>
+  <string name="xiangqiReviewFailed" comment="Game review: shown when the review could not be loaded at all.">The review could not be loaded.</string>
+  <string name="xiangqiReviewOffline" comment="Game review: shown when the device is offline, since the analysis is the server's.">You are offline. The review is the server's, so it needs a connection.</string>
+  <string name="xiangqiReviewPrevious" comment="Game review: the bar button that steps back one move.">Previous move</string>
+  <string name="xiangqiReviewNext" comment="Game review: the bar button that steps forward one move.">Next move</string>
   <string name="xiangqiSideBlack" comment="The black side of a xiangqi game, used as a side name in the game-end sentences.">Black</string>
   <string name="xiangqiSideRed" comment="The red side of a xiangqi game, used as a side name in the game-end sentences.">Red</string>
   <string name="xiangqiSignIn" comment="The entry that starts the xiangqi.com sign-in, and the title of the screen it opens. Named after the service, so that it does not read as a third way of signing in to lichess.">Sign in to xiangqi.com</string>

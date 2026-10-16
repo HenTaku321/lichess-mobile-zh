@@ -250,8 +250,14 @@
   <string name="viewLicenses" comment="Account menu entry that opens the open source licenses page.">查看许可</string>
   <string name="waitingForOpponentToJoin" comment="This is after the user has created a game and is waiting for an opponent to join.">等待对手加入...</string>
   <string name="watchTab" comment="The tab in bottom navigation bar. Must be very short (10 characters max) to avoid ugly text shifting issues." maxLength="10">观看</string>
+  <string name="watchGames" comment="The watch tab entry that opens the list of live games, and the title of that list. Chess opens lichess TV and xiangqi opens the live games on xiangqi.com, which is why the entry names neither.">对局直播</string>
+  <string name="watchGamesSubtitle" comment="The line under the live games entry on the watch tab, saying which two places the games come from.">观看 lichess 或 xiangqi.com 上正在进行的对局。</string>
   <string name="weWillEmailYouCode" comment="Shown on the email sign in screen before requesting a login code.">我们将通过邮件向您发送用于登录的验证码。</string>
   <string name="winOrFiftyMoveDraw" comment="Tablebase verdict: the position is won, or drawn by the fifty move rule.">胜或50回合和棋</string>
+  <string name="xiangqiWatchNoGames" comment="Xiangqi watch screen: shown when xiangqi.com is listing no games in progress at all.">现在没有人在下棋。</string>
+  <plurals name="xiangqiWatchMoves" comment="Xiangqi watch screen: how far along a game is, in the pairs of moves a player counts rather than the plies the server does. %s is the number of moves.">
+    <item quantity="other">%s 回合</item>
+  </plurals>
   <string name="youCannotChallengeYourself" comment="Error snackbar when trying to challenge yourself from the board editor.">您无法向自己发起挑战</string>
   <string name="xiangqi" comment="Xiangqi, the Chinese chess variant, as opposed to international chess. Used as a game name in the offline opponent picker and as a screen title.">象棋</string>
   <string name="xiangqiBoardCoordinates" comment="The board coordinates setting, as it appears on the xiangqi game settings sheet. Nine files by ten ranks, unlike the chess board's eight by eight.">棋盘坐标 (A-I, 0-9)</string>

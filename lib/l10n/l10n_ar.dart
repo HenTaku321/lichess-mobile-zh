@@ -728,6 +728,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get mobileWatchTab => 'شاهد';
 
   @override
+  String get mobileWatchGames => 'Live games';
+
+  @override
+  String get mobileWatchGamesSubtitle => 'Watch a game in progress on lichess or xiangqi.com.';
+
+  @override
   String get mobileWeWillEmailYouCode => 'سنرسل إليك رمزًا عبر البريد الإلكتروني لتسجيل الدخول.';
 
   @override
@@ -821,6 +827,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get mobileXiangqiThreefoldRepetition => 'The same position came back three times, so the game is drawn.';
 
   @override
+  String get mobileXiangqiWatchNoGames => 'Nobody is playing right now.';
+
+  @override
   String get mobileYouCannotChallengeYourself => 'لا يمكنك تحدّي نفسك';
 
   @override
@@ -874,6 +883,17 @@ class AppLocalizationsAr extends AppLocalizations {
       locale: localeName,
       other: 'Get a winning position in $count moves',
       one: 'Get a winning position in $count move',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String mobileXiangqiWatchMoves(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count moves',
+      one: '$count move',
     );
     return '$_temp0';
   }

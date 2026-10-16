@@ -109,4 +109,10 @@
   <string name="xiangqiSignIn" comment="The entry that starts the xiangqi.com sign-in, and the title of the screen it opens. Named after the service, so that it does not read as a third way of signing in to lichess.">登入象棋帳號</string>
   <string name="xiangqiStalemateLoss" comment="Xiangqi game-end sentence: the side named by %s has no legal move. Unlike chess, where having no move is a draw, in xiangqi it loses the game (困毙).">%s無子可走，困斃判負。</string>
   <string name="xiangqiThreefoldRepetition" comment="Xiangqi game-end sentence: the same position occurred three times, drawing the game.">同一局面出現三次，判為和棋。</string>
+  <string name="watchGames" comment="The watch tab entry that opens the list of live games, and the title of that list. Chess opens lichess TV and xiangqi opens the live games on xiangqi.com, which is why the entry names neither.">對局直播</string>
+  <string name="watchGamesSubtitle" comment="The line under the live games entry on the watch tab, saying which two places the games come from.">觀看 lichess 或 xiangqi.com 上正在進行的對局。</string>
+  <string name="xiangqiWatchNoGames" comment="Xiangqi watch screen: shown when xiangqi.com is listing no games in progress at all.">現在沒有人在下一盤棋。</string>
+  <plurals name="xiangqiWatchMoves" comment="Xiangqi watch screen: how far along a game is, in the pairs of moves a player counts rather than the plies the server does. %s is the number of moves.">
+    <item quantity="other">%s 回合</item>
+  </plurals>
 </resources>

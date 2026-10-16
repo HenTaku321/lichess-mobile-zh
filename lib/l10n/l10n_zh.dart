@@ -728,6 +728,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mobileWatchTab => '观看';
 
   @override
+  String get mobileWatchGames => '对局直播';
+
+  @override
+  String get mobileWatchGamesSubtitle => '观看 lichess 或 xiangqi.com 上正在进行的对局。';
+
+  @override
   String get mobileWeWillEmailYouCode => '我们将通过邮件向您发送用于登录的验证码。';
 
   @override
@@ -821,6 +827,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mobileXiangqiThreefoldRepetition => '同一局面出现三次，判为和棋。';
 
   @override
+  String get mobileXiangqiWatchNoGames => '现在没有人在下棋。';
+
+  @override
   String get mobileYouCannotChallengeYourself => '您无法向自己发起挑战';
 
   @override
@@ -869,6 +878,16 @@ class AppLocalizationsZh extends AppLocalizations {
       count,
       locale: localeName,
       other: '在 $count 步内取得胜势',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String mobileXiangqiWatchMoves(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 回合',
     );
     return '$_temp0';
   }
@@ -8304,6 +8323,12 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get mobileWatchTab => '觀戰';
 
   @override
+  String get mobileWatchGames => '對局直播';
+
+  @override
+  String get mobileWatchGamesSubtitle => '觀看 lichess 或 xiangqi.com 上正在進行的對局。';
+
+  @override
   String get mobileXiangqi => '象棋';
 
   @override
@@ -8389,6 +8414,19 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get mobileXiangqiThreefoldRepetition => '同一局面出現三次，判為和棋。';
+
+  @override
+  String get mobileXiangqiWatchNoGames => '現在沒有人在下一盤棋。';
+
+  @override
+  String mobileXiangqiWatchMoves(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 回合',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get activityActivity => '活動';

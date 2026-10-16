@@ -255,6 +255,8 @@
   <string name="viewLicenses" comment="Account menu entry that opens the open source licenses page.">View licences</string>
   <string name="waitingForOpponentToJoin" comment="This is after the user has created a game and is waiting for an opponent to join.">Waiting for opponent to join...</string>
   <string name="watchTab" comment="The tab in bottom navigation bar. Must be very short (10 characters max) to avoid ugly text shifting issues." maxLength="10">Watch</string>
+  <string name="watchGames" comment="The watch tab entry that opens the list of live games, and the title of that list. Chess opens lichess TV and xiangqi opens the live games on xiangqi.com, which is why the entry names neither.">Live games</string>
+  <string name="watchGamesSubtitle" comment="The line under the live games entry on the watch tab, saying which two places the games come from.">Watch a game in progress on lichess or xiangqi.com.</string>
   <string name="weWillEmailYouCode" comment="Shown on the email sign in screen before requesting a login code.">We will email you a code to sign in with.</string>
   <string name="winOrFiftyMoveDraw" comment="Tablebase verdict: the position is won, or drawn by the fifty move rule.">Win or 50 move draw</string>
   <string name="xiangqi" comment="Xiangqi, the Chinese chess variant, as opposed to international chess. Used as a game name in the offline opponent picker and as a screen title.">Xiangqi</string>
@@ -282,5 +284,10 @@
   <string name="xiangqiSignIn" comment="The entry that starts the xiangqi.com sign-in, and the title of the screen it opens. Named after the service, so that it does not read as a third way of signing in to lichess.">Sign in to xiangqi.com</string>
   <string name="xiangqiStalemateLoss" comment="Xiangqi game-end sentence: the side named by %s has no legal move. Unlike chess, where having no move is a draw, in xiangqi it loses the game (困毙).">%s has no legal move, which loses the game.</string>
   <string name="xiangqiThreefoldRepetition" comment="Xiangqi game-end sentence: the same position occurred three times, drawing the game.">The same position came back three times, so the game is drawn.</string>
+  <string name="xiangqiWatchNoGames" comment="Xiangqi watch screen: shown when xiangqi.com is listing no games in progress at all.">Nobody is playing right now.</string>
+  <plurals name="xiangqiWatchMoves" comment="Xiangqi watch screen: how far along a game is, in the pairs of moves a player counts rather than the plies the server does. %s is the number of moves.">
+    <item quantity="one">%s move</item>
+    <item quantity="other">%s moves</item>
+  </plurals>
   <string name="youCannotChallengeYourself" comment="Error snackbar when trying to challenge yourself from the board editor.">You cannot challenge yourself</string>
 </resources>

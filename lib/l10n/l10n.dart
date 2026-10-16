@@ -1606,6 +1606,18 @@ abstract class AppLocalizations {
   /// **'Watch'**
   String get mobileWatchTab;
 
+  /// No description provided for @mobileWatchGames.
+  ///
+  /// In en, this message translates to:
+  /// **'Live games'**
+  String get mobileWatchGames;
+
+  /// No description provided for @mobileWatchGamesSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Watch a game in progress on lichess or xiangqi.com.'**
+  String get mobileWatchGamesSubtitle;
+
   /// No description provided for @mobileWeWillEmailYouCode.
   ///
   /// In en, this message translates to:
@@ -1768,6 +1780,12 @@ abstract class AppLocalizations {
   /// **'The same position came back three times, so the game is drawn.'**
   String get mobileXiangqiThreefoldRepetition;
 
+  /// No description provided for @mobileXiangqiWatchNoGames.
+  ///
+  /// In en, this message translates to:
+  /// **'Nobody is playing right now.'**
+  String get mobileXiangqiWatchNoGames;
+
   /// No description provided for @mobileYouCannotChallengeYourself.
   ///
   /// In en, this message translates to:
@@ -1803,6 +1821,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count, plural, =1{Get a winning position in {count} move} other{Get a winning position in {count} moves}}'**
   String mobilePracticeGoalWinIn(int count);
+
+  /// No description provided for @mobileXiangqiWatchMoves.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{{count} move} other{{count} moves}}'**
+  String mobileXiangqiWatchMoves(int count);
 
   /// No description provided for @activityActivity.
   ///

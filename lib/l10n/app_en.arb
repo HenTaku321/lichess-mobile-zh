@@ -286,6 +286,8 @@
   "mobileViewLicenses": "View licences",
   "mobileWaitingForOpponentToJoin": "Waiting for opponent to join...",
   "mobileWatchTab": "Watch",
+  "mobileWatchGames": "Live games",
+  "mobileWatchGamesSubtitle": "Watch a game in progress on lichess or xiangqi.com.",
   "mobileWeWillEmailYouCode": "We will email you a code to sign in with.",
   "mobileWinOrFiftyMoveDraw": "Win or 50 move draw",
   "mobileXiangqi": "Xiangqi",
@@ -358,6 +360,7 @@
     }
   },
   "mobileXiangqiThreefoldRepetition": "The same position came back three times, so the game is drawn.",
+  "mobileXiangqiWatchNoGames": "Nobody is playing right now.",
   "mobileYouCannotChallengeYourself": "You cannot challenge yourself",
   "mobilePracticeGoalDefendIn": "{count, plural, =1{Defend for {count} more move} other{Defend for {count} more moves}}",
   "@mobilePracticeGoalDefendIn": {
@@ -393,6 +396,14 @@
   },
   "mobilePracticeGoalWinIn": "{count, plural, =1{Get a winning position in {count} move} other{Get a winning position in {count} moves}}",
   "@mobilePracticeGoalWinIn": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mobileXiangqiWatchMoves": "{count, plural, =1{{count} move} other{{count} moves}}",
+  "@mobileXiangqiWatchMoves": {
     "placeholders": {
       "count": {
         "type": "int"

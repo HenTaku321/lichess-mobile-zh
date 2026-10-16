@@ -949,6 +949,35 @@ class AppLocalizationsEu extends AppLocalizations {
   String get mobileXiangqiLessonScriptEmpty => 'This chapter has no moves to play.';
 
   @override
+  String get mobileXiangqiDatabase => 'Master games';
+
+  @override
+  String get mobileXiangqiDatabasePlayers => 'Players';
+
+  @override
+  String get mobileXiangqiDatabasePlayersEmpty => 'No player by that name.';
+
+  @override
+  String get mobileXiangqiDatabaseGames => 'Games';
+
+  @override
+  String get mobileXiangqiDatabaseGamesEmpty => 'No games.';
+
+  @override
+  String mobileXiangqiDatabaseGamesCount(String param) {
+    return '$param games';
+  }
+
+  @override
+  String get mobileXiangqiDatabaseWon => 'won';
+
+  @override
+  String get mobileXiangqiDatabaseLost => 'lost';
+
+  @override
+  String get mobileXiangqiDatabaseDrawn => 'drew';
+
+  @override
   String get mobileXiangqiSideBlack => 'Black';
 
   @override

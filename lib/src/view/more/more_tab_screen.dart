@@ -28,6 +28,7 @@ import 'package:lichess_mobile/src/view/user/leaderboard_screen.dart';
 import 'package:lichess_mobile/src/view/user/player_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_analysis_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_board_editor_screen.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_database_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_friends_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_leaderboard_screen.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_choice_picker.dart';
@@ -224,6 +225,25 @@ class const _Body() extends ConsumerWidget {
                     )),
                     .xiangqi => XiangqiBoardEditorScreen.buildRoute(),
                   });
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.menu_book_outlined),
+                trailing: Theme.of(context).platform == TargetPlatform.iOS
+                    ? const CupertinoListTileChevron()
+                    : null,
+                title: Text(context.l10n.mobileXiangqiDatabase),
+                enabled: isOnline,
+                onTap: () {
+                  // A row of its own rather than a picker like the ones above, and deliberately:
+                  // there is nothing on lichess this is the other half of. The master-games
+                  // database is a library of whole games by named players, and lichess's nearest
+                  // neighbour — the opening explorer — is a different question asked of a
+                  // different corpus. A picker would be claiming the two were one feature.
+                  Navigator.of(
+                    context,
+                    rootNavigator: true,
+                  ).push(XiangqiDatabaseScreen.buildRoute());
                 },
               ),
               ListTile(

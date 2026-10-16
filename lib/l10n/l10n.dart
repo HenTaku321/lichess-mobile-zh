@@ -2008,6 +2008,60 @@ abstract class AppLocalizations {
   /// **'This chapter has no moves to play.'**
   String get mobileXiangqiLessonScriptEmpty;
 
+  /// No description provided for @mobileXiangqiDatabase.
+  ///
+  /// In en, this message translates to:
+  /// **'Master games'**
+  String get mobileXiangqiDatabase;
+
+  /// No description provided for @mobileXiangqiDatabasePlayers.
+  ///
+  /// In en, this message translates to:
+  /// **'Players'**
+  String get mobileXiangqiDatabasePlayers;
+
+  /// No description provided for @mobileXiangqiDatabasePlayersEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No player by that name.'**
+  String get mobileXiangqiDatabasePlayersEmpty;
+
+  /// No description provided for @mobileXiangqiDatabaseGames.
+  ///
+  /// In en, this message translates to:
+  /// **'Games'**
+  String get mobileXiangqiDatabaseGames;
+
+  /// No description provided for @mobileXiangqiDatabaseGamesEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No games.'**
+  String get mobileXiangqiDatabaseGamesEmpty;
+
+  /// No description provided for @mobileXiangqiDatabaseGamesCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{param} games'**
+  String mobileXiangqiDatabaseGamesCount(String param);
+
+  /// No description provided for @mobileXiangqiDatabaseWon.
+  ///
+  /// In en, this message translates to:
+  /// **'won'**
+  String get mobileXiangqiDatabaseWon;
+
+  /// No description provided for @mobileXiangqiDatabaseLost.
+  ///
+  /// In en, this message translates to:
+  /// **'lost'**
+  String get mobileXiangqiDatabaseLost;
+
+  /// No description provided for @mobileXiangqiDatabaseDrawn.
+  ///
+  /// In en, this message translates to:
+  /// **'drew'**
+  String get mobileXiangqiDatabaseDrawn;
+
   /// No description provided for @mobileXiangqiSideBlack.
   ///
   /// In en, this message translates to:

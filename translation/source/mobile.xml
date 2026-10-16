@@ -322,6 +322,15 @@
   <string name="xiangqiLessonNoChapters" comment="Xiangqi lesson screen: shown when a lesson has no chapters to list.">No chapters.</string>
   <string name="xiangqiLessonScript" comment="Xiangqi chapter screen: the heading of the list of moves the chapter wants played.">The line to play</string>
   <string name="xiangqiLessonScriptEmpty" comment="Xiangqi chapter screen: shown when a chapter carries no moves, which is a chapter that only reads.">This chapter has no moves to play.</string>
+  <string name="xiangqiDatabase" comment="Xiangqi database screen: the title of the master-games database, and the name of the feature.">Master games</string>
+  <string name="xiangqiDatabasePlayers" comment="Xiangqi database screen: the heading of the list of players the database is built around.">Players</string>
+  <string name="xiangqiDatabasePlayersEmpty" comment="Xiangqi database screen: shown when a search finds no player.">No player by that name.</string>
+  <string name="xiangqiDatabaseGames" comment="Xiangqi database screen: the heading of a player's games.">Games</string>
+  <string name="xiangqiDatabaseGamesEmpty" comment="Xiangqi database screen: shown when a player has no games in the database.">No games.</string>
+  <string name="xiangqiDatabaseGamesCount" comment="Xiangqi database screen: how many games of a player the database holds. %s is the number.">%s games</string>
+  <string name="xiangqiDatabaseWon" comment="Xiangqi database screen: a game the player whose page this is won.">won</string>
+  <string name="xiangqiDatabaseLost" comment="Xiangqi database screen: a game the player whose page this is lost.">lost</string>
+  <string name="xiangqiDatabaseDrawn" comment="Xiangqi database screen: a game the player whose page this is drew.">drew</string>
   <string name="xiangqiSideBlack" comment="The black side of a xiangqi game, used as a side name in the game-end sentences.">Black</string>
   <string name="xiangqiSideRed" comment="The red side of a xiangqi game, used as a side name in the game-end sentences.">Red</string>
   <string name="xiangqiSignIn" comment="The entry that starts the xiangqi.com sign-in, and the title of the screen it opens. Named after the service, so that it does not read as a third way of signing in to lichess.">Sign in to xiangqi.com</string>

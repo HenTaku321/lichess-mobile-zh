@@ -949,6 +949,35 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mobileXiangqiLessonScriptEmpty => '本章没有要走的一步。';
 
   @override
+  String get mobileXiangqiDatabase => '大师棋谱';
+
+  @override
+  String get mobileXiangqiDatabasePlayers => '棋手';
+
+  @override
+  String get mobileXiangqiDatabasePlayersEmpty => '没有这个名字的棋手。';
+
+  @override
+  String get mobileXiangqiDatabaseGames => '对局';
+
+  @override
+  String get mobileXiangqiDatabaseGamesEmpty => '没有对局。';
+
+  @override
+  String mobileXiangqiDatabaseGamesCount(String param) {
+    return '$param 局';
+  }
+
+  @override
+  String get mobileXiangqiDatabaseWon => '胜';
+
+  @override
+  String get mobileXiangqiDatabaseLost => '负';
+
+  @override
+  String get mobileXiangqiDatabaseDrawn => '和';
+
+  @override
   String get mobileXiangqiSideBlack => '黑方';
 
   @override
@@ -8675,6 +8704,35 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get mobileXiangqiLessonScriptEmpty => '本章沒有要走的一步。';
+
+  @override
+  String get mobileXiangqiDatabase => '大師棋譜';
+
+  @override
+  String get mobileXiangqiDatabasePlayers => '棋手';
+
+  @override
+  String get mobileXiangqiDatabasePlayersEmpty => '沒有這個名字的棋手。';
+
+  @override
+  String get mobileXiangqiDatabaseGames => '對局';
+
+  @override
+  String get mobileXiangqiDatabaseGamesEmpty => '沒有對局。';
+
+  @override
+  String mobileXiangqiDatabaseGamesCount(String param) {
+    return '$param 局';
+  }
+
+  @override
+  String get mobileXiangqiDatabaseWon => '勝';
+
+  @override
+  String get mobileXiangqiDatabaseLost => '負';
+
+  @override
+  String get mobileXiangqiDatabaseDrawn => '和';
 
   @override
   String get mobileXiangqiSideBlack => '黑方';

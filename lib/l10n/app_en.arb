@@ -429,6 +429,22 @@
   "mobileXiangqiLessonNoChapters": "No chapters.",
   "mobileXiangqiLessonScript": "The line to play",
   "mobileXiangqiLessonScriptEmpty": "This chapter has no moves to play.",
+  "mobileXiangqiDatabase": "Master games",
+  "mobileXiangqiDatabasePlayers": "Players",
+  "mobileXiangqiDatabasePlayersEmpty": "No player by that name.",
+  "mobileXiangqiDatabaseGames": "Games",
+  "mobileXiangqiDatabaseGamesEmpty": "No games.",
+  "mobileXiangqiDatabaseGamesCount": "{param} games",
+  "@mobileXiangqiDatabaseGamesCount": {
+    "placeholders": {
+      "param": {
+        "type": "String"
+      }
+    }
+  },
+  "mobileXiangqiDatabaseWon": "won",
+  "mobileXiangqiDatabaseLost": "lost",
+  "mobileXiangqiDatabaseDrawn": "drew",
   "mobileXiangqiSideBlack": "Black",
   "mobileXiangqiSideRed": "Red",
   "mobileXiangqiSignIn": "Sign in to xiangqi.com",

@@ -158,4 +158,13 @@
   <string name="xiangqiLessonNoChapters" comment="Xiangqi lesson screen: shown when a lesson has no chapters to list.">沒有章節。</string>
   <string name="xiangqiLessonScript" comment="Xiangqi chapter screen: the heading of the list of moves the chapter wants played.">要走的一條線</string>
   <string name="xiangqiLessonScriptEmpty" comment="Xiangqi chapter screen: shown when a chapter carries no moves, which is a chapter that only reads.">本章沒有要走的一步。</string>
+  <string name="xiangqiDatabase" comment="Xiangqi database screen: the title of the master-games database, and the name of the feature.">大師棋譜</string>
+  <string name="xiangqiDatabasePlayers" comment="Xiangqi database screen: the heading of the list of players the database is built around.">棋手</string>
+  <string name="xiangqiDatabasePlayersEmpty" comment="Xiangqi database screen: shown when a search finds no player.">沒有這個名字的棋手。</string>
+  <string name="xiangqiDatabaseGames" comment="Xiangqi database screen: the heading of a player's games.">對局</string>
+  <string name="xiangqiDatabaseGamesEmpty" comment="Xiangqi database screen: shown when a player has no games in the database.">沒有對局。</string>
+  <string name="xiangqiDatabaseGamesCount" comment="Xiangqi database screen: how many games of a player the database holds. %s is the number.">%s 局</string>
+  <string name="xiangqiDatabaseWon" comment="Xiangqi database screen: a game the player whose page this is won.">勝</string>
+  <string name="xiangqiDatabaseLost" comment="Xiangqi database screen: a game the player whose page this is lost.">負</string>
+  <string name="xiangqiDatabaseDrawn" comment="Xiangqi database screen: a game the player whose page this is drew.">和</string>
 </resources>

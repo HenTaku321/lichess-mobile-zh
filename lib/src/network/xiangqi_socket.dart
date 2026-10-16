@@ -16,6 +16,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart' show immutable;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
 import 'package:lichess_mobile/src/network/socket.dart'
     show WebSocketChannelFactory, webSocketChannelFactoryProvider;
 import 'package:lichess_mobile/src/network/xiangqi_http.dart' show xiangqiAuthStorageProvider;
@@ -661,11 +662,49 @@ String _redact(String message, String token) {
 /// The connection is **not** opened here: call [XiangqiSocketClient.connect] from the screen that
 /// needs it, so that opening a xiangqi game is what puts a xiangqi socket on the wire — and so that
 /// nothing at app start touches a second server.
+///
+/// ## The token, and the guest session behind it
+///
+/// **The socket refuses a connection with no token at all** — measured on 2026-10-16, where a join
+/// with no `jwt` was answered `44/xiangqi,{"message":"Connection rejected by server"}`. So a device
+/// that has never signed in cannot open one, and the two things that live on the socket — watching
+/// a game and reading one back — would be unavailable to it.
+///
+/// What makes them available is the guest session the site's own client mints for a visitor:
+/// `POST /api/users/guest_jwt` answers a token that the socket accepts, and a guest was measured
+/// being handed a live game's snapshot and a whole archived game's analysis. So the token is read
+/// from storage, and **minted on demand** when there is none.
+///
+/// On demand and not at startup, deliberately: minting one is an account on somebody else's service,
+/// and a reader who never opens a xiangqi screen should not have one made for them. The moment the
+/// socket is asked to connect is the moment the app has a reason.
+///
+/// The subscription is not decoration. [XiangqiAuthController] is `autoDispose`, so it is collected
+/// between the read that finds no session and the write that stores the guest one unless something
+/// is listening to it — and a controller collected mid-flight is a guest token that never lands.
 final xiangqiSocketProvider = Provider<XiangqiSocketClient>((Ref ref) {
   final storage = ref.read(xiangqiAuthStorageProvider);
+  final auth = ref.read(xiangqiAuthControllerProvider.notifier);
+
+  // Held for the provider's own lifetime, which is the app's: see the class doc.
+  final keepAlive = ref.listen(xiangqiAuthControllerProvider, (_, _) {});
+  ref.onDispose(keepAlive.close);
+
   final client = XiangqiSocketClient(
     channelFactory: ref.read(webSocketChannelFactoryProvider),
-    getToken: () async => (await storage.read())?.accessToken,
+    getToken: () async {
+      final stored = await storage.read();
+      if (stored != null) return stored.accessToken;
+      try {
+        await auth.ensureGuestSession();
+      } on Object catch (error, stackTrace) {
+        // The socket reports the failure that follows; this is the reason behind it, which the
+        // socket's own message cannot carry.
+        _logger.warning('Could not mint a guest xiangqi.com session.', error, stackTrace);
+        return null;
+      }
+      return (await storage.read())?.accessToken;
+    },
   );
   ref.onDispose(client.dispose);
   return client;

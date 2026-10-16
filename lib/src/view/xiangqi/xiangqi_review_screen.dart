@@ -11,7 +11,6 @@ import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
-import 'package:lichess_mobile/src/view/auth/xiangqi_login_screen.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_avatar.dart';
@@ -67,9 +66,9 @@ class const _Body({required final String gameId}) extends ConsumerWidget {
       data: (review) => _Review(review: review),
       loading: () => const Center(child: CircularProgressIndicator.adaptive()),
       error: (error, stackTrace) => switch (error) {
-        // A device with no session has nothing to ask with, and the way in is offered rather than
-        // taken — the same arrangement the puzzle screen makes, and for the same reason.
-        XiangqiReviewException(reason: .noSession) => const _SignInPrompt(),
+        // No session branch: a review needs none. The socket opens a guest one of its own when the
+        // device has never signed in, and a guest was measured being handed a whole archived game's
+        // analysis — see [xiangqiReviewProvider].
         XiangqiReviewException(reason: .offline) => _Failed(
           message: context.l10n.mobileXiangqiReviewOffline,
           onRetry: () => ref.invalidate(xiangqiReviewProvider(gameId)),
@@ -313,35 +312,6 @@ Color _classificationColor(BuildContext context, XiangqiMoveClassification class
     .mistake => colors.brag,
     .blunder => colors.error,
   };
-}
-
-/// The way in, for a device with no xiangqi.com session.
-class const _SignInPrompt() extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: Styles.bodySectionPadding,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const XiangqiPieceAvatar(side: XiangqiSide.red, size: 64),
-            const SizedBox(height: 16.0),
-            Text(
-              context.l10n.mobileXiangqiSignIn,
-              textAlign: TextAlign.center,
-              style: TextTheme.of(context).bodyMedium?.copyWith(color: textShade(context, 0.7)),
-            ),
-            const SizedBox(height: 16.0),
-            FilledButton(
-              onPressed: () => Navigator.of(context).push(XiangqiLoginScreen.buildRoute()),
-              child: Text(context.l10n.mobileXiangqiSignIn),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 /// Something did not arrive, and there is a way to ask again.

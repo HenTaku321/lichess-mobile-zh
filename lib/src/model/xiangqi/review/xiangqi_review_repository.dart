@@ -3,7 +3,6 @@ import 'dart:io' show HttpDate;
 
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_com_protocol.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_live_game.dart';
 import 'package:lichess_mobile/src/model/xiangqi/review/xiangqi_review.dart';
@@ -36,9 +35,6 @@ const String kXiangqiReviewSuccessEvent = 'game.review.success';
 /// ask at all, a device that is offline cannot reach the server, and a server that answered is a
 /// failure of the review itself.
 enum XiangqiReviewFailure() {
-  /// There is no xiangqi.com session to ask with.
-  noSession,
-
   /// The device is offline.
   offline,
 
@@ -46,7 +42,7 @@ enum XiangqiReviewFailure() {
   failed,
 }
 
-/// Thrown when a review cannot be produced, carrying which of the three reasons it was.
+/// Thrown when a review cannot be produced, carrying which of the two reasons it was.
 class const XiangqiReviewException(final XiangqiReviewFailure reason) implements Exception {
   @override
   String toString() => 'XiangqiReviewException: ${reason.name}';
@@ -74,9 +70,10 @@ final xiangqiReviewProvider = FutureProvider.autoDispose.family<XiangqiReview, S
   Ref ref,
   String gameId,
 ) async {
-  if (ref.watch(xiangqiAuthControllerProvider) == null) {
-    throw const XiangqiReviewException(XiangqiReviewFailure.noSession);
-  }
+  // **No session is needed.** A review is a socket conversation, and the socket opens a guest
+  // session of its own when there is none — measured on 2026-10-16, where a guest token was handed
+  // the whole analysis of an archived game. Gating this on a signed-in account would leave the one
+  // screen that reads a game back unavailable to a reader who has never signed in.
   if (!ref.watch(isDeviceOnlineProvider)) {
     throw const XiangqiReviewException(XiangqiReviewFailure.offline);
   }

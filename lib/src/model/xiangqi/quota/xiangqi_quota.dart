@@ -97,13 +97,17 @@ final xiangqiQuotaRepositoryProvider = Provider<XiangqiQuotaRepository>((Ref ref
 
 /// The daily allowances, from `GET /api/quota/state`.
 ///
-/// **No session, no request**: an account that has never signed in to xiangqi.com has no allowances
-/// there, and asking would be a request the server can only refuse. Offline is an [Error] rather
-/// than an empty state, for the reason every other xiangqi provider gives — `lichessProviderRetry`
-/// never retries an [Error], so being offline is settled at once.
+/// **A real account only, and the server is why.** This is one of the few endpoints that wants one:
+/// measured on 2026-10-16, a request with no token was answered `401 Missing Authorization Header`
+/// and one with a *guest* token `401 User must logged in but found invalid user data for guest…`.
+/// So the gate here is [isXiangqiLoggedInProvider] and not "any session" — a guest has no allowances
+/// to be told about, and asking on their behalf is a request the server can only refuse.
+///
+/// Offline is an [Error] rather than an empty state, for the reason every other xiangqi provider
+/// gives — `lichessProviderRetry` never retries an [Error], so being offline is settled at once.
 final xiangqiQuotaStateProvider = FutureProvider.autoDispose<XiangqiQuotaState>((Ref ref) {
-  if (ref.watch(xiangqiAuthControllerProvider) == null) {
-    throw StateError('No xiangqi.com session; not asking for the daily allowances.');
+  if (!ref.watch(isXiangqiLoggedInProvider)) {
+    throw StateError('No xiangqi.com account; not asking for the daily allowances.');
   }
   if (!ref.watch(isDeviceOnlineProvider)) {
     throw StateError('The device is offline; not asking xiangqi.com for the daily allowances.');

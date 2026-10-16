@@ -162,6 +162,13 @@ sealed class const XiangqiOnlineGameState._() with _$XiangqiOnlineGameState {
     @Default(false) bool isLoaded,
 
     /// The last thing that went wrong, or null.
+    ///
+    /// **This can be set while [isLoaded] is false, and that pair is what a screen has to tell
+    /// apart from "still loading".** A game that never arrived — the socket would not open, the
+    /// server refused the namespace, the request was never answered — is a failure with nothing
+    /// read, so `isLoaded` stays false and this carries the reason. A screen that checked
+    /// `isLoaded` first would spin forever on it; see `XiangqiOnlineGameScreen._game`, which checks
+    /// this first for exactly that reason.
     String? error,
   }) = _XiangqiOnlineGameState;
 

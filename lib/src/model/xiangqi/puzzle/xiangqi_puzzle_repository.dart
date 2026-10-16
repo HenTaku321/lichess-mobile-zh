@@ -74,15 +74,18 @@ final xiangqiPuzzleRepositoryProvider = Provider<XiangqiPuzzleRepository>((Ref r
 /// A `429` **without** a puzzle in it is the other shape the server sends — `start_puzzle_race`
 /// answers that way — and that one is a real refusal, so it is a [XiangqiQuotaExceededException].
 ///
-/// **No session, no request.** The endpoint needs a token, and a device that has never signed in to
-/// xiangqi.com has none; the screen offers the way in rather than this provider inventing a guest
-/// account behind the user's back.
+/// **A real account, and the server is why.** Reading a puzzle is open to anybody — measured on
+/// 2026-10-16, where `GET /api/puzzle/P/<id>` answered `200` with no token at all — but *solving*
+/// one is not: `POST /api/puzzle/<id>/complete` and `POST /api/quota/usage` both answer
+/// `401 Missing Authorization Header` without a token and `401 …invalid user data for guest…` with a
+/// guest's. The screen offers the way in rather than this provider inventing a guest account behind
+/// the user's back.
 final xiangqiPuzzleProvider = FutureProvider.autoDispose.family<XiangqiPuzzle, String>((
   Ref ref,
   String id,
 ) {
-  if (ref.watch(xiangqiAuthControllerProvider) == null) {
-    throw StateError('No xiangqi.com session; not asking for puzzle $id.');
+  if (!ref.watch(isXiangqiLoggedInProvider)) {
+    throw StateError('No xiangqi.com account; not asking for puzzle $id.');
   }
   if (!ref.watch(isDeviceOnlineProvider)) {
     throw StateError('The device is offline; not asking xiangqi.com for puzzle $id.');
@@ -99,8 +102,10 @@ final xiangqiPuzzleProvider = FutureProvider.autoDispose.family<XiangqiPuzzle, S
 /// This call does **not** spend an allowance. See [xiangqiPuzzleProvider] for where the charge is.
 final xiangqiPuzzleSearchProvider = FutureProvider.autoDispose
     .family<String?, XiangqiPuzzleSearchQuery>((Ref ref, XiangqiPuzzleSearchQuery query) {
-      if (ref.watch(xiangqiAuthControllerProvider) == null) {
-        throw StateError('No xiangqi.com session; not asking for a puzzle.');
+      // A real account, for the reason [xiangqiPuzzleProvider] gives: the search itself is open to
+      // anybody, but a puzzle nobody can submit is not a puzzle this screen has a use for.
+      if (!ref.watch(isXiangqiLoggedInProvider)) {
+        throw StateError('No xiangqi.com account; not asking for a puzzle.');
       }
       if (!ref.watch(isDeviceOnlineProvider)) {
         throw StateError('The device is offline; not asking xiangqi.com for a puzzle.');

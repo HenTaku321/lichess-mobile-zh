@@ -62,10 +62,16 @@ class const XiangqiPuzzleScreen({super.key}) extends ConsumerWidget {
 class const _Body() extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // The puzzle endpoints want a token, and a device that has never signed in to xiangqi.com has
-    // none. The way in is offered rather than taken: a guest account is a real account on somebody
-    // else's service, and making one behind the user's back is not this screen's to do.
-    if (ref.watch(xiangqiAuthControllerProvider) == null) {
+    // **A real account, and the server is why.** Finding a puzzle and reading one are open to
+    // anybody — measured on 2026-10-16, both answered `200` with no token at all — but *solving* one
+    // is not: `POST /api/puzzle/<id>/complete` and `POST /api/quota/usage` both answer
+    // `401 Missing Authorization Header` without a token and `401 …invalid user data for guest…`
+    // with a guest's. A solver who could only fetch would be a solver who could not submit, so the
+    // whole screen asks for an account rather than half of it asking and half of it failing.
+    //
+    // The way in is offered rather than taken: a guest account is a real account on somebody else's
+    // service, and making one behind the user's back is not this screen's to do.
+    if (!ref.watch(isXiangqiLoggedInProvider)) {
       return const _SignInPrompt();
     }
 

@@ -83,14 +83,17 @@ Future<http.Response> xiangqiJsonResponse(String body, int status) =>
 
 /// A session, so that the providers that refuse to ask without one have one to find.
 ///
-/// A guest, because that is the session that costs nothing to describe: its id is a string, which is
-/// the other half of what the `sub` of a token can be.
+/// **A real account and not a guest**, because the puzzle domain needs one: the search and the fetch
+/// are open to anybody, but `complete` and `quota/usage` are `401` to a guest — measured on
+/// 2026-10-16 — so the screen and its providers gate on [isXiangqiLoggedInProvider] rather than on
+/// "any session". A fixture that handed them a guest would be testing a state the screen never
+/// reaches.
 const xiangqiTestSession = XiangqiSession(
-  userId: 'guestzzzzz',
-  name: 'guestzzzzz',
+  userId: '100001',
+  name: 'a-player',
   accessToken: 'access-token',
   refreshToken: 'refresh-token',
-  isGuest: true,
+  isGuest: false,
 );
 
 /// A stand-in for "this argument was not given".

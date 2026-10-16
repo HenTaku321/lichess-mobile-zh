@@ -243,12 +243,16 @@ void main() {
       expect(board(tester).position.toFen(), XiangqiPosition.initial().toFen());
     });
 
-    testWidgets('a device with no session is offered the way in', (tester) async {
-      await pumpReview(tester, signedIn: false);
-      await tester.pumpAndSettle();
+    testWidgets('a device with no session is not asked for one', (tester) async {
+      // **A review needs no account.** The socket opens a guest session of its own when there is
+      // none, and a guest was measured being handed a whole archived game's analysis — so the screen
+      // behind this one draws the game rather than a sign-in prompt. The socket is stubbed here, so
+      // what this pins is the screen's own half: no session is not a reason to refuse.
+      final factory = await pumpReview(tester, signedIn: false);
+      await loadReview(tester, factory);
 
-      expect(find.byType(XiangqiBoard), findsNothing);
-      expect(find.text('Sign in to xiangqi.com'), findsWidgets);
+      expect(find.byType(XiangqiBoard), findsOneWidget);
+      expect(find.text('Sign in to xiangqi.com'), findsNothing);
     });
 
     testWidgets('a review the server does not answer offers the way to ask again', (tester) async {

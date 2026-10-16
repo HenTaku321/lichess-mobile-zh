@@ -23,6 +23,7 @@ import 'package:lichess_mobile/src/widgets/clock.dart';
 import 'package:lichess_mobile/src/widgets/move_list.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_avatar.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../binding.dart';
 import '../../model/xiangqi/online/xiangqi_online_game_fixture.dart' as fx;
@@ -246,6 +247,54 @@ void main() {
       expect(board(tester).position.toFen(), fx.xiangqiTestPositions.last.toFen());
       expect(barButton(CupertinoIcons.flag), findsOneWidget);
       expect(tester.widget<BottomBarButton>(barButton(CupertinoIcons.flag)).onTap, isNull);
+    });
+
+    testWidgets('a socket that will not open says so, rather than spinning forever', (
+      tester,
+    ) async {
+      // **The regression this wave fixed.** The state a failed load leaves behind is `error` set and
+      // `isLoaded` false — nothing was ever read — and the screen used to check `isLoaded` first, so
+      // it drew a spinner for a game that was never coming. The reader could not tell that from a
+      // slow one, and there was no way out of it.
+      //
+      // The screen is pumped without a handshake, which is what a refused connection or a dead
+      // network looks like from here: the channel opens and then dies before the connect ack.
+      final factory = fx.FakeXiangqiChannelFactory();
+      final client = XiangqiSocketClient(
+        channelFactory: factory,
+        getToken: () async => fx.xiangqiTestToken(fx.xiangqiTestViewerId),
+      );
+      addTearDown(client.dispose);
+
+      await tester.pumpWidget(
+        await makeTestProviderScopeApp(
+          tester,
+          home: const XiangqiOnlineGameScreen(gameId: fx.xiangqiTestGameId),
+          overrides: {
+            xiangqiSocketProvider: xiangqiSocketProvider.overrideWith((Ref ref) {
+              ref.onDispose(client.dispose);
+              return client;
+            }),
+            xiangqiAuthStorageProvider: xiangqiAuthStorageProvider.overrideWithValue(
+              fx.FakeXiangqiAuthStorage(
+                fx.xiangqiTestSession(fx.xiangqiTestToken(fx.xiangqiTestViewerId)),
+              ),
+            ),
+          },
+        ),
+      );
+      for (var pump = 0; pump < 5 && factory.channels.isEmpty; pump++) {
+        await tester.pump();
+      }
+      expect(factory.channels, isNotEmpty, reason: 'the screen is expected to open a socket');
+
+      factory.channel.closeFromServer();
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.text('Retry'), findsOneWidget);
+      expect(find.byType(XiangqiBoard), findsNothing);
     });
   });
 }

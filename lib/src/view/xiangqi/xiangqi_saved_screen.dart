@@ -33,7 +33,11 @@ class const XiangqiSavedScreen({super.key}) extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final username = ref.watch(xiangqiAuthControllerProvider)?.name;
+    // **A real account**: the folder tree is filed under a username, and a guest's own name is not
+    // one the server will answer for — measured on 2026-10-16, where `items/folders/<guest>/…` was a
+    // `404` and the signed-in account's was a `200`.
+    final session = ref.watch(xiangqiAuthControllerProvider);
+    final username = session != null && !session.isGuest ? session.name : null;
 
     return DefaultTabController(
       length: XiangqiSavedKind.values.length,

@@ -120,11 +120,9 @@ class _XiangqiOnlineGameScreenState() extends ConsumerState<XiangqiOnlineGameScr
       body: SafeArea(
         child: switch (asyncState) {
           AsyncData(:final value) => _game(context, value, boardPrefs),
-          AsyncError(:final error) => Center(
-            child: Padding(
-              padding: Styles.bodySectionPadding,
-              child: Text(error.toString(), textAlign: TextAlign.center),
-            ),
+          AsyncError(:final error) => _Failed(
+            message: error.toString(),
+            onRetry: () => ref.invalidate(xiangqiOnlineGameControllerProvider(widget.gameId)),
           ),
           _ => const Center(child: CircularProgressIndicator.adaptive()),
         },
@@ -133,7 +131,21 @@ class _XiangqiOnlineGameScreenState() extends ConsumerState<XiangqiOnlineGameScr
   }
 
   Widget _game(BuildContext context, XiangqiOnlineGameState state, BoardPrefs boardPrefs) {
-    if (!state.isLoaded) return const Center(child: CircularProgressIndicator.adaptive());
+    // **The error is checked before the spinner, and that order is the whole of this method.** A
+    // state that has failed to load is not a state that is still loading: the socket reports what
+    // went wrong by setting [XiangqiOnlineGameState.error] and leaving `isLoaded` false, because
+    // nothing was ever read. Reading `isLoaded` first would draw a spinner for a game that is never
+    // coming, and the reader would have no way to tell that from a slow one.
+    if (!state.isLoaded) {
+      final error = state.error;
+      if (error == null) return const Center(child: CircularProgressIndicator.adaptive());
+      return _Failed(
+        message: error,
+        // Retrying is asking again, and the socket client is already reconnecting on its own with a
+        // back-off behind it — this is the reader saying "now", not the app's only chance.
+        onRetry: () => ref.invalidate(xiangqiOnlineGameControllerProvider(widget.gameId)),
+      );
+    }
 
     final controller = ref.read(xiangqiOnlineGameControllerProvider(widget.gameId).notifier);
     final l10n = context.l10n;
@@ -276,6 +288,31 @@ class _XiangqiOnlineGameScreenState() extends ConsumerState<XiangqiOnlineGameScr
           unawaited(controller.resign());
         },
         onNo: () => Navigator.pop(context),
+      ),
+    );
+  }
+}
+
+/// Something did not arrive, and there is a way to ask again.
+///
+/// The shape the other xiangqi screens use for the same moment, kept here rather than imported: the
+/// three of them are a sentence and a button, and a shared widget for two lines would be a file to
+/// find rather than a thing to read.
+class const _Failed({required final String message, required final VoidCallback onRetry})
+    extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: Styles.bodySectionPadding,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(message, textAlign: TextAlign.center),
+            const SizedBox(height: 16.0),
+            FilledButton(onPressed: onRetry, child: Text(context.l10n.retry)),
+          ],
+        ),
       ),
     );
   }

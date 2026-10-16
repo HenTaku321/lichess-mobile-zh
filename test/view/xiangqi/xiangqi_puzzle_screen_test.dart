@@ -17,6 +17,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_session.dart';
 import 'package:lichess_mobile/src/model/xiangqi/puzzle/xiangqi_puzzle.dart';
 import 'package:lichess_mobile/src/model/xiangqi/puzzle/xiangqi_puzzle_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
@@ -113,10 +114,12 @@ class PuzzleServer({
 /// The session is put in place through the storage provider rather than by overriding the
 /// controller, which is the one thing the harness allows here: the store is a plain provider and the
 /// controller is not.
+/// [session] is what the storage hands out: the fixture's real account by default, null for a device
+/// that has never signed in, and [xiangqiGuestSession] for one that has only a guest token.
 Future<void> pumpPuzzleScreen(
   WidgetTester tester, {
   required PuzzleServer server,
-  bool signedIn = true,
+  Object? session = _defaultSession,
 }) async {
   await tester.pumpWidget(
     await makeTestProviderScopeApp(
@@ -124,7 +127,9 @@ Future<void> pumpPuzzleScreen(
       home: const XiangqiPuzzleScreen(),
       overrides: {
         xiangqiAuthStorageProvider: xiangqiAuthStorageProvider.overrideWithValue(
-          FakeXiangqiAuthStorage(signedIn ? xiangqiTestSession : null),
+          FakeXiangqiAuthStorage(
+            identical(session, _defaultSession) ? xiangqiTestSession : session as XiangqiSession?,
+          ),
         ),
         httpClientFactoryProvider: httpClientFactoryProvider.overrideWith(
           (ref) => FakeHttpClientFactory(() => server.client),
@@ -134,6 +139,18 @@ Future<void> pumpPuzzleScreen(
   );
   await settle(tester);
 }
+
+/// A sentinel meaning "the fixture's own session", so that [pumpPuzzleScreen] can tell "not given"
+/// apart from an explicit null.
+const _defaultSession = Object();
+
+/// A session with no account behind it, which is what the socket mints for a visitor.
+const xiangqiGuestSession = XiangqiSession(
+  userId: 'guest5rll3',
+  name: 'guest5rll3',
+  accessToken: 'guest-token',
+  isGuest: true,
+);
 
 /// The board the screen has drawn.
 XiangqiBoard board(WidgetTester tester) => tester.widget<XiangqiBoard>(find.byType(XiangqiBoard));
@@ -191,7 +208,17 @@ void main() {
 
   group('XiangqiPuzzleScreen', () {
     testWidgets('a device with no session is offered the way in, and no board', (tester) async {
-      await pumpPuzzleScreen(tester, server: PuzzleServer(), signedIn: false);
+      await pumpPuzzleScreen(tester, server: PuzzleServer(), session: null);
+
+      expect(find.byType(XiangqiBoard), findsNothing);
+      expect(find.text('Sign in to xiangqi.com'), findsWidgets);
+    });
+
+    testWidgets('a guest session is offered the way in, and no board', (tester) async {
+      // **A guest is not an account here.** The search and the fetch are open to anybody, but
+      // `complete` and `quota/usage` are `401` to a guest — measured on 2026-10-16 — so a solver
+      // who could only fetch would be a solver who could not submit.
+      await pumpPuzzleScreen(tester, server: PuzzleServer(), session: xiangqiGuestSession);
 
       expect(find.byType(XiangqiBoard), findsNothing);
       expect(find.text('Sign in to xiangqi.com'), findsWidgets);

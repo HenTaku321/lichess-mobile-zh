@@ -135,7 +135,8 @@ class XiangqiAuthController() extends Notifier<XiangqiSession?> {
   /// `POST /api/users/guest_jwt` with an empty body answers `{"jwt": "..."}` — the one shape in
   /// this file that was measured live (`auth.rs:428-430`). The guest's `sub` looks like `guest7zuq8`.
   ///
-  /// Not called from any screen yet: see [ensureGuestSession].
+  /// Reached through [ensureGuestSession], which is what the socket provider calls when it is asked
+  /// to connect with nothing in storage.
   Future<void> signInAsGuest() async {
     final response = await _client.post(
       xiangqiUri('users/guest_jwt'),
@@ -170,10 +171,15 @@ class XiangqiAuthController() extends Notifier<XiangqiSession?> {
 
   /// Makes sure a session exists, creating a guest one when there is none.
   ///
-  /// **Deliberately called from nowhere in this wave.** The sign-in/account screens do not touch
-  /// it: silently creating an anonymous xiangqi.com account the moment a user opens the account
-  /// page would be an outward-facing action nobody asked for. The caller is the merged
-  /// online-xiangqi screen of the next wave, which calls this when online data is first needed.
+  /// **Called by the socket provider, and only there** — see `xiangqiSocketProvider`. The socket
+  /// refuses a connection with no token at all, so watching a game or reading one back needs
+  /// *something*, and a guest is what the site's own client uses for a visitor.
+  ///
+  /// **On demand and not at startup**, deliberately: minting one is an account on somebody else's
+  /// service, and a reader who never opens a xiangqi screen should not have one made for them. The
+  /// moment the socket is asked to connect is the moment the app has a reason. The sign-in and
+  /// account screens still do not touch it — signing in is the reader's own act, and making a guest
+  /// behind their back while they are looking at an account page is not.
   Future<void> ensureGuestSession() async {
     if (state != null) return;
     await signInAsGuest();

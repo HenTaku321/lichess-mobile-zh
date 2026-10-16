@@ -97,7 +97,9 @@ Future<fx.FakeXiangqiChannelFactory> pumpNotifications(WidgetTester tester) asyn
         }),
         xiangqiAuthStorageProvider: xiangqiAuthStorageProvider.overrideWith(
           (ref) => fx.FakeXiangqiAuthStorage(
-            fx.xiangqiTestSession(fx.xiangqiTestToken(fx.xiangqiTestViewerId)),
+            // A real account: notifications are the one thing on the socket a guest is not given —
+            // the server disconnects the namespace rather than answering.
+            fx.xiangqiTestSession(fx.xiangqiTestToken(fx.xiangqiTestViewerId), isGuest: false),
           ),
         ),
       },

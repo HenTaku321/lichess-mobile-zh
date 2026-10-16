@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/profile/xiangqi_profile.dart';
 import 'package:lichess_mobile/src/network/connectivity.dart';
 import 'package:lichess_mobile/src/network/http.dart' show ServerException;
@@ -114,16 +113,16 @@ String _leaderboardModeOf(XiangqiRatingType mode) => switch (mode) {
 Map<String, dynamic> _asMap(Object? value) =>
     value is Map<String, dynamic> ? value : const <String, dynamic>{};
 
-/// Reads `path` as JSON over the xiangqi.com client, with [query] on the URL.
+/// **No session is needed.** These endpoints answer a device that has never signed in to
+/// xiangqi.com — measured on 2026-10-16, where every one of them answered `200` to a request with no
+/// `Authorization` header at all. Gating them on a session would leave a screen that has nothing to
+/// do with an account showing an error instead of what it asked for; see
+/// `xiangqi-com-re/docs/api-map.md`.
 ///
-/// **No session, no request**: every endpoint here is one that a device with no xiangqi.com session
-/// has no business asking, and the screens behind them say so rather than asking and being refused.
-/// Offline is an [Error] rather than an empty answer, for the reason every other xiangqi provider
-/// gives — `lichessProviderRetry` never retries an [Error], so being offline is settled at once.
+/// Offline is still an [Error] rather than an empty answer, for the reason every other xiangqi
+/// provider gives — `lichessProviderRetry` never retries an [Error], so being offline is settled at
+/// once instead of six times over with a back-off in between.
 Future<Object?> _getJson(Ref ref, String path, Map<String, String> query) async {
-  if (ref.watch(xiangqiAuthControllerProvider) == null) {
-    throw StateError('No xiangqi.com session; not asking for $path.');
-  }
   if (!ref.watch(isDeviceOnlineProvider)) {
     throw StateError('The device is offline; not asking xiangqi.com for $path.');
   }

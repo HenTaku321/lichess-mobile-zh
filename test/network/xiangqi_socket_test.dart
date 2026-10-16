@@ -13,16 +13,32 @@
 // this is not that.
 
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:async/src/stream_sink_transformer.dart';
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_session.dart';
+import 'package:lichess_mobile/src/network/http.dart';
 import 'package:lichess_mobile/src/network/socket.dart';
+import 'package:lichess_mobile/src/network/xiangqi_http.dart';
 import 'package:lichess_mobile/src/network/xiangqi_socket.dart';
 import 'package:stream_channel/stream_channel.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../test_container.dart';
+import 'fake_http_client_factory.dart';
+
+/// A token shaped the way a real one is: three dot-separated parts with a `sub` in the middle.
+///
+/// The guest sign-in reads the subject out of the token it is handed — `_userIdFromToken` — so a
+/// test that answered with a bare string would be testing a response the server never sends.
+String _tokenFor(String subject) =>
+    'eyJhbGciOiJIUzI1NiJ9.'
+    '${base64Url.encode(utf8.encode(jsonEncode({'sub': subject}))).replaceAll('=', '')}'
+    '.not-a-real-signature';
 
 /// A `WebSocketChannel` that carries raw text frames and records what was written to it.
 class FakeXiangqiChannel() implements WebSocketChannel {
@@ -679,4 +695,133 @@ void main() {
       expect(lichess.isFailing.value, isFalse);
     });
   });
+
+  group('the socket provider, and the guest session behind it', () {
+    /// A storage with no disk behind it.
+    ///
+    /// Written here rather than imported from a fixture: this file carries its own fakes for the
+    /// same reason it carries its own channel — the shared ones are built for lichess's protocol and
+    /// for the model tests' needs, and neither is this.
+    test('hands the stored token to the socket when there is one', () async {
+      final factory = FakeXiangqiChannelFactory();
+      final storage = _FakeStorage(
+        const XiangqiSession(
+          userId: '100001',
+          name: 'a-player',
+          accessToken: 'stored-token',
+          isGuest: false,
+        ),
+      );
+      final asked = <String>[];
+      final container = await makeContainer(
+        overrides: {
+          xiangqiAuthStorageProvider: xiangqiAuthStorageProvider.overrideWithValue(storage),
+          webSocketChannelFactoryProvider: webSocketChannelFactoryProvider.overrideWithValue(
+            factory,
+          ),
+          httpClientFactoryProvider: httpClientFactoryProvider.overrideWith(
+            (ref) => FakeHttpClientFactory(
+              () => MockClient((request) async {
+                asked.add(request.url.path);
+                return http.Response('{}', 200);
+              }),
+            ),
+          ),
+        },
+      );
+
+      final client = container.read(xiangqiSocketProvider);
+      addTearDown(client.dispose);
+      final connecting = client.connect();
+      await pumpEventQueue();
+      factory.channels.single.fromServer(openFrame);
+      factory.channels.single.fromServer(connectAckFrame);
+      await connecting;
+
+      expect(factory.channels.single.sent.first, '40/xiangqi,{"token":"stored-token"}');
+      // Nothing was minted: a device that has a session keeps it.
+      expect(asked, isEmpty);
+    });
+
+    test('mints a guest session when there is none, and hands its token over', () async {
+      // **The whole reason this exists.** The socket refuses a connection with no token at all —
+      // `44/xiangqi,{"message":"Connection rejected by server"}` — so a device that has never signed
+      // in cannot watch a game or read one back unless something mints one. The site's own client
+      // mints a guest, and so does this.
+      final factory = FakeXiangqiChannelFactory();
+      final storage = _FakeStorage(null);
+      final asked = <String>[];
+      final container = await makeContainer(
+        overrides: {
+          xiangqiAuthStorageProvider: xiangqiAuthStorageProvider.overrideWithValue(storage),
+          webSocketChannelFactoryProvider: webSocketChannelFactoryProvider.overrideWithValue(
+            factory,
+          ),
+          httpClientFactoryProvider: httpClientFactoryProvider.overrideWith(
+            (ref) => FakeHttpClientFactory(
+              () => MockClient((request) async {
+                asked.add(request.url.path);
+                return http.Response('{"jwt":"${_tokenFor('guest5rll3')}"}', 200);
+              }),
+            ),
+          ),
+        },
+      );
+
+      final client = container.read(xiangqiSocketProvider);
+      addTearDown(client.dispose);
+      final connecting = client.connect();
+      await pumpEventQueue();
+      factory.channels.single.fromServer(openFrame);
+      factory.channels.single.fromServer(connectAckFrame);
+      await connecting;
+
+      expect(asked, contains('/api/users/guest_jwt'));
+      expect(
+        factory.channels.single.sent.first,
+        '40/xiangqi,{"token":"${_tokenFor('guest5rll3')}"}',
+      );
+      // And it was stored, so the next connection does not mint a second one — and it is filed as a
+      // guest, which is what tells the screens that need a real account to offer the way in.
+      expect((await storage.read())?.name, 'guest5rll3');
+      expect((await storage.read())?.isGuest, isTrue);
+    });
+
+    test('reports the failure when a guest cannot be minted, rather than connecting', () async {
+      final factory = FakeXiangqiChannelFactory();
+      final container = await makeContainer(
+        overrides: {
+          xiangqiAuthStorageProvider: xiangqiAuthStorageProvider.overrideWithValue(
+            _FakeStorage(null),
+          ),
+          webSocketChannelFactoryProvider: webSocketChannelFactoryProvider.overrideWithValue(
+            factory,
+          ),
+          httpClientFactoryProvider: httpClientFactoryProvider.overrideWith(
+            (ref) => FakeHttpClientFactory(
+              () => MockClient((request) async => http.Response('nope', 500)),
+            ),
+          ),
+        },
+      );
+
+      final client = container.read(xiangqiSocketProvider);
+      addTearDown(client.dispose);
+
+      await expectLater(client.connect(), throwsA(isA<XiangqiSocketException>()));
+      expect(factory.channels, isEmpty, reason: 'no channel should have been opened');
+    });
+  });
+}
+
+/// A [XiangqiAuthStorage] with no disk behind it.
+class _FakeStorage([var XiangqiSession? session]) extends XiangqiAuthStorage {
+  @override
+  Future<XiangqiSession?> read() async => session;
+
+  @override
+  Future<void> write(XiangqiSession value) async => session = value;
+
+  @override
+  Future<void> delete() async => session = null;
 }

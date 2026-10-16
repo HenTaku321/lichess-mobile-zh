@@ -244,8 +244,16 @@ String xiangqiTestToken(String subject) =>
     '.not-a-real-signature';
 
 /// A session holding [token], for a fake storage to hand out.
-XiangqiSession xiangqiTestSession(String token, {String userId = xiangqiTestViewerId}) =>
-    XiangqiSession(userId: userId, name: userId, accessToken: token, isGuest: true);
+///
+/// **A guest by default**, because that is the session the socket opens for itself and the one most
+/// of this file's readers are about: watching a game and reading one back both work for a guest.
+/// Pass `isGuest: false` for the screens that need a real account — the puzzle solver, the friend
+/// requests, the notification list — where a guest is `401` at the server.
+XiangqiSession xiangqiTestSession(
+  String token, {
+  String userId = xiangqiTestViewerId,
+  bool isGuest = true,
+}) => XiangqiSession(userId: userId, name: userId, accessToken: token, isGuest: isGuest);
 
 /// A [XiangqiAuthStorage] with no disk behind it.
 ///

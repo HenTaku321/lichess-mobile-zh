@@ -101,9 +101,12 @@ final xiangqiSavedRepositoryProvider = Provider<XiangqiSavedRepository>((Ref ref
   return XiangqiSavedRepository(ref.read(xiangqiClientProvider));
 }, name: 'XiangqiSavedRepositoryProvider');
 
+/// **A real account only.** The folder tree is an account's own content, and the endpoint is one
+/// the server will not answer for a guest: measured on 2026-10-16, a guest's own name was a `404`
+/// where the signed-in account's was a `200`. See `xiangqi-com-re/docs/saved.md`.
 Future<Object?> _getJson(Ref ref, String path, Map<String, String> query) async {
-  if (ref.watch(xiangqiAuthControllerProvider) == null) {
-    throw StateError('No xiangqi.com session; not asking for $path.');
+  if (!ref.watch(isXiangqiLoggedInProvider)) {
+    throw StateError('No xiangqi.com account; not asking for $path.');
   }
   if (!ref.watch(isDeviceOnlineProvider)) {
     throw StateError('The device is offline; not asking xiangqi.com for $path.');

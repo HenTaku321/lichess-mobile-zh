@@ -63,7 +63,14 @@ class const XiangqiSocialException(final XiangqiSocialFailure reason) implements
 /// The subscription is opened **before** the emit, and that is not tidiness: the answer can beat the
 /// ack, and a listener attached afterwards would miss it and then wait out the whole timeout for a
 /// frame that had already gone by. The same rule the review's two requests follow.
+///
+/// **A real account only.** Notifications are the one thing on the socket a guest is not given:
+/// measured on 2026-10-16, a guest's `get.notifications` was answered by the server **disconnecting
+/// the namespace** (`41/xiangqi,`) rather than by a message. See `xiangqi-com-re/docs/social.md`.
 final xiangqiNotificationsProvider = FutureProvider.autoDispose<XiangqiNotifications>((ref) async {
+  if (!ref.watch(isXiangqiLoggedInProvider)) {
+    throw const XiangqiSocialException(XiangqiSocialFailure.noSession);
+  }
   final socket = await _socketOf(ref);
   final answer = socket.stream
       .firstWhere((event) => event.name == kXiangqiNotificationsSuccessEvent)
@@ -89,9 +96,16 @@ final xiangqiFriendsProvider = FutureProvider.autoDispose
 ///
 /// The envelope is `{friend_requests: [...]}` and not the `{items: [...]}` the friend list uses —
 /// measured on 2026-10-16, where both answered with an empty list of their own shape.
+///
+/// **A real account only**, where the friend list above is public: this endpoint answered `401` to
+/// both an anonymous request and a guest's. Requests are somebody's own, and the server treats them
+/// that way.
 final xiangqiFriendRequestsProvider = FutureProvider.autoDispose<IList<XiangqiFriendRequest>>((
   ref,
 ) async {
+  if (!ref.watch(isXiangqiLoggedInProvider)) {
+    throw const XiangqiSocialException(XiangqiSocialFailure.noSession);
+  }
   return xiangqiFriendRequestsFromJson(await _getJson(ref, 'friends/friend-requests', const {}));
 }, name: 'XiangqiFriendRequestsProvider');
 
@@ -154,8 +168,10 @@ final xiangqiSocialRepositoryProvider = Provider<XiangqiSocialRepository>((Ref r
 /// see [kXiangqiMarkAllReadSuccessEvent] — and a request that is not answered is a failure rather
 /// than a success this app assumes.
 Future<bool> markAllXiangqiNotificationsRead(WidgetRef ref) async {
+  if (!ref.read(isXiangqiLoggedInProvider)) {
+    throw const XiangqiSocialException(XiangqiSocialFailure.noSession);
+  }
   final socket = await _connect(
-    hasSession: ref.read(xiangqiAuthControllerProvider) != null,
     online: ref.read(isDeviceOnlineProvider),
     socket: ref.read(xiangqiSocketProvider),
   );
@@ -169,16 +185,20 @@ Future<bool> markAllXiangqiNotificationsRead(WidgetRef ref) async {
 
 /// The connected socket, or a [XiangqiSocialException] saying why there is none.
 ///
-/// The three things it needs are passed in rather than read from a container, because there are two
-/// kinds of container here: a provider's own `Ref` and a widget's `WidgetRef` are different types
-/// with the same `read`, and the one function that opens the socket is worth more than the two it
-/// would take to open it from both.
+/// **No session check here**, and that is not an oversight: the socket opens a guest session of its
+/// own when there is none — see `xiangqiSocketProvider` — so "is there a token" is its question and
+/// not this one's. What the two callers that need a *real* account do is ask
+/// [isXiangqiLoggedInProvider] first and throw [XiangqiSocialFailure.noSession] themselves, which is
+/// the only place that reason is true.
+///
+/// The two things it does need are passed in rather than read from a container, because there are
+/// two kinds of container here: a provider's own `Ref` and a widget's `WidgetRef` are different
+/// types with the same `read`, and the one function that opens the socket is worth more than the two
+/// it would take to open it from both.
 Future<XiangqiSocketClient> _connect({
-  required bool hasSession,
   required bool online,
   required XiangqiSocketClient socket,
 }) async {
-  if (!hasSession) throw const XiangqiSocialException(XiangqiSocialFailure.noSession);
   if (!online) throw const XiangqiSocialException(XiangqiSocialFailure.offline);
   try {
     await socket.connect();
@@ -196,17 +216,19 @@ Future<XiangqiSocketClient> _connect({
 /// them once would settle into "no session" and stay there for the life of the screen. The socket
 /// itself is read, because it is a client rather than a state: the same one is handed back whenever
 /// it is asked for, and watching it would subscribe to nothing.
-Future<XiangqiSocketClient> _socketOf(Ref ref) => _connect(
-  hasSession: ref.watch(xiangqiAuthControllerProvider) != null,
-  online: ref.watch(isDeviceOnlineProvider),
-  socket: ref.read(xiangqiSocketProvider),
-);
+Future<XiangqiSocketClient> _socketOf(Ref ref) =>
+    _connect(online: ref.watch(isDeviceOnlineProvider), socket: ref.read(xiangqiSocketProvider));
 
+/// Reads [path] over the xiangqi.com client, with no session required.
+///
+/// **The one endpoint that goes through here is public** — `friends/<username>` answered `200` to a
+/// request with no `Authorization` header at all, measured on 2026-10-16 — so there is no session
+/// gate. The two that do want an account ([xiangqiFriendRequestsProvider] and
+/// [xiangqiNotificationsProvider]) check for one themselves, and say which of the two things is
+/// missing when it is.
+///
+/// `watch` and not `read` for the network, for the reason [_socketOf] gives.
 Future<Object?> _getJson(Ref ref, String path, Map<String, String> query) async {
-  // `watch`, for the reason [_socketOf] gives.
-  if (ref.watch(xiangqiAuthControllerProvider) == null) {
-    throw const XiangqiSocialException(XiangqiSocialFailure.noSession);
-  }
   if (!ref.watch(isDeviceOnlineProvider)) {
     throw const XiangqiSocialException(XiangqiSocialFailure.offline);
   }

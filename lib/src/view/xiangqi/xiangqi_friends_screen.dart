@@ -45,7 +45,11 @@ class _XiangqiFriendsScreenState() extends ConsumerState<XiangqiFriendsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final username = ref.watch(xiangqiAuthControllerProvider)?.name;
+    // **A real account**, for two reasons that agree: the friend list is asked for by username and
+    // a guest's own name is not one the server will answer for, and the requests under it are
+    // `401` to anybody but a signed-in account — measured both ways on 2026-10-16.
+    final session = ref.watch(xiangqiAuthControllerProvider);
+    final username = session != null && !session.isGuest ? session.name : null;
     if (username == null) {
       return Scaffold(
         appBar: AppBar(title: AppBarTitleText(context.l10n.friends)),

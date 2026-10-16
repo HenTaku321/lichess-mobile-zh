@@ -27,6 +27,7 @@ import 'package:lichess_mobile/src/view/auth/xiangqi_login_screen.dart';
 import 'package:lichess_mobile/src/view/message/contacts_screen.dart';
 import 'package:lichess_mobile/src/view/settings/settings_screen.dart';
 import 'package:lichess_mobile/src/view/team/team_updates_screen.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_profile_screen.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_action_sheet.dart';
 import 'package:lichess_mobile/src/widgets/feedback.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
@@ -213,19 +214,24 @@ class _AccountMenuScreenState()
                   ),
                   title: Text(context.l10n.mobileXiangqiGuest),
                 ),
-                // A real account: its name, its ratings and where it is, and a sign-out behind a
-                // tap. The account endpoint is verified and is what the subtitle is read from, but
-                // the row still carries no chevron and does not open a profile: it is an identity
-                // and a sign-out, not a door into xiangqi.com.
+                // A real account: its name, its ratings and where it is, and a tap that opens its
+                // profile. The account endpoint is verified and is what the subtitle is read from,
+                // and the same endpoint is what the profile behind the tap is built on — so the row
+                // and the screen it opens cannot disagree about who this is. Signing out lives on
+                // that screen, where it is one action among the account's own rather than the only
+                // thing the row can do.
                 final XiangqiSession session => ListTile(
                   leading: const Icon(Icons.grid_on),
+                  trailing: Theme.of(context).platform == TargetPlatform.iOS
+                      ? const CupertinoListTileChevron()
+                      : null,
                   title: Text(session.name),
                   subtitle: _xiangqiUserSubtitle(
                     context,
                     ref.watch(xiangqiUserProvider(session.name)),
                   ),
                   enabled: isOnline,
-                  onTap: () => _showXiangqiSignOutSheet(context, ref),
+                  onTap: () => _navigate(context, XiangqiProfileScreen.buildRoute(session.name)),
                 ),
               },
             ],
@@ -329,20 +335,6 @@ class _AccountMenuScreenState()
   /// Reuses the lichess "log out" wording (`context.l10n.logOut`) rather than inventing a new word
   /// for the same act, and drops straight through: unlike a lichess sign-out there is no
   /// server-side token to revoke, so there is nothing to wait on.
-  void _showXiangqiSignOutSheet(BuildContext context, WidgetRef ref) {
-    showAdaptiveActionSheet<void>(
-      context: context,
-      actions: [
-        BottomSheetAction(
-          makeLabel: (context) => Text(context.l10n.logOut),
-          isDestructiveAction: true,
-          onPressed: () async {
-            await ref.read(xiangqiAuthControllerProvider.notifier).signOut();
-          },
-        ),
-      ],
-    );
-  }
 
   /// The subtitle of the signed-in xiangqi.com row: the account's ratings, then whether it is
   /// online and where it is.

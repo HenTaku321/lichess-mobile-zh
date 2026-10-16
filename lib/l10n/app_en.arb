@@ -370,6 +370,41 @@
   "mobileXiangqiReviewOffline": "You are offline. The review is the server's, so it needs a connection.",
   "mobileXiangqiReviewPrevious": "Previous move",
   "mobileXiangqiReviewNext": "Next move",
+  "mobileXiangqiLeaderboardEmpty": "No players yet.",
+  "mobileXiangqiLeaderboardPlayers": "{param} players",
+  "@mobileXiangqiLeaderboardPlayers": {
+    "placeholders": {
+      "param": {
+        "type": "String"
+      }
+    }
+  },
+  "mobileXiangqiLeaderboardCountry": "Country",
+  "mobileXiangqiLeaderboardAllCountries": "All countries",
+  "mobileXiangqiHighestRating": "Highest rating",
+  "mobileXiangqiCountry": "Country",
+  "mobileXiangqiGamesPlayed": "Games played",
+  "mobileXiangqiNoGames": "No games yet.",
+  "mobileXiangqiSpeedRapid": "Rapid",
+  "mobileXiangqiSpeedBullet": "Bullet",
+  "mobileXiangqiSpeedDaily": "Daily",
+  "mobileXiangqiSpeedPuzzle": "Puzzles",
+  "mobileXiangqiPuzzlesAttempted": "Puzzles attempted {param}",
+  "@mobileXiangqiPuzzlesAttempted": {
+    "placeholders": {
+      "param": {
+        "type": "String"
+      }
+    }
+  },
+  "mobileXiangqiPuzzlesSuccessRate": "Solved {param}",
+  "@mobileXiangqiPuzzlesSuccessRate": {
+    "placeholders": {
+      "param": {
+        "type": "String"
+      }
+    }
+  },
   "mobileXiangqiSideBlack": "Black",
   "mobileXiangqiSideRed": "Red",
   "mobileXiangqiSignIn": "Sign in to xiangqi.com",

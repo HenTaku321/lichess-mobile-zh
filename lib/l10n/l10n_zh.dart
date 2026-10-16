@@ -857,6 +857,54 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mobileXiangqiReviewNext => '下一步';
 
   @override
+  String get mobileXiangqiLeaderboardEmpty => '暂时没有上榜的棋手。';
+
+  @override
+  String mobileXiangqiLeaderboardPlayers(String param) {
+    return '$param 位棋手';
+  }
+
+  @override
+  String get mobileXiangqiLeaderboardCountry => '国家/地区';
+
+  @override
+  String get mobileXiangqiLeaderboardAllCountries => '全部国家/地区';
+
+  @override
+  String get mobileXiangqiHighestRating => '最高等级分';
+
+  @override
+  String get mobileXiangqiCountry => '国家/地区';
+
+  @override
+  String get mobileXiangqiGamesPlayed => '对局数';
+
+  @override
+  String get mobileXiangqiNoGames => '还没有对局。';
+
+  @override
+  String get mobileXiangqiSpeedRapid => '快棋';
+
+  @override
+  String get mobileXiangqiSpeedBullet => '子弹棋';
+
+  @override
+  String get mobileXiangqiSpeedDaily => '日棋';
+
+  @override
+  String get mobileXiangqiSpeedPuzzle => '谜题';
+
+  @override
+  String mobileXiangqiPuzzlesAttempted(String param) {
+    return '做题 $param';
+  }
+
+  @override
+  String mobileXiangqiPuzzlesSuccessRate(String param) {
+    return '正确率 $param';
+  }
+
+  @override
   String get mobileXiangqiSideBlack => '黑方';
 
   @override
@@ -8491,6 +8539,54 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get mobileXiangqiReviewNext => '下一步';
+
+  @override
+  String get mobileXiangqiLeaderboardEmpty => '暫時沒有上榜的棋手。';
+
+  @override
+  String mobileXiangqiLeaderboardPlayers(String param) {
+    return '$param 位棋手';
+  }
+
+  @override
+  String get mobileXiangqiLeaderboardCountry => '國家/地區';
+
+  @override
+  String get mobileXiangqiLeaderboardAllCountries => '全部國家/地區';
+
+  @override
+  String get mobileXiangqiHighestRating => '最高等級分';
+
+  @override
+  String get mobileXiangqiCountry => '國家/地區';
+
+  @override
+  String get mobileXiangqiGamesPlayed => '對局數';
+
+  @override
+  String get mobileXiangqiNoGames => '還沒有對局。';
+
+  @override
+  String get mobileXiangqiSpeedRapid => '快棋';
+
+  @override
+  String get mobileXiangqiSpeedBullet => '子彈棋';
+
+  @override
+  String get mobileXiangqiSpeedDaily => '日棋';
+
+  @override
+  String get mobileXiangqiSpeedPuzzle => '謎題';
+
+  @override
+  String mobileXiangqiPuzzlesAttempted(String param) {
+    return '做題 $param';
+  }
+
+  @override
+  String mobileXiangqiPuzzlesSuccessRate(String param) {
+    return '正確率 $param';
+  }
 
   @override
   String get mobileXiangqiSideBlack => '黑方';

@@ -24,9 +24,11 @@ import 'package:lichess_mobile/src/view/more/import_pgn_screen.dart';
 import 'package:lichess_mobile/src/view/relation/friend_screen.dart';
 import 'package:lichess_mobile/src/view/settings/settings_screen.dart';
 import 'package:lichess_mobile/src/view/team/team_updates_screen.dart';
+import 'package:lichess_mobile/src/view/user/leaderboard_screen.dart';
 import 'package:lichess_mobile/src/view/user/player_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_analysis_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_board_editor_screen.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_leaderboard_screen.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_choice_picker.dart';
 import 'package:lichess_mobile/src/widgets/feedback.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
@@ -240,6 +242,45 @@ class const _Body() extends ConsumerWidget {
             hasLeading: true,
             children: [
               ListTile(
+                leading: const Icon(Icons.emoji_events_outlined),
+                title: Text(context.l10n.leaderboard),
+                enabled: isOnline,
+                trailing: Theme.of(context).platform == TargetPlatform.iOS
+                    ? const CupertinoListTileChevron()
+                    : null,
+                onTap: () async {
+                  // Chess and xiangqi share this one row, and the picker below decides whose board
+                  // is looked at: they are two games of equal standing, and giving xiangqi a row of
+                  // its own would say it was the lesser one. See the Analysis row above for the
+                  // whole of that argument.
+                  final choices = [_LeaderboardGame.chess, _LeaderboardGame.xiangqi];
+                  _LeaderboardGame? choice;
+                  await showChoicePicker<_LeaderboardGame?>(
+                    context,
+                    title: Text(context.l10n.leaderboard),
+                    choices: choices,
+                    // Left unticked, as the pickers above are: a question with two answers rather
+                    // than a setting being looked at.
+                    selectedItem: null,
+                    labelBuilder: (game) => Text(switch (game) {
+                      .chess => context.l10n.mobileChess,
+                      .xiangqi => context.l10n.mobileXiangqi,
+                      // Never built, but the picker is instantiated at a nullable type and the
+                      // switch has to answer for the null.
+                      null => '',
+                    }),
+                    onSelectedItemChanged: (game) => choice = game,
+                  );
+                  if (!context.mounted) return;
+                  final selected = choice;
+                  if (selected == null) return;
+                  Navigator.of(context, rootNavigator: true).push(switch (selected) {
+                    .chess => LeaderboardScreen.buildRoute(),
+                    .xiangqi => XiangqiLeaderboardScreen.buildRoute(),
+                  });
+                },
+              ),
+              ListTile(
                 leading: const Icon(Icons.groups_3_outlined),
                 title: Text(context.l10n.players),
                 enabled: isOnline,
@@ -385,6 +426,18 @@ enum _AnalysisGame() {
 /// left out — see the row's own comment — so this enum has the two choices it names and nothing to
 /// say about which of them a build can offer.
 enum _EditorGame() {
+  chess,
+  xiangqi,
+}
+
+/// The two games this app will show a leaderboard for.
+///
+/// The Leaderboard row offers both rather than a row each, for the reason [_AnalysisGame] above
+/// does: a list of the strongest accounts is the same thing in either game, and a row each would say
+/// one of them was the lesser. The two boards are the two sites' own and share nothing but the idea
+/// — lichess's is a top ten per variant and xiangqi.com's is a paginated board per rating — so the
+/// picker chooses between two screens rather than between two settings of one.
+enum _LeaderboardGame() {
   chess,
   xiangqi,
 }

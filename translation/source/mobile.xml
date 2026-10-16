@@ -294,6 +294,20 @@
   <string name="xiangqiReviewOffline" comment="Game review: shown when the device is offline, since the analysis is the server's.">You are offline. The review is the server's, so it needs a connection.</string>
   <string name="xiangqiReviewPrevious" comment="Game review: the bar button that steps back one move.">Previous move</string>
   <string name="xiangqiReviewNext" comment="Game review: the bar button that steps forward one move.">Next move</string>
+  <string name="xiangqiLeaderboardEmpty" comment="Xiangqi leaderboard: shown when the server has no one on the board asked for. The three game boards really do answer with nobody on them.">No players yet.</string>
+  <string name="xiangqiLeaderboardPlayers" comment="Xiangqi leaderboard: how many accounts the board holds. %s is the number.">%s players</string>
+  <string name="xiangqiLeaderboardCountry" comment="Xiangqi leaderboard: the button that filters the board by country.">Country</string>
+  <string name="xiangqiLeaderboardAllCountries" comment="Xiangqi leaderboard: the choice that clears the country filter.">All countries</string>
+  <string name="xiangqiHighestRating" comment="Xiangqi profile: the best rating the account has ever had for one speed.">Highest rating</string>
+  <string name="xiangqiCountry" comment="Xiangqi profile: the label before the account's country.">Country</string>
+  <string name="xiangqiGamesPlayed" comment="Xiangqi profile: how many games the account has finished for one speed. Reused from chess, where it means the same thing.">Games played</string>
+  <string name="xiangqiNoGames" comment="Xiangqi profile: shown when the account has no finished games to list.">No games yet.</string>
+  <string name="xiangqiSpeedRapid" comment="Xiangqi: the rapid rating, on the profile and as a leaderboard tab. xiangqi.com files it as rapid_rating.">Rapid</string>
+  <string name="xiangqiSpeedBullet" comment="Xiangqi: the bullet rating, on the profile and as a leaderboard tab. xiangqi.com files it as bullet_rating.">Bullet</string>
+  <string name="xiangqiSpeedDaily" comment="Xiangqi: the daily (correspondence) rating, on the profile and as a leaderboard tab. xiangqi.com files it as daily_rating.">Daily</string>
+  <string name="xiangqiSpeedPuzzle" comment="Xiangqi: the puzzle rating, on the profile and as a leaderboard tab. xiangqi.com files it as puzzle_rating.">Puzzles</string>
+  <string name="xiangqiPuzzlesAttempted" comment="Xiangqi profile: how many puzzles the account has tried. %s is the number.">Puzzles attempted %s</string>
+  <string name="xiangqiPuzzlesSuccessRate" comment="Xiangqi profile: the share of puzzles the account solved. %s is a percentage.">Solved %s</string>
   <string name="xiangqiSideBlack" comment="The black side of a xiangqi game, used as a side name in the game-end sentences.">Black</string>
   <string name="xiangqiSideRed" comment="The red side of a xiangqi game, used as a side name in the game-end sentences.">Red</string>
   <string name="xiangqiSignIn" comment="The entry that starts the xiangqi.com sign-in, and the title of the screen it opens. Named after the service, so that it does not read as a third way of signing in to lichess.">Sign in to xiangqi.com</string>

@@ -1840,6 +1840,90 @@ abstract class AppLocalizations {
   /// **'Next move'**
   String get mobileXiangqiReviewNext;
 
+  /// No description provided for @mobileXiangqiLeaderboardEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No players yet.'**
+  String get mobileXiangqiLeaderboardEmpty;
+
+  /// No description provided for @mobileXiangqiLeaderboardPlayers.
+  ///
+  /// In en, this message translates to:
+  /// **'{param} players'**
+  String mobileXiangqiLeaderboardPlayers(String param);
+
+  /// No description provided for @mobileXiangqiLeaderboardCountry.
+  ///
+  /// In en, this message translates to:
+  /// **'Country'**
+  String get mobileXiangqiLeaderboardCountry;
+
+  /// No description provided for @mobileXiangqiLeaderboardAllCountries.
+  ///
+  /// In en, this message translates to:
+  /// **'All countries'**
+  String get mobileXiangqiLeaderboardAllCountries;
+
+  /// No description provided for @mobileXiangqiHighestRating.
+  ///
+  /// In en, this message translates to:
+  /// **'Highest rating'**
+  String get mobileXiangqiHighestRating;
+
+  /// No description provided for @mobileXiangqiCountry.
+  ///
+  /// In en, this message translates to:
+  /// **'Country'**
+  String get mobileXiangqiCountry;
+
+  /// No description provided for @mobileXiangqiGamesPlayed.
+  ///
+  /// In en, this message translates to:
+  /// **'Games played'**
+  String get mobileXiangqiGamesPlayed;
+
+  /// No description provided for @mobileXiangqiNoGames.
+  ///
+  /// In en, this message translates to:
+  /// **'No games yet.'**
+  String get mobileXiangqiNoGames;
+
+  /// No description provided for @mobileXiangqiSpeedRapid.
+  ///
+  /// In en, this message translates to:
+  /// **'Rapid'**
+  String get mobileXiangqiSpeedRapid;
+
+  /// No description provided for @mobileXiangqiSpeedBullet.
+  ///
+  /// In en, this message translates to:
+  /// **'Bullet'**
+  String get mobileXiangqiSpeedBullet;
+
+  /// No description provided for @mobileXiangqiSpeedDaily.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily'**
+  String get mobileXiangqiSpeedDaily;
+
+  /// No description provided for @mobileXiangqiSpeedPuzzle.
+  ///
+  /// In en, this message translates to:
+  /// **'Puzzles'**
+  String get mobileXiangqiSpeedPuzzle;
+
+  /// No description provided for @mobileXiangqiPuzzlesAttempted.
+  ///
+  /// In en, this message translates to:
+  /// **'Puzzles attempted {param}'**
+  String mobileXiangqiPuzzlesAttempted(String param);
+
+  /// No description provided for @mobileXiangqiPuzzlesSuccessRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Solved {param}'**
+  String mobileXiangqiPuzzlesSuccessRate(String param);
+
   /// No description provided for @mobileXiangqiSideBlack.
   ///
   /// In en, this message translates to:

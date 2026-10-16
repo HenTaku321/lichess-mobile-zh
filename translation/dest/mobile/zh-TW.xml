@@ -130,4 +130,18 @@
   <string name="xiangqiReviewOffline" comment="Game review: shown when the device is offline, since the analysis is the server's.">目前離線。複盤由伺服器分析，需要連線。</string>
   <string name="xiangqiReviewPrevious" comment="Game review: the bar button that steps back one move.">上一步</string>
   <string name="xiangqiReviewNext" comment="Game review: the bar button that steps forward one move.">下一步</string>
+  <string name="xiangqiLeaderboardEmpty" comment="Xiangqi leaderboard: shown when the server has no one on the board asked for. The three game boards really do answer with nobody on them.">暫時沒有上榜的棋手。</string>
+  <string name="xiangqiLeaderboardPlayers" comment="Xiangqi leaderboard: how many accounts the board holds. %s is the number.">%s 位棋手</string>
+  <string name="xiangqiLeaderboardCountry" comment="Xiangqi leaderboard: the button that filters the board by country.">國家/地區</string>
+  <string name="xiangqiLeaderboardAllCountries" comment="Xiangqi leaderboard: the choice that clears the country filter.">全部國家/地區</string>
+  <string name="xiangqiHighestRating" comment="Xiangqi profile: the best rating the account has ever had for one speed.">最高等級分</string>
+  <string name="xiangqiCountry" comment="Xiangqi profile: the label before the account's country.">國家/地區</string>
+  <string name="xiangqiGamesPlayed" comment="Xiangqi profile: how many games the account has finished for one speed. Reused from chess, where it means the same thing.">對局數</string>
+  <string name="xiangqiNoGames" comment="Xiangqi profile: shown when the account has no finished games to list.">還沒有對局。</string>
+  <string name="xiangqiSpeedRapid" comment="Xiangqi: the rapid rating, on the profile and as a leaderboard tab. xiangqi.com files it as rapid_rating.">快棋</string>
+  <string name="xiangqiSpeedBullet" comment="Xiangqi: the bullet rating, on the profile and as a leaderboard tab. xiangqi.com files it as bullet_rating.">子彈棋</string>
+  <string name="xiangqiSpeedDaily" comment="Xiangqi: the daily (correspondence) rating, on the profile and as a leaderboard tab. xiangqi.com files it as daily_rating.">日棋</string>
+  <string name="xiangqiSpeedPuzzle" comment="Xiangqi: the puzzle rating, on the profile and as a leaderboard tab. xiangqi.com files it as puzzle_rating.">謎題</string>
+  <string name="xiangqiPuzzlesAttempted" comment="Xiangqi profile: how many puzzles the account has tried. %s is the number.">做題 %s</string>
+  <string name="xiangqiPuzzlesSuccessRate" comment="Xiangqi profile: the share of puzzles the account solved. %s is a percentage.">正確率 %s</string>
 </resources>

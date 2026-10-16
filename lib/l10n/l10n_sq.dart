@@ -857,6 +857,54 @@ class AppLocalizationsSq extends AppLocalizations {
   String get mobileXiangqiReviewNext => 'Next move';
 
   @override
+  String get mobileXiangqiLeaderboardEmpty => 'No players yet.';
+
+  @override
+  String mobileXiangqiLeaderboardPlayers(String param) {
+    return '$param players';
+  }
+
+  @override
+  String get mobileXiangqiLeaderboardCountry => 'Country';
+
+  @override
+  String get mobileXiangqiLeaderboardAllCountries => 'All countries';
+
+  @override
+  String get mobileXiangqiHighestRating => 'Highest rating';
+
+  @override
+  String get mobileXiangqiCountry => 'Country';
+
+  @override
+  String get mobileXiangqiGamesPlayed => 'Games played';
+
+  @override
+  String get mobileXiangqiNoGames => 'No games yet.';
+
+  @override
+  String get mobileXiangqiSpeedRapid => 'Rapid';
+
+  @override
+  String get mobileXiangqiSpeedBullet => 'Bullet';
+
+  @override
+  String get mobileXiangqiSpeedDaily => 'Daily';
+
+  @override
+  String get mobileXiangqiSpeedPuzzle => 'Puzzles';
+
+  @override
+  String mobileXiangqiPuzzlesAttempted(String param) {
+    return 'Puzzles attempted $param';
+  }
+
+  @override
+  String mobileXiangqiPuzzlesSuccessRate(String param) {
+    return 'Solved $param';
+  }
+
+  @override
   String get mobileXiangqiSideBlack => 'Black';
 
   @override

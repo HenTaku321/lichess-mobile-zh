@@ -1002,6 +1002,39 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mobileXiangqiSavedEmpty => '这里还没有东西。';
 
   @override
+  String get mobileXiangqiTournaments => '象棋锦标赛';
+
+  @override
+  String get mobileXiangqiTournamentsActive => '即将开始与进行中';
+
+  @override
+  String get mobileXiangqiTournamentsPrevious => '已结束';
+
+  @override
+  String get mobileXiangqiTournamentsEmpty => '没有锦标赛。';
+
+  @override
+  String mobileXiangqiTournamentsStartsAt(String param) {
+    return '$param 开始';
+  }
+
+  @override
+  String mobileXiangqiTournamentsRounds(String param) {
+    return '$param 轮';
+  }
+
+  @override
+  String mobileXiangqiTournamentsParticipants(String param) {
+    return '$param 人报名';
+  }
+
+  @override
+  String get mobileXiangqiTournamentsStandings => '积分榜';
+
+  @override
+  String get mobileXiangqiTournamentsStandingsEmpty => '还没有人下过。';
+
+  @override
   String get mobileXiangqiSideBlack => '黑方';
 
   @override
@@ -8781,6 +8814,39 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get mobileXiangqiSavedEmpty => '這裡還沒有東西。';
+
+  @override
+  String get mobileXiangqiTournaments => '象棋錦標賽';
+
+  @override
+  String get mobileXiangqiTournamentsActive => '即將開始與進行中';
+
+  @override
+  String get mobileXiangqiTournamentsPrevious => '已結束';
+
+  @override
+  String get mobileXiangqiTournamentsEmpty => '沒有錦標賽。';
+
+  @override
+  String mobileXiangqiTournamentsStartsAt(String param) {
+    return '$param 開始';
+  }
+
+  @override
+  String mobileXiangqiTournamentsRounds(String param) {
+    return '$param 輪';
+  }
+
+  @override
+  String mobileXiangqiTournamentsParticipants(String param) {
+    return '$param 人報名';
+  }
+
+  @override
+  String get mobileXiangqiTournamentsStandings => '積分榜';
+
+  @override
+  String get mobileXiangqiTournamentsStandingsEmpty => '還沒有人下過。';
 
   @override
   String get mobileXiangqiSideBlack => '黑方';

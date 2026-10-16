@@ -1002,6 +1002,39 @@ class AppLocalizationsSv extends AppLocalizations {
   String get mobileXiangqiSavedEmpty => 'Nothing here yet.';
 
   @override
+  String get mobileXiangqiTournaments => 'Tournaments';
+
+  @override
+  String get mobileXiangqiTournamentsActive => 'Upcoming and running';
+
+  @override
+  String get mobileXiangqiTournamentsPrevious => 'Finished';
+
+  @override
+  String get mobileXiangqiTournamentsEmpty => 'No tournaments.';
+
+  @override
+  String mobileXiangqiTournamentsStartsAt(String param) {
+    return 'Starts $param';
+  }
+
+  @override
+  String mobileXiangqiTournamentsRounds(String param) {
+    return '$param rounds';
+  }
+
+  @override
+  String mobileXiangqiTournamentsParticipants(String param) {
+    return '$param signed up';
+  }
+
+  @override
+  String get mobileXiangqiTournamentsStandings => 'Standings';
+
+  @override
+  String get mobileXiangqiTournamentsStandingsEmpty => 'Nobody has played yet.';
+
+  @override
   String get mobileXiangqiSideBlack => 'Black';
 
   @override

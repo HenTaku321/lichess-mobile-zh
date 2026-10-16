@@ -13,6 +13,7 @@ import 'package:lichess_mobile/src/view/play/create_game_widget.dart';
 import 'package:lichess_mobile/src/view/tournament/tournament_list_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_game_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_over_the_board_screen.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_tournaments_screen.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_choice_picker.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:material_ui/material_ui.dart';
@@ -67,11 +68,33 @@ class const PlayMenu() extends ConsumerWidget {
             ),
             ListTile(
               enabled: connectionStatus == LichessConnectionStatus.online,
-              onTap: () {
+              onTap: () async {
+                // Chess and xiangqi share this one row, and the picker below decides whose
+                // tournaments are listed: they are two games of equal standing, and giving xiangqi a
+                // row of its own would say it was the lesser one. See the two rows under this one
+                // for the same arrangement.
+                _TournamentGame? choice;
+                await showChoicePicker<_TournamentGame?>(
+                  context,
+                  title: Text(context.l10n.arenaArenaTournaments),
+                  choices: _TournamentGame.values,
+                  selectedItem: null,
+                  labelBuilder: (game) => Text(switch (game) {
+                    .chess => context.l10n.mobileChess,
+                    .xiangqi => context.l10n.mobileXiangqi,
+                    null => '',
+                  }),
+                  onSelectedItemChanged: (game) => choice = game,
+                );
+                if (!context.mounted) return;
+                final selected = choice;
+                if (selected == null) return;
                 // Pops the play bottom sheet
                 Navigator.of(context).popUntil((route) => route is! ModalBottomSheetRoute);
-
-                Navigator.of(context).push(TournamentListScreen.buildRoute());
+                Navigator.of(context, rootNavigator: true).push(switch (selected) {
+                  .chess => TournamentListScreen.buildRoute(),
+                  .xiangqi => XiangqiTournamentsScreen.buildRoute(),
+                });
               },
               leading: const Icon(LichessIcons.tournament_cup),
               title: Text(context.l10n.arenaArenaTournaments),
@@ -196,6 +219,15 @@ enum _OfflineOpponent() {
 /// of playing rather than a game of its own, so which game it is set up for is a choice inside the
 /// entry here too.
 enum _OtbGame() {
+  chess,
+  xiangqi,
+}
+
+/// Which game's tournaments are listed.
+///
+/// The two are offered side by side by the one tournaments row, so neither reads as the app's main
+/// game and the other as an extra: the game is a choice inside the row, not a property of it.
+enum _TournamentGame() {
   chess,
   xiangqi,
 }

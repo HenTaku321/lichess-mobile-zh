@@ -175,4 +175,13 @@
   <string name="xiangqiSavedRename" comment="Xiangqi saved-content screen: the action that renames a folder.">重新命名</string>
   <string name="xiangqiSavedDelete" comment="Xiangqi saved-content screen: the action that deletes a folder.">刪除</string>
   <string name="xiangqiSavedEmpty" comment="Xiangqi saved-content screen: shown when a kind of content has nothing in it at all.">這裡還沒有東西。</string>
+  <string name="xiangqiTournaments" comment="Xiangqi tournaments screen: the title of the list, and the name of the feature.">象棋錦標賽</string>
+  <string name="xiangqiTournamentsActive" comment="Xiangqi tournaments screen: the heading of the tournaments that are on or about to start.">即將開始與進行中</string>
+  <string name="xiangqiTournamentsPrevious" comment="Xiangqi tournaments screen: the heading of the tournaments that are over.">已結束</string>
+  <string name="xiangqiTournamentsEmpty" comment="Xiangqi tournaments screen: shown when there is no tournament in the section.">沒有錦標賽。</string>
+  <string name="xiangqiTournamentsStartsAt" comment="Xiangqi tournaments screen: when a tournament starts. %s is a date and a time.">%s 開始</string>
+  <string name="xiangqiTournamentsRounds" comment="Xiangqi tournaments screen: how many rounds a tournament has. %s is the number.">%s 輪</string>
+  <string name="xiangqiTournamentsParticipants" comment="Xiangqi tournaments screen: how many accounts have signed up. %s is the number.">%s 人報名</string>
+  <string name="xiangqiTournamentsStandings" comment="Xiangqi tournament screen: the heading of the standings.">積分榜</string>
+  <string name="xiangqiTournamentsStandingsEmpty" comment="Xiangqi tournament screen: shown when the standings have nobody on them yet.">還沒有人下過。</string>
 </resources>

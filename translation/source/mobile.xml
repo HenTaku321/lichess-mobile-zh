@@ -339,6 +339,15 @@
   <string name="xiangqiSavedRename" comment="Xiangqi saved-content screen: the action that renames a folder.">Rename</string>
   <string name="xiangqiSavedDelete" comment="Xiangqi saved-content screen: the action that deletes a folder.">Delete</string>
   <string name="xiangqiSavedEmpty" comment="Xiangqi saved-content screen: shown when a kind of content has nothing in it at all.">Nothing here yet.</string>
+  <string name="xiangqiTournaments" comment="Xiangqi tournaments screen: the title of the list, and the name of the feature.">Tournaments</string>
+  <string name="xiangqiTournamentsActive" comment="Xiangqi tournaments screen: the heading of the tournaments that are on or about to start.">Upcoming and running</string>
+  <string name="xiangqiTournamentsPrevious" comment="Xiangqi tournaments screen: the heading of the tournaments that are over.">Finished</string>
+  <string name="xiangqiTournamentsEmpty" comment="Xiangqi tournaments screen: shown when there is no tournament in the section.">No tournaments.</string>
+  <string name="xiangqiTournamentsStartsAt" comment="Xiangqi tournaments screen: when a tournament starts. %s is a date and a time.">Starts %s</string>
+  <string name="xiangqiTournamentsRounds" comment="Xiangqi tournaments screen: how many rounds a tournament has. %s is the number.">%s rounds</string>
+  <string name="xiangqiTournamentsParticipants" comment="Xiangqi tournaments screen: how many accounts have signed up. %s is the number.">%s signed up</string>
+  <string name="xiangqiTournamentsStandings" comment="Xiangqi tournament screen: the heading of the standings.">Standings</string>
+  <string name="xiangqiTournamentsStandingsEmpty" comment="Xiangqi tournament screen: shown when the standings have nobody on them yet.">Nobody has played yet.</string>
   <string name="xiangqiSideBlack" comment="The black side of a xiangqi game, used as a side name in the game-end sentences.">Black</string>
   <string name="xiangqiSideRed" comment="The red side of a xiangqi game, used as a side name in the game-end sentences.">Red</string>
   <string name="xiangqiSignIn" comment="The entry that starts the xiangqi.com sign-in, and the title of the screen it opens. Named after the service, so that it does not read as a third way of signing in to lichess.">Sign in to xiangqi.com</string>

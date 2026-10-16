@@ -453,6 +453,36 @@
   "mobileXiangqiSavedRename": "Rename",
   "mobileXiangqiSavedDelete": "Delete",
   "mobileXiangqiSavedEmpty": "Nothing here yet.",
+  "mobileXiangqiTournaments": "Tournaments",
+  "mobileXiangqiTournamentsActive": "Upcoming and running",
+  "mobileXiangqiTournamentsPrevious": "Finished",
+  "mobileXiangqiTournamentsEmpty": "No tournaments.",
+  "mobileXiangqiTournamentsStartsAt": "Starts {param}",
+  "@mobileXiangqiTournamentsStartsAt": {
+    "placeholders": {
+      "param": {
+        "type": "String"
+      }
+    }
+  },
+  "mobileXiangqiTournamentsRounds": "{param} rounds",
+  "@mobileXiangqiTournamentsRounds": {
+    "placeholders": {
+      "param": {
+        "type": "String"
+      }
+    }
+  },
+  "mobileXiangqiTournamentsParticipants": "{param} signed up",
+  "@mobileXiangqiTournamentsParticipants": {
+    "placeholders": {
+      "param": {
+        "type": "String"
+      }
+    }
+  },
+  "mobileXiangqiTournamentsStandings": "Standings",
+  "mobileXiangqiTournamentsStandingsEmpty": "Nobody has played yet.",
   "mobileXiangqiSideBlack": "Black",
   "mobileXiangqiSideRed": "Red",
   "mobileXiangqiSignIn": "Sign in to xiangqi.com",

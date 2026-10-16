@@ -2110,6 +2110,60 @@ abstract class AppLocalizations {
   /// **'Nothing here yet.'**
   String get mobileXiangqiSavedEmpty;
 
+  /// No description provided for @mobileXiangqiTournaments.
+  ///
+  /// In en, this message translates to:
+  /// **'Tournaments'**
+  String get mobileXiangqiTournaments;
+
+  /// No description provided for @mobileXiangqiTournamentsActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Upcoming and running'**
+  String get mobileXiangqiTournamentsActive;
+
+  /// No description provided for @mobileXiangqiTournamentsPrevious.
+  ///
+  /// In en, this message translates to:
+  /// **'Finished'**
+  String get mobileXiangqiTournamentsPrevious;
+
+  /// No description provided for @mobileXiangqiTournamentsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No tournaments.'**
+  String get mobileXiangqiTournamentsEmpty;
+
+  /// No description provided for @mobileXiangqiTournamentsStartsAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Starts {param}'**
+  String mobileXiangqiTournamentsStartsAt(String param);
+
+  /// No description provided for @mobileXiangqiTournamentsRounds.
+  ///
+  /// In en, this message translates to:
+  /// **'{param} rounds'**
+  String mobileXiangqiTournamentsRounds(String param);
+
+  /// No description provided for @mobileXiangqiTournamentsParticipants.
+  ///
+  /// In en, this message translates to:
+  /// **'{param} signed up'**
+  String mobileXiangqiTournamentsParticipants(String param);
+
+  /// No description provided for @mobileXiangqiTournamentsStandings.
+  ///
+  /// In en, this message translates to:
+  /// **'Standings'**
+  String get mobileXiangqiTournamentsStandings;
+
+  /// No description provided for @mobileXiangqiTournamentsStandingsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Nobody has played yet.'**
+  String get mobileXiangqiTournamentsStandingsEmpty;
+
   /// No description provided for @mobileXiangqiSideBlack.
   ///
   /// In en, this message translates to:

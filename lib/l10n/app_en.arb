@@ -405,6 +405,13 @@
       }
     }
   },
+  "mobileXiangqiNotificationsEmpty": "No notifications.",
+  "mobileXiangqiNotificationsMarkAllRead": "Mark all read",
+  "mobileXiangqiFriendsEmpty": "No friends yet.",
+  "mobileXiangqiFriendRequests": "Friend requests",
+  "mobileXiangqiFriendRequestsEmpty": "No requests.",
+  "mobileXiangqiUnfriend": "Unfriend",
+  "mobileXiangqiSendFriendRequest": "Send a friend request",
   "mobileXiangqiSideBlack": "Black",
   "mobileXiangqiSideRed": "Red",
   "mobileXiangqiSignIn": "Sign in to xiangqi.com",

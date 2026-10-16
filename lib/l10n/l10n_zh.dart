@@ -905,6 +905,27 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get mobileXiangqiNotificationsEmpty => '没有通知。';
+
+  @override
+  String get mobileXiangqiNotificationsMarkAllRead => '全部标为已读';
+
+  @override
+  String get mobileXiangqiFriendsEmpty => '还没有好友。';
+
+  @override
+  String get mobileXiangqiFriendRequests => '好友请求';
+
+  @override
+  String get mobileXiangqiFriendRequestsEmpty => '没有待处理的请求。';
+
+  @override
+  String get mobileXiangqiUnfriend => '删除好友';
+
+  @override
+  String get mobileXiangqiSendFriendRequest => '发送好友请求';
+
+  @override
   String get mobileXiangqiSideBlack => '黑方';
 
   @override
@@ -8587,6 +8608,27 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String mobileXiangqiPuzzlesSuccessRate(String param) {
     return '正確率 $param';
   }
+
+  @override
+  String get mobileXiangqiNotificationsEmpty => '沒有通知。';
+
+  @override
+  String get mobileXiangqiNotificationsMarkAllRead => '全部標為已讀';
+
+  @override
+  String get mobileXiangqiFriendsEmpty => '還沒有好友。';
+
+  @override
+  String get mobileXiangqiFriendRequests => '好友請求';
+
+  @override
+  String get mobileXiangqiFriendRequestsEmpty => '沒有待處理的請求。';
+
+  @override
+  String get mobileXiangqiUnfriend => '刪除好友';
+
+  @override
+  String get mobileXiangqiSendFriendRequest => '傳送好友請求';
 
   @override
   String get mobileXiangqiSideBlack => '黑方';

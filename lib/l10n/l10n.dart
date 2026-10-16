@@ -1924,6 +1924,48 @@ abstract class AppLocalizations {
   /// **'Solved {param}'**
   String mobileXiangqiPuzzlesSuccessRate(String param);
 
+  /// No description provided for @mobileXiangqiNotificationsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No notifications.'**
+  String get mobileXiangqiNotificationsEmpty;
+
+  /// No description provided for @mobileXiangqiNotificationsMarkAllRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark all read'**
+  String get mobileXiangqiNotificationsMarkAllRead;
+
+  /// No description provided for @mobileXiangqiFriendsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No friends yet.'**
+  String get mobileXiangqiFriendsEmpty;
+
+  /// No description provided for @mobileXiangqiFriendRequests.
+  ///
+  /// In en, this message translates to:
+  /// **'Friend requests'**
+  String get mobileXiangqiFriendRequests;
+
+  /// No description provided for @mobileXiangqiFriendRequestsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No requests.'**
+  String get mobileXiangqiFriendRequestsEmpty;
+
+  /// No description provided for @mobileXiangqiUnfriend.
+  ///
+  /// In en, this message translates to:
+  /// **'Unfriend'**
+  String get mobileXiangqiUnfriend;
+
+  /// No description provided for @mobileXiangqiSendFriendRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'Send a friend request'**
+  String get mobileXiangqiSendFriendRequest;
+
   /// No description provided for @mobileXiangqiSideBlack.
   ///
   /// In en, this message translates to:

@@ -905,6 +905,27 @@ class AppLocalizationsHe extends AppLocalizations {
   }
 
   @override
+  String get mobileXiangqiNotificationsEmpty => 'No notifications.';
+
+  @override
+  String get mobileXiangqiNotificationsMarkAllRead => 'Mark all read';
+
+  @override
+  String get mobileXiangqiFriendsEmpty => 'No friends yet.';
+
+  @override
+  String get mobileXiangqiFriendRequests => 'Friend requests';
+
+  @override
+  String get mobileXiangqiFriendRequestsEmpty => 'No requests.';
+
+  @override
+  String get mobileXiangqiUnfriend => 'Unfriend';
+
+  @override
+  String get mobileXiangqiSendFriendRequest => 'Send a friend request';
+
+  @override
   String get mobileXiangqiSideBlack => 'Black';
 
   @override

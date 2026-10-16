@@ -27,6 +27,7 @@ import 'package:lichess_mobile/src/view/auth/xiangqi_login_screen.dart';
 import 'package:lichess_mobile/src/view/message/contacts_screen.dart';
 import 'package:lichess_mobile/src/view/settings/settings_screen.dart';
 import 'package:lichess_mobile/src/view/team/team_updates_screen.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_notifications_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_profile_screen.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_action_sheet.dart';
 import 'package:lichess_mobile/src/widgets/feedback.dart';
@@ -234,6 +235,19 @@ class _AccountMenuScreenState()
                   onTap: () => _navigate(context, XiangqiProfileScreen.buildRoute(session.name)),
                 ),
               },
+              // What xiangqi.com has told this account. Offered only to a real account, and not to
+              // a guest: a guest session is one the app made for a visitor, and the notifications
+              // behind it would be the site's welcome notes and nothing of the visitor's own.
+              if (xiangqiSession != null && !xiangqiSession.isGuest)
+                ListTile(
+                  leading: const Icon(Icons.notifications_none),
+                  trailing: Theme.of(context).platform == TargetPlatform.iOS
+                      ? const CupertinoListTileChevron()
+                      : null,
+                  title: Text(context.l10n.notifications),
+                  enabled: isOnline,
+                  onTap: () => _navigate(context, XiangqiNotificationsScreen.buildRoute()),
+                ),
             ],
           ),
           ListSection(

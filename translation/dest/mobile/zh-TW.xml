@@ -144,4 +144,11 @@
   <string name="xiangqiSpeedPuzzle" comment="Xiangqi: the puzzle rating, on the profile and as a leaderboard tab. xiangqi.com files it as puzzle_rating.">謎題</string>
   <string name="xiangqiPuzzlesAttempted" comment="Xiangqi profile: how many puzzles the account has tried. %s is the number.">做題 %s</string>
   <string name="xiangqiPuzzlesSuccessRate" comment="Xiangqi profile: the share of puzzles the account solved. %s is a percentage.">正確率 %s</string>
+  <string name="xiangqiNotificationsEmpty" comment="Xiangqi notifications screen: shown when the account has no notifications at all.">沒有通知。</string>
+  <string name="xiangqiNotificationsMarkAllRead" comment="Xiangqi notifications screen: the action that marks every notification read.">全部標為已讀</string>
+  <string name="xiangqiFriendsEmpty" comment="Xiangqi friends screen: shown when the account has no friends.">還沒有好友。</string>
+  <string name="xiangqiFriendRequests" comment="Xiangqi friends screen: the tab, and the heading, for the friend requests waiting to be answered.">好友請求</string>
+  <string name="xiangqiFriendRequestsEmpty" comment="Xiangqi friends screen: shown when there are no requests waiting.">沒有待處理的請求。</string>
+  <string name="xiangqiUnfriend" comment="Xiangqi friends screen: the action that removes somebody from the friends.">刪除好友</string>
+  <string name="xiangqiSendFriendRequest" comment="Xiangqi friends screen: the action that asks somebody to be a friend.">傳送好友請求</string>
 </resources>

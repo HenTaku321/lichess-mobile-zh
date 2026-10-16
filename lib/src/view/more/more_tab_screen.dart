@@ -28,6 +28,7 @@ import 'package:lichess_mobile/src/view/user/leaderboard_screen.dart';
 import 'package:lichess_mobile/src/view/user/player_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_analysis_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_board_editor_screen.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_friends_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_leaderboard_screen.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_choice_picker.dart';
 import 'package:lichess_mobile/src/widgets/feedback.dart';
@@ -291,18 +292,46 @@ class const _Body() extends ConsumerWidget {
                   Navigator.of(context, rootNavigator: true).push(PlayerScreen.buildRoute());
                 },
               ),
-              if (authUser != null)
-                ListTile(
-                  leading: const Icon(Icons.people_outline),
-                  title: Text(context.l10n.friends),
-                  enabled: isOnline,
-                  trailing: Theme.of(context).platform == TargetPlatform.iOS
-                      ? const CupertinoListTileChevron()
-                      : null,
-                  onTap: () {
-                    Navigator.of(context, rootNavigator: true).push(FriendScreen.buildRoute());
-                  },
-                ),
+              ListTile(
+                leading: const Icon(Icons.people_outline),
+                title: Text(context.l10n.friends),
+                enabled: isOnline,
+                trailing: Theme.of(context).platform == TargetPlatform.iOS
+                    ? const CupertinoListTileChevron()
+                    : null,
+                onTap: () async {
+                  // Chess and xiangqi share this one row, and the picker below decides whose
+                  // friends are listed: they are two games of equal standing, and giving xiangqi a
+                  // row of its own would say it was the lesser one. See the Analysis row above for
+                  // the whole of that argument.
+                  //
+                  // The chess half is gated on a lichess account, which is what it always was: a
+                  // friend list on lichess is an account's own, and a device with no account has
+                  // none to show. The xiangqi half is not, because the screen behind it says so
+                  // itself — a device with no xiangqi.com session is offered the way in there.
+                  final choices = [if (authUser != null) _FriendsGame.chess, _FriendsGame.xiangqi];
+                  _FriendsGame? choice;
+                  await showChoicePicker<_FriendsGame?>(
+                    context,
+                    title: Text(context.l10n.friends),
+                    choices: choices,
+                    selectedItem: null,
+                    labelBuilder: (game) => Text(switch (game) {
+                      .chess => context.l10n.mobileChess,
+                      .xiangqi => context.l10n.mobileXiangqi,
+                      null => '',
+                    }),
+                    onSelectedItemChanged: (game) => choice = game,
+                  );
+                  if (!context.mounted) return;
+                  final selected = choice;
+                  if (selected == null) return;
+                  Navigator.of(context, rootNavigator: true).push(switch (selected) {
+                    .chess => FriendScreen.buildRoute(),
+                    .xiangqi => XiangqiFriendsScreen.buildRoute(),
+                  });
+                },
+              ),
             ],
           ),
           const _AccountSection(),
@@ -438,6 +467,18 @@ enum _EditorGame() {
 /// — lichess's is a top ten per variant and xiangqi.com's is a paginated board per rating — so the
 /// picker chooses between two screens rather than between two settings of one.
 enum _LeaderboardGame() {
+  chess,
+  xiangqi,
+}
+
+/// The two games this app will show a friend list for.
+///
+/// The Friends row offers both rather than a row each, for the reason [_AnalysisGame] above does.
+/// The two lists are the two sites' own and share nothing but the idea — lichess's is an account's
+/// own friends with the online state beside them and xiangqi.com's is a paginated list with the
+/// requests waiting above it — so the picker chooses between two screens rather than between two
+/// settings of one.
+enum _FriendsGame() {
   chess,
   xiangqi,
 }

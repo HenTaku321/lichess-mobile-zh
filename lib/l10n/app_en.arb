@@ -304,6 +304,31 @@
   "mobileXiangqiHard": "Hard",
   "mobileXiangqiInvalidCredentials": "Wrong email or password.",
   "mobileXiangqiMedium": "Medium",
+  "mobileXiangqiPuzzle": "Xiangqi puzzle",
+  "mobileXiangqiPuzzleFindBestMoveFor": "Find the best move for {param}.",
+  "@mobileXiangqiPuzzleFindBestMoveFor": {
+    "placeholders": {
+      "param": {
+        "type": "String"
+      }
+    }
+  },
+  "mobileXiangqiPuzzleHintsExhausted": "You have used all of today's hints.",
+  "mobileXiangqiPuzzleNoPuzzle": "There is no puzzle available for these settings.",
+  "mobileXiangqiPuzzleQuotaLeft": "{param1} of {param2} puzzles left today",
+  "@mobileXiangqiPuzzleQuotaLeft": {
+    "placeholders": {
+      "param1": {
+        "type": "String"
+      },
+      "param2": {
+        "type": "String"
+      }
+    }
+  },
+  "mobileXiangqiPuzzleSolutionWithheld": "You have used all of today's puzzles. The position is here; the answer is not.",
+  "mobileXiangqiPuzzleSubtitle": "Solve puzzles from xiangqi.com.",
+  "mobileXiangqiPuzzleWrongMove": "That is not the move.",
   "mobileXiangqiRanOutOfTime": "{param} ran out of time.",
   "@mobileXiangqiRanOutOfTime": {
     "placeholders": {

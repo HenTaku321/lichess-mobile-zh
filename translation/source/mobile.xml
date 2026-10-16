@@ -266,6 +266,14 @@
   <string name="xiangqiHard" comment="Xiangqi engine strength: the hardest level.">Hard</string>
   <string name="xiangqiInvalidCredentials" comment="Error shown when a xiangqi.com email and password match no account.">Wrong email or password.</string>
   <string name="xiangqiMedium" comment="Xiangqi engine strength: the medium level.">Medium</string>
+  <string name="xiangqiPuzzle" comment="The title of the screen a xiangqi.com puzzle is solved on, and the name of the feature.">Xiangqi puzzle</string>
+  <string name="xiangqiPuzzleFindBestMoveFor" comment="Xiangqi puzzle screen: the line that says whose move is being asked for. %s is a side, red or black.">Find the best move for %s.</string>
+  <string name="xiangqiPuzzleHintsExhausted" comment="Xiangqi puzzle screen: shown when the server refuses a hint because the day's hint allowance is spent.">You have used all of today's hints.</string>
+  <string name="xiangqiPuzzleNoPuzzle" comment="Xiangqi puzzle screen: shown when the server has no puzzle to offer for the settings asked for.">There is no puzzle available for these settings.</string>
+  <string name="xiangqiPuzzleQuotaLeft" comment="Xiangqi puzzle screen: how much of the day's puzzle allowance is left. %1$s is how many are left and %2$s is the day's total.">%1$s of %2$s puzzles left today</string>
+  <string name="xiangqiPuzzleSolutionWithheld" comment="Xiangqi puzzle screen: shown when the server answers with the position but withholds the answer, which is what it does once the day's puzzle allowance is spent.">You have used all of today's puzzles. The position is here; the answer is not.</string>
+  <string name="xiangqiPuzzleSubtitle" comment="Xiangqi puzzle menu: the line under the xiangqi puzzle tile, saying where its puzzles come from.">Solve puzzles from xiangqi.com.</string>
+  <string name="xiangqiPuzzleWrongMove" comment="Xiangqi puzzle screen: shown when the move played is not the puzzle's next one. The move is not played and the solver tries again.">That is not the move.</string>
   <string name="xiangqiRanOutOfTime" comment="Xiangqi game-end sentence: the side named by %s used up its clock and lost. Chess says the same thing with its own white/black pair, which a xiangqi game cannot use.">%s ran out of time.</string>
   <string name="xiangqiRedMovesFirst" comment="Xiangqi new game sheet: the line under the side setting once black is chosen, saying the computer opens the game.">Red moves first, so the computer opens the game.</string>
   <string name="xiangqiResigned" comment="Xiangqi game-end sentence: the side named by %s resigned.">%s resigned.</string>

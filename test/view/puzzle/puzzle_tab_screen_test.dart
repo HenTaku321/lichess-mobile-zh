@@ -108,6 +108,7 @@ void main() {
     await tester.pumpAndSettle(const Duration(milliseconds: 100));
 
     expect(find.text('Puzzle Themes'), findsOneWidget);
+    expect(find.text('Xiangqi puzzle'), findsOneWidget);
     expect(find.text('Puzzle Streak'), findsOneWidget);
     expect(find.text('123'), findsOneWidget); // saved streak score
     expect(find.text('Puzzle Storm'), findsOneWidget);
@@ -610,7 +611,7 @@ void main() {
     expect(await queueLength(), equals(50));
 
     // open the puzzle screen from the tab: the tab screen stays mounted below it
-    await tester.ensureVisible(find.widgetWithText(PuzzleAnglePreview, 'Healthy mix'));
+    await tester.scrollUntilVisible(find.widgetWithText(PuzzleAnglePreview, 'Healthy mix'), 200);
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(PuzzleAnglePreview, 'Healthy mix'));
     await tester.pumpAndSettle(const Duration(milliseconds: 100));

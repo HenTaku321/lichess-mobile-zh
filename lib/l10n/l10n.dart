@@ -1672,6 +1672,54 @@ abstract class AppLocalizations {
   /// **'Medium'**
   String get mobileXiangqiMedium;
 
+  /// No description provided for @mobileXiangqiPuzzle.
+  ///
+  /// In en, this message translates to:
+  /// **'Xiangqi puzzle'**
+  String get mobileXiangqiPuzzle;
+
+  /// No description provided for @mobileXiangqiPuzzleFindBestMoveFor.
+  ///
+  /// In en, this message translates to:
+  /// **'Find the best move for {param}.'**
+  String mobileXiangqiPuzzleFindBestMoveFor(String param);
+
+  /// No description provided for @mobileXiangqiPuzzleHintsExhausted.
+  ///
+  /// In en, this message translates to:
+  /// **'You have used all of today\'s hints.'**
+  String get mobileXiangqiPuzzleHintsExhausted;
+
+  /// No description provided for @mobileXiangqiPuzzleNoPuzzle.
+  ///
+  /// In en, this message translates to:
+  /// **'There is no puzzle available for these settings.'**
+  String get mobileXiangqiPuzzleNoPuzzle;
+
+  /// No description provided for @mobileXiangqiPuzzleQuotaLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'{param1} of {param2} puzzles left today'**
+  String mobileXiangqiPuzzleQuotaLeft(String param1, String param2);
+
+  /// No description provided for @mobileXiangqiPuzzleSolutionWithheld.
+  ///
+  /// In en, this message translates to:
+  /// **'You have used all of today\'s puzzles. The position is here; the answer is not.'**
+  String get mobileXiangqiPuzzleSolutionWithheld;
+
+  /// No description provided for @mobileXiangqiPuzzleSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Solve puzzles from xiangqi.com.'**
+  String get mobileXiangqiPuzzleSubtitle;
+
+  /// No description provided for @mobileXiangqiPuzzleWrongMove.
+  ///
+  /// In en, this message translates to:
+  /// **'That is not the move.'**
+  String get mobileXiangqiPuzzleWrongMove;
+
   /// No description provided for @mobileXiangqiRanOutOfTime.
   ///
   /// In en, this message translates to:

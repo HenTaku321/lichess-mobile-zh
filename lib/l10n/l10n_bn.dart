@@ -763,6 +763,34 @@ class AppLocalizationsBn extends AppLocalizations {
   String get mobileXiangqiMedium => 'Medium';
 
   @override
+  String get mobileXiangqiPuzzle => 'Xiangqi puzzle';
+
+  @override
+  String mobileXiangqiPuzzleFindBestMoveFor(String param) {
+    return 'Find the best move for $param.';
+  }
+
+  @override
+  String get mobileXiangqiPuzzleHintsExhausted => 'You have used all of today\'s hints.';
+
+  @override
+  String get mobileXiangqiPuzzleNoPuzzle => 'There is no puzzle available for these settings.';
+
+  @override
+  String mobileXiangqiPuzzleQuotaLeft(String param1, String param2) {
+    return '$param1 of $param2 puzzles left today';
+  }
+
+  @override
+  String get mobileXiangqiPuzzleSolutionWithheld => 'You have used all of today\'s puzzles. The position is here; the answer is not.';
+
+  @override
+  String get mobileXiangqiPuzzleSubtitle => 'Solve puzzles from xiangqi.com.';
+
+  @override
+  String get mobileXiangqiPuzzleWrongMove => 'That is not the move.';
+
+  @override
   String mobileXiangqiRanOutOfTime(String param) {
     return '$param ran out of time.';
   }

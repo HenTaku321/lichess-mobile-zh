@@ -262,6 +262,14 @@
   <string name="xiangqiHard" comment="Xiangqi engine strength: the hardest level.">困难</string>
   <string name="xiangqiInvalidCredentials" comment="Error shown when a xiangqi.com email and password match no account.">邮箱或密码不正确。</string>
   <string name="xiangqiMedium" comment="Xiangqi engine strength: the medium level.">中等</string>
+  <string name="xiangqiPuzzle" comment="The title of the screen a xiangqi.com puzzle is solved on, and the name of the feature.">象棋谜题</string>
+  <string name="xiangqiPuzzleFindBestMoveFor" comment="Xiangqi puzzle screen: the line that says whose move is being asked for. %s is a side, red or black.">找出%s的最佳着法</string>
+  <string name="xiangqiPuzzleHintsExhausted" comment="Xiangqi puzzle screen: shown when the server refuses a hint because the day's hint allowance is spent.">今天的提示次数已用完。</string>
+  <string name="xiangqiPuzzleNoPuzzle" comment="Xiangqi puzzle screen: shown when the server has no puzzle to offer for the settings asked for.">这些设置下没有可用的谜题。</string>
+  <string name="xiangqiPuzzleQuotaLeft" comment="Xiangqi puzzle screen: how much of the day's puzzle allowance is left. %1$s is how many are left and %2$s is the day's total.">今日剩余谜题 %1$s/%2$s</string>
+  <string name="xiangqiPuzzleSolutionWithheld" comment="Xiangqi puzzle screen: shown when the server answers with the position but withholds the answer, which is what it does once the day's puzzle allowance is spent.">今天的谜题次数已用完。题目在这里，解法不在。</string>
+  <string name="xiangqiPuzzleSubtitle" comment="Xiangqi puzzle menu: the line under the xiangqi puzzle tile, saying where its puzzles come from.">解 xiangqi.com 上的象棋谜题。</string>
+  <string name="xiangqiPuzzleWrongMove" comment="Xiangqi puzzle screen: shown when the move played is not the puzzle's next one. The move is not played and the solver tries again.">不是这一步。</string>
   <string name="xiangqiRanOutOfTime" comment="Xiangqi game-end sentence: the side named by %s used up its clock and lost. Chess says the same thing with its own white/black pair, which a xiangqi game cannot use.">%s超时判负。</string>
   <string name="xiangqiRedMovesFirst" comment="Xiangqi new game sheet: the line under the side setting once black is chosen, saying the computer opens the game.">红方先行，所以电脑先开局。</string>
   <string name="xiangqiResigned" comment="Xiangqi game-end sentence: the side named by %s resigned.">%s认输。</string>

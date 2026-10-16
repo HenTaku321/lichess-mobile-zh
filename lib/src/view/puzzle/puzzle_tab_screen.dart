@@ -26,6 +26,7 @@ import 'package:lichess_mobile/src/view/puzzle/puzzle_screen.dart';
 import 'package:lichess_mobile/src/view/puzzle/puzzle_themes_screen.dart';
 import 'package:lichess_mobile/src/view/puzzle/storm_screen.dart';
 import 'package:lichess_mobile/src/view/puzzle/streak_screen.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_puzzle_screen.dart';
 import 'package:lichess_mobile/src/widgets/board_preview.dart';
 import 'package:lichess_mobile/src/widgets/feedback.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
@@ -262,6 +263,22 @@ class const _PuzzleMenu() extends ConsumerWidget {
           onTap: () {
             Navigator.of(context).push(PuzzleThemesScreen.buildRoute());
           },
+        ),
+        // Xiangqi's puzzles are xiangqi.com's rather than lichess's, and are solved on this app's
+        // own board; the tile sits in this menu because a puzzle is a puzzle, and a solver looking
+        // for one should not have to know whose server it comes from to find it. Nothing here asks
+        // whether the device is signed in to xiangqi.com: the screen behind it offers the way in,
+        // which is where a solver who has never been there needs to arrive anyway.
+        _PuzzleMenuListTile(
+          enabled: isOnline,
+          icon: Icons.extension_outlined,
+          title: context.l10n.mobileXiangqiPuzzle,
+          subtitle: context.l10n.mobileXiangqiPuzzleSubtitle,
+          onTap: isOnline
+              ? () {
+                  Navigator.of(context, rootNavigator: true).push(XiangqiPuzzleScreen.buildRoute());
+                }
+              : null,
         ),
         _PuzzleMenuListTile(
           enabled: isOnline,

@@ -763,6 +763,34 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mobileXiangqiMedium => '中等';
 
   @override
+  String get mobileXiangqiPuzzle => '象棋谜题';
+
+  @override
+  String mobileXiangqiPuzzleFindBestMoveFor(String param) {
+    return '找出$param的最佳着法';
+  }
+
+  @override
+  String get mobileXiangqiPuzzleHintsExhausted => '今天的提示次数已用完。';
+
+  @override
+  String get mobileXiangqiPuzzleNoPuzzle => '这些设置下没有可用的谜题。';
+
+  @override
+  String mobileXiangqiPuzzleQuotaLeft(String param1, String param2) {
+    return '今日剩余谜题 $param1/$param2';
+  }
+
+  @override
+  String get mobileXiangqiPuzzleSolutionWithheld => '今天的谜题次数已用完。题目在这里，解法不在。';
+
+  @override
+  String get mobileXiangqiPuzzleSubtitle => '解 xiangqi.com 上的象棋谜题。';
+
+  @override
+  String get mobileXiangqiPuzzleWrongMove => '不是这一步。';
+
+  @override
   String mobileXiangqiRanOutOfTime(String param) {
     return '$param超时判负。';
   }
@@ -8303,6 +8331,34 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get mobileXiangqiMedium => '中等';
+
+  @override
+  String get mobileXiangqiPuzzle => '象棋謎題';
+
+  @override
+  String mobileXiangqiPuzzleFindBestMoveFor(String param) {
+    return '找出$param的最佳著法';
+  }
+
+  @override
+  String get mobileXiangqiPuzzleHintsExhausted => '今天的提示次數已用完。';
+
+  @override
+  String get mobileXiangqiPuzzleNoPuzzle => '這些設定下沒有可用的謎題。';
+
+  @override
+  String mobileXiangqiPuzzleQuotaLeft(String param1, String param2) {
+    return '今日剩餘謎題 $param1/$param2';
+  }
+
+  @override
+  String get mobileXiangqiPuzzleSolutionWithheld => '今天的謎題次數已用完。題目在這裡，解法不在。';
+
+  @override
+  String get mobileXiangqiPuzzleSubtitle => '解 xiangqi.com 上的象棋謎題。';
+
+  @override
+  String get mobileXiangqiPuzzleWrongMove => '不是這一步。';
 
   @override
   String mobileXiangqiRanOutOfTime(String param) {

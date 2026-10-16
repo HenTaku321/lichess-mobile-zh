@@ -978,6 +978,30 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mobileXiangqiDatabaseDrawn => '和';
 
   @override
+  String get mobileXiangqiSaved => '我的内容';
+
+  @override
+  String get mobileXiangqiSavedPuzzles => '我出的题';
+
+  @override
+  String get mobileXiangqiSavedNotes => '我的笔记';
+
+  @override
+  String get mobileXiangqiSavedNewFolder => '新建文件夹';
+
+  @override
+  String get mobileXiangqiSavedFolderName => '文件夹名称';
+
+  @override
+  String get mobileXiangqiSavedRename => '重命名';
+
+  @override
+  String get mobileXiangqiSavedDelete => '删除';
+
+  @override
+  String get mobileXiangqiSavedEmpty => '这里还没有东西。';
+
+  @override
   String get mobileXiangqiSideBlack => '黑方';
 
   @override
@@ -8733,6 +8757,30 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get mobileXiangqiDatabaseDrawn => '和';
+
+  @override
+  String get mobileXiangqiSaved => '我的內容';
+
+  @override
+  String get mobileXiangqiSavedPuzzles => '我出的題';
+
+  @override
+  String get mobileXiangqiSavedNotes => '我的筆記';
+
+  @override
+  String get mobileXiangqiSavedNewFolder => '新增資料夾';
+
+  @override
+  String get mobileXiangqiSavedFolderName => '資料夾名稱';
+
+  @override
+  String get mobileXiangqiSavedRename => '重新命名';
+
+  @override
+  String get mobileXiangqiSavedDelete => '刪除';
+
+  @override
+  String get mobileXiangqiSavedEmpty => '這裡還沒有東西。';
 
   @override
   String get mobileXiangqiSideBlack => '黑方';

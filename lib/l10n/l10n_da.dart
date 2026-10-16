@@ -978,6 +978,30 @@ class AppLocalizationsDa extends AppLocalizations {
   String get mobileXiangqiDatabaseDrawn => 'drew';
 
   @override
+  String get mobileXiangqiSaved => 'My content';
+
+  @override
+  String get mobileXiangqiSavedPuzzles => 'My puzzles';
+
+  @override
+  String get mobileXiangqiSavedNotes => 'My notes';
+
+  @override
+  String get mobileXiangqiSavedNewFolder => 'New folder';
+
+  @override
+  String get mobileXiangqiSavedFolderName => 'Folder name';
+
+  @override
+  String get mobileXiangqiSavedRename => 'Rename';
+
+  @override
+  String get mobileXiangqiSavedDelete => 'Delete';
+
+  @override
+  String get mobileXiangqiSavedEmpty => 'Nothing here yet.';
+
+  @override
   String get mobileXiangqiSideBlack => 'Black';
 
   @override

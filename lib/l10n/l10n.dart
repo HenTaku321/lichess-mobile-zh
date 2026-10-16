@@ -2062,6 +2062,54 @@ abstract class AppLocalizations {
   /// **'drew'**
   String get mobileXiangqiDatabaseDrawn;
 
+  /// No description provided for @mobileXiangqiSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'My content'**
+  String get mobileXiangqiSaved;
+
+  /// No description provided for @mobileXiangqiSavedPuzzles.
+  ///
+  /// In en, this message translates to:
+  /// **'My puzzles'**
+  String get mobileXiangqiSavedPuzzles;
+
+  /// No description provided for @mobileXiangqiSavedNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'My notes'**
+  String get mobileXiangqiSavedNotes;
+
+  /// No description provided for @mobileXiangqiSavedNewFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'New folder'**
+  String get mobileXiangqiSavedNewFolder;
+
+  /// No description provided for @mobileXiangqiSavedFolderName.
+  ///
+  /// In en, this message translates to:
+  /// **'Folder name'**
+  String get mobileXiangqiSavedFolderName;
+
+  /// No description provided for @mobileXiangqiSavedRename.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename'**
+  String get mobileXiangqiSavedRename;
+
+  /// No description provided for @mobileXiangqiSavedDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get mobileXiangqiSavedDelete;
+
+  /// No description provided for @mobileXiangqiSavedEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing here yet.'**
+  String get mobileXiangqiSavedEmpty;
+
   /// No description provided for @mobileXiangqiSideBlack.
   ///
   /// In en, this message translates to:

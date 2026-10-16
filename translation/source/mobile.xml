@@ -331,6 +331,14 @@
   <string name="xiangqiDatabaseWon" comment="Xiangqi database screen: a game the player whose page this is won.">won</string>
   <string name="xiangqiDatabaseLost" comment="Xiangqi database screen: a game the player whose page this is lost.">lost</string>
   <string name="xiangqiDatabaseDrawn" comment="Xiangqi database screen: a game the player whose page this is drew.">drew</string>
+  <string name="xiangqiSaved" comment="Xiangqi saved-content screen: the title of the account's own content library, and the name of the feature.">My content</string>
+  <string name="xiangqiSavedPuzzles" comment="Xiangqi saved-content screen: the tab, and the heading, for the puzzles this account has created.">My puzzles</string>
+  <string name="xiangqiSavedNotes" comment="Xiangqi saved-content screen: the tab, and the heading, for the game notes this account has saved.">My notes</string>
+  <string name="xiangqiSavedNewFolder" comment="Xiangqi saved-content screen: the action that makes a folder.">New folder</string>
+  <string name="xiangqiSavedFolderName" comment="Xiangqi saved-content screen: the field a folder's name is typed into.">Folder name</string>
+  <string name="xiangqiSavedRename" comment="Xiangqi saved-content screen: the action that renames a folder.">Rename</string>
+  <string name="xiangqiSavedDelete" comment="Xiangqi saved-content screen: the action that deletes a folder.">Delete</string>
+  <string name="xiangqiSavedEmpty" comment="Xiangqi saved-content screen: shown when a kind of content has nothing in it at all.">Nothing here yet.</string>
   <string name="xiangqiSideBlack" comment="The black side of a xiangqi game, used as a side name in the game-end sentences.">Black</string>
   <string name="xiangqiSideRed" comment="The red side of a xiangqi game, used as a side name in the game-end sentences.">Red</string>
   <string name="xiangqiSignIn" comment="The entry that starts the xiangqi.com sign-in, and the title of the screen it opens. Named after the service, so that it does not read as a third way of signing in to lichess.">Sign in to xiangqi.com</string>

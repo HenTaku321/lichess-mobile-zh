@@ -167,4 +167,12 @@
   <string name="xiangqiDatabaseWon" comment="Xiangqi database screen: a game the player whose page this is won.">勝</string>
   <string name="xiangqiDatabaseLost" comment="Xiangqi database screen: a game the player whose page this is lost.">負</string>
   <string name="xiangqiDatabaseDrawn" comment="Xiangqi database screen: a game the player whose page this is drew.">和</string>
+  <string name="xiangqiSaved" comment="Xiangqi saved-content screen: the title of the account's own content library, and the name of the feature.">我的內容</string>
+  <string name="xiangqiSavedPuzzles" comment="Xiangqi saved-content screen: the tab, and the heading, for the puzzles this account has created.">我出的題</string>
+  <string name="xiangqiSavedNotes" comment="Xiangqi saved-content screen: the tab, and the heading, for the game notes this account has saved.">我的筆記</string>
+  <string name="xiangqiSavedNewFolder" comment="Xiangqi saved-content screen: the action that makes a folder.">新增資料夾</string>
+  <string name="xiangqiSavedFolderName" comment="Xiangqi saved-content screen: the field a folder's name is typed into.">資料夾名稱</string>
+  <string name="xiangqiSavedRename" comment="Xiangqi saved-content screen: the action that renames a folder.">重新命名</string>
+  <string name="xiangqiSavedDelete" comment="Xiangqi saved-content screen: the action that deletes a folder.">刪除</string>
+  <string name="xiangqiSavedEmpty" comment="Xiangqi saved-content screen: shown when a kind of content has nothing in it at all.">這裡還沒有東西。</string>
 </resources>

@@ -926,6 +926,29 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mobileXiangqiSendFriendRequest => '发送好友请求';
 
   @override
+  String get mobileXiangqiLessons => '象棋课程';
+
+  @override
+  String mobileXiangqiLessonsProgress(String param1, String param2) {
+    return '已完成 $param1/$param2';
+  }
+
+  @override
+  String get mobileXiangqiLessonChapters => '章节';
+
+  @override
+  String get mobileXiangqiLessonNotPlayable => '本章暂时无法在本应用中走子。';
+
+  @override
+  String get mobileXiangqiLessonNoChapters => '没有章节。';
+
+  @override
+  String get mobileXiangqiLessonScript => '要走的一条线';
+
+  @override
+  String get mobileXiangqiLessonScriptEmpty => '本章没有要走的一步。';
+
+  @override
   String get mobileXiangqiSideBlack => '黑方';
 
   @override
@@ -8629,6 +8652,29 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get mobileXiangqiSendFriendRequest => '傳送好友請求';
+
+  @override
+  String get mobileXiangqiLessons => '象棋課程';
+
+  @override
+  String mobileXiangqiLessonsProgress(String param1, String param2) {
+    return '已完成 $param1/$param2';
+  }
+
+  @override
+  String get mobileXiangqiLessonChapters => '章節';
+
+  @override
+  String get mobileXiangqiLessonNotPlayable => '本章暫時無法在本應用中走子。';
+
+  @override
+  String get mobileXiangqiLessonNoChapters => '沒有章節。';
+
+  @override
+  String get mobileXiangqiLessonScript => '要走的一條線';
+
+  @override
+  String get mobileXiangqiLessonScriptEmpty => '本章沒有要走的一步。';
 
   @override
   String get mobileXiangqiSideBlack => '黑方';

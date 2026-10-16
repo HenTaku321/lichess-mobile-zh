@@ -926,6 +926,29 @@ class AppLocalizationsCs extends AppLocalizations {
   String get mobileXiangqiSendFriendRequest => 'Send a friend request';
 
   @override
+  String get mobileXiangqiLessons => 'Lessons';
+
+  @override
+  String mobileXiangqiLessonsProgress(String param1, String param2) {
+    return '$param1 of $param2 done';
+  }
+
+  @override
+  String get mobileXiangqiLessonChapters => 'Chapters';
+
+  @override
+  String get mobileXiangqiLessonNotPlayable => 'This chapter is not playable in this app yet.';
+
+  @override
+  String get mobileXiangqiLessonNoChapters => 'No chapters.';
+
+  @override
+  String get mobileXiangqiLessonScript => 'The line to play';
+
+  @override
+  String get mobileXiangqiLessonScriptEmpty => 'This chapter has no moves to play.';
+
+  @override
   String get mobileXiangqiSideBlack => 'Black';
 
   @override

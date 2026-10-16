@@ -315,6 +315,13 @@
   <string name="xiangqiFriendRequestsEmpty" comment="Xiangqi friends screen: shown when there are no requests waiting.">No requests.</string>
   <string name="xiangqiUnfriend" comment="Xiangqi friends screen: the action that removes somebody from the friends.">Unfriend</string>
   <string name="xiangqiSendFriendRequest" comment="Xiangqi friends screen: the action that asks somebody to be a friend.">Send a friend request</string>
+  <string name="xiangqiLessons" comment="Xiangqi lessons screen: the title of the course list, and the name of the feature.">Lessons</string>
+  <string name="xiangqiLessonsProgress" comment="Xiangqi lessons screen: how far through a topic or a lesson the account is. %1$s is how many are done and %2$s is how many there are.">%1$s of %2$s done</string>
+  <string name="xiangqiLessonChapters" comment="Xiangqi lesson screen: the heading of the list of chapters a lesson is made of.">Chapters</string>
+  <string name="xiangqiLessonNotPlayable" comment="Xiangqi lesson screen: shown in place of a chapter this app cannot draw a board for, saying why.">This chapter is not playable in this app yet.</string>
+  <string name="xiangqiLessonNoChapters" comment="Xiangqi lesson screen: shown when a lesson has no chapters to list.">No chapters.</string>
+  <string name="xiangqiLessonScript" comment="Xiangqi chapter screen: the heading of the list of moves the chapter wants played.">The line to play</string>
+  <string name="xiangqiLessonScriptEmpty" comment="Xiangqi chapter screen: shown when a chapter carries no moves, which is a chapter that only reads.">This chapter has no moves to play.</string>
   <string name="xiangqiSideBlack" comment="The black side of a xiangqi game, used as a side name in the game-end sentences.">Black</string>
   <string name="xiangqiSideRed" comment="The red side of a xiangqi game, used as a side name in the game-end sentences.">Red</string>
   <string name="xiangqiSignIn" comment="The entry that starts the xiangqi.com sign-in, and the title of the screen it opens. Named after the service, so that it does not read as a third way of signing in to lichess.">Sign in to xiangqi.com</string>

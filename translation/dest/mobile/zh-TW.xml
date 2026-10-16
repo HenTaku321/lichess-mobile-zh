@@ -151,4 +151,11 @@
   <string name="xiangqiFriendRequestsEmpty" comment="Xiangqi friends screen: shown when there are no requests waiting.">沒有待處理的請求。</string>
   <string name="xiangqiUnfriend" comment="Xiangqi friends screen: the action that removes somebody from the friends.">刪除好友</string>
   <string name="xiangqiSendFriendRequest" comment="Xiangqi friends screen: the action that asks somebody to be a friend.">傳送好友請求</string>
+  <string name="xiangqiLessons" comment="Xiangqi lessons screen: the title of the course list, and the name of the feature.">象棋課程</string>
+  <string name="xiangqiLessonsProgress" comment="Xiangqi lessons screen: how far through a topic or a lesson the account is. %1$s is how many are done and %2$s is how many there are.">已完成 %1$s/%2$s</string>
+  <string name="xiangqiLessonChapters" comment="Xiangqi lesson screen: the heading of the list of chapters a lesson is made of.">章節</string>
+  <string name="xiangqiLessonNotPlayable" comment="Xiangqi lesson screen: shown in place of a chapter this app cannot draw a board for, saying why.">本章暫時無法在本應用中走子。</string>
+  <string name="xiangqiLessonNoChapters" comment="Xiangqi lesson screen: shown when a lesson has no chapters to list.">沒有章節。</string>
+  <string name="xiangqiLessonScript" comment="Xiangqi chapter screen: the heading of the list of moves the chapter wants played.">要走的一條線</string>
+  <string name="xiangqiLessonScriptEmpty" comment="Xiangqi chapter screen: shown when a chapter carries no moves, which is a chapter that only reads.">本章沒有要走的一步。</string>
 </resources>

@@ -412,6 +412,23 @@
   "mobileXiangqiFriendRequestsEmpty": "No requests.",
   "mobileXiangqiUnfriend": "Unfriend",
   "mobileXiangqiSendFriendRequest": "Send a friend request",
+  "mobileXiangqiLessons": "Lessons",
+  "mobileXiangqiLessonsProgress": "{param1} of {param2} done",
+  "@mobileXiangqiLessonsProgress": {
+    "placeholders": {
+      "param1": {
+        "type": "String"
+      },
+      "param2": {
+        "type": "String"
+      }
+    }
+  },
+  "mobileXiangqiLessonChapters": "Chapters",
+  "mobileXiangqiLessonNotPlayable": "This chapter is not playable in this app yet.",
+  "mobileXiangqiLessonNoChapters": "No chapters.",
+  "mobileXiangqiLessonScript": "The line to play",
+  "mobileXiangqiLessonScriptEmpty": "This chapter has no moves to play.",
   "mobileXiangqiSideBlack": "Black",
   "mobileXiangqiSideRed": "Red",
   "mobileXiangqiSignIn": "Sign in to xiangqi.com",

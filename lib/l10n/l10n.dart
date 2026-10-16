@@ -1966,6 +1966,48 @@ abstract class AppLocalizations {
   /// **'Send a friend request'**
   String get mobileXiangqiSendFriendRequest;
 
+  /// No description provided for @mobileXiangqiLessons.
+  ///
+  /// In en, this message translates to:
+  /// **'Lessons'**
+  String get mobileXiangqiLessons;
+
+  /// No description provided for @mobileXiangqiLessonsProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'{param1} of {param2} done'**
+  String mobileXiangqiLessonsProgress(String param1, String param2);
+
+  /// No description provided for @mobileXiangqiLessonChapters.
+  ///
+  /// In en, this message translates to:
+  /// **'Chapters'**
+  String get mobileXiangqiLessonChapters;
+
+  /// No description provided for @mobileXiangqiLessonNotPlayable.
+  ///
+  /// In en, this message translates to:
+  /// **'This chapter is not playable in this app yet.'**
+  String get mobileXiangqiLessonNotPlayable;
+
+  /// No description provided for @mobileXiangqiLessonNoChapters.
+  ///
+  /// In en, this message translates to:
+  /// **'No chapters.'**
+  String get mobileXiangqiLessonNoChapters;
+
+  /// No description provided for @mobileXiangqiLessonScript.
+  ///
+  /// In en, this message translates to:
+  /// **'The line to play'**
+  String get mobileXiangqiLessonScript;
+
+  /// No description provided for @mobileXiangqiLessonScriptEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'This chapter has no moves to play.'**
+  String get mobileXiangqiLessonScriptEmpty;
+
   /// No description provided for @mobileXiangqiSideBlack.
   ///
   /// In en, this message translates to:

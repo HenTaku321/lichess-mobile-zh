@@ -17,6 +17,7 @@ import 'package:lichess_mobile/src/view/practice/practice_screen.dart';
 import 'package:lichess_mobile/src/view/study/study_list.dart';
 import 'package:lichess_mobile/src/view/study/study_list_screen.dart';
 import 'package:lichess_mobile/src/view/study/study_screen.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_lessons_screen.dart';
 import 'package:lichess_mobile/src/widgets/haptic_refresh_indicator.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:lichess_mobile/src/widgets/platform.dart';
@@ -149,6 +150,17 @@ class const _Body() extends ConsumerWidget {
                     context,
                     rootNavigator: true,
                   ).push(CoordinateTrainingScreen.buildRoute()),
+                ),
+                ListTile(
+                  leading: const Icon(Symbols.school),
+                  trailing: Theme.of(context).platform == TargetPlatform.iOS
+                      ? const CupertinoListTileChevron()
+                      : null,
+                  title: Text(context.l10n.mobileXiangqiLessons, style: Styles.callout),
+                  onTap: () => Navigator.of(
+                    context,
+                    rootNavigator: true,
+                  ).push(XiangqiLessonsScreen.buildRoute()),
                 ),
               ],
             ),

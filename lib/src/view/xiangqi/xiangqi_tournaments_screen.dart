@@ -2,6 +2,7 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/xiangqi/tournament/xiangqi_tournament.dart';
 import 'package:lichess_mobile/src/model/xiangqi/tournament/xiangqi_tournament_repository.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_country_names.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
@@ -237,7 +238,12 @@ class const _StandingRow({required final XiangqiTournamentParticipant entry})
       title: Text(entry.player.name, overflow: TextOverflow.ellipsis),
       subtitle: Text(
         [
-          if (entry.player.countryName != null) entry.player.countryName!,
+          if (entry.player.countryName != null)
+            xiangqiLocalizedCountryName(
+                  Localizations.localeOf(context),
+                  englishName: entry.player.countryName,
+                ) ??
+                entry.player.countryName!,
           if (entry.gameCount > 0) '${entry.winCount}/${entry.gameCount}',
         ].join(' · '),
         maxLines: 1,

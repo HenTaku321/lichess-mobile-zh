@@ -14,27 +14,29 @@ import 'package:lichess_mobile/src/network/xiangqi_uri.dart';
 /// One page for the whole list: the endpoint takes no page parameter and none was found. The
 /// progress on each topic is this account's — `complete_lessons` — so the list is worth asking for
 /// again when the account has done something, which is what the screens behind it do.
-final xiangqiTopicsProvider = FutureProvider.autoDispose<IList<XiangqiTopic>>((ref) async {
-  return xiangqiTopicsFromJson(await _getJson(ref, 'lessons/levels', const {}));
+final xiangqiTopicsProvider = FutureProvider.autoDispose.family<IList<XiangqiTopic>, String>((
+  ref,
+  locale,
+) async {
+  return xiangqiTopicsFromJson(await _getJson(ref, 'lessons/levels', {'locale': locale}));
 }, name: 'XiangqiTopicsProvider');
 
 /// One topic and its lessons, from `GET /api/lessons/topic/<id>`.
-final xiangqiTopicProvider = FutureProvider.autoDispose.family<XiangqiTopicDetail, String>((
-  ref,
-  id,
-) async {
-  final json = await _getJson(ref, 'lessons/topic/$id', const {});
-  final detail = xiangqiTopicDetailFromJson(json);
-  if (detail == null) {
-    throw ServerException(
-      200,
-      'xiangqi.com answered the topic with something else.',
-      xiangqiUri('lessons/topic/$id'),
-      null,
-    );
-  }
-  return detail;
-}, name: 'XiangqiTopicProvider');
+final xiangqiTopicProvider = FutureProvider.autoDispose
+    .family<XiangqiTopicDetail, (String id, String locale)>((ref, key) async {
+      final (id, locale) = key;
+      final json = await _getJson(ref, 'lessons/topic/$id', {'locale': locale});
+      final detail = xiangqiTopicDetailFromJson(json);
+      if (detail == null) {
+        throw ServerException(
+          200,
+          'xiangqi.com answered the topic with something else.',
+          xiangqiUri('lessons/topic/$id'),
+          null,
+        );
+      }
+      return detail;
+    }, name: 'XiangqiTopicProvider');
 
 /// One lesson's chapters, from `GET /api/lessons/lesson/<id>/chapters`.
 ///

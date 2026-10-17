@@ -9,6 +9,7 @@ import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_hint.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
+import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/screen.dart';
 import 'package:lichess_mobile/src/widgets/move_list.dart';
 import 'package:material_ui/material_ui.dart';
@@ -295,7 +296,7 @@ class const XiangqiEvalGauge({
     );
 
     return Semantics(
-      label: label ?? 'Engine evaluation',
+      label: label ?? context.l10n.mobileEngineEvaluation,
       child: CustomPaint(
         painter: _XiangqiEvalGaugePainter(
           backgroundColor: backgroundColor(context),

@@ -12,6 +12,7 @@ import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_online_game_cont
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_user_repository.dart';
 import 'package:lichess_mobile/src/model/xiangqi/profile/xiangqi_profile.dart';
 import 'package:lichess_mobile/src/model/xiangqi/profile/xiangqi_profile_repository.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_country_names.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
@@ -100,7 +101,12 @@ class const _Header({required final XiangqiUserProfile profile}) extends Statele
   @override
   Widget build(BuildContext context) {
     final parts = <String>[
-      if (profile.countryName != null) profile.countryName!,
+      if (profile.countryName != null)
+        xiangqiLocalizedCountryName(
+              Localizations.localeOf(context),
+              englishName: profile.countryName,
+            ) ??
+            profile.countryName!,
       if (profile.memberSince != null) '${context.l10n.memberSince} ${_date(profile.memberSince!)}',
     ];
     return Padding(

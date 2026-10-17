@@ -99,13 +99,16 @@ void main() {
   group('a device with no xiangqi.com session', () {
     test('can read the courses', () async {
       final container = await _containerWithNoSession();
-      final topics = await _read(container, xiangqiTopicsProvider);
+      final topics = await _read(container, xiangqiTopicsProvider('zh_Hans'));
       expect(topics.single.title, 'A topic');
     });
 
     test('can read the master-games database', () async {
       final container = await _containerWithNoSession();
-      final players = await _read(container, xiangqiMasterPlayersProvider((null, 1)));
+      final players = await _read(
+        container,
+        xiangqiMasterPlayersProvider((search: null, page: 1, locale: 'zh_Hans')),
+      );
       expect(players.items.single.name, 'A Player');
     });
 

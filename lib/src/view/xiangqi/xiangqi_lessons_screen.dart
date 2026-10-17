@@ -4,6 +4,7 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/xiangqi/lesson/xiangqi_lesson.dart';
 import 'package:lichess_mobile/src/model/xiangqi/lesson/xiangqi_lesson_repository.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_locale.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_move.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_notation.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
@@ -35,7 +36,8 @@ class const XiangqiLessonsScreen({super.key}) extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final topics = ref.watch(xiangqiTopicsProvider);
+    final locale = xiangqiLocaleOf(Localizations.localeOf(context));
+    final topics = ref.watch(xiangqiTopicsProvider(locale));
 
     return Scaffold(
       appBar: AppBar(
@@ -45,7 +47,7 @@ class const XiangqiLessonsScreen({super.key}) extends ConsumerWidget {
       ),
       body: topics.when(
         data: (topics) => RefreshIndicator.adaptive(
-          onRefresh: () => ref.refresh(xiangqiTopicsProvider.future),
+          onRefresh: () => ref.refresh(xiangqiTopicsProvider(locale).future),
           child: ListView(
             children: [
               for (final level in _levelsOf(topics))
@@ -67,7 +69,7 @@ class const XiangqiLessonsScreen({super.key}) extends ConsumerWidget {
                 Text(context.l10n.mobileSomethingWentWrong, textAlign: TextAlign.center),
                 const SizedBox(height: 16.0),
                 FilledButton(
-                  onPressed: () => ref.invalidate(xiangqiTopicsProvider),
+                  onPressed: () => ref.invalidate(xiangqiTopicsProvider(locale)),
                   child: Text(context.l10n.retry),
                 ),
               ],
@@ -129,7 +131,8 @@ class const XiangqiTopicScreen({required final String topicId, super.key}) exten
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final detail = ref.watch(xiangqiTopicProvider(topicId));
+    final locale = xiangqiLocaleOf(Localizations.localeOf(context));
+    final detail = ref.watch(xiangqiTopicProvider((topicId, locale)));
 
     return Scaffold(
       appBar: AppBar(
@@ -162,7 +165,7 @@ class const XiangqiTopicScreen({required final String topicId, super.key}) exten
                 Text(context.l10n.mobileSomethingWentWrong, textAlign: TextAlign.center),
                 const SizedBox(height: 16.0),
                 FilledButton(
-                  onPressed: () => ref.invalidate(xiangqiTopicProvider(topicId)),
+                  onPressed: () => ref.invalidate(xiangqiTopicProvider((topicId, locale))),
                   child: Text(context.l10n.retry),
                 ),
               ],
@@ -224,7 +227,7 @@ class const XiangqiLessonScreen({
   Widget build(BuildContext context, WidgetRef ref) {
     // The chapters come back with their descriptions already in the reader's language, which is
     // what the `locale` parameter is for.
-    final locale = Localizations.localeOf(context).toLanguageTag();
+    final locale = xiangqiLocaleOf(Localizations.localeOf(context));
     final chapters = ref.watch(xiangqiChaptersProvider((lessonId, locale)));
 
     return Scaffold(

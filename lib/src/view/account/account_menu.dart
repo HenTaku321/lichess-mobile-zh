@@ -12,6 +12,7 @@ import 'package:lichess_mobile/src/model/user/user.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_session.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_user_repository.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_country_names.dart';
 import 'package:lichess_mobile/src/network/connectivity.dart';
 import 'package:lichess_mobile/src/network/http.dart';
 import 'package:lichess_mobile/src/styles/lichess_icons.dart';
@@ -387,7 +388,12 @@ class _AccountMenuScreenState()
     ];
     final status = [
       if (value.isOnline) l10n.online else l10n.offline,
-      if (value.countryName != null) value.countryName!,
+      if (value.countryName != null)
+        xiangqiLocalizedCountryName(
+              Localizations.localeOf(context),
+              englishName: value.countryName,
+            ) ??
+            value.countryName!,
     ];
 
     return Text(

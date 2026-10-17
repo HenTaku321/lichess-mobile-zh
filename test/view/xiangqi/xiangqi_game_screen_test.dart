@@ -341,7 +341,7 @@ void main() {
       // The engine's own name, and the badge that says the seat is a program rather than a person —
       // the same badge the chess screens put on an engine's row.
       expect(find.text('Pikafish'), findsOneWidget);
-      expect(find.text('BOT'), findsOneWidget);
+      expect(find.text('Computer'), findsOneWidget);
 
       // Nobody is signed in here, so the player's row falls back to the side they are playing,
       // which is how the online row names a seat nobody has taken yet. The row's own name is the

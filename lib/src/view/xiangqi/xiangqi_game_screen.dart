@@ -531,9 +531,9 @@ class const _PlayerRow({
                         color: context.lichessColors.fancy,
                         borderRadius: const BorderRadius.all(Radius.circular(3)),
                       ),
-                      child: const Text(
-                        'BOT',
-                        style: TextStyle(
+                      child: Text(
+                        context.l10n.computer,
+                        style: const TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,

@@ -2,6 +2,7 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/xiangqi/profile/xiangqi_profile.dart';
 import 'package:lichess_mobile/src/model/xiangqi/profile/xiangqi_profile_repository.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_country_names.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
@@ -163,7 +164,12 @@ class const _LeaderRow({required final XiangqiLeaderboardEntry entry}) extends S
       title: Text(player.name, overflow: TextOverflow.ellipsis),
       subtitle: Text(
         [
-          if (player.countryName != null) player.countryName!,
+          if (player.countryName != null)
+            xiangqiLocalizedCountryName(
+                  Localizations.localeOf(context),
+                  englishName: player.countryName,
+                ) ??
+                player.countryName!,
           // The two boards count different things, and the server sends whichever one is the
           // board's own. A row that has neither shows neither.
           if (entry.challengeAttempts != null)
@@ -242,11 +248,24 @@ class _CountrySheetState() extends State<_CountrySheet> {
   @override
   Widget build(BuildContext context) {
     final query = _query.toLowerCase();
+    final locale = Localizations.localeOf(context);
     final entries =
         widget.countries.entries
-            .where((entry) => query.isEmpty || entry.value.toLowerCase().contains(query))
+            .map(
+              (entry) => (
+                code: entry.key,
+                name:
+                    xiangqiLocalizedCountryName(
+                      locale,
+                      code: entry.key,
+                      englishName: entry.value,
+                    ) ??
+                    entry.value,
+              ),
+            )
+            .where((entry) => query.isEmpty || entry.name.toLowerCase().contains(query))
             .toList()
-          ..sort((a, b) => a.value.compareTo(b.value));
+          ..sort((a, b) => a.name.compareTo(b.name));
 
     return SafeArea(
       child: Column(
@@ -270,9 +289,9 @@ class _CountrySheetState() extends State<_CountrySheet> {
                 ),
                 for (final entry in entries)
                   _CountryTile(
-                    name: entry.value,
-                    selected: widget.selected == entry.key,
-                    onTap: () => _pick(entry.key),
+                    name: entry.name,
+                    selected: widget.selected == entry.code,
+                    onTap: () => _pick(entry.code),
                   ),
               ],
             ),

@@ -194,7 +194,7 @@ void main() {
         ),
       ]);
 
-      expect(find.text('BOT'), findsOneWidget);
+      expect(find.text('Computer'), findsOneWidget);
     });
 
     testWidgets('a tap opens the game', (tester) async {

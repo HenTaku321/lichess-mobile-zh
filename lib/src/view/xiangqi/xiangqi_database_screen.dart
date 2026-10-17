@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
 import 'package:lichess_mobile/src/model/xiangqi/database/xiangqi_master_game.dart';
 import 'package:lichess_mobile/src/model/xiangqi/database/xiangqi_master_game_repository.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_country_names.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_locale.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_notation.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
@@ -51,8 +53,13 @@ class _XiangqiDatabaseScreenState() extends ConsumerState<XiangqiDatabaseScreen>
 
   @override
   Widget build(BuildContext context) {
+    final locale = xiangqiLocaleOf(Localizations.localeOf(context));
     final players = ref.watch(
-      xiangqiMasterPlayersProvider((_search.isEmpty ? null : _search, _page)),
+      xiangqiMasterPlayersProvider((
+        search: _search.isEmpty ? null : _search,
+        page: _page,
+        locale: locale,
+      )),
     );
 
     return Scaffold(
@@ -102,7 +109,11 @@ class _XiangqiDatabaseScreenState() extends ConsumerState<XiangqiDatabaseScreen>
               loading: () => const Center(child: CircularProgressIndicator.adaptive()),
               error: (error, stackTrace) => _Failed(
                 onRetry: () => ref.invalidate(
-                  xiangqiMasterPlayersProvider((_search.isEmpty ? null : _search, _page)),
+                  xiangqiMasterPlayersProvider((
+                    search: _search.isEmpty ? null : _search,
+                    page: _page,
+                    locale: locale,
+                  )),
                 ),
               ),
             ),
@@ -157,8 +168,11 @@ class _XiangqiMasterPlayerScreenState() extends ConsumerState<XiangqiMasterPlaye
 
   @override
   Widget build(BuildContext context) {
-    final stats = ref.watch(xiangqiMasterStatsProvider(widget.playerId));
-    final games = ref.watch(xiangqiMasterGamesProvider((widget.playerId, _page)));
+    final locale = xiangqiLocaleOf(Localizations.localeOf(context));
+    final stats = ref.watch(xiangqiMasterStatsProvider((id: widget.playerId, locale: locale)));
+    final games = ref.watch(
+      xiangqiMasterGamesProvider((playerId: widget.playerId, page: _page, locale: locale)),
+    );
 
     return Scaffold(
       appBar: AppBar(title: AppBarTitleText(widget.playerName)),
@@ -173,7 +187,12 @@ class _XiangqiMasterPlayerScreenState() extends ConsumerState<XiangqiMasterPlaye
                   title: Text(
                     [
                       if (stats.value!.title != null) stats.value!.title!,
-                      if (stats.value!.country != null) stats.value!.country!,
+                      if (stats.value!.country != null)
+                        xiangqiLocalizedCountryName(
+                              Localizations.localeOf(context),
+                              code: stats.value!.country,
+                            ) ??
+                            stats.value!.country!,
                     ].join(' · '),
                   ),
                 ),
@@ -260,15 +279,17 @@ class const XiangqiMasterGameScreen({required final String slug, super.key})
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final game = ref.watch(xiangqiMasterGameProvider(slug));
+    final locale = xiangqiLocaleOf(Localizations.localeOf(context));
+    final game = ref.watch(xiangqiMasterGameProvider((slug: slug, locale: locale)));
 
     return Scaffold(
       appBar: AppBar(title: AppBarTitleText(context.l10n.mobileXiangqiDatabase)),
       body: game.when(
         data: (game) => _Game(game: game),
         loading: () => const Center(child: CircularProgressIndicator.adaptive()),
-        error: (error, stackTrace) =>
-            _Failed(onRetry: () => ref.invalidate(xiangqiMasterGameProvider(slug))),
+        error: (error, stackTrace) => _Failed(
+          onRetry: () => ref.invalidate(xiangqiMasterGameProvider((slug: slug, locale: locale))),
+        ),
       ),
     );
   }

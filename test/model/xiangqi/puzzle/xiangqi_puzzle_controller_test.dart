@@ -49,8 +49,13 @@ Future<({ProviderContainer container, XiangqiPuzzleController controller})> make
   required MockClient client,
   XiangqiPuzzle? puzzle,
   Duration replyDelay = Duration.zero,
+  Duration wrongMoveDelay = Duration.zero,
 }) async {
-  final container = await makeXiangqiPuzzleContainer(client, replyDelay: replyDelay);
+  final container = await makeXiangqiPuzzleContainer(
+    client,
+    replyDelay: replyDelay,
+    wrongMoveDelay: wrongMoveDelay,
+  );
   final provider = xiangqiPuzzleControllerProvider((
     puzzle: puzzle ?? xiangqiTestPuzzle,
     attempt: 0,
@@ -90,18 +95,34 @@ void main() {
     expect(state.wrongMove, isNull);
   });
 
-  test('a wrong move is counted and not played', () async {
-    final attempt = await makeAttempt(client: attemptClient(requests: []));
+  test('a wrong move is played, counted, and then taken back', () async {
+    final attempt = await makeAttempt(
+      client: attemptClient(requests: []),
+      wrongMoveDelay: const Duration(milliseconds: 100),
+    );
     final before = stateOf(attempt.container);
     final wrong = otherLegalMove(before);
 
     attempt.controller.onUserMove(wrong);
 
+    final during = stateOf(attempt.container);
+    expect(during.position, rules.play(before.position, wrong));
+    expect(during.moves, [...before.moves, wrong]);
+    expect(during.mistakes, 1);
+    expect(during.wrongMove, wrong);
+    expect(during.isSolverTurn, isFalse, reason: 'nothing else can be played while it is shown');
+
+    await waitUntil(
+      () => stateOf(attempt.container).isSolverTurn,
+      reason: 'the wrong move to be taken back',
+    );
+
     final after = stateOf(attempt.container);
-    expect(after.position, before.position, reason: 'the board does not move for a wrong move');
+    expect(after.position, before.position);
+    expect(after.positions, before.positions);
     expect(after.moves, before.moves);
     expect(after.mistakes, 1);
-    expect(after.wrongMove, wrong);
+    expect(after.wrongMove, wrong, reason: 'the feedback stays until the next move');
     expect(after.isSolverTurn, isTrue, reason: 'the solver tries again from the same position');
   });
 
@@ -163,6 +184,10 @@ void main() {
     );
 
     attempt.controller.onUserMove(otherLegalMove(stateOf(attempt.container)));
+    await waitUntil(
+      () => stateOf(attempt.container).isSolverTurn,
+      reason: 'the wrong move to be taken back',
+    );
     await attempt.controller.hint();
     _solve(attempt.container, attempt.controller);
 

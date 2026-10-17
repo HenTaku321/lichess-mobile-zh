@@ -34,6 +34,22 @@ final xiangqiPuzzleReplyDelayProvider = Provider<Duration>(
   name: 'XiangqiPuzzleReplyDelayProvider',
 );
 
+/// How long a wrong move stays on the board before it is taken back.
+///
+/// The move is shown, not silently refused: a solver who taps a legal move deserves to see what that
+/// move would have done and which piece it moved. It is then spliced back out so the next attempt
+/// starts from the puzzle's own position. The five hundred milliseconds match the chess puzzle
+/// controller's wrong-move feedback.
+const xiangqiPuzzleWrongMoveDelay = Duration(milliseconds: 500);
+
+/// The pause [XiangqiPuzzleController] takes before taking a wrong move back.
+///
+/// A provider so tests can shorten the feedback without changing what users see.
+final xiangqiPuzzleWrongMoveDelayProvider = Provider<Duration>(
+  (Ref ref) => xiangqiPuzzleWrongMoveDelay,
+  name: 'XiangqiPuzzleWrongMoveDelayProvider',
+);
+
 /// Where an attempt at a puzzle has got to.
 enum XiangqiPuzzlePhase() {
   /// The solver is looking for the next move.
@@ -75,10 +91,10 @@ sealed class const XiangqiPuzzleAttemptState._() with _$XiangqiPuzzleAttemptStat
 
     /// How many moves the solver got wrong.
     ///
-    /// A wrong move is not played: the board does not move, and the solver tries again from the same
-    /// position. That is what the shipped client does — its `makeRevertWrongMove` splices the move
-    /// back off the history — and it is what the server's own `attempt_status` implies, since an
-    /// attempt can be recorded as solved *by mistake*.
+    /// A wrong move is played for [xiangqiPuzzleWrongMoveDelay] and then spliced back out, so the
+    /// solver sees which move was wrong but tries again from the same position. That is what the
+    /// shipped client's `makeRevertWrongMove` does, and it is what the server's own `attempt_status`
+    /// implies, since an attempt can be recorded as solved *by mistake*.
     required int mistakes,
 
     /// How many hints the solver has asked for and been given.
@@ -190,10 +206,10 @@ class XiangqiPuzzleController(final XiangqiPuzzleAttemptKey key)
 
   /// Plays [move] for the solver.
   ///
-  /// A move that is not the puzzle's next one is **not played**: it is counted and reported through
-  /// [XiangqiPuzzleAttemptState.wrongMove], and the solver tries again from the same position. A
-  /// move that is the next one is played, and so is the opponent's answer to it, which is the half
-  /// of the line the app plays for them.
+  /// A move that is not the puzzle's next one is played for a moment, counted and reported through
+  /// [XiangqiPuzzleAttemptState.wrongMove], and then taken back so the solver tries again from the
+  /// same position. A move that is the next one is played, and so is the opponent's answer to it,
+  /// which is the half of the line the app plays for them.
   ///
   /// Does nothing when it is not the solver's turn, when the line is already complete, or when the
   /// puzzle has no answer to check against.
@@ -203,7 +219,16 @@ class XiangqiPuzzleController(final XiangqiPuzzleAttemptKey key)
     if (expected == null) return;
 
     if (move != expected) {
-      state = state.copyWith(mistakes: state.mistakes + 1, wrongMove: move, hint: null);
+      final positionsBefore = state.positions;
+      final movesBefore = state.moves;
+      state = state.copyWith(
+        positions: positionsBefore.add(rules.play(state.position, move)),
+        moves: movesBefore.add(move),
+        mistakes: state.mistakes + 1,
+        wrongMove: move,
+        hint: null,
+      );
+      unawaited(_revertWrongMove(move, positionsBefore, movesBefore));
       return;
     }
 
@@ -257,6 +282,25 @@ class XiangqiPuzzleController(final XiangqiPuzzleAttemptKey key)
       _play(answer);
     }
     if (state.nextSolutionMove == null) await _submit();
+  }
+
+  /// Takes [move] back if it is still the wrong move on the board.
+  ///
+  /// The captured lists are the attempt before the wrong move. Nothing can be played while the move
+  /// is showing — appending it flips [XiangqiPuzzleAttemptState.isSolverTurn] to false — so the only
+  /// race that matters is this provider being disposed, which [Ref.mounted] covers.
+  Future<void> _revertWrongMove(
+    XiangqiMove move,
+    IList<XiangqiPosition> positionsBefore,
+    IList<XiangqiMove> movesBefore,
+  ) async {
+    final delay = ref.read(xiangqiPuzzleWrongMoveDelayProvider);
+    if (delay > Duration.zero) {
+      await Future<void>.delayed(delay);
+      if (!ref.mounted) return;
+    }
+    if (state.wrongMove != move || state.moves.length != movesBefore.length + 1) return;
+    state = state.copyWith(positions: positionsBefore, moves: movesBefore);
   }
 
   /// Plays [move] on the board and appends it to the attempt.

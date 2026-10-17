@@ -172,6 +172,7 @@ Future<ProviderContainer> makeXiangqiPuzzleContainer(
   bool signedIn = true,
   bool offline = false,
   Duration replyDelay = Duration.zero,
+  Duration wrongMoveDelay = Duration.zero,
 }) async {
   final container = await makeContainer(
     overrides: {
@@ -183,6 +184,9 @@ Future<ProviderContainer> makeXiangqiPuzzleContainer(
       ),
       xiangqiPuzzleReplyDelayProvider: xiangqiPuzzleReplyDelayProvider.overrideWithValue(
         replyDelay,
+      ),
+      xiangqiPuzzleWrongMoveDelayProvider: xiangqiPuzzleWrongMoveDelayProvider.overrideWithValue(
+        wrongMoveDelay,
       ),
       if (offline) isDeviceOnlineProvider: isDeviceOnlineProvider.overrideWithValue(false),
     },

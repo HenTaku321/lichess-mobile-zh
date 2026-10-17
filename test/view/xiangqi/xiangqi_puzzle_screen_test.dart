@@ -260,10 +260,10 @@ void main() {
       expect(body['attempt_mode'], 'P');
     });
 
-    testWidgets("a move that is not the puzzle's own is counted, and not played", (tester) async {
+    testWidgets("a move that is not the puzzle's own is played, then taken back", (tester) async {
       await pumpPuzzleScreen(tester, server: PuzzleServer());
 
-      final before = board(tester).position.toFen();
+      final before = board(tester).position;
       final expected = xiangqiTestLine.solution.first;
       // The first legal move in the position that is not the puzzle's next one: a move the solver
       // could really make, and the wrong one.
@@ -271,11 +271,17 @@ void main() {
 
       await tapSquare(tester, wrong.from.name, orientation: XiangqiSide.black);
       await tapSquare(tester, wrong.to.name, orientation: XiangqiSide.black);
-      await settle(tester);
 
-      expect(board(tester).position.toFen(), before, reason: 'a wrong move is not played');
+      expect(board(tester).position, rules.play(before, wrong));
       expect(attemptState(tester).mistakes, 1);
       expect(attemptState(tester).wrongMove, wrong);
+      expect(find.text('That is not the move.'), findsOneWidget);
+
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(board(tester).position, before, reason: 'the wrong move is taken back');
+      expect(attemptState(tester).wrongMove, wrong);
+      expect(find.text('That is not the move.'), findsOneWidget);
     });
 
     testWidgets('a queue with nothing in it says so rather than showing an empty board', (

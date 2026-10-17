@@ -392,6 +392,9 @@ String _statusText(BuildContext context, XiangqiPuzzleAttemptState state) {
       if (state.puzzle.solution == null) {
         return context.l10n.mobileXiangqiPuzzleSolutionWithheld;
       }
+      if (state.wrongMove != null) {
+        return context.l10n.mobileXiangqiPuzzleWrongMove;
+      }
       if (!state.isSolverTurn) return '';
       return context.l10n.mobileXiangqiPuzzleFindBestMoveFor(
         state.puzzle.playerSide.label(context.l10n),

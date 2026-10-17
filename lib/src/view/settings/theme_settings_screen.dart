@@ -1,5 +1,6 @@
 import 'package:chessground/chessground.dart';
 import 'package:dartchess/dartchess.dart';
+import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/l10n/l10n.dart';
@@ -388,6 +389,10 @@ class const _BoardPreview({
                   child: XiangqiBoard(
                     position: play(XiangqiPosition.initial(), opening),
                     lastMove: opening,
+                    hint: opening,
+                    arrows: IList([
+                      XiangqiBoardArrow(move: opening, color: boardPrefs.shapeColor.color),
+                    ]),
                     showCoordinates: boardPrefs.coordinates,
                     showBorder: boardPrefs.showBorder,
                     style: XiangqiBoardStyle.fromChessboardColorScheme(

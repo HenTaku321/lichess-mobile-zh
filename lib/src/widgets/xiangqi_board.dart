@@ -1289,6 +1289,15 @@ class XiangqiBoardPainter({
   void paintHint(Canvas canvas) {
     final hint = this.hint;
     if (hint == null) return;
+    // When the hint is also drawn as an arrow, the circle borrows that arrow's colour: the two are
+    // one annotation, and a blue circle under a green arrow would look like two different hints.
+    var color = style.hint;
+    for (final arrow in arrows) {
+      if (arrow.move == hint) {
+        color = (arrow.color ?? style.hint).withValues(alpha: arrow.opacity);
+        break;
+      }
+    }
     final centre = geometry.centerOf(hint.from, orientation);
     final radius = geometry.pieceRadius * 1.18;
     canvas.drawCircle(
@@ -1296,15 +1305,15 @@ class XiangqiBoardPainter({
       radius,
       Paint()
         ..shader = ui.Gradient.radial(centre, radius, [
-          style.hint.withValues(alpha: 0.35),
-          style.hint.withValues(alpha: 0.0),
+          color.withValues(alpha: 0.35),
+          color.withValues(alpha: 0.0),
         ]),
     );
     canvas.drawCircle(
       centre,
       geometry.pieceRadius * 1.08,
       Paint()
-        ..color = style.hint
+        ..color = color
         ..style = .stroke
         ..strokeWidth = cell * 0.03,
     );

@@ -17,6 +17,7 @@ import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_profile_edit_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_review_screen.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
@@ -56,6 +57,26 @@ class const XiangqiProfileScreen({required final String username, super.key})
       appBar: AppBar(
         title: AppBarTitleText(username),
         actions: [
+          if (isMe)
+            IconButton(
+              tooltip: context.l10n.editProfile,
+              icon: const Icon(Icons.edit_outlined),
+              onPressed: () async {
+                final updated = await Navigator.of(
+                  context,
+                  rootNavigator: true,
+                ).push<String?>(XiangqiProfileEditScreen.buildRoute(username));
+                if (!context.mounted || updated == null) return;
+                if (updated != username) {
+                  Navigator.of(
+                    context,
+                    rootNavigator: true,
+                  ).pushReplacement(XiangqiProfileScreen.buildRoute(updated));
+                } else {
+                  ref.invalidate(xiangqiUserProvider(username));
+                }
+              },
+            ),
           if (isMe)
             IconButton(
               tooltip: context.l10n.logOut,
@@ -134,6 +155,11 @@ class const _Header({required final XiangqiUserProfile profile}) extends Statele
                     context.l10n.online,
                     style: TextTheme.of(context).bodySmall
                         ?.copyWith(color: context.lichessColors.good),
+                  ),
+                if (profile.bio != null && profile.bio!.trim().isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4.0),
+                    child: Text(profile.bio!, style: TextTheme.of(context).bodyMedium),
                   ),
               ],
             ),

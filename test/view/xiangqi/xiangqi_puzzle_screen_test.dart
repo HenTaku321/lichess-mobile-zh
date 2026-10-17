@@ -316,6 +316,7 @@ void main() {
       expect(server.lastBody('/api/quota/usage'), {'feature': 'puzzle_hints'});
       expect(attemptState(tester).hintsUsed, 1);
       expect(attemptState(tester).hint, xiangqiTestLine.solution.first);
+      expect(board(tester).arrows.single.move, xiangqiTestLine.solution.first);
     });
   });
 }

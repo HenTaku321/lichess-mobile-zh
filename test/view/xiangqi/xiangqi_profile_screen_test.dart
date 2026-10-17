@@ -70,71 +70,84 @@ Map<String, Object?> seat({required String name, required int result}) => {
 };
 
 /// A client that answers the five endpoints this screen reads.
-MockClient profileClient({bool withGames = true}) => MockClient((request) async {
-  Object body;
-  switch (request.url.path) {
-    case '/api/users/account/$_username':
-      body = {
-        'id': 1,
-        'username': _username,
-        'identity': _username,
-        'country': {'id': 1, 'code': 'VN', 'name': 'Viet Nam'},
-        'bullet_rating': 900,
-        'rapid_rating': 1200,
-        'daily_rating': 1000,
-        'puzzle_rating': 600,
-        'is_online': true,
-        'member_since': 'Thu, 15 Oct 2026 14:05:19 GMT',
-        'last_online': "b'1792142453'",
-      };
-    case '/api/users/multiplayer_stats/$_username':
-      body = {
-        'wins': 12,
-        'losses': 8,
-        'draws': 3,
-        'win_rate': 52.17,
-        'total_games': 23,
-        'current_rating': 1234,
-        'highest_rating': 1300,
-        'rating_history': <Object?>[],
-      };
-    case '/api/users/puzzle_stats/$_username':
-      body = {
-        'attempted': 40,
-        'success_rate': 62.5,
-        'current_rating': 1500,
-        'highest_rating': 1600,
-        'rating_history': <Object?>[],
-      };
-    case '/api/users/games/$_username':
-      body = {
-        'total_pages': 1,
-        'next_page_num': null,
-        'items': withGames
-            ? [
-                {
-                  'id': 'AbCdEf1234',
-                  'state': 3,
-                  'end_reason': 100,
-                  'moves_count': 42,
-                  'game_timer': 10,
-                  'increment': 5,
-                  'last_move_time': '2026-10-16T08:24:45.411049',
-                  'rplayer': seat(name: 'red-one', result: 30),
-                  'bplayer': seat(name: 'black-two', result: 10),
-                },
-              ]
-            : <Object?>[],
-      };
-    default:
-      return http.Response('', 404);
-  }
-  return http.Response.bytes(
-    utf8.encode(jsonEncode(body)),
-    200,
-    headers: const {'content-type': 'application/json'},
-  );
-});
+MockClient profileClient({bool withGames = true}) {
+  var bio = '';
+  return MockClient((request) async {
+    Object body;
+    if (request.method == 'PUT' && request.url.path == '/api/users/account/$_username') {
+      final json = jsonDecode(request.body) as Map<String, dynamic>;
+      bio = json['bio'] as String? ?? '';
+    }
+    switch (request.url.path) {
+      case '/api/users/account/$_username':
+        body = {
+          'id': 1,
+          'username': _username,
+          'identity': _username,
+          'country': {'id': 1, 'code': 'VN', 'name': 'Viet Nam'},
+          'bio': bio,
+          'email': 'player@example.com',
+          'bullet_rating': 900,
+          'rapid_rating': 1200,
+          'daily_rating': 1000,
+          'puzzle_rating': 600,
+          'is_online': true,
+          'member_since': 'Thu, 15 Oct 2026 14:05:19 GMT',
+          'last_online': "b'1792142453'",
+        };
+      case '/api/users/countries':
+        body = [
+          {'code': 'VN', 'name': 'Viet Nam', 'value': 1},
+        ];
+      case '/api/users/multiplayer_stats/$_username':
+        body = {
+          'wins': 12,
+          'losses': 8,
+          'draws': 3,
+          'win_rate': 52.17,
+          'total_games': 23,
+          'current_rating': 1234,
+          'highest_rating': 1300,
+          'rating_history': <Object?>[],
+        };
+      case '/api/users/puzzle_stats/$_username':
+        body = {
+          'attempted': 40,
+          'success_rate': 62.5,
+          'current_rating': 1500,
+          'highest_rating': 1600,
+          'rating_history': <Object?>[],
+        };
+      case '/api/users/games/$_username':
+        body = {
+          'total_pages': 1,
+          'next_page_num': null,
+          'items': withGames
+              ? [
+                  {
+                    'id': 'AbCdEf1234',
+                    'state': 3,
+                    'end_reason': 100,
+                    'moves_count': 42,
+                    'game_timer': 10,
+                    'increment': 5,
+                    'last_move_time': '2026-10-16T08:24:45.411049',
+                    'rplayer': seat(name: 'red-one', result: 30),
+                    'bplayer': seat(name: 'black-two', result: 10),
+                  },
+                ]
+              : <Object?>[],
+        };
+      default:
+        return http.Response('', 404);
+    }
+    return http.Response.bytes(
+      utf8.encode(jsonEncode(body)),
+      200,
+      headers: const {'content-type': 'application/json'},
+    );
+  });
+}
 
 /// Opens the profile screen over [client], signed in as [sessionName] or not at all.
 Future<void> pumpProfile(
@@ -225,6 +238,7 @@ void main() {
     testWidgets('offers the way out on the account this device is signed in as', (tester) async {
       await pumpProfile(tester, client: profileClient());
 
+      expect(find.byIcon(Icons.edit_outlined), findsOneWidget);
       expect(find.byIcon(Icons.logout), findsOneWidget);
       await drain(tester);
     });
@@ -236,8 +250,28 @@ void main() {
       // would not change and the test would be asserting on the wrong account.
       await pumpProfile(tester, client: profileClient(), sessionName: 'somebody-else');
 
+      expect(find.byIcon(Icons.edit_outlined), findsNothing);
       expect(find.byIcon(Icons.logout), findsNothing);
       await drain(tester);
+    });
+
+    testWidgets('edits the biography and draws the saved text on the profile', (tester) async {
+      await pumpProfile(tester, client: profileClient());
+
+      await tester.tap(find.byIcon(Icons.edit_outlined));
+      await tester.pumpAndSettle();
+      await settle(tester);
+
+      expect(find.text('Edit profile'), findsOneWidget);
+      final fields = find.byType(TextFormField);
+      expect(fields, findsNWidgets(2), reason: 'the username and the biography');
+      await tester.enterText(fields.at(1), 'a new biography');
+      await tester.tap(find.text('Save'));
+      await tester.pump();
+      await settle(tester, rounds: 20);
+      await drain(tester);
+
+      expect(find.text('a new biography'), findsOneWidget);
     });
   });
 }

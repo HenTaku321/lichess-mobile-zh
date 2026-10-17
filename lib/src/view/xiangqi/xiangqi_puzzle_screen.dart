@@ -167,6 +167,9 @@ class _PuzzleBodyState() extends ConsumerState<_PuzzleBody> {
             showLastMove: boardPrefs.boardHighlights,
             showBorder: boardPrefs.showBorder,
             hint: state.hint,
+            arrows: state.hint == null
+                ? const IListConst([])
+                : IList([XiangqiBoardArrow(move: state.hint!)]),
             magnifyDraggedPiece: boardPrefs.magnifyDraggedPiece,
             dragTargetKind: boardPrefs.dragTargetKind,
             style: style,

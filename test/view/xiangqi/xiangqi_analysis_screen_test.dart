@@ -193,6 +193,7 @@ void main() {
         reason: "red's score, to one decimal, on the bar beside the board",
       );
       expect(find.text('1. 炮二平五 马8进7'), findsOneWidget);
+      expect(board(tester).arrows.single.move, moveAt('h2e2'));
     });
 
     testWidgets('the engine says where the game stands on the bar beside the board', (

@@ -371,11 +371,10 @@ class const _BoardPreview({
               ),
             ),
             const SizedBox(width: 16.0),
-            // Nine files by ten ranks — ten cells of height for nine of width, plus half a cell of
-            // frame around each — so the box that lets the board fill it exactly is nine tenths as
-            // wide as it is tall.
+            // Nine files by ten ranks, plus the frame the coordinates ask for: nine tenths as wide
+            // as it is tall when they are off, ten elevenths when they are on.
             Container(
-              width: size * 0.9,
+              width: size * (boardPrefs.coordinates ? 10 / 11 : 0.9),
               height: size,
               decoration: BoxDecoration(
                 borderRadius: Styles.boardBorderRadius,
@@ -389,6 +388,7 @@ class const _BoardPreview({
                   child: XiangqiBoard(
                     position: play(XiangqiPosition.initial(), opening),
                     lastMove: opening,
+                    showCoordinates: boardPrefs.coordinates,
                     showBorder: boardPrefs.showBorder,
                     style: XiangqiBoardStyle.fromChessboardColorScheme(
                       boardPrefs.boardTheme.colors,

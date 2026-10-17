@@ -451,6 +451,28 @@ void _paintXiangqiText(Canvas canvas, String text, TextStyle style, Offset centr
   painter.paint(canvas, centre - Offset(painter.width / 2, painter.height / 2));
 }
 
+/// One arrow drawn over a xiangqi board: the move [move], in [color] when given.
+///
+/// The engine speaks in moves, and an arrow is a move drawn rather than played. [color] is null
+/// for the board's own hint colour; an analysis board with several lines passes a colour per line
+/// so the reader can tell which arrow belongs to which score.
+@immutable
+final class const XiangqiBoardArrow({
+  required final XiangqiMove move,
+  final Color? color,
+  final double opacity = 0.82,
+}) {
+  @override
+  bool operator ==(Object other) =>
+      other is XiangqiBoardArrow &&
+      other.move == move &&
+      other.color == color &&
+      other.opacity == opacity;
+
+  @override
+  int get hashCode => Object.hash(move, color, opacity);
+}
+
 /// A xiangqi board, drawn rather than assembled, and played by hand.
 ///
 /// This is a picture and not a tree of boxes: nine files crossing ten ranks at ninety points, which
@@ -533,6 +555,14 @@ class const XiangqiBoard({
 
   /// A move to hint at, drawn as a translucent circle on the square it would be played from.
   final XiangqiMove? hint,
+
+  /// Moves to draw as arrows over the board, best line first.
+  ///
+  /// An arrow is what the engine's own answer looks like on the chess board: a line from the
+  /// piece to move to the point it is going to. The hint's circle below still says which piece is
+  /// being pointed at, and the arrow says where it goes. Analysis lines use the same drawing so a
+  /// second and third line can be shown in their own colours.
+  final IList<XiangqiBoardArrow> arrows = const IListConst([]),
 
   /// Whether the piece under the finger is drawn larger than the rest, with a soft shadow, and
   /// lifted clear of the touch point so that the finger does not cover it.
@@ -731,6 +761,7 @@ class _XiangqiBoardState() extends State<XiangqiBoard> with SingleTickerProvider
                   showLastMove: widget.showLastMove,
                   showBorder: widget.showBorder,
                   hint: widget.hint,
+                  arrows: widget.arrows,
                   magnifyDraggedPiece: widget.magnifyDraggedPiece,
                   dragTargetKind: widget.dragTargetKind,
                   blindfoldMode: widget.blindfoldMode,
@@ -803,6 +834,7 @@ class XiangqiBoardPainter({
   required final bool showLastMove,
   required final bool showBorder,
   required final XiangqiMove? hint,
+  required final IList<XiangqiBoardArrow> arrows,
   required final bool magnifyDraggedPiece,
   required final DragTargetKind dragTargetKind,
   required final bool blindfoldMode,
@@ -839,6 +871,7 @@ class XiangqiBoardPainter({
     paintTargets(canvas);
     paintSelection(canvas);
     paintHint(canvas);
+    paintArrows(canvas);
     paintDragTarget(canvas);
     paintDraggedPiece(canvas);
   }
@@ -901,14 +934,19 @@ class XiangqiBoardPainter({
     }
 
     // The board's edge is drawn twice, a thinner line just outside the grid's own: that double line
-    // is what tells a printed board apart from a sheet of paper with lines on it.
-    canvas.drawRect(
-      Rect.fromPoints(geometry.pointAt(0, 9), geometry.pointAt(8, 0)).inflate(cell * 0.1),
-      Paint()
-        ..color = style.ink
-        ..style = .stroke
-        ..strokeWidth = math.max(1, cell * 0.014),
-    );
+    // is what tells a printed board apart from a sheet of paper with lines on it. It belongs to the
+    // frame, so turning the frame off leaves the grid's own boundary and takes the second line with
+    // it — otherwise the switch would change the wood underneath while leaving the outline that
+    // reads as the border still drawn.
+    if (showBorder) {
+      canvas.drawRect(
+        Rect.fromPoints(geometry.pointAt(0, 9), geometry.pointAt(8, 0)).inflate(cell * 0.1),
+        Paint()
+          ..color = style.ink
+          ..style = .stroke
+          ..strokeWidth = math.max(1, cell * 0.014),
+      );
+    }
 
     // Both palaces: the two diagonals of each, drawn from the corners of the three by three they
     // sit in.
@@ -1272,6 +1310,60 @@ class XiangqiBoardPainter({
     );
   }
 
+  /// The engine's moves as arrows: a shaft from the piece to move and a solid head at its
+  /// destination.
+  ///
+  /// The endpoints are shortened by a fraction of a piece so that an arrow begins on the piece and
+  /// ends at the point it is going to, rather than running through both characters. They are
+  /// measured with [XiangqiBoardGeometry.centerOf], so turning the board turns the arrows with it.
+  void paintArrows(Canvas canvas) {
+    for (final arrow in arrows) {
+      final from = geometry.centerOf(arrow.move.from, orientation);
+      final to = geometry.centerOf(arrow.move.to, orientation);
+      final delta = to - from;
+      final distance = delta.distance;
+      if (distance < cell * 0.2) continue;
+
+      final direction = delta / distance;
+      final start = from + direction * (geometry.pieceRadius * 0.75);
+      final tip = to - direction * (geometry.pieceRadius * 0.82);
+      final shaftLength = (tip - start).distance;
+      if (shaftLength < cell * 0.08) continue;
+
+      final headLength = math.min(cell * 0.30, shaftLength * 0.38);
+      final headHalfWidth = math.min(cell * 0.20, shaftLength * 0.24);
+      final shaftEnd = tip - direction * headLength;
+      final normal = Offset(-direction.dy, direction.dx);
+      final head = Path()
+        ..moveTo(tip.dx, tip.dy)
+        ..lineTo(shaftEnd.dx + normal.dx * headHalfWidth, shaftEnd.dy + normal.dy * headHalfWidth)
+        ..lineTo(shaftEnd.dx - normal.dx * headHalfWidth, shaftEnd.dy - normal.dy * headHalfWidth)
+        ..close();
+
+      final color = (arrow.color ?? style.hint).withValues(alpha: arrow.opacity);
+      final shadow = Paint()
+        ..color = const Color(0x33000000)
+        ..strokeWidth = cell * 0.085
+        ..strokeCap = StrokeCap.round
+        ..style = PaintingStyle.stroke
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, cell * 0.025);
+      final shadowOffset = Offset(0, cell * 0.018);
+      canvas.drawLine(start + shadowOffset, shaftEnd + shadowOffset, shadow);
+      canvas.save();
+      canvas.translate(shadowOffset.dx, shadowOffset.dy);
+      canvas.drawPath(head, Paint()..color = const Color(0x33000000));
+      canvas.restore();
+
+      final line = Paint()
+        ..color = color
+        ..strokeWidth = cell * 0.072
+        ..strokeCap = StrokeCap.round
+        ..style = PaintingStyle.stroke;
+      canvas.drawLine(start, shaftEnd, line);
+      canvas.drawPath(head, Paint()..color = color);
+    }
+  }
+
   /// The box the drag target fills: two cells across for a [DragTargetKind.circle] and one for a
   /// [DragTargetKind.square], centred on the point the finger is over. Null when there is no drag
   /// in flight, the finger is off the board, or [dragTargetKind] is [DragTargetKind.none], and
@@ -1402,6 +1494,7 @@ class XiangqiBoardPainter({
       oldDelegate.showLastMove != showLastMove ||
       oldDelegate.showBorder != showBorder ||
       oldDelegate.hint != hint ||
+      oldDelegate.arrows != arrows ||
       oldDelegate.magnifyDraggedPiece != magnifyDraggedPiece ||
       oldDelegate.dragTargetKind != dragTargetKind ||
       oldDelegate.blindfoldMode != blindfoldMode ||

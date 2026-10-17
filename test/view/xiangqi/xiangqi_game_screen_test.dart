@@ -225,6 +225,23 @@ void main() {
       expect(gauge.orientation, XiangqiSide.red);
     });
 
+    testWidgets('a hint is drawn as an arrow from the piece to its destination', (tester) async {
+      final transport = await pumpGameScreen(tester);
+
+      await tester.tap(find.byIcon(CupertinoIcons.lightbulb));
+      await tester.pump();
+      await startSearch(tester, transport);
+      transport.emit('info depth 9 score cp 34 nodes 9450 time 90 pv h2e2');
+      await tester.pump();
+      transport.emit('bestmove h2e2');
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+      await tester.pump();
+
+      final board = tester.widget<XiangqiBoard>(find.byType(XiangqiBoard));
+      expect(board.hint, moveAt('h2e2'));
+      expect(board.arrows.single.move, moveAt('h2e2'));
+    });
+
     testWidgets('there is no evaluation bar when the evaluation is off', (tester) async {
       await pumpGameScreen(tester);
 
@@ -476,6 +493,28 @@ void main() {
       await tester.pumpAndSettle();
       expect(board().dragTargetKind, DragTargetKind.square);
 
+      // The two board appearance switches are wired to this board, not only to the chess one.
+      final coordinatesSwitch = find.descendant(
+        of: find.ancestor(
+          of: find.text('Board coordinates (A-I, 0-9)'),
+          matching: find.byType(SwitchSettingTile),
+        ),
+        matching: find.byType(Switch),
+      );
+      await tester.ensureVisible(find.text('Board coordinates (A-I, 0-9)'));
+      await tester.tap(coordinatesSwitch);
+      await tester.pumpAndSettle();
+      expect(board().showCoordinates, isFalse);
+
+      final borderSwitch = find.descendant(
+        of: find.ancestor(of: find.text('Show border'), matching: find.byType(SwitchSettingTile)),
+        matching: find.byType(Switch),
+      );
+      await tester.ensureVisible(find.text('Show border'));
+      await tester.tap(borderSwitch);
+      await tester.pumpAndSettle();
+      expect(board().showBorder, isTrue);
+
       // Blindfold, which is the same preference the chess game against the computer keeps: the same
       // kind of game, with the pieces taken off the board.
       final blindfoldSwitch = find.descendant(
@@ -504,11 +543,11 @@ void main() {
           .firstWhere((board) => board.onTapSquare == null);
       expect(preview.position.toFen(), start.toFen());
       expect(preview.onDragMove, isNull, reason: 'a preview is not a board to move pieces on');
-      // Nine files by ten ranks with the coordinates off, the same ratio the layout sizes the board
-      // by — see [XiangqiGameLayout].
+      // Nine files by ten ranks with the coordinates on (the preference's default), the same ratio
+      // the layout sizes the board by — see [XiangqiGameLayout].
       expect(
         tester.getSize(find.byWidget(preview)).aspectRatio,
-        closeTo(9 / 10, 0.001),
+        closeTo(10 / 11, 0.001),
         reason: 'the preview is the board at its own shape, not whatever room it is given',
       );
 

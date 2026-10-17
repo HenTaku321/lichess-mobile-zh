@@ -23,6 +23,7 @@ import 'package:http/testing.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_user_repository.dart';
 import 'package:lichess_mobile/src/network/connectivity.dart';
 import 'package:lichess_mobile/src/network/http.dart';
+import 'package:lichess_mobile/src/network/xiangqi_http.dart' show xiangqiClientProvider;
 
 import '../../../network/fake_http_client_factory.dart';
 import '../../../test_container.dart';
@@ -154,6 +155,7 @@ void main() {
       expect(profile.puzzleRating, 1200);
       expect(profile.isOnline, isTrue);
       expect(profile.countryName, 'United States');
+      expect(profile.bio, '');
       expect(profile.memberSince, DateTime.utc(2023, 11, 14, 22, 13, 20));
     });
 
@@ -214,6 +216,54 @@ void main() {
         );
         expect(profile.isOnline, isFalse, reason: 'is_online: $value');
       }
+    });
+  });
+
+  group('profile editing', () {
+    test('reads the edit form values, including the numeric country id', () async {
+      final container = await makeUserContainer(accountClient(jsonEncode(xiangqiAccountPayload())));
+
+      final editable = await container.read(
+        xiangqiEditableProfileProvider(xiangqiAccountUsername).future,
+      );
+
+      expect(editable.username, xiangqiAccountUsername);
+      expect(editable.email, 'user@example.com');
+      expect(editable.countryId, 226);
+      expect(editable.countryCode, 'US');
+      expect(editable.countryName, 'United States');
+    });
+
+    test('saves the same fields the website sends, and reads the updated account back', () async {
+      http.Request? sent;
+      final updated = xiangqiAccountPayload()
+        ..['username'] = 'renamed-user'
+        ..['bio'] = 'a short biography';
+      final client = MockClient((request) {
+        sent = request;
+        return utf8Response(jsonEncode(updated), 200);
+      });
+      final container = await makeUserContainer(client);
+
+      final profile = await updateXiangqiProfile(
+        container.read(xiangqiClientProvider),
+        username: xiangqiAccountUsername,
+        newUsername: 'renamed-user',
+        bio: 'a short biography',
+        countryId: 226,
+        password: 'secret',
+      );
+
+      expect(sent!.method, 'PUT');
+      expect(sent!.url.pathSegments, ['api', 'users', 'account', xiangqiAccountUsername]);
+      expect(jsonDecode(sent!.body), {
+        'username': 'renamed-user',
+        'bio': 'a short biography',
+        'password': 'secret',
+        'country': 226,
+      });
+      expect(profile.username, 'renamed-user');
+      expect(profile.bio, 'a short biography');
     });
   });
 

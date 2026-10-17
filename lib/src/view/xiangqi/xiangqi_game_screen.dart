@@ -310,6 +310,9 @@ class _BodyState() extends ConsumerState<_Body> {
                     showLastMove: boardPrefs.boardHighlights,
                     showBorder: boardPrefs.showBorder,
                     hint: hintMove,
+                    arrows: hintMove == null
+                        ? const IListConst([])
+                        : IList([XiangqiBoardArrow(move: hintMove)]),
                     blindfoldMode: blindfoldMode,
                     // The two drag settings the sheet above offers: a dragged piece is magnified or
                     // not, and the square it is over is marked the way the player asked for.
@@ -889,6 +892,7 @@ class _NewGameSheetState() extends ConsumerState<_NewGameSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final boardPrefs = ref.watch(boardPreferencesProvider);
     return BottomSheetScrollableContainer(
       children: [
         ListSection(
@@ -913,16 +917,23 @@ class _NewGameSheetState() extends ConsumerState<_NewGameSheet> {
               },
             ),
             // The position being set up, drawn below the side it is drawn for. Read only and with no
-            // callbacks, so a touch on it does nothing; 9:10 is the shape of nine files by ten ranks
-            // with the coordinates off, the same ratio [XiangqiGameLayout] sizes the board by.
+            // callbacks, so a touch on it does nothing. Its box follows the same coordinate margin
+            // the live board does, rather than leaving the preview letterboxed.
             if (_initialPosition != null)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 16.0),
                 child: Center(
                   child: SizedBox(
                     width: 135.0,
-                    height: 150.0,
-                    child: XiangqiBoard(position: _initialPosition),
+                    height: 135.0 * (boardPrefs.coordinates ? 11 / 10 : 10 / 9),
+                    child: XiangqiBoard(
+                      position: _initialPosition,
+                      showCoordinates: boardPrefs.coordinates,
+                      showBorder: boardPrefs.showBorder,
+                      style: XiangqiBoardStyle.fromChessboardColorScheme(
+                        boardPrefs.boardTheme.colors,
+                      ),
+                    ),
                   ),
                 ),
               ),

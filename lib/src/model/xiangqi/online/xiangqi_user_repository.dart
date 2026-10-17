@@ -31,6 +31,13 @@ sealed class const XiangqiUserProfile._() with _$XiangqiUserProfile {
     required bool isOnline,
     String? countryName,
 
+    /// The account's own short biography, or null when it has never been set.
+    ///
+    /// The wire sends `null` and the edit form sends the empty string, so both mean "nothing to
+    /// read" and both are kept as the string they are. The profile screen decides whether to draw
+    /// a row; the model does not turn one into the other.
+    String? bio,
+
     /// When the account was created, from `member_since`.
     ///
     /// Nullable although the wire does send it: the value is an RFC-1123 HTTP-date
@@ -88,6 +95,7 @@ XiangqiUserProfile xiangqiUserProfileFromJson(
 }) {
   final country = json['country'];
   final memberSince = json['member_since'];
+  final bio = json['bio'];
 
   return XiangqiUserProfile(
     username: _string(json['username']) ?? username,
@@ -97,8 +105,155 @@ XiangqiUserProfile xiangqiUserProfileFromJson(
     puzzleRating: _int(json['puzzle_rating']),
     isOnline: json['is_online'] == true,
     countryName: country is Map<String, dynamic> ? _string(country['name']) : null,
+    bio: bio is String ? bio : null,
     memberSince: memberSince is String ? _httpDate(memberSince) : null,
   );
+}
+
+/// The fields the edit-profile form starts from, read from the same account payload.
+///
+/// This is deliberately separate from [XiangqiUserProfile]: the profile row is a public summary,
+/// while an edit form also needs the account's email and the numeric country id the write endpoint
+/// takes. Keeping the write-only shape out of the public model means a profile screen cannot
+/// accidentally draw an email it was never meant to show.
+final class const XiangqiEditableProfile({
+  required final String username,
+  required final String email,
+  required final String bio,
+  final int? countryId,
+  final String? countryCode,
+  final String? countryName,
+  final String? profileImage,
+});
+
+/// One row of `GET /api/users/countries`.
+///
+/// The edit endpoint wants the numeric `value` under the name `country`, while the UI shows the
+/// human name. Both are kept together so a selected country can be sent without a second lookup.
+final class const XiangqiCountryOption({
+  required final int id,
+  required final String code,
+  required final String name,
+});
+
+/// Thrown when the account update endpoint refuses the submitted profile.
+///
+/// [message] is the server's own sentence when it sent one; otherwise it is a neutral fallback.
+final class const XiangqiProfileUpdateException(final String message) implements Exception {
+  @override
+  String toString() => message;
+}
+
+/// The edit form's starting values for [username].
+final xiangqiEditableProfileProvider = FutureProvider.autoDispose
+    .family<XiangqiEditableProfile, String>((Ref ref, String username) async {
+      if (!ref.watch(isDeviceOnlineProvider)) {
+        throw StateError('The device is offline; not asking xiangqi.com for $username.');
+      }
+      final uri = xiangqiUri('users/account/$username');
+      final response = await ref.read(xiangqiClientProvider).get(uri);
+      if (response.statusCode >= 400) {
+        throw ServerException(response.statusCode, 'xiangqi.com account lookup failed.', uri, null);
+      }
+      return xiangqiEditableProfileFromJson(_decodeObject(_bodyText(response)), username: username);
+    }, name: 'XiangqiEditableProfileProvider');
+
+/// The country choices the edit form offers, read once for the whole session.
+final xiangqiCountryOptionsProvider = FutureProvider<List<XiangqiCountryOption>>((Ref ref) async {
+  if (!ref.watch(isDeviceOnlineProvider)) {
+    throw StateError('The device is offline; not asking xiangqi.com for the country list.');
+  }
+  final uri = xiangqiUri('users/countries');
+  final response = await ref.read(xiangqiClientProvider).get(uri);
+  if (response.statusCode >= 400) {
+    throw ServerException(response.statusCode, 'xiangqi.com country lookup failed.', uri, null);
+  }
+  final json = jsonDecode(utf8.decode(response.bodyBytes));
+  if (json is! List) {
+    throw const FormatException('xiangqi.com answered the country list with something else.');
+  }
+  final options = <XiangqiCountryOption>[];
+  for (final row in json) {
+    if (row is! Map<String, dynamic>) continue;
+    final id = _int(row['value']) ?? _int(row['id']);
+    final code = _string(row['code']);
+    final name = _string(row['name']);
+    if (id == null || code == null || name == null) continue;
+    options.add(XiangqiCountryOption(id: id, code: code, name: name));
+  }
+  options.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+  return List.unmodifiable(options);
+}, name: 'XiangqiCountryOptionsProvider');
+
+/// Reads an account payload into the edit form's shape.
+XiangqiEditableProfile xiangqiEditableProfileFromJson(
+  Map<String, dynamic> json, {
+  required String username,
+}) {
+  final country = json['country'];
+  final countryMap = country is Map<String, dynamic> ? country : null;
+  return XiangqiEditableProfile(
+    username: _string(json['username']) ?? username,
+    email: _string(json['email']) ?? '',
+    bio: json['bio'] is String ? json['bio'] as String : '',
+    countryId: _int(countryMap?['id']),
+    countryCode: _string(countryMap?['code']),
+    countryName: _string(countryMap?['name']),
+    profileImage: _string(json['profile_image']),
+  );
+}
+
+/// Saves the editable fields of [username] and returns the account the server answered with.
+///
+/// Measured against the live endpoint on 2026-10-17: `PUT /api/users/account/<username>` accepts
+/// `{country, bio, username, password}` and answers with the updated account object. The website's
+/// own edit form sends the same fields, plus a locale it uses for its own UI; this app leaves the
+/// website's locale alone and sends only what it is changing. `password` may be empty when the
+/// username is unchanged; the server accepts that.
+Future<XiangqiEditableProfile> updateXiangqiProfile(
+  XiangqiClient client, {
+  required String username,
+  required String newUsername,
+  required String bio,
+  required int? countryId,
+  required String password,
+}) async {
+  final uri = xiangqiUri('users/account/$username');
+  final response = await client.put(
+    uri,
+    headers: const {'Content-Type': 'application/json', 'Accept': 'application/json'},
+    body: jsonEncode({
+      'username': newUsername,
+      'bio': bio,
+      'password': password,
+      'country': ?countryId,
+    }),
+  );
+  if (response.statusCode >= 400) {
+    throw XiangqiProfileUpdateException(_profileUpdateMessage(response));
+  }
+  return xiangqiEditableProfileFromJson(_decodeObject(_bodyText(response)), username: newUsername);
+}
+
+/// The server's own sentence for a refused profile update, or a neutral fallback.
+String _profileUpdateMessage(Response response) {
+  try {
+    final json = _decodeObject(_bodyText(response));
+    final message = json['message'];
+    if (message is String && message.isNotEmpty) return message;
+    final errors = json['errors'];
+    if (errors is Map<String, dynamic>) {
+      for (final value in errors.values) {
+        if (value is List && value.isNotEmpty && value.first is String) {
+          return value.first as String;
+        }
+        if (value is String && value.isNotEmpty) return value;
+      }
+    }
+  } catch (_) {
+    // The status is still the failure; an unreadable body only loses its explanation.
+  }
+  return 'xiangqi.com could not save the profile (${response.statusCode}).';
 }
 
 /// The instant `last_online` names, or null if it cannot be read.

@@ -192,6 +192,17 @@ class XiangqiAuthController() extends Notifier<XiangqiSession?> {
     state = null;
   }
 
+  /// Adopts [username] after the account endpoint has renamed this account.
+  ///
+  /// The access token is unchanged — the server keeps the same session across a rename — but the
+  /// stored name is what every screen compares against to decide whether a profile is the reader's
+  /// own, so it has to follow the rename or the profile would stop offering its edit button.
+  Future<void> updateUsername(String username) async {
+    final session = state;
+    if (session == null || session.isGuest || session.name == username) return;
+    await _store(session.copyWith(name: username));
+  }
+
   /// Re-reads the stored session and makes [state] agree with it again.
   ///
   /// There is no measured xiangqi.com endpoint that tests a token, and this repo does not invent

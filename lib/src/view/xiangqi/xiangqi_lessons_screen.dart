@@ -2,6 +2,7 @@ import 'package:chessground/chessground.dart' show DragTargetKind;
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
 import 'package:lichess_mobile/src/model/xiangqi/lesson/xiangqi_lesson.dart';
 import 'package:lichess_mobile/src/model/xiangqi/lesson/xiangqi_lesson_repository.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_locale.dart';
@@ -318,6 +319,7 @@ class const XiangqiChapterScreen({
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final boardPrefs = ref.watch(boardPreferencesProvider);
     final position = chapter.position!;
     final moves = chapter.moves;
     // The line is written from the positions it is played on, which is what the notation needs. A
@@ -347,7 +349,7 @@ class const XiangqiChapterScreen({
                 child: Padding(
                   padding: Styles.horizontalBodyPadding,
                   child: AspectRatio(
-                    aspectRatio: 9 / 10,
+                    aspectRatio: boardPrefs.coordinates ? 10 / 11 : 9 / 10,
                     child: XiangqiBoard(
                       position: position,
                       orientation: _sideToMove(position),
@@ -357,12 +359,14 @@ class const XiangqiChapterScreen({
                       onDragMove: null,
                       lastMove: null,
                       animationDuration: Duration.zero,
-                      showCoordinates: true,
+                      showCoordinates: boardPrefs.coordinates,
                       showLastMove: false,
-                      showBorder: true,
+                      showBorder: boardPrefs.showBorder,
                       magnifyDraggedPiece: false,
                       dragTargetKind: DragTargetKind.circle,
-                      style: const XiangqiBoardStyle(),
+                      style: XiangqiBoardStyle.fromChessboardColorScheme(
+                        boardPrefs.boardTheme.colors,
+                      ),
                     ),
                   ),
                 ),

@@ -51,7 +51,7 @@ class const XiangqiOngoingGamePreview({
             child: Row(
               children: [
                 SizedBox(
-                  width: boardSize * 0.9,
+                  width: boardSize * (boardPrefs.coordinates ? 10 / 11 : 0.9),
                   height: boardSize,
                   child: ClipRRect(
                     // The same corner treatment the chess preview gives its board.
@@ -62,6 +62,8 @@ class const XiangqiOngoingGamePreview({
                       child: XiangqiBoard(
                         position: XiangqiPosition.fromFen(game.fen),
                         orientation: game.mySide,
+                        showCoordinates: boardPrefs.coordinates,
+                        showBorder: boardPrefs.showBorder,
                         style: XiangqiBoardStyle.fromChessboardColorScheme(
                           boardPrefs.boardTheme.colors,
                         ),
@@ -265,6 +267,8 @@ class const _XiangqiBoardCarouselItem({
                   child: XiangqiBoard(
                     position: position,
                     orientation: orientation,
+                    showCoordinates: boardPrefs.coordinates,
+                    showBorder: boardPrefs.showBorder,
                     style: XiangqiBoardStyle.fromChessboardColorScheme(
                       _realTimeColorScheme(context),
                     ),

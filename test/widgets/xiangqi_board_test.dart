@@ -594,6 +594,7 @@ void main() {
       final position = play(XiangqiPosition.initial(), move);
       const style = XiangqiBoardStyle(surface: Color(0xFF000000), redInk: Color(0xFFFF00FF));
       final hint = XiangqiMove.parseIccs('b2e2');
+      final arrow = XiangqiBoardArrow(move: hint!, color: const Color(0xCC0099C8));
       final rect = await pumpBoard(
         tester,
         XiangqiBoard(
@@ -603,6 +604,7 @@ void main() {
           showLastMove: false,
           showBorder: false,
           hint: hint,
+          arrows: IList([arrow]),
           style: style,
         ),
         size: const Size(400, 440),
@@ -611,6 +613,7 @@ void main() {
       expect(painter.showLastMove, isFalse);
       expect(painter.showBorder, isFalse);
       expect(painter.hint, hint);
+      expect(painter.arrows.single, arrow);
       expect(painter.style, style);
       expect(painter.geometry.showCoordinates, isTrue);
       final expected = XiangqiBoardGeometry.fit(rect.size, showCoordinates: true);
@@ -629,6 +632,7 @@ void main() {
       expect(painter.showLastMove, isTrue);
       expect(painter.showBorder, isTrue);
       expect(painter.hint, isNull);
+      expect(painter.arrows, isEmpty);
       expect(painter.style, const XiangqiBoardStyle());
       expect(painter.geometry.showCoordinates, isFalse);
       expect(painter.geometry.cell, 40);

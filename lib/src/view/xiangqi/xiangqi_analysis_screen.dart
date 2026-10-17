@@ -31,6 +31,13 @@ import 'package:material_ui/material_ui.dart';
 const double _kEngineLineHeight = 24.0;
 const double _kEngineLineFontSize = 11.0;
 
+/// The colours of the first, second and third engine arrows.
+///
+/// The first is the board's own hint blue; the others are distinct enough to tell two lines apart
+/// without turning the position into a rainbow. They are deliberately not board-theme colours: an
+/// arrow is the engine speaking, not part of the wood.
+const _analysisArrowColors = [Color(0xFF0099C8), Color(0xFFE69826), Color(0xFF7B61FF)];
+
 /// A board to take a xiangqi position apart on.
 ///
 /// The mirror of the chess analysis board: a board to move pieces on, the line those moves make in
@@ -160,6 +167,16 @@ class _BodyState() extends ConsumerState<_Body> {
     final numEvalLines = ref.watch(
       engineEvaluationPreferencesProvider.select((p) => p.numEvalLines),
     );
+    final shownLines = analysisState.lines.take(numEvalLines).toList();
+    final arrows = IList<XiangqiBoardArrow>([
+      for (var index = 0; index < shownLines.length; index++)
+        if (shownLines[index].moves.isNotEmpty)
+          XiangqiBoardArrow(
+            move: shownLines[index].moves.first,
+            color: _analysisArrowColors[index % _analysisArrowColors.length],
+            opacity: index == 0 ? 0.9 : 0.62,
+          ),
+    ]);
     final controller = ref.read(xiangqiAnalysisControllerProvider.notifier);
 
     ref.listen(engineEvaluationPreferencesProvider.select((p) => p.isEnabled), (_, _) {
@@ -206,6 +223,7 @@ class _BodyState() extends ConsumerState<_Body> {
               showCoordinates: boardPrefs.coordinates,
               showLastMove: boardPrefs.boardHighlights,
               showBorder: boardPrefs.showBorder,
+              arrows: arrows,
               magnifyDraggedPiece: boardPrefs.magnifyDraggedPiece,
               dragTargetKind: boardPrefs.dragTargetKind,
               style: XiangqiBoardStyle.fromChessboardColorScheme(boardPrefs.boardTheme.colors),

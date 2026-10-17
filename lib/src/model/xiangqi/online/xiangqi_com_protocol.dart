@@ -15,10 +15,11 @@ import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 /// by two digits, and it is what makes a naive `length == 4` parse wrong: five characters are as
 /// ordinary as four.
 ///
-/// Everything xiangqi.com carries about a move uses the rank-1 spelling — the `move` field of a
-/// `g_v2.move` emit and each entry of `move_history`, whose first whitespace-separated token is the
-/// UCI (`"c3d5 577/120 570/120 3"`). The callers of this file split that token off and hand it here;
-/// these two functions take a move and nothing else.
+/// The live game carries moves in the rank-1 spelling — the `move` field of a `g_v2.move` emit and
+/// each entry of `move_history`, whose first whitespace-separated token is the UCI
+/// (`"c3d5 577/120 570/120 3"`). The callers of this file split that token off and hand it here;
+/// these two functions take a move and nothing else. Puzzle payloads do **not** use this spelling:
+/// their `blunder_move` and `model_answer` are rank-0 ICCS, read by `xiangqiPuzzleFromJson`.
 
 /// The file letter a to i of [square]. [XiangqiSquare.name] spells file *and* rank together, and
 /// here the rank has to be written xiangqi.com's way, so the two halves are taken separately.

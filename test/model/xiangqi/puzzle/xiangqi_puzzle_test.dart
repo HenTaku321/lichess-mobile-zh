@@ -12,7 +12,6 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_com_protocol.dart';
 import 'package:lichess_mobile/src/model/xiangqi/puzzle/xiangqi_puzzle.dart';
 import 'package:lichess_mobile/src/model/xiangqi/puzzle/xiangqi_puzzle_repository.dart';
 import 'package:lichess_mobile/src/model/xiangqi/quota/xiangqi_quota.dart';
@@ -119,7 +118,7 @@ void main() {
     });
 
     test('an answer of one move cannot describe a blunder and an answer to it', () {
-      final answer = xiangqiTestLine.answer.map(xiangqiMoveToComUci).toList();
+      final answer = xiangqiTestLine.answer.map((move) => move.iccs).toList();
 
       expect(xiangqiPuzzleFromJson(payload(xiangqiPuzzlePayload(modelAnswer: []))), isNull);
       expect(
@@ -129,7 +128,7 @@ void main() {
     });
 
     test('an answer holding something that is not a move is dropped', () {
-      final answer = xiangqiTestLine.answer.map(xiangqiMoveToComUci).toList()..[1] = 'zz99';
+      final answer = xiangqiTestLine.answer.map((move) => move.iccs).toList()..[1] = 'zz99';
 
       expect(xiangqiPuzzleFromJson(payload(xiangqiPuzzlePayload(modelAnswer: answer))), isNull);
     });
@@ -170,7 +169,7 @@ void main() {
       // A move that is well formed and legal *somewhere* — the opening cannon — played from the
       // fixture's position, where that cannon is no longer on h2. The app plays the blunder itself,
       // so a puzzle whose blunder is not a move here is a puzzle that cannot be set up.
-      final illegal = xiangqiMoveToComUci(XiangqiMove.parseIccs('h2e2')!);
+      final illegal = XiangqiMove.parseIccs('h2e2')!.iccs;
 
       expect(xiangqiPuzzleFromJson(payload(xiangqiPuzzlePayload(blunderMove: illegal))), isNull);
     });

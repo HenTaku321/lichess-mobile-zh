@@ -1,6 +1,5 @@
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_com_protocol.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_move.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_rules.dart' as rules;
@@ -302,14 +301,16 @@ XiangqiSide _playerSide(Object? playerTurn, XiangqiPosition position) {
   return position.turn.opposite;
 }
 
-/// The move [value] names in xiangqi.com's rank-1 UCI, or null if it names none.
+/// The move [value] names as rank-0 ICCS, or null if it names none.
 ///
-/// The wire spells a move the way its own board does — `h3e3`, and `h10g8` on the back rank — while
-/// this repo's moves are rank-0. [xiangqiMoveFromComUci] is the one place that is translated, and
-/// this is the puzzle reader's use of it.
+/// Puzzle payloads are the exception to the rest of xiangqi.com's move spelling: unlike the live
+/// game's rank-1 UCI (`h3e3`, `h10g8`), `blunder_move` and `model_answer` use the same coordinates
+/// as the FEN and this repo's board (`h2e2`, `h9g7`). Measured on two published puzzles, every move
+/// was legal verbatim in its `initial_fen` and illegal after subtracting one from each rank. Passing
+/// these through [xiangqiMoveFromComUci] therefore made valid puzzles unreadable.
 XiangqiMove? _move(Object? value) {
   final text = _string(value);
-  return text == null ? null : xiangqiMoveFromComUci(text);
+  return text == null ? null : XiangqiMove.parseIccs(text);
 }
 
 /// The tag ids [value] holds, empty when it holds none.

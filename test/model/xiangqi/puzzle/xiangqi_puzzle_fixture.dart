@@ -1,5 +1,5 @@
 // The puzzle payloads below are the *shapes* the 2026-10-15/16 probe measured against
-// xiangqi.com — the key names, the two move spellings, the enums, the 429 envelope — with every
+// xiangqi.com — the key names, the rank-0 move spelling, the enums, the 429 envelope — with every
 // value replaced. Not one puzzle id, rating, FEN or move here is the capture's.
 //
 // The position is not typed out either, and that is the point: the opening is played through this
@@ -19,7 +19,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
-import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_com_protocol.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_session.dart';
 import 'package:lichess_mobile/src/model/xiangqi/puzzle/xiangqi_puzzle.dart';
 import 'package:lichess_mobile/src/model/xiangqi/puzzle/xiangqi_puzzle_controller.dart';
@@ -131,11 +130,9 @@ Map<String, Object?> xiangqiPuzzlePayload({
   'full_moves': fullMoves == _unset ? xiangqiTestLine.solution.length ~/ 2 : fullMoves,
   'initial_fen': initialFen == _unset ? xiangqiTestLine.before.toFen() : initialFen,
   'player_turn': playerTurn == _unset ? 2 : playerTurn,
-  'blunder_move': blunderMove == _unset
-      ? xiangqiMoveToComUci(xiangqiTestLine.blunder)
-      : blunderMove,
+  'blunder_move': blunderMove == _unset ? xiangqiTestLine.blunder.iccs : blunderMove,
   'model_answer': modelAnswer == _unset
-      ? xiangqiTestLine.answer.map(xiangqiMoveToComUci).toList()
+      ? xiangqiTestLine.answer.map((move) => move.iccs).toList()
       : modelAnswer,
   'tags': tags == _unset ? const <Object?>[] : tags,
   'state': state == _unset ? 300 : state,

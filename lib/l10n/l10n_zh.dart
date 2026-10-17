@@ -83,9 +83,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mobileChapterName => '章节名称';
 
   @override
-  String get mobileGame => '棋种';
-
-  @override
   String get mobileChess => '国际象棋';
 
   @override
@@ -197,6 +194,27 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get mobileFlipPiecesAfterMove => '走棋后翻转棋子和对手信息';
+
+  @override
+  String get mobileAnalysisChessDescription => '使用本地引擎分析国际象棋局面。';
+
+  @override
+  String get mobileAnalysisXiangqiDescription => '使用皮卡鱼分析象棋局面。';
+
+  @override
+  String get mobileBoardEditorChessDescription => '在 8×8 棋盘上摆出国际象棋局面。';
+
+  @override
+  String get mobileBoardEditorXiangqiDescription => '在 9×10 棋盘上摆出象棋局面。';
+
+  @override
+  String get mobileGame => '对局';
+
+  @override
+  String get mobileNoFriendsOnline => '暂无好友在线。';
+
+  @override
+  String get mobileXiangqiEvaluatingMove => '正在评估你的着法…';
 
   @override
   String get mobileGamePoints => '局分';
@@ -741,24 +759,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get mobileWinOrFiftyMoveDraw => '胜或50回合和棋';
-
-  @override
-  String get mobileAnalysisChessDescription => '用本地引擎分析国际象棋局面。';
-
-  @override
-  String get mobileAnalysisXiangqiDescription => '用皮卡鱼分析象棋局面。';
-
-  @override
-  String get mobileBoardEditorChessDescription => '在 8×8 棋盘上摆出国际象棋局面。';
-
-  @override
-  String get mobileBoardEditorXiangqiDescription => '在 9×10 棋盘上摆出象棋局面。';
-
-  @override
-  String get mobileNoFriendsOnline => '目前没有在线好友。';
-
-  @override
-  String get mobileXiangqiEvaluatingMove => '正在评估你的着法…';
 
   @override
   String get mobileXiangqi => '象棋';
@@ -8333,9 +8333,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get mobileChallengeCreated => '挑戰已建立：對戰開始時您將收到通知。\n您可以在首頁分頁中查看。';
 
   @override
-  String get mobileGame => '棋種';
-
-  @override
   String get mobileChess => '國際象棋';
 
   @override
@@ -8361,6 +8358,27 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get mobileFeedbackButton => '問題反饋';
+
+  @override
+  String get mobileAnalysisChessDescription => '使用本機引擎分析國際象棋局面。';
+
+  @override
+  String get mobileAnalysisXiangqiDescription => '使用皮卡魚分析象棋局面。';
+
+  @override
+  String get mobileBoardEditorChessDescription => '在 8×8 棋盤上擺出國際象棋局面。';
+
+  @override
+  String get mobileBoardEditorXiangqiDescription => '在 9×10 棋盤上擺出象棋局面。';
+
+  @override
+  String get mobileGame => '對局';
+
+  @override
+  String get mobileNoFriendsOnline => '暫無好友在線。';
+
+  @override
+  String get mobileXiangqiEvaluatingMove => '正在評估你的着法…';
 
   @override
   String mobileGoodDay(String param) {
@@ -8576,24 +8594,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get mobileWatchGamesSubtitle => '觀看 lichess 或 xiangqi.com 上正在進行的對局。';
-
-  @override
-  String get mobileAnalysisChessDescription => '用本機引擎分析西洋棋局面。';
-
-  @override
-  String get mobileAnalysisXiangqiDescription => '用皮卡魚分析象棋局面。';
-
-  @override
-  String get mobileBoardEditorChessDescription => '在 8×8 棋盤上擺出西洋棋局面。';
-
-  @override
-  String get mobileBoardEditorXiangqiDescription => '在 9×10 棋盤上擺出象棋局面。';
-
-  @override
-  String get mobileNoFriendsOnline => '目前沒有線上好友。';
-
-  @override
-  String get mobileXiangqiEvaluatingMove => '正在評估你的著法…';
 
   @override
   String get mobileXiangqi => '象棋';

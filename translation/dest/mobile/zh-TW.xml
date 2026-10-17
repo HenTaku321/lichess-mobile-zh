@@ -184,4 +184,11 @@
   <string name="xiangqiTournamentsParticipants" comment="Xiangqi tournaments screen: how many accounts have signed up. %s is the number.">%s 人報名</string>
   <string name="xiangqiTournamentsStandings" comment="Xiangqi tournament screen: the heading of the standings.">積分榜</string>
   <string name="xiangqiTournamentsStandingsEmpty" comment="Xiangqi tournament screen: shown when the standings have nobody on them yet.">還沒有人下過。</string>
+  <string name="analysisChessDescription" comment="Description of the chess analysis entry in the analysis hub.">使用本機引擎分析國際象棋局面。</string>
+  <string name="analysisXiangqiDescription" comment="Description of the xiangqi analysis entry in the analysis hub.">使用皮卡魚分析象棋局面。</string>
+  <string name="boardEditorChessDescription" comment="Description of the chess board editor entry in the board editor hub.">在 8×8 棋盤上擺出國際象棋局面。</string>
+  <string name="boardEditorXiangqiDescription" comment="Description of the xiangqi board editor entry in the board editor hub.">在 9×10 棋盤上擺出象棋局面。</string>
+  <string name="game" comment="Generic label for a game when the game type is chosen separately.">對局</string>
+  <string name="noFriendsOnline" comment="Shown in the friends hub when no friend is currently online.">暫無好友在線。</string>
+  <string name="xiangqiEvaluatingMove" comment="Shown while Pikafish evaluates the player's move in xiangqi practice mode.">正在評估你的着法…</string>
 </resources>

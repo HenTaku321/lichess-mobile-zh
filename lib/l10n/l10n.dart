@@ -340,12 +340,6 @@ abstract class AppLocalizations {
   /// **'Chapter Name'**
   String get mobileChapterName;
 
-  /// No description provided for @mobileGame.
-  ///
-  /// In en, this message translates to:
-  /// **'Game'**
-  String get mobileGame;
-
   /// No description provided for @mobileChess.
   ///
   /// In en, this message translates to:
@@ -567,6 +561,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Flip pieces and opponent info after move'**
   String get mobileFlipPiecesAfterMove;
+
+  /// No description provided for @mobileAnalysisChessDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Analyse a chess position with the local engine.'**
+  String get mobileAnalysisChessDescription;
+
+  /// No description provided for @mobileAnalysisXiangqiDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Analyse a xiangqi position with Pikafish.'**
+  String get mobileAnalysisXiangqiDescription;
+
+  /// No description provided for @mobileBoardEditorChessDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Build a chess position on an eight by eight board.'**
+  String get mobileBoardEditorChessDescription;
+
+  /// No description provided for @mobileBoardEditorXiangqiDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Build a xiangqi position on a nine by ten board.'**
+  String get mobileBoardEditorXiangqiDescription;
+
+  /// No description provided for @mobileGame.
+  ///
+  /// In en, this message translates to:
+  /// **'Game'**
+  String get mobileGame;
+
+  /// No description provided for @mobileNoFriendsOnline.
+  ///
+  /// In en, this message translates to:
+  /// **'No friends online.'**
+  String get mobileNoFriendsOnline;
+
+  /// No description provided for @mobileXiangqiEvaluatingMove.
+  ///
+  /// In en, this message translates to:
+  /// **'Evaluating your move…'**
+  String get mobileXiangqiEvaluatingMove;
 
   /// No description provided for @mobileGamePoints.
   ///
@@ -1635,42 +1671,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Win or 50 move draw'**
   String get mobileWinOrFiftyMoveDraw;
-
-  /// No description provided for @mobileAnalysisChessDescription.
-  ///
-  /// In en, this message translates to:
-  /// **'Analyse a chess position with the local engine.'**
-  String get mobileAnalysisChessDescription;
-
-  /// No description provided for @mobileAnalysisXiangqiDescription.
-  ///
-  /// In en, this message translates to:
-  /// **'Analyse a xiangqi position with Pikafish.'**
-  String get mobileAnalysisXiangqiDescription;
-
-  /// No description provided for @mobileBoardEditorChessDescription.
-  ///
-  /// In en, this message translates to:
-  /// **'Build a chess position on an eight by eight board.'**
-  String get mobileBoardEditorChessDescription;
-
-  /// No description provided for @mobileBoardEditorXiangqiDescription.
-  ///
-  /// In en, this message translates to:
-  /// **'Build a xiangqi position on a nine by ten board.'**
-  String get mobileBoardEditorXiangqiDescription;
-
-  /// No description provided for @mobileNoFriendsOnline.
-  ///
-  /// In en, this message translates to:
-  /// **'No friends online.'**
-  String get mobileNoFriendsOnline;
-
-  /// No description provided for @mobileXiangqiEvaluatingMove.
-  ///
-  /// In en, this message translates to:
-  /// **'Evaluating your move…'**
-  String get mobileXiangqiEvaluatingMove;
 
   /// No description provided for @mobileXiangqi.
   ///

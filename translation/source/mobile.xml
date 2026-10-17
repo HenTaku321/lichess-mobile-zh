@@ -61,6 +61,13 @@
   <string name="flip" comment="Bottom bar button that turns the board around. Keep it very short.">Flip</string>
   <string name="flipClock" comment="Tooltip of the button that flips the chess clock orientation.">Flip clock</string>
   <string name="flipPiecesAfterMove" comment="Over the board display setting: rotate the board after each move.">Flip pieces and opponent info after move</string>
+  <string name="analysisChessDescription" comment="Description of the chess analysis entry in the analysis hub.">Analyse a chess position with the local engine.</string>
+  <string name="analysisXiangqiDescription" comment="Description of the xiangqi analysis entry in the analysis hub.">Analyse a xiangqi position with Pikafish.</string>
+  <string name="boardEditorChessDescription" comment="Description of the chess board editor entry in the board editor hub.">Build a chess position on an eight by eight board.</string>
+  <string name="boardEditorXiangqiDescription" comment="Description of the xiangqi board editor entry in the board editor hub.">Build a xiangqi position on a nine by ten board.</string>
+  <string name="game" comment="Generic label for a game when the game type is chosen separately.">Game</string>
+  <string name="noFriendsOnline" comment="Shown in the friends hub when no friend is currently online.">No friends online.</string>
+  <string name="xiangqiEvaluatingMove" comment="Shown while Pikafish evaluates the player's move in xiangqi practice mode.">Evaluating your move…</string>
   <string name="gamePoints" comment="Column header in a broadcast team table: game points. Keep it very short.">GP</string>
   <string name="generatingGif" comment="Shown while a game is being exported as an animated GIF.">Generating GIF...</string>
   <string name="getFeedbackOnMoves" comment="Subtitle of the practice mode switch when playing against the offline computer.">Get feedback on your moves</string>

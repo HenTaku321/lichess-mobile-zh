@@ -396,6 +396,7 @@ void main() {
       // move over — and the sheet says so at the moment the choice is made.
       expect(find.text('Red moves first, so the computer opens the game.'), findsOneWidget);
 
+      await tester.ensureVisible(find.text('Play'));
       await tester.tap(find.text('Play'));
       await tester.pumpAndSettle();
 

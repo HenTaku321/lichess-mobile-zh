@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lichess_mobile/src/model/common/chess.dart';
 import 'package:lichess_mobile/src/model/engine/opponent_level.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_controller.dart';
 import 'package:lichess_mobile/src/service/weights_service.dart';
 import 'package:lichess_mobile/src/view/offline_computer/opponent_picker.dart';
 import 'package:material_ui/material_ui.dart';
@@ -168,9 +169,14 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.textContaining('xiangqi engine'), findsOneWidget);
 
+      // The difficulty is part of the engine picker, not a second step on the New Game sheet.
+      await tester.drag(find.byType(Slider), const Offset(500, 0));
+      await tester.pumpAndSettle();
+
       await tester.tap(find.text('OK'));
       await tester.pumpAndSettle();
       expect(host.picked?.isPikafish, isTrue);
+      expect((host.picked! as PikafishComputerOpponentChoice).difficulty, XiangqiDifficulty.level6);
     });
 
     testWidgets('does not offer Pikafish in a build that does not ship it', (tester) async {

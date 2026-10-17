@@ -5,12 +5,14 @@ import 'package:lichess_mobile/src/model/common/chess.dart';
 import 'package:lichess_mobile/src/model/engine/engine_availability.dart';
 import 'package:lichess_mobile/src/model/engine/engine_utils.dart';
 import 'package:lichess_mobile/src/model/engine/opponent_level.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_controller.dart';
 import 'package:lichess_mobile/src/service/weights_service.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_bottom_sheet.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:lichess_mobile/src/widgets/non_linear_slider.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_difficulty_tile.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// The engines a game can be played against, in the order the picker presents them: Stockfish
@@ -65,7 +67,8 @@ sealed class const ComputerOpponentChoice() {
 final class const ChessComputerOpponentChoice(final OpponentSpec spec)
     extends ComputerOpponentChoice;
 
-final class const PikafishComputerOpponentChoice() extends ComputerOpponentChoice;
+final class const PikafishComputerOpponentChoice(final XiangqiDifficulty difficulty)
+    extends ComputerOpponentChoice;
 
 /// The logo of the engine [spec] plays on.
 class const OpponentIcon(final OpponentSpec spec, {final double size = 44, super.key})
@@ -86,6 +89,7 @@ Future<ComputerOpponentChoice?> showOpponentPicker(
   required Variant variant,
   required bool showPikafish,
   bool selectedPikafish = false,
+  XiangqiDifficulty selectedXiangqiDifficulty = XiangqiDifficulty.level3,
 }) {
   return showModalBottomSheet<ComputerOpponentChoice>(
     context: context,
@@ -95,6 +99,7 @@ Future<ComputerOpponentChoice?> showOpponentPicker(
       variant: variant,
       showPikafish: showPikafish,
       selectedPikafish: selectedPikafish,
+      selectedXiangqiDifficulty: selectedXiangqiDifficulty,
     ),
   );
 }
@@ -107,6 +112,7 @@ class const _OpponentPickerSheet({
   required final Variant variant,
   required final bool showPikafish,
   required final bool selectedPikafish,
+  required final XiangqiDifficulty selectedXiangqiDifficulty,
 }) extends ConsumerStatefulWidget {
   @override
   ConsumerState<_OpponentPickerSheet> createState() => _OpponentPickerSheetState();
@@ -116,6 +122,7 @@ class _OpponentPickerSheetState() extends ConsumerState<_OpponentPickerSheet> {
   late OpponentEngine _engine;
   late StockfishLevel _level;
   late MaiaRating _rating;
+  late XiangqiDifficulty _xiangqiDifficulty;
 
   /// The Maia networks that are on the device, or null until we have looked.
   Set<MaiaRating>? _available;
@@ -158,6 +165,7 @@ class _OpponentPickerSheetState() extends ConsumerState<_OpponentPickerSheet> {
       final MaiaOpponentSpec spec => spec.rating,
       StockfishOpponentSpec() => MaiaRating.defaultRating,
     };
+    _xiangqiDifficulty = widget.selectedXiangqiDifficulty;
     final initialRating = _rating;
     _weights.availableRatings().then((available) {
       // Nothing else ever looks at the networks an older version of the app left behind: no rating
@@ -207,7 +215,7 @@ class _OpponentPickerSheetState() extends ConsumerState<_OpponentPickerSheet> {
   ComputerOpponentChoice get _choice => switch (_engine) {
     OpponentEngine.stockfish => ChessComputerOpponentChoice(StockfishOpponentSpec(_level)),
     OpponentEngine.maia => ChessComputerOpponentChoice(MaiaOpponentSpec(_rating)),
-    OpponentEngine.pikafish => const PikafishComputerOpponentChoice(),
+    OpponentEngine.pikafish => PikafishComputerOpponentChoice(_xiangqiDifficulty),
   };
 
   @override
@@ -257,10 +265,9 @@ class _OpponentPickerSheetState() extends ConsumerState<_OpponentPickerSheet> {
                   _ensure(rating);
                 },
               ),
-              OpponentEngine.pikafish => ListTile(
-                leading: const Icon(Icons.grid_on),
-                title: Text(context.l10n.mobileXiangqi),
-                subtitle: Text(context.l10n.mobileXiangqiDifficultyExplanation),
+              OpponentEngine.pikafish => XiangqiDifficultyTile(
+                difficulty: _xiangqiDifficulty,
+                onChanged: (difficulty) => setState(() => _xiangqiDifficulty = difficulty),
               ),
             },
           ],

@@ -21,6 +21,7 @@ import 'package:lichess_mobile/src/model/offline_computer/offline_computer_clock
 import 'package:lichess_mobile/src/model/offline_computer/offline_computer_game_controller.dart';
 import 'package:lichess_mobile/src/model/offline_computer/offline_computer_game_preferences.dart';
 import 'package:lichess_mobile/src/model/offline_computer/offline_computer_game_storage.dart';
+import 'package:lichess_mobile/src/model/offline_computer/xiangqi_computer_setup.dart';
 import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
@@ -36,7 +37,6 @@ import 'package:lichess_mobile/src/utils/screen.dart';
 import 'package:lichess_mobile/src/view/analysis/analysis_screen.dart';
 import 'package:lichess_mobile/src/view/game/status_l10n.dart';
 import 'package:lichess_mobile/src/view/offline_computer/opponent_picker.dart';
-import 'package:lichess_mobile/src/view/xiangqi/xiangqi_game_screen.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_action_sheet.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_bottom_sheet.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_choice_picker.dart';
@@ -50,7 +50,6 @@ import 'package:lichess_mobile/src/widgets/misc.dart';
 import 'package:lichess_mobile/src/widgets/non_linear_slider.dart';
 import 'package:lichess_mobile/src/widgets/settings.dart';
 import 'package:lichess_mobile/src/widgets/variant_app_bar_title.dart';
-import 'package:lichess_mobile/src/widgets/xiangqi_difficulty_tile.dart';
 import 'package:lichess_mobile/src/widgets/yes_no_dialog.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -779,7 +778,7 @@ class _NewGameSheetState() extends ConsumerState<_NewGameSheet> {
         ? prefs.opponentSpec
         : OpponentSpec.defaultSpec;
     _selectedOpponent = ChessComputerOpponentChoice(chessOpponent);
-    _xiangqiDifficulty = XiangqiDifficulty.level3;
+    _xiangqiDifficulty = XiangqiDifficulty.values[(prefs.lastXiangqiLevel - 1).clamp(0, 5)];
     if (chessOpponent case MaiaOpponentSpec(:final rating) when !rating.isBundled) {
       _checkMaiaWeights(rating);
     }
@@ -920,15 +919,10 @@ class _NewGameSheetState() extends ConsumerState<_NewGameSheet> {
                   : OpponentIcon(_selectedOpponent.chessSpec!, size: 32),
               settingsLabel: Text(context.l10n.opponent),
               settingsValue: _selectedOpponent.isPikafish
-                  ? 'Pikafish'
+                  ? 'Pikafish · Level ${_xiangqiDifficulty.level}'
                   : _selectedOpponent.chessSpec!.displayName,
               onTap: _pickOpponent,
             ),
-            if (_selectedOpponent.isPikafish)
-              XiangqiDifficultyTile(
-                difficulty: _xiangqiDifficulty,
-                onChanged: (difficulty) => setState(() => _xiangqiDifficulty = difficulty),
-              ),
             SettingsListTile(
               settingsLabel: Text(context.l10n.timeControl),
               settingsValue: _timeControlType.label(context.l10n),
@@ -1146,15 +1140,18 @@ class _NewGameSheetState() extends ConsumerState<_NewGameSheet> {
                     if (_selectedOpponent.isPikafish) {
                       final side = _selectedSideChoice.toSide() ?? Side.values[Random().nextInt(2)];
                       final xiangqiSide = side == Side.white ? XiangqiSide.red : XiangqiSide.black;
-                      Navigator.pop(context);
-                      Navigator.of(context, rootNavigator: true).push(
-                        XiangqiGameScreen.buildRoute(
-                          initialSide: xiangqiSide,
-                          initialDifficulty: _xiangqiDifficulty,
-                          initialTimeIncrement: _timeIncrement,
-                          initialPracticeMode: _practiceMode,
-                        ),
+                      ref
+                          .read(pendingXiangqiComputerSetupProvider.notifier)
+                          .setup = XiangqiComputerSetup(
+                        side: xiangqiSide,
+                        difficulty: _xiangqiDifficulty,
+                        timeIncrement: _timeIncrement,
+                        practiceMode: _practiceMode,
                       );
+                      ref
+                          .read(offlineComputerGamePreferencesProvider.notifier)
+                          .setLastGameWasXiangqi(true);
+                      Navigator.pop(context);
                       return;
                     }
                     final effectiveFen =
@@ -1194,12 +1191,22 @@ class _NewGameSheetState() extends ConsumerState<_NewGameSheet> {
       variant: _selectedVariant,
       showPikafish: _engines.pikafish,
       selectedPikafish: _selectedOpponent.isPikafish,
+      selectedXiangqiDifficulty: _xiangqiDifficulty,
     );
     if (opponent == null || !mounted) return;
-    setState(() => _selectedOpponent = opponent);
+    setState(() {
+      _selectedOpponent = opponent;
+      if (opponent case PikafishComputerOpponentChoice(:final difficulty)) {
+        _xiangqiDifficulty = difficulty;
+      }
+    });
     final chessSpec = opponent.chessSpec;
     if (chessSpec != null) {
       await ref.read(offlineComputerGamePreferencesProvider.notifier).setOpponent(chessSpec);
+    } else if (opponent case PikafishComputerOpponentChoice(:final difficulty)) {
+      await ref
+          .read(offlineComputerGamePreferencesProvider.notifier)
+          .setLastXiangqiLevel(difficulty.level);
     }
   }
 

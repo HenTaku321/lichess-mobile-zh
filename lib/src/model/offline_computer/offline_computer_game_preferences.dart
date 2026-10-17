@@ -79,6 +79,11 @@ class OfflineComputerGamePreferences()
   Future<void> setLastGameWasXiangqi(bool value) {
     return save(state.copyWith(lastGameWasXiangqi: value));
   }
+
+  /// Remembers the last Pikafish difficulty, one to six.
+  Future<void> setLastXiangqiLevel(int level) {
+    return save(state.copyWith(lastXiangqiLevel: level.clamp(1, 6)));
+  }
 }
 
 /// Represents the player's color choice for offline computer games.
@@ -126,6 +131,7 @@ sealed class const OfflineComputerGamePrefs._()
     @Default(false) bool hideEvaluation,
     @Default(false) bool blindfoldMode,
     @Default(false) bool lastGameWasXiangqi,
+    @Default(3) int lastXiangqiLevel,
   }) = _OfflineComputerGamePrefs;
 
   static const defaults = OfflineComputerGamePrefs(
@@ -140,6 +146,7 @@ sealed class const OfflineComputerGamePrefs._()
     hideEvaluation: false,
     blindfoldMode: false,
     lastGameWasXiangqi: false,
+    lastXiangqiLevel: 3,
   );
 
   factory fromJson(Map<String, dynamic> json) {

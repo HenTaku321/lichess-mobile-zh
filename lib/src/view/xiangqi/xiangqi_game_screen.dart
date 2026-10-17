@@ -10,6 +10,7 @@ import 'package:lichess_mobile/src/model/common/time_increment.dart';
 import 'package:lichess_mobile/src/model/engine/evaluation_preferences.dart';
 import 'package:lichess_mobile/src/model/engine/practice_comment.dart' show MoveVerdict;
 import 'package:lichess_mobile/src/model/offline_computer/offline_computer_game_preferences.dart';
+import 'package:lichess_mobile/src/model/offline_computer/xiangqi_computer_setup.dart';
 import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_clock.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_controller.dart';
@@ -203,21 +204,26 @@ class _BodyState() extends ConsumerState<_Body> {
     final setupDifficulty = widget.initialDifficulty;
     if (setupSide != null && setupDifficulty != null) {
       final timeIncrement = widget.initialTimeIncrement ?? XiangqiClock.defaultTimeIncrement;
-      ref
-          .read(xiangqiGameControllerProvider.notifier)
-          .startNewGame(
-            side: setupSide,
-            difficulty: setupDifficulty,
-            timeIncrement: timeIncrement,
-            practiceMode: widget.initialPracticeMode,
-          );
-      ref.read(xiangqiClockProvider.notifier).setupClock(timeIncrement);
-      unawaited(ref.read(xiangqiGameStorageProvider).delete());
-      if (!timeIncrement.isInfinite) {
-        ref.read(xiangqiClockProvider.notifier).resume(setupSide);
-      }
+      // The screen replaces the chess board while its parent is rebuilding. Starting the game
+      // writes to Riverpod, which is not allowed during that build, so do all of it once the
+      // replacement screen has been mounted.
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _syncEvaluation(ref.read(xiangqiGameControllerProvider));
+        if (!mounted) return;
+        ref
+            .read(xiangqiGameControllerProvider.notifier)
+            .startNewGame(
+              side: setupSide,
+              difficulty: setupDifficulty,
+              timeIncrement: timeIncrement,
+              practiceMode: widget.initialPracticeMode,
+            );
+        ref.read(xiangqiClockProvider.notifier).setupClock(timeIncrement);
+        unawaited(ref.read(xiangqiGameStorageProvider).delete());
+        if (!timeIncrement.isInfinite) {
+          ref.read(xiangqiClockProvider.notifier).resume(setupSide);
+        }
+        ref.read(pendingXiangqiComputerSetupProvider.notifier).clear();
+        _syncEvaluation(ref.read(xiangqiGameControllerProvider));
       });
       return;
     }
@@ -1021,6 +1027,11 @@ class _XiangqiGameSettingsSheetState() extends ConsumerState<_XiangqiGameSetting
   }
 }
 
+enum _XiangqiComputerOpponent() {
+  pikafish,
+  stockfish,
+}
+
 /// The sheet a game is set up in: which side to take, and how hard the computer plays.
 ///
 /// [initialFen] is a position to set up on, and is only ever given when the screen was opened with
@@ -1060,6 +1071,28 @@ class _NewGameSheetState() extends ConsumerState<_NewGameSheet> {
         ListSection(
           materialFilledCard: true,
           children: [
+            SettingsListTile(
+              settingsLabel: Text(context.l10n.opponent),
+              settingsValue: 'Pikafish',
+              onTap: () {
+                showChoicePicker<_XiangqiComputerOpponent>(
+                  context,
+                  title: Text(context.l10n.opponent),
+                  choices: _XiangqiComputerOpponent.values,
+                  selectedItem: _XiangqiComputerOpponent.pikafish,
+                  labelBuilder: (opponent) => Text(
+                    opponent == _XiangqiComputerOpponent.pikafish ? 'Pikafish' : 'Stockfish',
+                  ),
+                  onSelectedItemChanged: (opponent) {
+                    if (opponent != _XiangqiComputerOpponent.stockfish) return;
+                    ref
+                        .read(offlineComputerGamePreferencesProvider.notifier)
+                        .setLastGameWasXiangqi(false);
+                    Navigator.pop(context);
+                  },
+                );
+              },
+            ),
             SettingsListTile(
               settingsLabel: Text(context.l10n.side),
               settingsValue: _side.label(context.l10n),

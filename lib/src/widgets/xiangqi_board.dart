@@ -749,7 +749,28 @@ class _XiangqiBoardState() extends State<XiangqiBoard> with SingleTickerProvider
                   child: Stack(
                     children: [
                       Positioned.fill(
-                        child: Image(image: bgImage, fit: BoxFit.cover),
+                        // The board assets are complete 8x8 chessboards, not seamless material
+                        // tiles. A xiangqi board is one continuous field, so showing the whole
+                        // photograph would put an eight-by-eight checker pattern underneath a
+                        // nine-by-ten grid. Show only the top-left light square instead: an
+                        // OverflowBox lays the complete image out at eight times the board's size,
+                        // and the Stack clips away everything except that first square.
+                        child: ClipRect(
+                          child: OverflowBox(
+                            alignment: Alignment.topLeft,
+                            minWidth: geometry.width * 8,
+                            maxWidth: geometry.width * 8,
+                            minHeight: geometry.height * 8,
+                            maxHeight: geometry.height * 8,
+                            child: Image(
+                              image: bgImage,
+                              width: geometry.width * 8,
+                              height: geometry.height * 8,
+                              fit: BoxFit.fill,
+                              filterQuality: FilterQuality.high,
+                            ),
+                          ),
+                        ),
                       ),
                       boardWidget,
                     ],

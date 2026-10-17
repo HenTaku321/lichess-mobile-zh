@@ -749,4 +749,22 @@ void main() {
       }
     });
   });
+
+  testWidgets('crops one light square from an eight-by-eight board photograph', (tester) async {
+    final rect = await pumpBoard(
+      tester,
+      XiangqiBoard(
+        position: XiangqiPosition.initial(),
+        style: XiangqiBoardStyle.fromChessboardColorScheme(ChessboardColorScheme.marble),
+      ),
+    );
+
+    final image = tester.widget<Image>(find.byType(Image));
+    expect(image.fit, BoxFit.fill);
+    expect(image.width, closeTo(rect.width * 8, 0.01));
+    expect(image.height, closeTo(rect.height * 8, 0.01));
+
+    final overflow = tester.widget<OverflowBox>(find.byType(OverflowBox));
+    expect(overflow.alignment, Alignment.topLeft);
+  });
 }

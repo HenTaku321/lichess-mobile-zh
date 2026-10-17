@@ -12,8 +12,11 @@ import 'package:lichess_mobile/src/model/lobby/game_setup_preferences.dart';
 import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_clock.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_controller.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_storage.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_notation.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_otb_game_storage.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
+import 'package:lichess_mobile/src/service/move_feedback.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/focus_detector.dart';
 import 'package:lichess_mobile/src/utils/immersive_mode.dart';
@@ -28,9 +31,9 @@ import 'package:lichess_mobile/src/widgets/clock.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:lichess_mobile/src/widgets/non_linear_slider.dart';
 import 'package:lichess_mobile/src/widgets/settings.dart';
-import 'package:lichess_mobile/src/widgets/xiangqi_avatar.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_game_layout.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_player_row.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// A game of xiangqi played by two people at one device, over the board.
@@ -95,9 +98,43 @@ class _BodyState() extends ConsumerState<_Body> {
     ref.read(xiangqiClockProvider);
     // The sheet opens on arrival either way; a position handed to the screen is what the game it
     // starts from becomes, and is the only thing it carries.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _showConfigureSheet(context, initialFen: widget.initialFen);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      if (widget.initialFen != null) {
+        _showConfigureSheet(context, initialFen: widget.initialFen);
+        return;
+      }
+      final saved = await ref.read(xiangqiOtbGameStorageProvider).fetchGame();
+      if (!mounted) return;
+      if (saved != null && saved.state.moves.isNotEmpty && !saved.state.isFinished) {
+        ref
+            .read(xiangqiGameControllerProvider.notifier)
+            .restoreGame(
+              game: saved.state,
+              timeIncrement: saved.timeIncrement,
+              redTimeLeft: saved.redTimeLeft,
+              blackTimeLeft: saved.blackTimeLeft,
+            );
+        return;
+      }
+      _showConfigureSheet(context);
     });
+  }
+
+  Future<void> _saveGame() async {
+    final state = ref.read(xiangqiGameControllerProvider);
+    if (state.moves.isEmpty) return;
+    final clock = ref.read(xiangqiClockProvider);
+    await ref
+        .read(xiangqiOtbGameStorageProvider)
+        .save(
+          SavedXiangqiGame(
+            state: state.copyWith(isEngineThinking: false, selected: null),
+            timeIncrement: state.timeIncrement,
+            redTimeLeft: clock.redTimeLeft,
+            blackTimeLeft: clock.blackTimeLeft,
+          ),
+        );
   }
 
   /// Shows the result half a second after the game ends.
@@ -139,6 +176,17 @@ class _BodyState() extends ConsumerState<_Body> {
       final played = newState.moves.length - previous.moves.length;
       if (played > 0) {
         ref.read(xiangqiClockProvider.notifier).onMove(newSideToMove: newState.turn);
+        unawaited(_saveGame());
+        if (played == 1) {
+          final move = newState.moves.last;
+          final isCapture = previous.position.pieceAt(move.to) != null;
+          final service = ref.read(moveFeedbackServiceProvider);
+          if (isCapture) {
+            service.captureFeedback(null, check: newState.isInCheck);
+          } else {
+            service.moveFeedback(check: newState.isInCheck);
+          }
+        }
       } else if (played < 0 && ref.read(xiangqiClockProvider).active) {
         ref
             .read(xiangqiClockProvider.notifier)
@@ -172,69 +220,70 @@ class _BodyState() extends ConsumerState<_Body> {
         // pause button in the bar below, which is where pausing is done anyway, is also the way back.
         onForegroundLost: () {
           if (!context.mounted) return;
+          unawaited(_saveGame());
           ref.read(xiangqiClockProvider.notifier).pause();
         },
-        child: Column(
-          children: [
-            Expanded(
-              child: SafeArea(
-                child: XiangqiGameLayout(
-                  board: BrightnessHueFilter(
-                    brightness: boardPrefs.brightness,
-                    hue: boardPrefs.hue,
-                    child: XiangqiBoard(
-                      position: gameState.position,
-                      orientation: _orientation,
-                      selected: gameState.selected,
-                      // The legal moves and the last move are things the board draws, so the two
-                      // settings that turn them off turn them off here as well as on the computer
-                      // screen: they are the same board.
-                      moves: boardPrefs.showLegalMoves
-                          ? gameState.selectedMoves
-                          : const IListConst([]),
-                      lastMove: boardPrefs.boardHighlights ? gameState.lastMove : null,
-                      onTapSquare: ref.read(xiangqiGameControllerProvider.notifier).tapSquare,
-                      // A drag is the same two taps in the order they were made, as it is on the
-                      // computer screen: the piece is picked up where it was let go of and put down
-                      // where it was dropped.
-                      onDragMove: (from, to) {
-                        final controller = ref.read(xiangqiGameControllerProvider.notifier);
-                        controller.tapSquare(from);
-                        controller.tapSquare(to);
-                      },
-                      animationDuration: boardPrefs.pieceAnimationDuration,
-                      showCoordinates: boardPrefs.coordinates,
-                      showLastMove: boardPrefs.boardHighlights,
-                      showBorder: boardPrefs.showBorder,
-                      magnifyDraggedPiece: boardPrefs.magnifyDraggedPiece,
-                      dragTargetKind: boardPrefs.dragTargetKind,
-                      style: XiangqiBoardStyle.fromChessboardColorScheme(
-                        boardPrefs.boardTheme.colors,
+        child: PopScope(
+          onPopInvokedWithResult: (_, _) => unawaited(_saveGame()),
+          child: Column(
+            children: [
+              Expanded(
+                child: SafeArea(
+                  child: XiangqiGameLayout(
+                    board: BrightnessHueFilter(
+                      brightness: boardPrefs.brightness,
+                      hue: boardPrefs.hue,
+                      child: XiangqiBoard(
+                        position: gameState.position,
+                        orientation: _orientation,
+                        selected: gameState.selected,
+                        // The legal moves and the last move are things the board draws, so the two
+                        // settings that turn them off turn them off here as well as on the computer
+                        // screen: they are the same board.
+                        moves: boardPrefs.showLegalMoves
+                            ? gameState.selectedMoves
+                            : const IListConst([]),
+                        lastMove: boardPrefs.boardHighlights ? gameState.lastMove : null,
+                        onTapSquare: ref.read(xiangqiGameControllerProvider.notifier).tapSquare,
+                        // A drag is the same two taps in the order they were made, as it is on the
+                        // computer screen: the piece is picked up where it was let go of and put down
+                        // where it was dropped.
+                        onDragMove: (from, to) {
+                          final controller = ref.read(xiangqiGameControllerProvider.notifier);
+                          controller.tapSquare(from);
+                          controller.tapSquare(to);
+                        },
+                        animationDuration: boardPrefs.pieceAnimationDuration,
+                        showCoordinates: boardPrefs.coordinates,
+                        showLastMove: boardPrefs.boardHighlights,
+                        showBorder: boardPrefs.showBorder,
+                        magnifyDraggedPiece: boardPrefs.magnifyDraggedPiece,
+                        dragTargetKind: boardPrefs.dragTargetKind,
+                        style: XiangqiBoardStyle.fromChessboardColorScheme(
+                          boardPrefs.boardTheme.colors,
+                        ),
                       ),
                     ),
-                  ),
-                  topTable: _OtbPlayer(side: topSide, clockKey: const ValueKey('topClock')),
-                  bottomTable: _OtbPlayer(
-                    side: _orientation,
-                    clockKey: const ValueKey('bottomClock'),
-                  ),
-                  moves: xiangqiGameNotation(gameState.positions, gameState.moves),
-                  // The last move played is the one the list marks, which is the only move there is
-                  // to mark: the controller keeps no cursor — see [XiangqiGameController] — so the
-                  // list is a list and not a control.
-                  currentMoveIndex: gameState.moves.length,
-                  onSelectMove: null,
-                  userActionsBar: _OtbBottomBar(
-                    onFlipBoard: () {
-                      setState(() {
-                        _orientation = _orientation.opposite;
-                      });
-                    },
+                    topTable: _OtbPlayer(side: topSide, clockKey: const ValueKey('topClock')),
+                    bottomTable: _OtbPlayer(
+                      side: _orientation,
+                      clockKey: const ValueKey('bottomClock'),
+                    ),
+                    moves: xiangqiGameNotation(gameState.positions, gameState.moves),
+                    currentMoveIndex: gameState.viewCursor,
+                    onSelectMove: ref.read(xiangqiGameControllerProvider.notifier).goTo,
+                    userActionsBar: _OtbBottomBar(
+                      onFlipBoard: () {
+                        setState(() {
+                          _orientation = _orientation.opposite;
+                        });
+                      },
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -263,36 +312,23 @@ class const _OtbPlayer({required final XiangqiSide side, required final Key cloc
     final boardPrefs = ref.watch(boardPreferencesProvider);
     final style = XiangqiBoardStyle.fromChessboardColorScheme(boardPrefs.boardTheme.colors);
 
-    return Row(
-      children: [
-        XiangqiPieceAvatar(side: side, size: 32, style: style),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            side.label(context.l10n),
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              color: isToMove ? null : textShade(context, 0.5),
+    return XiangqiPlayerRow(
+      side: side,
+      style: style,
+      name: side.label(context.l10n),
+      isToMove: isToMove,
+      avatarSize: 32,
+      clock: clock.timeIncrement.isInfinite
+          ? null
+          : Clock(
+              key: clockKey,
+              timeLeft: Duration(milliseconds: max(0, clock.timeLeft(side)!.inMilliseconds)),
+              active: clock.activeClock == side,
+              emergencyThreshold: Duration(
+                seconds: (clock.timeIncrement.time * 0.125).clamp(10, 60).toInt(),
+              ),
+              clockTenths: clockTenths,
             ),
-          ),
-        ),
-        // An untimed game has nothing to draw, and a clock showing hours nobody counts down would be
-        // a lie about the game: the row is a name and nothing else. See [Clock].
-        if (!clock.timeIncrement.isInfinite)
-          Clock(
-            key: clockKey,
-            // A clock that has run out reads a fraction of a second past zero, which is not a time
-            // anyone has left: what is drawn is that there is none.
-            timeLeft: Duration(milliseconds: max(0, clock.timeLeft(side)!.inMilliseconds)),
-            active: clock.activeClock == side,
-            // The same threshold the chess clock of the same length uses: an eighth of the game's
-            // own time control, held between ten seconds and a minute.
-            emergencyThreshold: Duration(
-              seconds: (clock.timeIncrement.time * 0.125).clamp(10, 60).toInt(),
-            ),
-            clockTenths: clockTenths,
-          ),
-      ],
     );
   }
 }
@@ -330,6 +366,20 @@ class const _OtbBottomBar({required final VoidCallback onFlipBoard}) extends Con
                   },
             icon: clock.active ? CupertinoIcons.pause : CupertinoIcons.play,
           ),
+        BottomBarButton(
+          label: context.l10n.mobilePreviousMove,
+          onTap: gameState.viewCursor > 0
+              ? ref.read(xiangqiGameControllerProvider.notifier).goBackward
+              : null,
+          icon: CupertinoIcons.chevron_back,
+        ),
+        BottomBarButton(
+          label: context.l10n.next,
+          onTap: gameState.viewCursor < gameState.positions.length - 1
+              ? ref.read(xiangqiGameControllerProvider.notifier).goForward
+              : null,
+          icon: CupertinoIcons.chevron_forward,
+        ),
         BottomBarButton(
           label: context.l10n.takeback,
           // The clock is not touched here: taking a move back changes the game, and the game is

@@ -727,6 +727,14 @@ void main() {
       final brown = XiangqiBoardStyle.fromChessboardColorScheme(ChessboardColorScheme.brown);
       expect(brown.backgroundImage, isNull);
       expect(brown.ink, ChessboardColorScheme.brown.darkSquare);
+
+      // The interaction marks are the chess board's own, not a weaker xiangqi-only wash.
+      expect(brown.lastMove, ChessboardColorScheme.brown.lastMove);
+      expect(brown.selected, ChessboardColorScheme.brown.selected);
+      expect(brown.target, ChessboardColorScheme.brown.validMoves);
+      expect(marble.lastMove, ChessboardColorScheme.marble.lastMove);
+      expect(marble.selected, ChessboardColorScheme.marble.selected);
+      expect(marble.target, ChessboardColorScheme.marble.validMoves);
     });
 
     test('deepens the ink over a photograph, and leaves it alone over a flat colour', () {

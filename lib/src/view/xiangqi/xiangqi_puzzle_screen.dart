@@ -14,6 +14,8 @@ import 'package:lichess_mobile/src/model/xiangqi/xiangqi_move.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_notation.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_rules.dart' as rules;
+import 'package:lichess_mobile/src/service/move_feedback.dart';
+import 'package:lichess_mobile/src/service/sound_service.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
@@ -24,6 +26,7 @@ import 'package:lichess_mobile/src/widgets/misc.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_avatar.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_game_layout.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_player_row.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// Solves xiangqi.com's puzzles, on this app's own board.
@@ -129,6 +132,34 @@ class _PuzzleBodyState() extends ConsumerState<_PuzzleBody> {
   Widget build(BuildContext context) {
     final puzzle = widget.puzzle;
     final provider = xiangqiPuzzleControllerProvider(_key);
+    ref.listen(provider, (previous, next) {
+      if (previous == null) return;
+      if (next.wrongMove != null && previous.wrongMove == null) {
+        unawaited(ref.read(soundServiceProvider).play(Sound.error));
+        return;
+      }
+      if (next.moves.length != previous.moves.length + 1) return;
+      final move = next.moves.last;
+      final before = previous.position;
+      final isCapture = before.pieceAt(move.to) != null;
+      final isCheck = rules.isCheck(next.position);
+      void playFeedback() {
+        if (!context.mounted) return;
+        final feedback = ref.read(moveFeedbackServiceProvider);
+        if (isCapture) {
+          feedback.captureFeedback(null, check: isCheck);
+        } else {
+          feedback.moveFeedback(check: isCheck);
+        }
+      }
+
+      final delay = ref.read(boardPreferencesProvider).pieceAnimationDuration ~/ 2;
+      if (delay <= Duration.zero) {
+        playFeedback();
+      } else {
+        Timer(delay, playFeedback);
+      }
+    });
     final state = ref.watch(provider);
     final controller = ref.read(provider.notifier);
     final boardPrefs = ref.watch(boardPreferencesProvider);
@@ -341,31 +372,21 @@ class const _SolverRow({
 }) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        XiangqiPieceAvatar(side: side, size: 40, style: style),
-        const SizedBox(width: 8.0),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    final counts = mistakes > 0 || hintsUsed > 0
+        ? Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(side.label(context.l10n), style: TextTheme.of(context).titleMedium),
-              if (status.isNotEmpty)
-                Text(
-                  status,
-                  style: TextTheme.of(context).bodyMedium?.copyWith(color: textShade(context, 0.7)),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
+              if (mistakes > 0) _Count(icon: CupertinoIcons.xmark, value: mistakes),
+              if (hintsUsed > 0) _Count(icon: CupertinoIcons.lightbulb, value: hintsUsed),
             ],
-          ),
-        ),
-        // The two counts the server is told about, shown only once there is something to count: an
-        // attempt with neither is the ordinary one and does not need saying.
-        if (mistakes > 0) _Count(icon: CupertinoIcons.xmark, value: mistakes),
-        if (hintsUsed > 0) _Count(icon: CupertinoIcons.lightbulb, value: hintsUsed),
-      ],
+          )
+        : null;
+    return XiangqiPlayerRow(
+      side: side,
+      style: style,
+      name: side.label(context.l10n),
+      status: status,
+      clock: counts,
     );
   }
 }

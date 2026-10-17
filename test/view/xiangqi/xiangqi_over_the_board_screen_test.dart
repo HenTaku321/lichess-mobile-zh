@@ -8,6 +8,8 @@ import 'package:lichess_mobile/src/model/engine/engine.dart';
 import 'package:lichess_mobile/src/model/engine/engine_spec.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_clock.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_controller.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_storage.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_otb_game_storage.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_over_the_board_screen.dart';
 import 'package:lichess_mobile/src/widgets/clock.dart';
@@ -40,6 +42,17 @@ XiangqiSquare squareAt(String name) {
 /// [initialFen] is the position to open the screen on, and only the test about opening on one passes
 /// it. [startGame] is false for that test alone, which is about the sheet and not the game behind it,
 /// and so leaves the sheet up rather than pressing its button.
+final class const _NoSavedOtbGame() implements XiangqiOtbGameStorage {
+  @override
+  Future<SavedXiangqiGame?> fetchGame() async => null;
+
+  @override
+  Future<void> save(SavedXiangqiGame game) async {}
+
+  @override
+  Future<void> delete() async {}
+}
+
 Future<FakeTransport> pumpOtbScreen(
   WidgetTester tester, {
   Size surfaceSize = kTestSurfaceSize,
@@ -57,7 +70,12 @@ Future<FakeTransport> pumpOtbScreen(
     await makeTestProviderScopeApp(
       tester,
       home: XiangqiOverTheBoardScreen(initialFen: initialFen),
-      overrides: {xiangqiEngineProvider: xiangqiEngineProvider.overrideWith((Ref ref) => engine)},
+      overrides: {
+        xiangqiEngineProvider: xiangqiEngineProvider.overrideWith((Ref ref) => engine),
+        xiangqiOtbGameStorageProvider: xiangqiOtbGameStorageProvider.overrideWith(
+          (_) => const _NoSavedOtbGame(),
+        ),
+      },
       surfaceSize: surfaceSize,
     ),
   );

@@ -5,6 +5,7 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:lichess_mobile/src/model/common/chess.dart';
+import 'package:lichess_mobile/src/model/common/eval.dart';
 import 'package:lichess_mobile/src/model/common/time_increment.dart';
 import 'package:lichess_mobile/src/model/engine/engine.dart';
 import 'package:lichess_mobile/src/model/engine/engine_providers.dart';
@@ -15,9 +16,9 @@ import 'package:lichess_mobile/src/model/xiangqi/xiangqi_clock.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_hint.dart'
     show XiangqiEvaluation, xiangqiEvaluationFromEngine;
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_move.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_notation.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_rules.dart';
-import 'package:lichess_mobile/src/service/move_feedback.dart';
 import 'package:lichess_mobile/src/service/pikafish_nnue_service.dart';
 import 'package:logging/logging.dart';
 
@@ -140,6 +141,12 @@ final class const XiangqiPracticeComment({
   required final MoveVerdict verdict,
   required final XiangqiMove? bestMove,
   required final XiangqiEvaluation? evaluation,
+
+  /// The suggested move in Chinese notation, captured against the position it was played in.
+  required final String? suggestionNotation,
+
+  /// The evaluation after the move, in red's point of view.
+  required final String? evalAfter,
 });
 
 /// The game in progress.
@@ -173,6 +180,12 @@ sealed class const XiangqiGameState._() with _$XiangqiGameState {
     /// The last xiangqi practice verdict, if any.
     XiangqiPracticeComment? practiceComment,
 
+    /// The practice suggestion currently drawn on the board, if any.
+    XiangqiMove? showingSuggestedMove,
+
+    /// Which position of [positions] is on the board. `-1` follows the live end of the game.
+    @Default(-1) int cursor,
+
     /// The piece the player has picked up, if any.
     XiangqiSquare? selected,
 
@@ -187,11 +200,20 @@ sealed class const XiangqiGameState._() with _$XiangqiGameState {
     XiangqiSide? flaggedSide,
   }) = _XiangqiGameState;
 
-  /// The game as it stands.
-  XiangqiPosition get position => positions.last;
+  /// The position drawn on the board.
+  XiangqiPosition get position => positions[viewCursor];
 
-  /// Whose move it is.
-  XiangqiSide get turn => position.turn;
+  /// The live end of the game, which is where moves are played and results are decided.
+  XiangqiPosition get gamePosition => positions.last;
+
+  /// Which position the board is showing.
+  int get viewCursor => cursor < 0 ? positions.length - 1 : cursor.clamp(0, positions.length - 1);
+
+  /// Whether the board is at the live end of the game.
+  bool get isAtLivePosition => viewCursor == positions.length - 1;
+
+  /// Whose move it is in the game as it stands, not in a position being reviewed.
+  XiangqiSide get turn => gamePosition.turn;
 
   /// Whether the side to move is one a person at this board may move.
   ///
@@ -200,7 +222,7 @@ sealed class const XiangqiGameState._() with _$XiangqiGameState {
   /// does anything, and before the engine is given a turn at all.
   bool get isPlayerTurn => opponent == .human || turn == playerSide;
 
-  XiangqiMove? get lastMove => moves.isEmpty ? null : moves.last;
+  XiangqiMove? get lastMove => viewCursor == 0 ? null : moves[viewCursor - 1];
 
   /// How the game ended, or null while it is still running.
   ///
@@ -217,10 +239,10 @@ sealed class const XiangqiGameState._() with _$XiangqiGameState {
     // remembered as which side it was, which is the only thing about them the position cannot say.
     if (resignedBy != null) return .resign;
     if (flaggedSide != null) return .timeout;
-    if (isCheckmate(position)) return .checkmate;
+    if (isCheckmate(gamePosition)) return .checkmate;
     // 困毙: not in check, and no move to make. A loss, not a draw — see [XiangqiGameEnd].
-    if (isStalemate(position)) return .stalemate;
-    if (positions.where((p) => p == position).length >= kXiangqiRepetitionDraw) {
+    if (isStalemate(gamePosition)) return .stalemate;
+    if (positions.where((p) => p == gamePosition).length >= kXiangqiRepetitionDraw) {
       return .threefoldRepetition;
     }
     return null;
@@ -266,7 +288,9 @@ sealed class const XiangqiGameState._() with _$XiangqiGameState {
   /// Where the selected piece may go, for the board to shade.
   IList<XiangqiMove> get selectedMoves {
     final square = selected;
-    if (square == null || !isPlayerTurn || isFinished) return const IListConst([]);
+    if (square == null || !isAtLivePosition || !isPlayerTurn || isFinished) {
+      return const IListConst([]);
+    }
     return legalMovesFrom(position, square);
   }
 }
@@ -345,6 +369,7 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
       moves: const IListConst([]),
       timeIncrement: effectiveTimeIncrement,
       practiceMode: practiceMode,
+      cursor: 0,
     );
     if (timeIncrement != null) {
       ref.read(xiangqiClockProvider.notifier).setupClock(timeIncrement);
@@ -364,7 +389,11 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
     _epoch++;
     _search?.stop();
     _search = null;
-    state = game.copyWith(isEngineThinking: false, selected: null);
+    state = game.copyWith(
+      isEngineThinking: false,
+      selected: null,
+      cursor: game.positions.length - 1,
+    );
     ref
         .read(xiangqiClockProvider.notifier)
         .setupClock(timeIncrement, redTimeLeft: redTimeLeft, blackTimeLeft: blackTimeLeft);
@@ -376,7 +405,12 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
 
   /// Acts on a touch on [square]: picks a piece up, puts one down, or ignores it.
   void tapSquare(XiangqiSquare square) {
-    if (state.isFinished || state.isEngineThinking || !state.isPlayerTurn) return;
+    if (state.isFinished ||
+        state.isEngineThinking ||
+        !state.isAtLivePosition ||
+        !state.isPlayerTurn) {
+      return;
+    }
 
     final selected = state.selected;
     if (selected != null && state.selectedMoves.any((move) => move.to == square)) {
@@ -403,7 +437,28 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
       moves: state.moves.sublist(0, index),
       isEngineThinking: false,
       selected: null,
+      cursor: index,
     );
+  }
+
+  /// Shows or hides the practice-mode suggestion on the board.
+  void toggleSuggestedMove(XiangqiMove? move) {
+    state = state.copyWith(showingSuggestedMove: state.showingSuggestedMove == move ? null : move);
+  }
+
+  /// Puts the board back on the position at [index] in the move history.
+  void goTo(int index) {
+    if (state.positions.isEmpty) return;
+    final clamped = index.clamp(0, state.positions.length - 1);
+    state = state.copyWith(cursor: clamped, selected: null, showingSuggestedMove: null);
+  }
+
+  void goBackward() {
+    if (state.viewCursor > 0) goTo(state.viewCursor - 1);
+  }
+
+  void goForward() {
+    if (state.viewCursor < state.positions.length - 1) goTo(state.viewCursor + 1);
   }
 
   /// The player gives up.
@@ -430,7 +485,7 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
   }
 
   bool _isPlayerPiece(XiangqiSquare square) {
-    final piece = state.position.pieceAt(square);
+    final piece = state.gamePosition.pieceAt(square);
     // The piece the side to move owns. Against the engine the side to move is only ever the
     // player's, so this is the player's piece; over the board it is whichever side's turn it is,
     // which is the side whose player is at the board.
@@ -439,27 +494,19 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
 
   /// Makes [move] and, if the game is still running, hands the turn to the engine.
   void _play(XiangqiMove move) {
-    // Read before the move is made: afterwards the square holds whatever landed on it, and nothing
-    // there says whether what arrived took a piece or merely moved to a square that was empty.
-    final isCapture = state.position.pieceAt(move.to) != null;
-    final positionBefore = state.position;
+    final positionBefore = state.gamePosition;
     final wasPlayerMove = state.isPlayerTurn;
+    final wasAtLive = state.isAtLivePosition;
+    final nextPosition = play(state.gamePosition, move);
 
     state = state.copyWith(
-      positions: state.positions.add(play(state.position, move)),
+      positions: state.positions.add(nextPosition),
       moves: state.moves.add(move),
       selected: null,
       practiceComment: null,
+      showingSuggestedMove: null,
+      cursor: wasAtLive ? state.positions.length : state.viewCursor,
     );
-
-    // Xiangqi has no dartchess variant, so a capture is reported with none; the service reads that
-    // as the ordinary capture sound, which is what a capture in this game always is.
-    final check = isCheck(state.position);
-    if (isCapture) {
-      ref.read(moveFeedbackServiceProvider).captureFeedback(null, check: check);
-    } else {
-      ref.read(moveFeedbackServiceProvider).moveFeedback(check: check);
-    }
 
     if (state.practiceMode && wasPlayerMove) {
       unawaited(_evaluatePracticeMove(positionBefore, move));
@@ -474,7 +521,7 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
     try {
       final pre = await _practiceSearch(before);
       if (epoch != _epoch || !ref.mounted) return;
-      final after = await _practiceSearch(state.position);
+      final after = await _practiceSearch(state.gamePosition);
       if (epoch != _epoch || !ref.mounted) return;
 
       final preEval = pre.evaluation;
@@ -500,7 +547,12 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
           verdict: verdict,
           bestMove: pre.bestMove,
           evaluation: afterEval,
+          suggestionNotation: pre.bestMove == null
+              ? null
+              : xiangqiMoveNotation(before, pre.bestMove!),
+          evalAfter: ExternalEval(cp: afterEval.cp, mate: afterEval.mate).evalString,
         ),
+        showingSuggestedMove: null,
       );
     } catch (error, stackTrace) {
       _logger.warning('Xiangqi practice move evaluation failed', error, stackTrace);
@@ -556,7 +608,7 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
           moves: const IListConst([]),
           variant: Variant.standard,
           limit: state.difficulty.limit,
-          fenOverride: state.position.toFen(),
+          fenOverride: state.gamePosition.toFen(),
           // A new value here is what tells the engine a new game has started, and with it to clear
           // the table it filled for the last one.
           game: epoch,
@@ -570,7 +622,7 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
       if (best == null || epoch != _epoch || !ref.mounted) return;
 
       final move = XiangqiMove.parseIccs(best);
-      if (move == null || !isLegal(state.position, move)) {
+      if (move == null || !isLegal(state.gamePosition, move)) {
         // An engine that answers with a move this game cannot play is broken rather than merely slow,
         // and there is no way to carry on: the position that would follow it does not exist.
         _logger.severe('Pikafish answered "$best", which is not a legal move in this position');

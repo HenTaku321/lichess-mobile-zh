@@ -13,7 +13,6 @@ import 'package:lichess_mobile/src/model/common/local_game_clock.dart';
 import 'package:lichess_mobile/src/model/common/time_increment.dart';
 import 'package:lichess_mobile/src/model/engine/engine_availability.dart';
 import 'package:lichess_mobile/src/model/engine/engine_utils.dart';
-import 'package:lichess_mobile/src/model/engine/practice_comment.dart';
 import 'package:lichess_mobile/src/model/game/game_board_params.dart';
 import 'package:lichess_mobile/src/model/game/offline_computer_game.dart';
 import 'package:lichess_mobile/src/model/lobby/game_setup_preferences.dart';
@@ -26,7 +25,6 @@ import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/service/weights_service.dart';
-import 'package:lichess_mobile/src/styles/lichess_colors.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/chessboard.dart';
 import 'package:lichess_mobile/src/utils/focus_detector.dart';
@@ -48,32 +46,11 @@ import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:lichess_mobile/src/widgets/material_diff.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
 import 'package:lichess_mobile/src/widgets/non_linear_slider.dart';
+import 'package:lichess_mobile/src/widgets/practice_feedback_card.dart';
 import 'package:lichess_mobile/src/widgets/settings.dart';
 import 'package:lichess_mobile/src/widgets/variant_app_bar_title.dart';
 import 'package:lichess_mobile/src/widgets/yes_no_dialog.dart';
 import 'package:material_ui/material_ui.dart';
-
-extension _MoveVerdictDisplay on MoveVerdict {
-  IconData get icon => switch (this) {
-    .goodMove => Icons.check_circle,
-    .notBest => Icons.info,
-    .inaccuracy => Icons.help,
-    .mistake => Icons.error,
-    .blunder => Icons.cancel,
-  };
-
-  Color get color => switch (this) {
-    .goodMove || .notBest => Colors.lightGreen,
-    .inaccuracy => LichessColors.inaccuracy,
-    .mistake => LichessColors.mistake,
-    .blunder => LichessColors.blunder,
-  };
-}
-
-extension _PracticeCommentDisplay on PracticeComment {
-  IconData get icon => isBookMove ? Icons.menu_book : verdict.icon;
-  Color get color => verdict.color;
-}
 
 class const OfflineComputerGameScreen({
   /// Optional initial variant to be preselected in the "New Game" dialog.
@@ -531,7 +508,29 @@ class const _Player({required final Side side}) extends ConsumerWidget {
               ),
             ),
           ),
-          _PracticeCommentCard(gameState: gameState),
+          PracticeFeedbackCard(
+            feedback: gameState.practiceComment == null
+                ? null
+                : PracticeFeedbackData(
+                    verdict: gameState.practiceComment!.verdict,
+                    suggestion: gameState.practiceComment!.moveSuggestion?.san,
+                    evalAfter: gameState.practiceComment!.evalAfter,
+                    isBookMove: gameState.practiceComment!.isBookMove,
+                  ),
+            isEvaluatingMove: gameState.isEvaluatingMove,
+            isPlayerTurn: gameState.turn == gameState.game.playerSide,
+            isFinished: gameState.finished,
+            currentEval: gameState.currentAnalysis?.evalString,
+            showSuggestion:
+                gameState.showingSuggestedMove == gameState.practiceComment?.moveSuggestion?.move,
+            onToggleSuggestion: switch (gameState.practiceComment?.moveSuggestion?.move) {
+              final NormalMove move =>
+                () => ref
+                    .read(offlineComputerGameControllerProvider.notifier)
+                    .toggleSuggestedMove(move),
+              _ => null,
+            },
+          ),
           SizedBox(height: isShortScreen ? 4.0 : 8.0),
         ],
         Row(
@@ -570,157 +569,6 @@ class const _PlayerClock({required final Side side, required final Key clockKey}
         seconds: (clock.timeIncrement.time * 0.125).clamp(10, 60).toInt(),
       ),
       clockTenths: clockTenths,
-    );
-  }
-}
-
-class const _PracticeCommentCard({required final OfflineComputerGameState gameState})
-    extends ConsumerStatefulWidget {
-  @override
-  ConsumerState<_PracticeCommentCard> createState() => _PracticeCommentCardState();
-}
-
-class _PracticeCommentCardState() extends ConsumerState<_PracticeCommentCard> {
-  // Last non-null comment, kept so we can show it with opacity while a new evaluation is in
-  // progress and no new comment has arrived yet.
-  PracticeComment? _previousComment;
-
-  @override
-  void didUpdateWidget(_PracticeCommentCard oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.gameState.practiceComment != null && widget.gameState.practiceComment == null) {
-      _previousComment = oldWidget.gameState.practiceComment;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final prefs = ref.watch(offlineComputerGamePreferencesProvider);
-    final hideBestMove = prefs.hideBestMove;
-    final hideEvaluation = prefs.hideEvaluation;
-    final gameState = widget.gameState;
-    final isEvaluatingMove = gameState.isEvaluatingMove;
-    final practiceComment =
-        gameState.practiceComment ?? (isEvaluatingMove ? _previousComment : null);
-    final showingSuggestedMove = gameState.showingSuggestedMove;
-    final isShortScreen = isShortVerticalScreen(context);
-    final evalTextStyle = TextStyle(
-      fontWeight: FontWeight.w600,
-      fontSize: isShortScreen ? 12 : 14,
-      color: textShade(context, 0.6),
-    );
-
-    final cardHeight = isShortScreen ? 40.0 : 54.0;
-
-    Widget content;
-    Color? backgroundColor;
-    Color? iconColor;
-    IconData? icon;
-
-    if (gameState.finished) {
-      content = Text(context.l10n.gameOver, style: const TextStyle(fontStyle: .italic));
-    } else if (practiceComment != null) {
-      final verdict = practiceComment.verdict;
-      final eval = gameState.currentAnalysis?.evalString;
-      icon = practiceComment.icon;
-      iconColor = practiceComment.color;
-      backgroundColor = practiceComment.color.withValues(alpha: 0.1);
-
-      final verdictText = switch (verdict) {
-        MoveVerdict.goodMove => context.l10n.studyGoodMove,
-        MoveVerdict.notBest => context.l10n.mobileGoodMoveButThereIsBetter,
-        MoveVerdict.inaccuracy => context.l10n.inaccuracy,
-        MoveVerdict.mistake => context.l10n.mistake,
-        MoveVerdict.blunder => context.l10n.blunder,
-      };
-
-      Widget? suggestedMoveWidget;
-      final suggestedMove = practiceComment.moveSuggestion;
-      if (suggestedMove != null && !hideBestMove) {
-        final moveText = suggestedMove.san;
-        final labelText = practiceComment.verdict == MoveVerdict.goodMove
-            ? context.l10n.anotherWasX('')
-            : context.l10n.bestWasX('');
-        final label = labelText.replaceAll(' ', '').isEmpty
-            ? ''
-            : labelText.substring(0, labelText.length - 1);
-        final isShowing = showingSuggestedMove == suggestedMove.move;
-
-        suggestedMoveWidget = GestureDetector(
-          onTap: () {
-            final move = suggestedMove.move;
-            if (move is NormalMove) {
-              ref.read(offlineComputerGameControllerProvider.notifier).toggleSuggestedMove(move);
-            }
-          },
-          child: Text.rich(
-            TextSpan(
-              children: [
-                TextSpan(text: label),
-                const TextSpan(text: ' '),
-                TextSpan(
-                  text: moveText,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: isShowing ? iconColor : null,
-                    decoration: TextDecoration.underline,
-                    decorationStyle: TextDecorationStyle.dotted,
-                  ),
-                ),
-              ],
-            ),
-            style: TextStyle(fontSize: 12, color: textShade(context, 0.6)),
-          ),
-        );
-      }
-
-      content = Row(
-        children: [
-          Icon(icon, color: iconColor, size: 20),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  verdictText,
-                  style: TextStyle(fontWeight: FontWeight.w600, color: iconColor),
-                ),
-                ?suggestedMoveWidget,
-              ],
-            ),
-          ),
-          if ((eval ?? practiceComment.evalAfter) != null && !hideEvaluation)
-            Text(eval ?? practiceComment.evalAfter!, style: evalTextStyle),
-        ],
-      );
-    } else if (gameState.turn == gameState.game.playerSide) {
-      final eval = gameState.currentAnalysis?.evalString;
-      content = Row(
-        children: [
-          const Spacer(),
-          if (!hideEvaluation)
-            if (eval != null) Text(eval, style: evalTextStyle),
-        ],
-      );
-    } else {
-      content = const SizedBox.shrink();
-    }
-
-    return AnimatedOpacity(
-      opacity: isEvaluatingMove && gameState.practiceComment == null ? 0.5 : 1.0,
-      duration: const Duration(milliseconds: 300),
-      child: Container(
-        height: cardHeight,
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          color: backgroundColor ?? Theme.of(context).colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Align(alignment: Alignment.centerLeft, child: content),
-      ),
     );
   }
 }

@@ -10,6 +10,8 @@ import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_online_game_cont
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_controller.dart' show XiangqiGameEnd;
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_notation.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_rules.dart' as rules;
+import 'package:lichess_mobile/src/service/move_feedback.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/focus_detector.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
@@ -22,6 +24,7 @@ import 'package:lichess_mobile/src/widgets/platform_alert_dialog.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_avatar.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_game_layout.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_player_row.dart';
 import 'package:lichess_mobile/src/widgets/yes_no_dialog.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -97,6 +100,31 @@ class _XiangqiOnlineGameScreenState() extends ConsumerState<XiangqiOnlineGameScr
   @override
   Widget build(BuildContext context) {
     final provider = xiangqiOnlineGameControllerProvider(widget.gameId);
+    ref.listen(provider, (previous, next) {
+      final before = previous?.value;
+      final after = next.value;
+      if (before == null || after == null || after.moves.length != before.moves.length + 1) return;
+      final move = after.moves.last;
+      final isCapture = before.position.pieceAt(move.to) != null;
+      final isCheck = rules.isCheck(after.position);
+      void playFeedback() {
+        final service = ref.read(moveFeedbackServiceProvider);
+        if (isCapture) {
+          service.captureFeedback(null, check: isCheck);
+        } else {
+          service.moveFeedback(check: isCheck);
+        }
+      }
+
+      final delay = ref.read(boardPreferencesProvider).pieceAnimationDuration ~/ 2;
+      if (delay <= Duration.zero) {
+        playFeedback();
+      } else {
+        Timer(delay, () {
+          if (mounted) playFeedback();
+        });
+      }
+    });
     final asyncState = ref.watch(provider);
     final boardPrefs = ref.watch(boardPreferencesProvider);
 
@@ -231,14 +259,23 @@ class _XiangqiOnlineGameScreenState() extends ConsumerState<XiangqiOnlineGameScr
               ),
           ],
         ),
-        // The line of play, in the game's own notation, marked at the move just played. A list and
-        // not a control: neither the player nor the spectator can step back through the game, so
-        // there is nothing to select. See [XiangqiGameLayout]'s `onSelectMove`.
+        // The line of play, in the game's own notation. Players and spectators can step back
+        // through it; playing is only accepted again once the board is at the live end.
         moves: xiangqiGameNotation(state.positions, state.moves),
-        currentMoveIndex: state.positions.length - 1,
-        onSelectMove: null,
+        currentMoveIndex: state.viewCursor,
+        onSelectMove: controller.goTo,
         userActionsBar: BottomBar(
           children: [
+            BottomBarButton(
+              label: l10n.mobilePreviousMove,
+              onTap: state.viewCursor > 0 ? controller.goBackward : null,
+              icon: CupertinoIcons.chevron_back,
+            ),
+            BottomBarButton(
+              label: l10n.next,
+              onTap: state.viewCursor < state.positions.length - 1 ? controller.goForward : null,
+              icon: CupertinoIcons.chevron_forward,
+            ),
             BottomBarButton(
               label: l10n.flipBoard,
               onTap: () => setState(() => _isFlipped = !_isFlipped),
@@ -354,61 +391,27 @@ class const XiangqiOnlinePlayerRow({
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final seconds = secondsLeft;
+    final name = player.isTaken
+        ? player.name
+        : side == XiangqiSide.red
+        ? l10n.mobileXiangqiSideRed
+        : l10n.mobileXiangqiSideBlack;
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        XiangqiPieceAvatar(side: side, size: 40, style: style),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Flexible(
-                // An empty seat is still a row: the game is on the board before both players have
-                // taken their seats, and the side is the honest thing to print until somebody sits.
-                child: Text(
-                  player.isTaken
-                      ? player.name
-                      : side == XiangqiSide.red
-                      ? l10n.mobileXiangqiSideRed
-                      : l10n.mobileXiangqiSideBlack,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: isTurn ? null : textShade(context, 0.6),
-                  ),
-                ),
-              ),
-              if (player.rating != null) ...[
-                const SizedBox(width: 4),
-                // The rating the chess players' rows show, at the size and shade those rows show
-                // it at — see `GamePlayer`.
-                Text(
-                  '${player.rating}',
-                  style: TextStyle(fontSize: 14, color: textShade(context, 0.7)),
-                ),
-              ],
-              if (isMe) ...[
-                const SizedBox(width: 4),
-                Icon(Icons.person, size: 16, color: textShade(context, 0.5)),
-              ],
-            ],
-          ),
-        ),
-        if (seconds != null)
-          Padding(
-            // The chess screens' own clock, at the same emergency reading: the seconds below ten
-            // count in tenths, and half a minute left is when the clock starts looking worried.
-            padding: const EdgeInsets.only(left: 8),
-            child: Clock(
+    return XiangqiPlayerRow(
+      side: side,
+      style: style,
+      name: name,
+      rating: player.rating?.toString(),
+      isMe: isMe,
+      isToMove: isTurn,
+      clock: seconds == null
+          ? null
+          : Clock(
               timeLeft: Duration(seconds: seconds),
               active: isTurn,
               emergencyThreshold: const Duration(seconds: 30),
               clockTenths: .lessThan10s,
             ),
-          ),
-      ],
     );
   }
 }

@@ -121,7 +121,7 @@ class const XiangqiGameLayout({
     return LayoutBuilder(
       builder: (context, constraints) {
         final isLandscape = constraints.maxWidth > constraints.maxHeight;
-        final radius = boardRadius ?? (isTablet || isLandscape ? Styles.boardBorderRadius : null);
+        final radius = boardRadius ?? (isTablet ? Styles.boardBorderRadius : null);
         final boardInCard = radius != null ? _boardCard(board, radius) : board;
 
         if (isLandscape) {

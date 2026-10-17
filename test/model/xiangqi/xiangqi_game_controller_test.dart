@@ -1,20 +1,16 @@
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:lichess_mobile/src/model/common/chess.dart';
 import 'package:lichess_mobile/src/model/common/time_increment.dart';
 import 'package:lichess_mobile/src/model/engine/engine.dart';
 import 'package:lichess_mobile/src/model/engine/engine_spec.dart';
-import 'package:lichess_mobile/src/model/settings/general_preferences.dart';
 import 'package:lichess_mobile/src/model/ui_events.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_move.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_rules.dart';
-import 'package:lichess_mobile/src/service/sound_service.dart';
 
 import '../../binding.dart';
-import '../../service/fake_sound_service.dart';
 import '../engine/fake_transport.dart';
 
 /// The square named [name], which the tests below write the way a player would.
@@ -52,7 +48,7 @@ class XiangqiHarness(final ProviderContainer container, final FakeTransport tran
 /// under test is the game, and an [Engine] over a [FakeTransport] is the smallest thing that answers
 /// the way Pikafish does — the handshake, the option hygiene, the commands and the `bestmove`
 /// parsing are all the real ones, and only the bytes in and out are not.
-Future<XiangqiHarness> makeHarness({SoundService? soundService}) async {
+Future<XiangqiHarness> makeHarness() async {
   final binding = TestLichessBinding.ensureInitialized();
   addTearDown(binding.reset);
 
@@ -64,13 +60,7 @@ Future<XiangqiHarness> makeHarness({SoundService? soundService}) async {
   addTearDown(engine.dispose);
 
   final container = ProviderContainer(
-    overrides: [
-      xiangqiEngineProvider.overrideWith((Ref ref) => engine),
-      // A move now plays a sound and a haptic as it lands — see [MoveFeedbackService] — and a test
-      // surface has neither an audio device nor a preference store behind it: the haptics go
-      // nowhere, and the sound service is faked so that nothing tries to open a player.
-      soundServiceProvider.overrideWithValue(soundService ?? FakeSoundService()),
-    ],
+    overrides: [xiangqiEngineProvider.overrideWith((Ref ref) => engine)],
   );
   addTearDown(container.dispose);
 
@@ -96,32 +86,6 @@ Future<void> answer(FakeTransport transport, String iccs) async {
   await pumpEventQueue();
   transport.emit('bestmove $iccs');
   await pumpEventQueue();
-}
-
-/// A sound service that writes down what it was asked to play, so that a test can tell one kind of
-/// move from another.
-///
-/// A capture is asked for as `playCaptureSound` and a quiet move as `play`, and both are written
-/// down as the sound they mean: the point of the test is which of the two the game asked for, not
-/// which method it went through.
-class RecordingSoundService() implements SoundService {
-  final List<Sound> sounds = [];
-
-  @override
-  Future<void> play(Sound sound, {double? volume}) async {
-    sounds.add(sound);
-  }
-
-  @override
-  Future<void> playCaptureSound(Variant variant, {double? volume}) async {
-    sounds.add(Sound.capture);
-  }
-
-  @override
-  Future<void> changeTheme(SoundTheme theme, {bool playSound = false}) async {}
-
-  @override
-  Future<void> release() async {}
 }
 
 void main() {
@@ -180,19 +144,62 @@ void main() {
       expect(harness.state.isInCheck, isFalse);
     });
 
-    test('a move is heard as it is played, and a piece picked up is not', () async {
-      final sound = RecordingSoundService();
-      final harness = await makeHarness(soundService: sound);
-      harness.controller.startNewGame(side: .red, difficulty: .level4);
-      // A player on red is not asked for anything of the engine's, so whatever is heard from here
-      // is the player's own doing.
-      expect(sound.sounds, isEmpty);
+    test('practice feedback carries Chinese notation and an evaluation', () async {
+      final harness = await makeHarness();
+      harness.controller.startNewGame(side: .red, difficulty: .level4, practiceMode: true);
 
       harness.controller.tapSquare(square('h2'));
-      expect(sound.sounds, isEmpty, reason: 'picking a piece up is not a move');
-
       harness.controller.tapSquare(square('e2'));
-      expect(sound.sounds, [Sound.move]);
+
+      Future<void> finishSearch(int cp, String move) async {
+        await pumpEventQueue();
+        harness.transport.emit('readyok');
+        await pumpEventQueue();
+        harness.transport.emit('info depth 9 score cp $cp pv $move');
+        await pumpEventQueue();
+        harness.transport.emit('bestmove $move');
+        await pumpEventQueue();
+      }
+
+      // The pre-move search names a different best move; the post-move search scores the move
+      // actually played.
+      await finishSearch(20, 'b2e2');
+      await finishSearch(-30, 'h9g7');
+
+      final comment = harness.state.practiceComment;
+      expect(comment, isNotNull);
+      expect(comment!.bestMove, move('b2e2'));
+      expect(comment.suggestionNotation, isNot('b2e2'));
+      expect(comment.suggestionNotation, contains('平'));
+      expect(comment.evalAfter, isNotNull);
+    });
+
+    test('the game can be stepped through without changing the live position', () async {
+      final harness = await makeHarness();
+      harness.controller.startNewGame(side: .red, difficulty: .level4);
+      harness.controller.tapSquare(square('h2'));
+      harness.controller.tapSquare(square('e2'));
+      await answer(harness.transport, 'h9g7');
+      expect(harness.state.moves, IList([move('h2e2'), move('h9g7')]));
+      expect(harness.state.isAtLivePosition, isTrue);
+
+      harness.controller.goTo(0);
+      expect(harness.state.viewCursor, 0);
+      expect(harness.state.position, XiangqiPosition.initial());
+      expect(harness.state.lastMove, isNull);
+      expect(harness.state.isAtLivePosition, isFalse);
+      expect(harness.state.isPlayerTurn, isTrue, reason: 'the live game still has red to move');
+
+      // Reviewing is not playing: a tap cannot change a position in the past.
+      harness.controller.tapSquare(square('h2'));
+      expect(harness.state.selected, isNull);
+
+      harness.controller.goForward();
+      expect(harness.state.viewCursor, 1);
+      expect(harness.state.lastMove, move('h2e2'));
+      harness.controller.goTo(99);
+      expect(harness.state.viewCursor, 2);
+      expect(harness.state.isAtLivePosition, isTrue);
     });
 
     test('the ladder is six levels, and both of its columns rise from end to end', () {

@@ -49,15 +49,17 @@ final class const XiangqiBoardStyle({
   /// The character and inner ring of black's pieces.
   final Color blackInk = const Color(0xFF1D2024),
 
-  /// The two squares a move was played between.
-  final Color lastMove = const Color(0x3DE69826),
+  /// The two points a move was played between, painted in the same square-sized shape and at the
+  /// same strength as the chess board's last-move highlight.
+  final HighlightDetails lastMove = const HighlightDetails(solidColor: Color(0x809CC700)),
 
-  /// The ring around the picked-up piece, and around the square a drag began on.
-  final Color selected = const Color(0xCCE69826),
+  /// The point the picked-up piece stands on, in the same square-sized shape as the chess board's
+  /// selection highlight.
+  final HighlightDetails selected = const HighlightDetails(solidColor: Color(0x6014551E)),
 
   /// The dot on an empty point a selected piece may play to, and the ring around a piece it may
-  /// take.
-  final Color target = const Color(0x594E3723),
+  /// take. These are the chess board's valid-move colour and drawing rules.
+  final Color target = const Color(0x4014551E),
 
   /// The glow at the centre of the mark behind a general that is in check, shading out to nothing
   /// at the rim: a glow rather than a flat wash, the way the chess board's own check mark is a
@@ -80,10 +82,9 @@ final class const XiangqiBoardStyle({
   /// the two flat colours of a theme can be taken from it: its light square becomes the field and its
   /// dark square the frame. [ink] is the dark square too, which is the darkest flat colour the theme
   /// offers and so the one that stays legible drawn over its own light field; [riverInk] is that ink
-  /// faded towards the field, the way 楚河汉界 are printed faintly today. The two move highlights are
-  /// read from their solid colour where a theme gives one, and fall back to this board's own defaults
-  /// where it does not — `horsey` draws them as images alone, with no colour to read. [target] is the
-  /// theme's valid-move colour.
+  /// faded towards the field, the way 楚河汉界 are printed faintly today. The two move highlights keep
+  /// the theme's full [HighlightDetails], solid colour or image, and [target] is its valid-move
+  /// colour. A theme that paints an interaction mark with an image therefore paints it here too.
   ///
   /// The pieces follow the field: [pieceFace] is the field lifted towards white (a disc cut from
   /// the board's own wood, polished) and its rim shade [pieceFaceEnd] a touch darker; [pieceRing]
@@ -130,8 +131,8 @@ final class const XiangqiBoardStyle({
       pieceFace: plain.pieceFace,
       pieceFaceEnd: plain.pieceFaceEnd,
       pieceRing: plain.pieceRing,
-      lastMove: colorScheme.lastMove.solidColor ?? plain.lastMove,
-      selected: colorScheme.selected.solidColor ?? plain.selected,
+      lastMove: colorScheme.lastMove,
+      selected: colorScheme.selected,
       target: colorScheme.validMoves,
       backgroundImage: backgroundImage,
     );
@@ -865,11 +866,11 @@ class XiangqiBoardPainter({
     paintMarks(canvas);
     paintLastMove(canvas);
     paintCheck(canvas);
+    paintTargets(canvas);
+    paintSelection(canvas);
     paintPieces(canvas);
     paintTranslating(canvas);
     paintFading(canvas);
-    paintTargets(canvas);
-    paintSelection(canvas);
     paintHint(canvas);
     paintArrows(canvas);
     paintDragTarget(canvas);
@@ -1036,35 +1037,40 @@ class XiangqiBoardPainter({
   }
 
   /// The from and the to of the last move, under the pieces so that a piece hides the half of its
-  /// own marker.
+  /// own marker. The shape and colours are the chess board's last-move highlight, mapped onto a
+  /// board whose squares meet at points rather than filling a grid.
   void paintLastMove(Canvas canvas) {
     final move = lastMove;
     if (!showLastMove || move == null) return;
-    final fromCenter = geometry.centerOf(move.from, orientation);
-    canvas.drawCircle(
-      fromCenter,
-      geometry.pieceRadius * 1.05,
-      Paint()..color = style.lastMove.withValues(alpha: 0.22),
-    );
-    canvas.drawCircle(
-      fromCenter,
-      geometry.pieceRadius * 0.85,
-      Paint()
-        ..color = style.lastMove.withValues(alpha: 0.18)
-        ..style = .stroke
-        ..strokeWidth = cell * 0.02,
-    );
+    for (final square in [move.from, move.to]) {
+      _paintSquareHighlight(canvas, geometry.centerOf(square, orientation), style.lastMove);
+    }
+  }
 
-    final toCenter = geometry.centerOf(move.to, orientation);
-    canvas.drawCircle(toCenter, geometry.pieceRadius * 1.08, Paint()..color = style.lastMove);
-    canvas.drawCircle(
-      toCenter,
-      geometry.pieceRadius * 1.08,
-      Paint()
-        ..color = style.lastMove.withValues(alpha: 0.6)
-        ..style = .stroke
-        ..strokeWidth = cell * 0.025,
+  /// Draws one chess-board highlight over one xiangqi point.
+  ///
+  /// The square is centred on the point, because that is where a xiangqi piece stands. At an edge
+  /// the square is clipped to the board, exactly as the chess board clips a highlight at its own
+  /// edge. Theme images are supported too, so image-only chessboard themes keep their material.
+  void _paintSquareHighlight(Canvas canvas, Offset centre, HighlightDetails details) {
+    final board = RRect.fromRectAndRadius(
+      Rect.fromLTWH(0, 0, geometry.width, geometry.height),
+      Radius.circular(cell * 0.16),
     );
+    final rect = Rect.fromCenter(center: centre, width: cell, height: cell);
+    canvas.save();
+    canvas.clipRRect(board);
+    if (details.solidColor case final color?) {
+      canvas.drawRect(rect, Paint()..color = color);
+    }
+    if (details.image case final image?) {
+      final loaded = ChessgroundImages.instance.get(image);
+      if (loaded != null) {
+        final src = Rect.fromLTWH(0, 0, loaded.width.toDouble(), loaded.height.toDouble());
+        canvas.drawImageRect(loaded, src, rect, Paint()..filterQuality = FilterQuality.medium);
+      }
+    }
+    canvas.restore();
   }
 
   /// A red glow behind the general that is in check — bright at the piece and fading out — with a
@@ -1194,89 +1200,35 @@ class XiangqiBoardPainter({
     canvas.restore();
   }
 
-  /// What the selected piece may play: a dot on an empty point, a ring around a piece that would be
-  /// taken.
+  /// What the selected piece may play: the chess board's own two destination marks, mapped from
+  /// squares to points. An empty point gets the same filled dot; an occupied one gets the same
+  /// clipped ring around the piece.
   void paintTargets(Canvas canvas) {
+    final fillPaint = Paint()..color = style.target;
+    final strokePaint = Paint()
+      ..color = style.target
+      ..strokeWidth = cell / 5
+      ..style = .stroke;
     for (final move in moves) {
       final centre = geometry.centerOf(move.to, orientation);
+      final rect = Rect.fromCenter(center: centre, width: cell, height: cell);
       if (position.pieceAt(move.to) == null) {
-        canvas.drawCircle(
-          centre,
-          cell * 0.16,
-          Paint()
-            ..shader = ui.Gradient.radial(centre, cell * 0.16, [
-              style.target.withValues(alpha: 0.5),
-              style.target.withValues(alpha: 0.0),
-            ]),
-        );
-        canvas.drawCircle(
-          centre,
-          cell * 0.05,
-          Paint()..color = style.target.withValues(alpha: 0.95),
-        );
+        canvas.drawCircle(centre, cell / 6, fillPaint);
       } else {
-        final radius = geometry.pieceRadius;
-        final dist = radius * 1.06;
-        final arm = cell * 0.13;
-        final bracketPaint = Paint()
-          ..color = style.target.withValues(alpha: 0.95)
-          ..strokeWidth = cell * 0.026
-          ..strokeCap = StrokeCap.round;
-
-        canvas.drawCircle(
-          centre,
-          dist,
-          Paint()
-            ..color = style.target.withValues(alpha: 0.22)
-            ..style = .stroke
-            ..strokeWidth = cell * 0.015,
-        );
-
-        for (final (dx, dy) in const [(-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)]) {
-          final vx = centre.dx + dx * dist;
-          final vy = centre.dy + dy * dist;
-          final vertex = Offset(vx, vy);
-          canvas.drawLine(vertex, Offset(vx - dx * arm, vy), bracketPaint);
-          canvas.drawLine(vertex, Offset(vx, vy - dy * arm), bracketPaint);
-        }
+        canvas.save();
+        canvas.clipRect(rect);
+        canvas.drawCircle(centre, cell - (cell / 3), strokePaint);
+        canvas.restore();
       }
     }
   }
 
-  /// The ring around the picked-up piece, and around the square a drag was picked up on: both say
-  /// the same thing, that this is the piece the player is holding.
+  /// The chess board's selection highlight, under the picked-up piece and under the point a drag
+  /// began on: both say the same thing, that this is the piece the player is holding.
   void paintSelection(Canvas canvas) {
     for (final square in [selected, dragFrom]) {
       if (square == null) continue;
-      final centre = geometry.centerOf(square, orientation);
-      final radius = geometry.pieceRadius;
-
-      canvas.drawCircle(
-        centre,
-        radius * 1.25,
-        Paint()
-          ..shader = ui.Gradient.radial(centre, radius * 1.25, [
-            style.selected.withValues(alpha: 0.35),
-            style.selected.withValues(alpha: 0.0),
-          ]),
-      );
-
-      canvas.drawCircle(
-        centre,
-        radius * 1.06,
-        Paint()
-          ..color = style.selected.withValues(alpha: 0.9)
-          ..style = .stroke
-          ..strokeWidth = cell * 0.026,
-      );
-      canvas.drawCircle(
-        centre,
-        radius * 1.14,
-        Paint()
-          ..color = style.selected.withValues(alpha: 0.45)
-          ..style = .stroke
-          ..strokeWidth = cell * 0.012,
-      );
+      _paintSquareHighlight(canvas, geometry.centerOf(square, orientation), style.selected);
     }
   }
 
@@ -1396,47 +1348,20 @@ class XiangqiBoardPainter({
   }
 
   /// The highlight on the square a dragged piece is over, under the piece but over the board and
-  /// everything drawn on it, so that the piece still reads as picked up and its destination is
-  /// still marked underneath it.
+  /// everything drawn on it.
   ///
-  /// The colour is the board's own legal-move target, so a destination a piece may be played to is
-  /// marked the same way whether it is being tapped or dragged, and follows the theme with the rest
-  /// of the board rather than being a wash of its own.
+  /// This is chessground's drag target: the same translucent black, the same circle or square, and
+  /// the same size. It is deliberately not the legal-move colour; on both boards, a drag target is
+  /// the finger's shadow while a legal destination is the game's own mark.
   void paintDragTarget(Canvas canvas) {
     final bounds = dragTargetBounds;
     if (bounds == null) return;
-    final centre = bounds.center;
-    canvas.drawCircle(
-      centre,
-      cell * 0.46,
-      Paint()
-        ..shader = ui.Gradient.radial(centre, cell * 0.46, [
-          style.target.withValues(alpha: 0.3),
-          style.target.withValues(alpha: 0.0),
-        ]),
-    );
-    canvas.drawCircle(
-      centre,
-      cell * 0.44,
-      Paint()
-        ..color = style.target.withValues(alpha: 0.6)
-        ..style = .stroke
-        ..strokeWidth = cell * 0.02,
-    );
-    final arm = cell * 0.15;
-    final linePaint = Paint()
-      ..color = style.target.withValues(alpha: 0.7)
-      ..strokeWidth = cell * 0.02;
-    canvas.drawLine(
-      Offset(centre.dx - arm, centre.dy),
-      Offset(centre.dx + arm, centre.dy),
-      linePaint,
-    );
-    canvas.drawLine(
-      Offset(centre.dx, centre.dy - arm),
-      Offset(centre.dx, centre.dy + arm),
-      linePaint,
-    );
+    final paint = Paint()..color = const Color(0x33000000);
+    if (dragTargetKind == DragTargetKind.circle) {
+      canvas.drawCircle(bounds.center, cell, paint);
+    } else {
+      canvas.drawRect(bounds, paint);
+    }
   }
 
   /// The scale the dragged piece is drawn at: the board's own enlarged size while

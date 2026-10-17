@@ -2,20 +2,22 @@ import 'package:chessground/chessground.dart' show BrightnessHueFilter;
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lichess_mobile/src/model/common/chess.dart' show Variant;
 import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_live_game.dart';
 import 'package:lichess_mobile/src/model/xiangqi/review/xiangqi_review.dart';
 import 'package:lichess_mobile/src/model/xiangqi/review/xiangqi_review_repository.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_notation.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
+import 'package:lichess_mobile/src/service/sound_service.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
-import 'package:lichess_mobile/src/widgets/xiangqi_avatar.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_game_layout.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_player_row.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// A finished game on xiangqi.com, with every move of it marked up.
@@ -101,6 +103,22 @@ class _ReviewState() extends ConsumerState<_Review> {
     _cursor = widget.review.moves.length;
   }
 
+  void _goTo(int target) {
+    final clamped = target.clamp(0, widget.review.moves.length);
+    if (clamped == _cursor) return;
+    if (clamped > 0) {
+      final before = widget.review.positions[clamped - 1];
+      final move = widget.review.moves[clamped - 1];
+      final sound = ref.read(soundServiceProvider);
+      if (before.pieceAt(move.to) != null) {
+        sound.playCaptureSound(Variant.standard);
+      } else {
+        sound.play(Sound.move);
+      }
+    }
+    setState(() => _cursor = clamped);
+  }
+
   @override
   Widget build(BuildContext context) {
     final review = widget.review;
@@ -164,19 +182,17 @@ class _ReviewState() extends ConsumerState<_Review> {
         ),
         moves: xiangqiGameNotation(review.positions, review.moves),
         currentMoveIndex: cursor,
-        onSelectMove: (index) => setState(() => _cursor = index),
+        onSelectMove: _goTo,
         userActionsBar: BottomBar(
           children: [
             BottomBarButton(
               label: context.l10n.mobileXiangqiReviewPrevious,
-              onTap: cursor > 0 ? () => setState(() => _cursor = cursor - 1) : null,
+              onTap: cursor > 0 ? () => _goTo(cursor - 1) : null,
               icon: CupertinoIcons.chevron_back,
             ),
             BottomBarButton(
               label: context.l10n.mobileXiangqiReviewNext,
-              onTap: cursor < review.moves.length
-                  ? () => setState(() => _cursor = cursor + 1)
-                  : null,
+              onTap: cursor < review.moves.length ? () => _goTo(cursor + 1) : null,
               icon: CupertinoIcons.chevron_forward,
             ),
           ],
@@ -199,37 +215,17 @@ class const _PlayerRow({
 }) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final name = player?.name;
-    return Row(
-      children: [
-        XiangqiPieceAvatar(side: side, size: 40, style: style),
-        const SizedBox(width: 8.0),
-        Expanded(
-          child: Row(
-            children: [
-              Flexible(
-                child: Text(
-                  name ?? side.label(context.l10n),
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-              ),
-              if (player?.rating != null) ...[
-                const SizedBox(width: 4.0),
-                Text(
-                  '${player!.rating}',
-                  style: TextStyle(fontSize: 14, color: textShade(context, 0.7)),
-                ),
-              ],
-            ],
-          ),
-        ),
-        if (accuracy != null)
-          Text(
-            '${context.l10n.mobileXiangqiReviewAccuracy} $accuracy',
-            style: TextStyle(fontSize: 14, color: textShade(context, 0.7)),
-          ),
-      ],
+    return XiangqiPlayerRow(
+      side: side,
+      style: style,
+      name: player?.name,
+      rating: player?.rating?.toString(),
+      clock: accuracy == null
+          ? null
+          : Text(
+              '${context.l10n.mobileXiangqiReviewAccuracy} $accuracy',
+              style: TextStyle(fontSize: 14, color: textShade(context, 0.7)),
+            ),
     );
   }
 }

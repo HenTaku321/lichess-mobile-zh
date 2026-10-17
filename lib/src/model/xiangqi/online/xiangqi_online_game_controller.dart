@@ -152,6 +152,9 @@ sealed class const XiangqiOnlineGameState._() with _$XiangqiOnlineGameState {
     /// about it.
     XiangqiSquare? selected,
 
+    /// Which position is being reviewed. `-1` follows the live end.
+    @Default(-1) int cursor,
+
     /// Whether the socket is up, as far as this client can tell.
     ///
     /// Honest about being a guess: the client is never told when the connection drops, only when an
@@ -173,13 +176,21 @@ sealed class const XiangqiOnlineGameState._() with _$XiangqiOnlineGameState {
   }) = _XiangqiOnlineGameState;
 
   /// The position the board is showing.
-  XiangqiPosition get position => positions.last;
+  XiangqiPosition get position => positions[viewCursor];
 
-  /// The move just played, or null before the first one.
-  XiangqiMove? get lastMove => moves.isEmpty ? null : moves.last;
+  /// The live end of the game.
+  XiangqiPosition get gamePosition => positions.last;
 
-  /// The side to move.
-  XiangqiSide get turn => position.turn;
+  /// Which position the board is showing.
+  int get viewCursor => cursor < 0 ? positions.length - 1 : cursor.clamp(0, positions.length - 1);
+
+  bool get isAtLivePosition => viewCursor == positions.length - 1;
+
+  /// The move that led to the position on the board.
+  XiangqiMove? get lastMove => viewCursor == 0 ? null : moves[viewCursor - 1];
+
+  /// The side to move in the live game.
+  XiangqiSide get turn => gamePosition.turn;
 
   /// Whether the game is over.
   bool get isFinished => end != null;
@@ -188,7 +199,7 @@ sealed class const XiangqiOnlineGameState._() with _$XiangqiOnlineGameState {
   bool get isSpectator => isLoaded && mySide == null;
 
   /// Whether it is this device's move and a move may be played.
-  bool get isMyTurn => mySide != null && !isFinished && turn == mySide;
+  bool get isMyTurn => mySide != null && !isFinished && isAtLivePosition && turn == mySide;
 
   /// The side that won, or null for a draw — and for a game that has not ended.
   ///
@@ -203,8 +214,9 @@ sealed class const XiangqiOnlineGameState._() with _$XiangqiOnlineGameState {
   };
 
   /// The pieces [square] may be played to, or none when it holds nothing of the side to move.
-  IList<XiangqiMove> get selectedMoves =>
-      selected == null ? const IListConst([]) : rules.legalMovesFrom(position, selected!);
+  IList<XiangqiMove> get selectedMoves => selected == null || !isAtLivePosition
+      ? const IListConst([])
+      : rules.legalMovesFrom(gamePosition, selected!);
 
   /// How long [side] has left, counted from the last frame, or null when the game is untimed.
   ///
@@ -384,6 +396,20 @@ class XiangqiOnlineGameController(final String gameId)
     }
   }
 
+  /// Puts the board back on an earlier position in the recorded game.
+  void goTo(int index) {
+    final clamped = index.clamp(0, _latest.positions.length - 1);
+    _set(_latest.copyWith(cursor: clamped, selected: null));
+  }
+
+  void goBackward() {
+    if (_latest.viewCursor > 0) goTo(_latest.viewCursor - 1);
+  }
+
+  void goForward() {
+    if (_latest.viewCursor < _latest.positions.length - 1) goTo(_latest.viewCursor + 1);
+  }
+
   /// Picks up the piece on [square], or plays the picked-up piece onto it.
   ///
   /// The same two-taps-or-a-drag contract the offline screen's board has, kept here rather than in
@@ -394,7 +420,7 @@ class XiangqiOnlineGameController(final String gameId)
 
     final selected = state.selected;
     if (selected == null) {
-      final piece = state.position.pieceAt(square);
+      final piece = state.gamePosition.pieceAt(square);
       if (piece == null || piece.side != state.mySide) return;
       _set(state.copyWith(selected: square));
       return;
@@ -409,7 +435,7 @@ class XiangqiOnlineGameController(final String gameId)
       unawaited(playMove(move));
       return;
     }
-    final piece = state.position.pieceAt(square);
+    final piece = state.gamePosition.pieceAt(square);
     _set(state.copyWith(selected: piece != null && piece.side == state.mySide ? square : null));
   }
 

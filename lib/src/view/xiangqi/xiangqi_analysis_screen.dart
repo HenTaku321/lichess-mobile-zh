@@ -4,6 +4,7 @@ import 'package:chessground/chessground.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lichess_mobile/src/model/common/chess.dart' show Variant;
 import 'package:lichess_mobile/src/model/engine/evaluation_preferences.dart';
 import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_analysis_controller.dart';
@@ -12,6 +13,9 @@ import 'package:lichess_mobile/src/model/xiangqi/xiangqi_hint.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_move.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_notation.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_rules.dart' as rules;
+import 'package:lichess_mobile/src/service/move_feedback.dart';
+import 'package:lichess_mobile/src/service/sound_service.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/focus_detector.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
@@ -178,6 +182,33 @@ class _BodyState() extends ConsumerState<_Body> {
           ),
     ]);
     final controller = ref.read(xiangqiAnalysisControllerProvider.notifier);
+
+    ref.listen(xiangqiAnalysisControllerProvider, (previous, next) {
+      if (previous == null ||
+          previous.cursor == next.cursor && previous.moves.length == next.moves.length) {
+        return;
+      }
+      final moveIndex = next.cursor > 0 ? next.cursor - 1 : 0;
+      if (moveIndex >= next.moves.length || moveIndex >= next.positions.length) return;
+      final before = next.positions[moveIndex];
+      final move = next.moves[moveIndex];
+      final isCapture = before.pieceAt(move.to) != null;
+      if (previous.moves.length < next.moves.length) {
+        final feedback = ref.read(moveFeedbackServiceProvider);
+        if (isCapture) {
+          feedback.captureFeedback(null, check: rules.isCheck(next.position));
+        } else {
+          feedback.moveFeedback(check: rules.isCheck(next.position));
+        }
+      } else {
+        final sound = ref.read(soundServiceProvider);
+        if (isCapture) {
+          sound.playCaptureSound(Variant.standard);
+        } else {
+          sound.play(Sound.move);
+        }
+      }
+    });
 
     ref.listen(engineEvaluationPreferencesProvider.select((p) => p.isEnabled), (_, _) {
       _syncEngine();

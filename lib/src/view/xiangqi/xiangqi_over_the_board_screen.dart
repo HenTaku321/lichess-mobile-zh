@@ -583,6 +583,7 @@ class _ConfigureXiangqiOtbSheetState() extends ConsumerState<_ConfigureXiangqiOt
                         ? null
                         : XiangqiPosition.fromFen(widget.initialFen!),
                   );
+              unawaited(ref.read(xiangqiOtbGameStorageProvider).delete());
               Navigator.pop(context);
             },
             child: Text(context.l10n.play, style: Styles.bold),

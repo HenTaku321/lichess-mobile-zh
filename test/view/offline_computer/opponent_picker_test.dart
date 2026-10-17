@@ -10,14 +10,17 @@ import '../../service/fake_weights_service.dart';
 import '../../test_provider_scope.dart';
 
 /// A screen whose only job is to open the picker and remember what it returned.
-class const _PickerHost({required final OpponentSpec selected, required final Variant variant})
-    extends StatefulWidget {
+class const _PickerHost({
+  required final OpponentSpec selected,
+  required final Variant variant,
+  final bool showPikafish = false,
+}) extends StatefulWidget {
   @override
   State<_PickerHost> createState() => _PickerHostState();
 }
 
 class _PickerHostState() extends State<_PickerHost> {
-  OpponentSpec? picked;
+  ComputerOpponentChoice? picked;
 
   @override
   Widget build(BuildContext context) {
@@ -29,6 +32,7 @@ class _PickerHostState() extends State<_PickerHost> {
               context,
               selected: widget.selected,
               variant: widget.variant,
+              showPikafish: widget.showPikafish,
             );
             if (mounted) setState(() => picked = result);
           },
@@ -47,10 +51,11 @@ void main() {
     OpponentSpec selected = const StockfishOpponentSpec(StockfishLevel.level4),
     Variant variant = Variant.standard,
     FakeMaiaWeightsService? weights,
+    bool showPikafish = false,
   }) async {
     final app = await makeTestProviderScopeApp(
       tester,
-      home: _PickerHost(selected: selected, variant: variant),
+      home: _PickerHost(selected: selected, variant: variant, showPikafish: showPikafish),
       overrides: {
         if (weights != null)
           maiaWeightsServiceProvider: maiaWeightsServiceProvider.overrideWithValue(weights),
@@ -96,7 +101,7 @@ void main() {
       await tester.tap(find.text('OK'));
       await tester.pumpAndSettle();
 
-      expect(host.picked, const MaiaOpponentSpec(MaiaRating.maia1100));
+      expect(host.picked?.chessSpec, const MaiaOpponentSpec(MaiaRating.maia1100));
     });
 
     testWidgets('downloads the network of a rating the device does not have', (tester) async {
@@ -114,7 +119,7 @@ void main() {
 
       await tester.tap(find.text('OK'));
       await tester.pumpAndSettle();
-      expect(host.picked, const MaiaOpponentSpec(MaiaRating.maia2200));
+      expect(host.picked?.chessSpec, const MaiaOpponentSpec(MaiaRating.maia2200));
     });
 
     testWidgets('a download that fails leaves the bundled network selected', (tester) async {
@@ -132,7 +137,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Never a game that cannot start: the network that ships with the app plays instead.
-      expect(host.picked, const MaiaOpponentSpec(MaiaRating.defaultRating));
+      expect(host.picked?.chessSpec, const MaiaOpponentSpec(MaiaRating.defaultRating));
     });
 
     testWidgets('falls back to the bundled network when the selected one was deleted', (
@@ -152,7 +157,25 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(weights.downloads, isEmpty);
-      expect(host.picked, const MaiaOpponentSpec(MaiaRating.defaultRating));
+      expect(host.picked?.chessSpec, const MaiaOpponentSpec(MaiaRating.defaultRating));
+    });
+
+    testWidgets('offers Pikafish and returns it as the xiangqi choice', (tester) async {
+      final host = await openPicker(tester, showPikafish: true);
+
+      expect(find.text('Pikafish'), findsOneWidget);
+      await tester.tap(find.text('Pikafish'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('xiangqi engine'), findsOneWidget);
+
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+      expect(host.picked?.isPikafish, isTrue);
+    });
+
+    testWidgets('does not offer Pikafish in a build that does not ship it', (tester) async {
+      await openPicker(tester, showPikafish: false);
+      expect(find.text('Pikafish'), findsNothing);
     });
 
     testWidgets('returns the Stockfish level that was chosen', (tester) async {
@@ -163,7 +186,7 @@ void main() {
       await tester.tap(find.text('OK'));
       await tester.pumpAndSettle();
 
-      expect(host.picked, const StockfishOpponentSpec(StockfishLevel.level1));
+      expect(host.picked?.chessSpec, const StockfishOpponentSpec(StockfishLevel.level1));
     });
   });
 }

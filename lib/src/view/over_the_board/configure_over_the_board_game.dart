@@ -1,6 +1,7 @@
 import 'package:dartchess/dartchess.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/common/chess.dart';
+import 'package:lichess_mobile/src/model/common/game_family.dart';
 import 'package:lichess_mobile/src/model/common/local_game_clock.dart';
 import 'package:lichess_mobile/src/model/common/time_increment.dart';
 import 'package:lichess_mobile/src/model/lobby/game_setup_preferences.dart';
@@ -9,6 +10,7 @@ import 'package:lichess_mobile/src/model/over_the_board/over_the_board_game_cont
 import 'package:lichess_mobile/src/model/over_the_board/over_the_board_preferences.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_over_the_board_screen.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_bottom_sheet.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_choice_picker.dart';
 import 'package:lichess_mobile/src/widgets/board_preview.dart';
@@ -146,6 +148,31 @@ class _ConfigureOverTheBoardGameSheetState()
         ListSection(
           materialFilledCard: true,
           children: [
+            SettingsListTile(
+              settingsLabel: Text(context.l10n.mobileGame),
+              settingsValue: context.l10n.mobileChess,
+              onTap: () {
+                showChoicePicker<GameFamily>(
+                  context,
+                  title: Text(context.l10n.mobileGame),
+                  choices: GameFamily.values,
+                  selectedItem: GameFamily.chess,
+                  labelBuilder: (game) => Text(
+                    game == GameFamily.chess
+                        ? context.l10n.mobileChess
+                        : context.l10n.mobileXiangqi,
+                  ),
+                  onSelectedItemChanged: (game) {
+                    if (game != GameFamily.xiangqi) return;
+                    Navigator.pop(context);
+                    Navigator.of(
+                      context,
+                      rootNavigator: true,
+                    ).push(XiangqiOverTheBoardScreen.buildRoute(initialFen: widget.initialFen));
+                  },
+                );
+              },
+            ),
             SettingsListTile(
               settingsLabel: Text(context.l10n.timeControl),
               settingsValue: chosenTimeControlType.label(context.l10n),

@@ -16,9 +16,8 @@ import 'package:l10n_esperanto/l10n_esperanto.dart';
 import 'package:lichess_mobile/l10n/l10n.dart';
 import 'package:lichess_mobile/src/network/http.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
-import 'package:lichess_mobile/src/view/watch/live_tv_channels_screen.dart';
+import 'package:lichess_mobile/src/view/watch/watch_games_hub_screen.dart';
 import 'package:lichess_mobile/src/view/watch/watch_tab_screen.dart';
-import 'package:lichess_mobile/src/view/xiangqi/xiangqi_watch_screen.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../binding.dart';
@@ -86,38 +85,16 @@ void main() {
   TestLichessBinding.ensureInitialized();
 
   group("the watch tab's live games row", () {
-    testWidgets('offers both games', (tester) async {
-      await pumpWatchTab(tester);
+    testWidgets('opens the dual-source watch page directly', (tester) async {
+      final recorder = await pumpWatchTab(tester);
 
       expect(find.text('Live games'), findsOneWidget);
-
       await tester.tap(find.text('Live games'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Chess'), findsOneWidget);
-      expect(find.text('Xiangqi'), findsOneWidget);
-    });
-
-    testWidgets('tapping chess opens lichess TV', (tester) async {
-      final recorder = await pumpWatchTab(tester);
-
-      await tester.tap(find.text('Live games'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Chess'));
-      await tester.pumpAndSettle();
-
-      expect(pushedScreen(recorder), isA<LiveTvChannelsScreen>());
-    });
-
-    testWidgets('tapping xiangqi opens the live xiangqi games', (tester) async {
-      final recorder = await pumpWatchTab(tester);
-
-      await tester.tap(find.text('Live games'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Xiangqi'));
-      await tester.pumpAndSettle();
-
-      expect(pushedScreen(recorder), isA<XiangqiWatchScreen>());
+      expect(pushedScreen(recorder), isA<WatchGamesHubScreen>());
+      expect(find.text('Chess'), findsNothing);
+      expect(find.text('Xiangqi'), findsNothing);
     });
   });
 }

@@ -83,6 +83,9 @@ class AppLocalizationsSv extends AppLocalizations {
   String get mobileChapterName => 'Chapter Name';
 
   @override
+  String get mobileGame => 'Game';
+
+  @override
   String get mobileChess => 'Chess';
 
   @override
@@ -738,6 +741,24 @@ class AppLocalizationsSv extends AppLocalizations {
 
   @override
   String get mobileWinOrFiftyMoveDraw => 'Win or 50 move draw';
+
+  @override
+  String get mobileAnalysisChessDescription => 'Analyse a chess position with the local engine.';
+
+  @override
+  String get mobileAnalysisXiangqiDescription => 'Analyse a xiangqi position with Pikafish.';
+
+  @override
+  String get mobileBoardEditorChessDescription => 'Build a chess position on an eight by eight board.';
+
+  @override
+  String get mobileBoardEditorXiangqiDescription => 'Build a xiangqi position on a nine by ten board.';
+
+  @override
+  String get mobileNoFriendsOnline => 'No friends online.';
+
+  @override
+  String get mobileXiangqiEvaluatingMove => 'Evaluating your move…';
 
   @override
   String get mobileXiangqi => 'Xiangqi';

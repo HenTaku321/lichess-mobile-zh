@@ -2,6 +2,7 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lichess_mobile/src/model/common/chess.dart';
+import 'package:lichess_mobile/src/model/common/time_increment.dart';
 import 'package:lichess_mobile/src/model/engine/engine.dart';
 import 'package:lichess_mobile/src/model/engine/engine_spec.dart';
 import 'package:lichess_mobile/src/model/settings/general_preferences.dart';
@@ -125,6 +126,19 @@ class RecordingSoundService() implements SoundService {
 
 void main() {
   group('XiangqiGameController', () {
+    test('a new game remembers its clock and practice setting', () async {
+      final harness = await makeHarness();
+      harness.controller.startNewGame(
+        side: XiangqiSide.red,
+        difficulty: XiangqiDifficulty.level2,
+        timeIncrement: const TimeIncrement(300, 3),
+        practiceMode: true,
+      );
+
+      expect(harness.state.timeIncrement, const TimeIncrement(300, 3));
+      expect(harness.state.practiceMode, isTrue);
+    });
+
     test('the player moves, and the computer is asked to answer', () async {
       final harness = await makeHarness();
       harness.controller.startNewGame(side: .red, difficulty: .level4);

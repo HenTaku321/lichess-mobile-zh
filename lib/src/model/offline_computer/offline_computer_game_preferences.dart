@@ -74,6 +74,11 @@ class OfflineComputerGamePreferences()
   Future<void> toggleBlindfoldMode() {
     return save(state.copyWith(blindfoldMode: !state.blindfoldMode));
   }
+
+  /// Remembers which board game the computer entry should open next time.
+  Future<void> setLastGameWasXiangqi(bool value) {
+    return save(state.copyWith(lastGameWasXiangqi: value));
+  }
 }
 
 /// Represents the player's color choice for offline computer games.
@@ -120,6 +125,7 @@ sealed class const OfflineComputerGamePrefs._()
     @Default(false) bool hideBestMove,
     @Default(false) bool hideEvaluation,
     @Default(false) bool blindfoldMode,
+    @Default(false) bool lastGameWasXiangqi,
   }) = _OfflineComputerGamePrefs;
 
   static const defaults = OfflineComputerGamePrefs(
@@ -133,6 +139,7 @@ sealed class const OfflineComputerGamePrefs._()
     hideBestMove: false,
     hideEvaluation: false,
     blindfoldMode: false,
+    lastGameWasXiangqi: false,
   );
 
   factory fromJson(Map<String, dynamic> json) {

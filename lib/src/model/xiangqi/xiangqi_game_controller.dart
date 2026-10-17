@@ -5,10 +5,15 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:lichess_mobile/src/model/common/chess.dart';
+import 'package:lichess_mobile/src/model/common/time_increment.dart';
 import 'package:lichess_mobile/src/model/engine/engine.dart';
 import 'package:lichess_mobile/src/model/engine/engine_providers.dart';
 import 'package:lichess_mobile/src/model/engine/engine_spec.dart';
+import 'package:lichess_mobile/src/model/engine/practice_comment.dart' show MoveVerdict;
 import 'package:lichess_mobile/src/model/ui_events.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_clock.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_hint.dart'
+    show XiangqiEvaluation, xiangqiEvaluationFromEngine;
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_move.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_rules.dart';
@@ -129,6 +134,14 @@ final xiangqiEngineProvider = FutureProvider.autoDispose<Engine>((Ref ref) async
   return await ref.read(engineProvider(spec).future);
 }, name: 'XiangqiEngineProvider');
 
+/// One evaluation of a move the player made in practice mode.
+@immutable
+final class const XiangqiPracticeComment({
+  required final MoveVerdict verdict,
+  required final XiangqiMove? bestMove,
+  required final XiangqiEvaluation? evaluation,
+});
+
 /// The game in progress.
 @freezed
 sealed class const XiangqiGameState._() with _$XiangqiGameState {
@@ -146,6 +159,19 @@ sealed class const XiangqiGameState._() with _$XiangqiGameState {
     required IList<XiangqiMove> moves,
 
     @Default(false) bool isEngineThinking,
+
+    /// The time control the game is played with. Infinite when the setup sheet did not ask for a
+    /// clock, which is what every xiangqi computer game was before the clock was wired in.
+    @Default(TimeIncrement.infinite()) TimeIncrement timeIncrement,
+
+    /// Whether the player's moves are evaluated and commented on after they are played.
+    @Default(false) bool practiceMode,
+
+    /// Whether the current player move is still being evaluated in practice mode.
+    @Default(false) bool isEvaluatingMove,
+
+    /// The last xiangqi practice verdict, if any.
+    XiangqiPracticeComment? practiceComment,
 
     /// The piece the player has picked up, if any.
     XiangqiSquare? selected,
@@ -304,20 +330,48 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
     required XiangqiDifficulty difficulty,
     XiangqiOpponent opponent = XiangqiOpponent.engine,
     XiangqiPosition? initialPosition,
+    TimeIncrement? timeIncrement,
+    bool practiceMode = false,
   }) {
     _epoch++;
     _search?.stop();
     _search = null;
+    final effectiveTimeIncrement = timeIncrement ?? ref.read(xiangqiClockProvider).timeIncrement;
     state = XiangqiGameState(
       playerSide: side,
       difficulty: difficulty,
       opponent: opponent,
       positions: IList([initialPosition ?? XiangqiPosition.initial()]),
       moves: const IListConst([]),
+      timeIncrement: effectiveTimeIncrement,
+      practiceMode: practiceMode,
     );
+    if (timeIncrement != null) {
+      ref.read(xiangqiClockProvider.notifier).setupClock(timeIncrement);
+    }
     // Over the board it is never the computer's turn, so this never starts a search — see
     // [XiangqiGameState.isPlayerTurn].
     if (!state.isPlayerTurn) unawaited(_playEngineMove());
+  }
+
+  /// Restores a game that was saved to disk.
+  void restoreGame({
+    required XiangqiGameState game,
+    required TimeIncrement timeIncrement,
+    Duration? redTimeLeft,
+    Duration? blackTimeLeft,
+  }) {
+    _epoch++;
+    _search?.stop();
+    _search = null;
+    state = game.copyWith(isEngineThinking: false, selected: null);
+    ref
+        .read(xiangqiClockProvider.notifier)
+        .setupClock(timeIncrement, redTimeLeft: redTimeLeft, blackTimeLeft: blackTimeLeft);
+    if (!state.isFinished && !timeIncrement.isInfinite) {
+      ref.read(xiangqiClockProvider.notifier).resume(state.turn);
+    }
+    if (!state.isFinished && !state.isPlayerTurn) unawaited(_playEngineMove());
   }
 
   /// Acts on a touch on [square]: picks a piece up, puts one down, or ignores it.
@@ -388,11 +442,14 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
     // Read before the move is made: afterwards the square holds whatever landed on it, and nothing
     // there says whether what arrived took a piece or merely moved to a square that was empty.
     final isCapture = state.position.pieceAt(move.to) != null;
+    final positionBefore = state.position;
+    final wasPlayerMove = state.isPlayerTurn;
 
     state = state.copyWith(
       positions: state.positions.add(play(state.position, move)),
       moves: state.moves.add(move),
       selected: null,
+      practiceComment: null,
     );
 
     // Xiangqi has no dartchess variant, so a capture is reported with none; the service reads that
@@ -404,7 +461,82 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
       ref.read(moveFeedbackServiceProvider).moveFeedback(check: check);
     }
 
-    if (!state.isFinished && !state.isPlayerTurn) unawaited(_playEngineMove());
+    if (state.practiceMode && wasPlayerMove) {
+      unawaited(_evaluatePracticeMove(positionBefore, move));
+    } else if (!state.isFinished && !state.isPlayerTurn) {
+      unawaited(_playEngineMove());
+    }
+  }
+
+  Future<void> _evaluatePracticeMove(XiangqiPosition before, XiangqiMove move) async {
+    final epoch = _epoch;
+    state = state.copyWith(isEvaluatingMove: true);
+    try {
+      final pre = await _practiceSearch(before);
+      if (epoch != _epoch || !ref.mounted) return;
+      final after = await _practiceSearch(state.position);
+      if (epoch != _epoch || !ref.mounted) return;
+
+      final preEval = pre.evaluation;
+      final afterEval = after.evaluation;
+      if (preEval == null || afterEval == null) return;
+
+      double playerChances(XiangqiEvaluation evaluation) => state.playerSide == XiangqiSide.red
+          ? evaluation.redWinProbability
+          : 1 - evaluation.redWinProbability;
+
+      final beforeChances = playerChances(preEval);
+      final afterChances = playerChances(afterEval);
+      final shift = (beforeChances - afterChances).clamp(0.0, 1.0);
+      final verdict = MoveVerdict.fromShift(
+        shift,
+        hasBetterMove: pre.bestMove != null && pre.bestMove != move,
+        winningChancesBefore: beforeChances,
+        winningChancesAfter: afterChances,
+      );
+      state = state.copyWith(
+        isEvaluatingMove: false,
+        practiceComment: XiangqiPracticeComment(
+          verdict: verdict,
+          bestMove: pre.bestMove,
+          evaluation: afterEval,
+        ),
+      );
+    } catch (error, stackTrace) {
+      _logger.warning('Xiangqi practice move evaluation failed', error, stackTrace);
+    } finally {
+      if (epoch == _epoch && ref.mounted) {
+        state = state.copyWith(isEvaluatingMove: false);
+        if (!state.isFinished && !state.isPlayerTurn) unawaited(_playEngineMove());
+      }
+    }
+  }
+
+  Future<({XiangqiMove? bestMove, XiangqiEvaluation? evaluation})> _practiceSearch(
+    XiangqiPosition position,
+  ) async {
+    final engine = await ref.read(xiangqiEngineProvider.future);
+    final search = engine.search(
+      SearchRequest(
+        initialPosition: Chess.initial,
+        moves: const IListConst([]),
+        variant: Variant.standard,
+        limit: const SearchLimit.depth(9),
+        fenOverride: position.toFen(),
+        game: this,
+      ),
+    );
+    XiangqiEvaluation? evaluation;
+    final subscription = search.infos.listen((info) {
+      evaluation = xiangqiEvaluationFromEngine(
+        cp: info.cp,
+        mate: info.mate,
+        sideToMove: position.turn,
+      );
+    });
+    final best = await search.bestMove;
+    await subscription.cancel();
+    return (bestMove: best == null ? null : XiangqiMove.parseIccs(best), evaluation: evaluation);
   }
 
   Future<void> _playEngineMove() async {

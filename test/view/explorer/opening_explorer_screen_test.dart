@@ -210,9 +210,11 @@ void main() {
       await playMove(tester, 'e2', 'e4');
       expect(boardHasPiece(tester, Square.e4, Piece.whitePawn), isTrue);
 
-      // Go back to "more" screen and open opening explorer
-      await tester.pageBack();
-      await tester.pump();
+      // Go back through the analysis hub to the More screen, then open the opening explorer.
+      await tester.tap(find.byTooltip('Back').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Back').last);
+      await tester.pumpAndSettle();
 
       await tester.tap(find.text('Opening explorer'));
       await tester.pumpAndSettle(); // wait for opening explorer screen to open

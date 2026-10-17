@@ -22,6 +22,8 @@ import 'package:lichess_mobile/src/model/offline_computer/offline_computer_game_
 import 'package:lichess_mobile/src/model/offline_computer/offline_computer_game_preferences.dart';
 import 'package:lichess_mobile/src/model/offline_computer/offline_computer_game_storage.dart';
 import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_controller.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/service/weights_service.dart';
 import 'package:lichess_mobile/src/styles/lichess_colors.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
@@ -34,6 +36,7 @@ import 'package:lichess_mobile/src/utils/screen.dart';
 import 'package:lichess_mobile/src/view/analysis/analysis_screen.dart';
 import 'package:lichess_mobile/src/view/game/status_l10n.dart';
 import 'package:lichess_mobile/src/view/offline_computer/opponent_picker.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_game_screen.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_action_sheet.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_bottom_sheet.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_choice_picker.dart';
@@ -47,6 +50,7 @@ import 'package:lichess_mobile/src/widgets/misc.dart';
 import 'package:lichess_mobile/src/widgets/non_linear_slider.dart';
 import 'package:lichess_mobile/src/widgets/settings.dart';
 import 'package:lichess_mobile/src/widgets/variant_app_bar_title.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_difficulty_tile.dart';
 import 'package:lichess_mobile/src/widgets/yes_no_dialog.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -729,8 +733,9 @@ class const _NewGameSheet({required final Variant? initialVariant, final String?
 }
 
 class _NewGameSheetState() extends ConsumerState<_NewGameSheet> {
-  late OpponentSpec _selectedOpponent;
+  late ComputerOpponentChoice _selectedOpponent;
   late SideChoice _selectedSideChoice;
+  late XiangqiDifficulty _xiangqiDifficulty;
   late Variant _selectedVariant;
   late bool _casual;
   late bool _practiceMode;
@@ -741,7 +746,8 @@ class _NewGameSheetState() extends ConsumerState<_NewGameSheet> {
   final _fenController = TextEditingController();
 
   String _sideChoiceLabel(BuildContext context, SideChoice choice) => switch (choice) {
-    SideChoice.white => context.l10n.white,
+    SideChoice.white =>
+      _selectedOpponent.isPikafish ? context.l10n.mobileXiangqiSideRed : context.l10n.white,
     SideChoice.random => context.l10n.randomColor,
     SideChoice.black => context.l10n.black,
     SideChoice.nextToPlay => context.l10n.mobileNextToPlay,
@@ -769,10 +775,12 @@ class _NewGameSheetState() extends ConsumerState<_NewGameSheet> {
     // at all — a Maia chosen on a phone, on a machine with no LC0 to run it — and that is the
     // difference the comparison below is about rather than what the engine could do on the machine
     // it was chosen on.
-    _selectedOpponent = prefs.opponentSpec.supports(_selectedVariant, engines: engines)
+    final chessOpponent = prefs.opponentSpec.supports(_selectedVariant, engines: engines)
         ? prefs.opponentSpec
         : OpponentSpec.defaultSpec;
-    if (_selectedOpponent case MaiaOpponentSpec(:final rating) when !rating.isBundled) {
+    _selectedOpponent = ChessComputerOpponentChoice(chessOpponent);
+    _xiangqiDifficulty = XiangqiDifficulty.level3;
+    if (chessOpponent case MaiaOpponentSpec(:final rating) when !rating.isBundled) {
       _checkMaiaWeights(rating);
     }
     _casual = prefs.casual;
@@ -797,9 +805,9 @@ class _NewGameSheetState() extends ConsumerState<_NewGameSheet> {
   Future<void> _checkMaiaWeights(MaiaRating rating) async {
     if (await ref.read(maiaWeightsServiceProvider).isAvailable(rating)) return;
     // The user may have picked another opponent while we were looking.
-    if (!mounted || _selectedOpponent != MaiaOpponentSpec(rating)) return;
+    if (!mounted || _selectedOpponent.chessSpec != MaiaOpponentSpec(rating)) return;
     const fallback = MaiaOpponentSpec(MaiaRating.defaultRating);
-    setState(() => _selectedOpponent = fallback);
+    setState(() => _selectedOpponent = const ChessComputerOpponentChoice(fallback));
     await ref.read(offlineComputerGamePreferencesProvider.notifier).setOpponent(fallback);
   }
 
@@ -907,11 +915,20 @@ class _NewGameSheetState() extends ConsumerState<_NewGameSheet> {
           materialFilledCard: true,
           children: [
             SettingsListTile(
-              icon: OpponentIcon(_selectedOpponent, size: 32),
+              icon: _selectedOpponent.isPikafish
+                  ? const Icon(Icons.grid_on)
+                  : OpponentIcon(_selectedOpponent.chessSpec!, size: 32),
               settingsLabel: Text(context.l10n.opponent),
-              settingsValue: _selectedOpponent.displayName,
+              settingsValue: _selectedOpponent.isPikafish
+                  ? 'Pikafish'
+                  : _selectedOpponent.chessSpec!.displayName,
               onTap: _pickOpponent,
             ),
+            if (_selectedOpponent.isPikafish)
+              XiangqiDifficultyTile(
+                difficulty: _xiangqiDifficulty,
+                onChanged: (difficulty) => setState(() => _xiangqiDifficulty = difficulty),
+              ),
             SettingsListTile(
               settingsLabel: Text(context.l10n.timeControl),
               settingsValue: _timeControlType.label(context.l10n),
@@ -1023,42 +1040,46 @@ class _NewGameSheetState() extends ConsumerState<_NewGameSheet> {
                     )
                   : const SizedBox.shrink(),
             ),
-            SettingsListTile(
-              settingsLabel: Text(context.l10n.variant),
-              settingsValue: _selectedVariant.label(context.l10n),
-              onTap: () {
-                showChoicePicker(
-                  context,
-                  choices: playSupportedVariants.toList(),
-                  selectedItem: _selectedVariant,
-                  labelBuilder: (variant) => VariantLabel(variant),
-                  // A variant this machine has no opponent for is listed and greyed out rather than
-                  // left out: the list then says the same thing everywhere, and a greyed row
-                  // explains itself where a missing one would only puzzle. On a machine the app
-                  // ships no engine for that is every variant but the three the installed stockfish
-                  // plays.
-                  isEnabled: (variant) => _selectedOpponent.supports(variant, engines: engines),
-                  onSelectedItemChanged: (Variant variant) {
-                    setState(() {
-                      _selectedVariant = variant;
-                      if (variant == Variant.crazyhouse) {
-                        _practiceMode = false;
-                      }
-                      // Maia only knows standard chess, so picking a variant it cannot play hands
-                      // the game back to Stockfish rather than leaving an opponent that would
-                      // have to refuse to move. The picker greys such a variant out where it can,
-                      // but it cannot everywhere: the iOS action sheet has no per-row disabled
-                      // state, and it is the same list the app shows there.
-                      if (!_selectedOpponent.supports(variant, engines: engines)) {
-                        _selectedOpponent = OpponentSpec.defaultSpec;
-                      }
-                    });
-                    ref.read(offlineComputerGamePreferencesProvider.notifier).setVariant(variant);
-                  },
-                );
-              },
-            ),
-            if (widget.initialFen == null)
+            if (!_selectedOpponent.isPikafish)
+              SettingsListTile(
+                settingsLabel: Text(context.l10n.variant),
+                settingsValue: _selectedVariant.label(context.l10n),
+                onTap: () {
+                  showChoicePicker(
+                    context,
+                    choices: playSupportedVariants.toList(),
+                    selectedItem: _selectedVariant,
+                    labelBuilder: (variant) => VariantLabel(variant),
+                    // A variant this machine has no opponent for is listed and greyed out rather than
+                    // left out: the list then says the same thing everywhere, and a greyed row
+                    // explains itself where a missing one would only puzzle. On a machine the app
+                    // ships no engine for that is every variant but the three the installed stockfish
+                    // plays.
+                    isEnabled: (variant) =>
+                        _selectedOpponent.chessSpec!.supports(variant, engines: engines),
+                    onSelectedItemChanged: (Variant variant) {
+                      setState(() {
+                        _selectedVariant = variant;
+                        if (variant == Variant.crazyhouse) {
+                          _practiceMode = false;
+                        }
+                        // Maia only knows standard chess, so picking a variant it cannot play hands
+                        // the game back to Stockfish rather than leaving an opponent that would
+                        // have to refuse to move. The picker greys such a variant out where it can,
+                        // but it cannot everywhere: the iOS action sheet has no per-row disabled
+                        // state, and it is the same list the app shows there.
+                        if (!_selectedOpponent.chessSpec!.supports(variant, engines: engines)) {
+                          _selectedOpponent = const ChessComputerOpponentChoice(
+                            OpponentSpec.defaultSpec,
+                          );
+                        }
+                      });
+                      ref.read(offlineComputerGamePreferencesProvider.notifier).setVariant(variant);
+                    },
+                  );
+                },
+              ),
+            if (!_selectedOpponent.isPikafish && widget.initialFen == null)
               AnimatedSize(
                 duration: const Duration(milliseconds: 300),
                 curve: Curves.fastOutSlowIn,
@@ -1122,6 +1143,20 @@ class _NewGameSheetState() extends ConsumerState<_NewGameSheet> {
           child: FilledButton(
             onPressed: _isPlayEnabled
                 ? () {
+                    if (_selectedOpponent.isPikafish) {
+                      final side = _selectedSideChoice.toSide() ?? Side.values[Random().nextInt(2)];
+                      final xiangqiSide = side == Side.white ? XiangqiSide.red : XiangqiSide.black;
+                      Navigator.pop(context);
+                      Navigator.of(context, rootNavigator: true).push(
+                        XiangqiGameScreen.buildRoute(
+                          initialSide: xiangqiSide,
+                          initialDifficulty: _xiangqiDifficulty,
+                          initialTimeIncrement: _timeIncrement,
+                          initialPracticeMode: _practiceMode,
+                        ),
+                      );
+                      return;
+                    }
                     final effectiveFen =
                         widget.initialFen ??
                         (_selectedVariant == Variant.fromPosition ? _fromPositionFen : null);
@@ -1129,9 +1164,12 @@ class _NewGameSheetState() extends ConsumerState<_NewGameSheet> {
                         _selectedSideChoice.toSide(fen: effectiveFen) ??
                         Side.values[Random().nextInt(2)];
                     ref
+                        .read(offlineComputerGamePreferencesProvider.notifier)
+                        .setLastGameWasXiangqi(false);
+                    ref
                         .read(offlineComputerGameControllerProvider.notifier)
                         .startNewGame(
-                          opponentSpec: _selectedOpponent,
+                          opponentSpec: _selectedOpponent.chessSpec!,
                           playerSide: side,
                           casual: _practiceMode || _casual,
                           practiceMode: _practiceMode,
@@ -1152,12 +1190,17 @@ class _NewGameSheetState() extends ConsumerState<_NewGameSheet> {
   Future<void> _pickOpponent() async {
     final opponent = await showOpponentPicker(
       context,
-      selected: _selectedOpponent,
+      selected: _selectedOpponent.chessSpec ?? OpponentSpec.defaultSpec,
       variant: _selectedVariant,
+      showPikafish: _engines.pikafish,
+      selectedPikafish: _selectedOpponent.isPikafish,
     );
     if (opponent == null || !mounted) return;
     setState(() => _selectedOpponent = opponent);
-    await ref.read(offlineComputerGamePreferencesProvider.notifier).setOpponent(opponent);
+    final chessSpec = opponent.chessSpec;
+    if (chessSpec != null) {
+      await ref.read(offlineComputerGamePreferencesProvider.notifier).setOpponent(chessSpec);
+    }
   }
 
   /// Which of the app's engines are on this machine. A platform constant, so reading it where it is
@@ -1167,11 +1210,12 @@ class _NewGameSheetState() extends ConsumerState<_NewGameSheet> {
   /// A play button that starts a game with an opponent that has nothing to move with is worse than
   /// one that cannot be pressed: the game is not lost, it never begins. The sheet's own state should
   /// keep this true, and this is what says so when it does not.
-  bool get _isPlayEnabled =>
-      _selectedOpponent.supports(_selectedVariant, engines: _engines) &&
-      (_selectedVariant != Variant.fromPosition ||
-          widget.initialFen != null ||
-          (_fromPositionFen != null && _fromPositionFen!.isNotEmpty));
+  bool get _isPlayEnabled => _selectedOpponent.isPikafish
+      ? _engines.pikafish && widget.initialFen == null
+      : _selectedOpponent.chessSpec!.supports(_selectedVariant, engines: _engines) &&
+            (_selectedVariant != Variant.fromPosition ||
+                widget.initialFen != null ||
+                (_fromPositionFen != null && _fromPositionFen!.isNotEmpty));
 }
 
 class const _OfflineComputerGameSettingsSheet() extends ConsumerWidget {

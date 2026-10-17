@@ -1575,8 +1575,10 @@ void main() {
     expect(boardHasPiece(tester, Square.a3, Piece.blackKing), isTrue);
     expect(boardHasPiece(tester, Square.g3, Piece.whiteKing), isFalse);
 
-    // Navigate back to More tab
-    await tester.pageBack();
+    // Navigate back through the analysis hub to the More tab.
+    await tester.tap(find.byTooltip('Back').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Back').last);
     await tester.pumpAndSettle();
 
     // Verify we're back at More tab
@@ -1638,8 +1640,10 @@ void main() {
     expect(find.textContaining('e4'), findsNothing);
     expect(boardHasPiece(tester, Square.e4, Piece.whitePawn), isFalse);
 
-    // Navigate back to More tab
-    await tester.pageBack();
+    // Navigate back through the analysis hub to the More tab.
+    await tester.tap(find.byTooltip('Back').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Back').last);
     await tester.pumpAndSettle();
 
     // Verify we're back at More tab
@@ -1687,8 +1691,10 @@ void main() {
     expect(find.textContaining('f4'), findsOneWidget);
     expect(boardHasPiece(tester, Square.f4, Piece.whitePawn), isTrue);
 
-    // Navigate back to More tab
-    await tester.pageBack();
+    // Navigate back through the analysis hub to the More tab.
+    await tester.tap(find.byTooltip('Back').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Back').last);
     await tester.pumpAndSettle();
 
     // Verify we're back at More tab

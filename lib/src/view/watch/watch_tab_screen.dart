@@ -23,8 +23,7 @@ import 'package:lichess_mobile/src/view/broadcast/broadcast_list_screen.dart';
 import 'package:lichess_mobile/src/view/watch/live_tv_channels_screen.dart';
 import 'package:lichess_mobile/src/view/watch/streamer_screen.dart';
 import 'package:lichess_mobile/src/view/watch/tv_screen.dart';
-import 'package:lichess_mobile/src/view/xiangqi/xiangqi_watch_screen.dart';
-import 'package:lichess_mobile/src/widgets/adaptive_choice_picker.dart';
+import 'package:lichess_mobile/src/view/watch/watch_games_hub_screen.dart';
 import 'package:lichess_mobile/src/widgets/haptic_refresh_indicator.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:lichess_mobile/src/widgets/platform.dart';
@@ -195,16 +194,7 @@ class _BodyState() extends ConsumerState<_Body> {
   }
 }
 
-/// The way into watching a game, for either game.
-///
-/// Chess and xiangqi share this one row, and the picker behind it decides which is watched: they are
-/// two games of equal standing, and giving xiangqi a row of its own would say it was the lesser one.
-/// See the analysis and board-editor rows in `more_tab_screen.dart` for the same arrangement.
-///
-/// Chess opens lichess TV, which is the list of every channel; xiangqi opens the games being played
-/// on xiangqi.com, which is the only list of games it has. Neither is gated on a session: a xiangqi
-/// guest token is enough for the live list, and the screen behind the row is where a device with no
-/// session at all finds that out.
+/// The way into watching games from both sites.
 class const _LiveGamesEntry() extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -219,46 +209,13 @@ class const _LiveGamesEntry() extends ConsumerWidget {
               : null,
           title: Text(context.l10n.mobileWatchGames),
           subtitle: Text(context.l10n.mobileWatchGamesSubtitle),
-          onTap: () async {
-            // Nothing is ticked before the player ticks it, and the type is nullable to say so: a
-            // default here would be a choice that cannot be made, since the Material dialog's radios
-            // ignore a tap on the choice that is already selected.
-            _WatchGame? choice;
-            await showChoicePicker<_WatchGame?>(
-              context,
-              title: Text(context.l10n.mobileWatchGames),
-              choices: _WatchGame.values,
-              selectedItem: null,
-              labelBuilder: (game) => Text(switch (game) {
-                .chess => context.l10n.mobileChess,
-                .xiangqi => context.l10n.mobileXiangqi,
-                // Never built — the choices are the two games — but the picker is instantiated at
-                // a nullable type, so the switch has to answer for the null.
-                null => '',
-              }),
-              onSelectedItemChanged: (game) => choice = game,
-            );
-            if (!context.mounted) return;
-            final selected = choice;
-            if (selected == null) return;
-            Navigator.of(context, rootNavigator: true).push(switch (selected) {
-              .chess => LiveTvChannelsScreen.buildRoute(),
-              .xiangqi => XiangqiWatchScreen.buildRoute(),
-            });
+          onTap: () {
+            Navigator.of(context, rootNavigator: true).push(WatchGamesHubScreen.buildRoute());
           },
         ),
       ],
     );
   }
-}
-
-/// Which game the player wants to watch.
-///
-/// The two are offered side by side by the one "Live games" row, so neither reads as the app's main
-/// game and the other as an extra: the game is a choice inside the row, not a property of it.
-enum _WatchGame() {
-  chess,
-  xiangqi,
 }
 
 Future<void> _doRefreshDataForRef(WidgetRef ref) async {

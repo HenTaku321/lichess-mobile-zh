@@ -527,7 +527,7 @@ void main() {
       // The gate sits on the choice rather than on a row of its own, so this build still analyses
       // chess — the one thing a build with no Pikafish can do.
       expect(find.text('Chess'), findsOneWidget);
-      expect(find.text('Xiangqi'), findsNothing);
+      expect(find.text('Analyse a xiangqi position with Pikafish.'), findsNothing);
     });
   });
 }

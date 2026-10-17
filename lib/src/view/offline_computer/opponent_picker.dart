@@ -38,6 +38,13 @@ enum OpponentEngine({
         'Maia is a human-like neural network chess engine. Maia Chess is an ongoing research '
         'project aiming to make a more human-friendly, useful, and fun chess AI. For more '
         'information go to maiachess.com.',
+  ),
+  pikafish(
+    name: 'Pikafish',
+    iconAsset: 'assets/images/anon-engine.webp',
+    description:
+        'Pikafish is the xiangqi engine bundled with the app. Choosing it starts a Chinese chess '
+        'game; its difficulty is the six-level search ladder used by the xiangqi screens.',
   );
 
   static OpponentEngine of(OpponentSpec spec) => switch (spec) {
@@ -45,6 +52,20 @@ enum OpponentEngine({
     MaiaOpponentSpec() => OpponentEngine.maia,
   };
 }
+
+/// The result of the computer picker: a chess engine spec or Pikafish.
+sealed class const ComputerOpponentChoice() {
+  bool get isPikafish => this is PikafishComputerOpponentChoice;
+  OpponentSpec? get chessSpec => switch (this) {
+    ChessComputerOpponentChoice(:final spec) => spec,
+    PikafishComputerOpponentChoice() => null,
+  };
+}
+
+final class const ChessComputerOpponentChoice(final OpponentSpec spec)
+    extends ComputerOpponentChoice;
+
+final class const PikafishComputerOpponentChoice() extends ComputerOpponentChoice;
 
 /// The logo of the engine [spec] plays on.
 class const OpponentIcon(final OpponentSpec spec, {final double size = 44, super.key})
@@ -59,15 +80,22 @@ class const OpponentIcon(final OpponentSpec spec, {final double size = 44, super
 /// The spec it returns is always playable: a Maia rating whose network could not be downloaded is
 /// swapped for the one that ships with the app rather than being handed back as a game that cannot
 /// start.
-Future<OpponentSpec?> showOpponentPicker(
+Future<ComputerOpponentChoice?> showOpponentPicker(
   BuildContext context, {
   required OpponentSpec selected,
   required Variant variant,
+  required bool showPikafish,
+  bool selectedPikafish = false,
 }) {
-  return showModalBottomSheet<OpponentSpec>(
+  return showModalBottomSheet<ComputerOpponentChoice>(
     context: context,
     isScrollControlled: true,
-    builder: (_) => _OpponentPickerSheet(selected: selected, variant: variant),
+    builder: (_) => _OpponentPickerSheet(
+      selected: selected,
+      variant: variant,
+      showPikafish: showPikafish,
+      selectedPikafish: selectedPikafish,
+    ),
   );
 }
 
@@ -77,6 +105,8 @@ class const _OpponentPickerSheet({
   /// The variant the game will be played in. Maia only knows standard chess, so for anything else
   /// there is nothing to choose between.
   required final Variant variant,
+  required final bool showPikafish,
+  required final bool selectedPikafish,
 }) extends ConsumerStatefulWidget {
   @override
   ConsumerState<_OpponentPickerSheet> createState() => _OpponentPickerSheetState();
@@ -108,12 +138,18 @@ class _OpponentPickerSheetState() extends ConsumerState<_OpponentPickerSheet> {
   /// network is on this machine.
   bool get _maiaAvailable => _maiaOffered && _engines.lc0;
 
+  bool get _hasEngineChoice => _maiaAvailable || (widget.showPikafish && _engines.pikafish);
+
   MaiaWeightsService get _weights => ref.read(maiaWeightsServiceProvider);
 
   @override
   void initState() {
     super.initState();
-    _engine = _maiaAvailable ? OpponentEngine.of(widget.selected) : OpponentEngine.stockfish;
+    _engine = widget.selectedPikafish && widget.showPikafish && _engines.pikafish
+        ? OpponentEngine.pikafish
+        : _maiaAvailable
+        ? OpponentEngine.of(widget.selected)
+        : OpponentEngine.stockfish;
     _level = switch (widget.selected) {
       final StockfishOpponentSpec spec => spec.level,
       MaiaOpponentSpec() => StockfishLevel.defaultLevel,
@@ -168,9 +204,10 @@ class _OpponentPickerSheetState() extends ConsumerState<_OpponentPickerSheet> {
     });
   }
 
-  OpponentSpec get _spec => switch (_engine) {
-    OpponentEngine.stockfish => StockfishOpponentSpec(_level),
-    OpponentEngine.maia => MaiaOpponentSpec(_rating),
+  ComputerOpponentChoice get _choice => switch (_engine) {
+    OpponentEngine.stockfish => ChessComputerOpponentChoice(StockfishOpponentSpec(_level)),
+    OpponentEngine.maia => ChessComputerOpponentChoice(MaiaOpponentSpec(_rating)),
+    OpponentEngine.pikafish => const PikafishComputerOpponentChoice(),
   };
 
   @override
@@ -180,19 +217,21 @@ class _OpponentPickerSheetState() extends ConsumerState<_OpponentPickerSheet> {
         // Shown wherever there is a choice to be made at all — including where Maia cannot be
         // played, so that the greyed segment is what says so. Hiding it there would leave the
         // engine that is missing as the one thing the screen does not mention.
-        if (_maiaOffered)
+        if (_hasEngineChoice)
           Padding(
             padding: Styles.horizontalBodyPadding,
             child: SegmentedButton<OpponentEngine>(
               segments: [
                 for (final engine in OpponentEngine.values)
-                  ButtonSegment(
-                    value: engine,
-                    label: Text(engine.name),
-                    // Only Stockfish is left where the app has no LC0 to play Maia with — on the
-                    // desktop, where Stockfish is the app's own and there is no network engine.
-                    enabled: engine == OpponentEngine.stockfish || _engines.lc0,
-                  ),
+                  if (engine != OpponentEngine.pikafish || widget.showPikafish)
+                    ButtonSegment(
+                      value: engine,
+                      label: Text(engine.name),
+                      enabled:
+                          engine == OpponentEngine.stockfish ||
+                          (engine == OpponentEngine.maia && _engines.lc0) ||
+                          (engine == OpponentEngine.pikafish && _engines.pikafish),
+                    ),
               ],
               selected: {_engine},
               showSelectedIcon: false,
@@ -218,13 +257,18 @@ class _OpponentPickerSheetState() extends ConsumerState<_OpponentPickerSheet> {
                   _ensure(rating);
                 },
               ),
+              OpponentEngine.pikafish => ListTile(
+                leading: const Icon(Icons.grid_on),
+                title: Text(context.l10n.mobileXiangqi),
+                subtitle: Text(context.l10n.mobileXiangqiDifficultyExplanation),
+              ),
             },
           ],
         ),
         Padding(
           padding: Styles.bodySectionPadding,
           child: FilledButton(
-            onPressed: _downloading != null ? null : () => Navigator.of(context).pop(_spec),
+            onPressed: _downloading != null ? null : () => Navigator.of(context).pop(_choice),
             child: Text(context.l10n.ok, style: Styles.bold),
           ),
         ),

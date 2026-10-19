@@ -25,6 +25,7 @@ import 'package:lichess_mobile/src/view/settings/settings_screen.dart';
 import 'package:lichess_mobile/src/view/team/team_updates_screen.dart';
 import 'package:lichess_mobile/src/view/user/leaderboard_hub_screen.dart';
 import 'package:lichess_mobile/src/view/user/player_screen.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_chat_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_database_screen.dart';
 import 'package:lichess_mobile/src/widgets/feedback.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
@@ -203,6 +204,21 @@ class const _Body() extends ConsumerWidget {
                     : null,
                 onTap: () {
                   Navigator.of(context, rootNavigator: true).push(FriendsHubScreen.buildRoute());
+                },
+              ),
+              // The one community this app has that lichess does not: xiangqi.com's own rooms. It
+              // sits beside the lichess ones rather than in a section of its own because it is the
+              // same thing to a reader — somewhere to talk — and a section called "xiangqi" would
+              // be a second menu for one row.
+              ListTile(
+                leading: const Icon(Icons.forum_outlined),
+                title: Text(context.l10n.mobileXiangqiChat),
+                enabled: isOnline,
+                trailing: Theme.of(context).platform == TargetPlatform.iOS
+                    ? const CupertinoListTileChevron()
+                    : null,
+                onTap: () {
+                  Navigator.of(context, rootNavigator: true).push(XiangqiChatScreen.buildRoute());
                 },
               ),
             ],

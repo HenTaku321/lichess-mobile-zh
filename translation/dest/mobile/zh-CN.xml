@@ -379,6 +379,9 @@
   <string name="xiangqiChatEmpty" comment="Shown in a chat room that has no messages.">还没有消息。</string>
   <string name="xiangqiChatSend" comment="Placeholder of the chat input field.">发送消息</string>
   <string name="xiangqiChatGame" comment="Section heading in the chat hub: the game being played, if any.">本局</string>
+  <string name="xiangqiChatClubsSubtitle" comment="Shown under the empty club list: what a club takes to join.">棋社需要账号注册满两周并下满十四局。</string>
+  <string name="xiangqiChatOffline" comment="Shown in a chat room whose connection never came up.">聊天未连接。</string>
+  <string name="xiangqiChatLoadOlder" comment="Button at the top of a chat room that loads the messages before the ones on screen.">加载更早的消息</string>
   <string name="xiangqiLessonPlay" comment="Button that starts playing a lesson chapter.">开始这一章</string>
   <string name="xiangqiLessonHint" comment="Bottom bar button that shows the next move of a lesson.">提示</string>
   <string name="xiangqiLessonUndo" comment="Bottom bar button that takes the last lesson move back.">撤销</string>

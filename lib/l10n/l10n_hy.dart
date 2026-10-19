@@ -274,6 +274,15 @@ class AppLocalizationsHy extends AppLocalizations {
   String get mobileXiangqiChatGame => 'This game';
 
   @override
+  String get mobileXiangqiChatClubsSubtitle => 'A club needs an account that has been around for two weeks and has played fourteen games.';
+
+  @override
+  String get mobileXiangqiChatOffline => 'The chat is not connected.';
+
+  @override
+  String get mobileXiangqiChatLoadOlder => 'Load older messages';
+
+  @override
   String get mobileXiangqiLessonPlay => 'Play the chapter';
 
   @override

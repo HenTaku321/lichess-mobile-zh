@@ -6,6 +6,7 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
+import 'package:lichess_mobile/src/model/xiangqi/chat/xiangqi_chat.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_online_game_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_controller.dart' show XiangqiGameEnd;
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_notation.dart';
@@ -16,6 +17,7 @@ import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/focus_detector.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_chat_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_review_screen.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
 import 'package:lichess_mobile/src/widgets/clock.dart';
@@ -280,6 +282,19 @@ class _XiangqiOnlineGameScreenState() extends ConsumerState<XiangqiOnlineGameScr
               label: l10n.flipBoard,
               onTap: () => setState(() => _isFlipped = !_isFlipped),
               icon: CupertinoIcons.arrow_2_squarepath,
+            ),
+            // The game's own chat, which is the same room the site shows beside the board: the
+            // `game` kind of a chat whose `room` is this game's id. A spectator reads it too — it
+            // is the same conversation either way.
+            BottomBarButton(
+              label: l10n.mobileXiangqiChat,
+              onTap: () => Navigator.of(context, rootNavigator: true).push(
+                XiangqiChatRoomScreen.buildRoute(
+                  roomKey: (kind: XiangqiChatKind.game, room: widget.gameId),
+                  title: l10n.mobileXiangqiChatGame,
+                ),
+              ),
+              icon: CupertinoIcons.chat_bubble_2,
             ),
             // A spectator has nobody to resign as, and a finished game has nothing to resign, so
             // the button is not there at all rather than there and inert.

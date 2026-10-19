@@ -87,6 +87,9 @@
   <string name="xiangqiChatEmpty" comment="Shown in a chat room that has no messages.">No messages yet.</string>
   <string name="xiangqiChatSend" comment="Placeholder of the chat input field.">Send a message</string>
   <string name="xiangqiChatGame" comment="Section heading in the chat hub: the game being played, if any.">This game</string>
+  <string name="xiangqiChatClubsSubtitle" comment="Shown under the empty club list: what a club takes to join.">A club needs an account that has been around for two weeks and has played fourteen games.</string>
+  <string name="xiangqiChatOffline" comment="Shown in a chat room whose connection never came up.">The chat is not connected.</string>
+  <string name="xiangqiChatLoadOlder" comment="Button at the top of a chat room that loads the messages before the ones on screen.">Load older messages</string>
   <string name="xiangqiLessonPlay" comment="Button that starts playing a lesson chapter.">Play the chapter</string>
   <string name="xiangqiLessonHint" comment="Bottom bar button that shows the next move of a lesson.">Hint</string>
   <string name="xiangqiLessonUndo" comment="Bottom bar button that takes the last lesson move back.">Undo</string>

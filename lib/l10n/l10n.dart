@@ -718,6 +718,24 @@ abstract class AppLocalizations {
   /// **'This game'**
   String get mobileXiangqiChatGame;
 
+  /// No description provided for @mobileXiangqiChatClubsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'A club needs an account that has been around for two weeks and has played fourteen games.'**
+  String get mobileXiangqiChatClubsSubtitle;
+
+  /// No description provided for @mobileXiangqiChatOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'The chat is not connected.'**
+  String get mobileXiangqiChatOffline;
+
+  /// No description provided for @mobileXiangqiChatLoadOlder.
+  ///
+  /// In en, this message translates to:
+  /// **'Load older messages'**
+  String get mobileXiangqiChatLoadOlder;
+
   /// No description provided for @mobileXiangqiLessonPlay.
   ///
   /// In en, this message translates to:

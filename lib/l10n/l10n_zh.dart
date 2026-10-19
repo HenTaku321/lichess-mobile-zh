@@ -274,6 +274,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mobileXiangqiChatGame => '本局';
 
   @override
+  String get mobileXiangqiChatClubsSubtitle => '棋社需要账号注册满两周并下满十四局。';
+
+  @override
+  String get mobileXiangqiChatOffline => '聊天未连接。';
+
+  @override
+  String get mobileXiangqiChatLoadOlder => '加载更早的消息';
+
+  @override
   String get mobileXiangqiLessonPlay => '开始这一章';
 
   @override
@@ -8581,6 +8590,15 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get mobileXiangqiChatGame => '本局';
+
+  @override
+  String get mobileXiangqiChatClubsSubtitle => '棋社需要帳號註冊滿兩週並下滿十四局。';
+
+  @override
+  String get mobileXiangqiChatOffline => '聊天未連線。';
+
+  @override
+  String get mobileXiangqiChatLoadOlder => '載入更早的訊息';
 
   @override
   String get mobileXiangqiLessonPlay => '開始這一章';

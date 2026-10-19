@@ -81,6 +81,54 @@ XiangqiPosition play(XiangqiPosition position, XiangqiMove move) {
   );
 }
 
+/// Every move the piece standing on [from] could make, whoever is to move.
+///
+/// **Not a rule of the game.** [legalMoves] is the side to move's, and a lesson needs more than
+/// that: a chapter's script is not a game — measured on 2026-10-16, one chapter asks for two red
+/// moves in a row — and the site's own lesson board lets the reader pick up either side's piece and
+/// play any move that piece could make. This is that: the piece's own rule of movement, with no
+/// question asked about whose turn it is and no question asked about check.
+///
+/// The one thing it does keep is that a piece cannot land on its own side: that is part of what a
+/// piece's move is, not a consequence of whose turn it is.
+IList<XiangqiMove> pieceMoves(XiangqiPosition position, XiangqiSquare from) {
+  final piece = position.pieceAt(from);
+  if (piece == null) return const IListConst([]);
+  final board = List<XiangqiPiece?>.of(position.board);
+  final packed = <int>[];
+  _generate(board, piece.side, packed);
+  return [
+    for (final move in packed)
+      if (_fromOf(move) == from.index) _unpack(move),
+  ].lock;
+}
+
+/// The position after [move], whether or not it is legal here.
+///
+/// A lesson's script is not a game, and the site's own player does not ask the rules about the
+/// moves it plays on the reader's behalf: it moves the piece, takes whatever was on the square it
+/// landed on, and hands the turn to the other side of the piece that moved. That last part is not
+/// the same as handing it to the other side of the *position* — a script with two red moves in a
+/// row has the second one played while it is still black's turn by the rules — which is exactly why
+/// this cannot be [play].
+///
+/// Everything else in this file refuses a move that is not legal. This is the one door the lesson's
+/// script comes through, and it is deliberately not used by games.
+XiangqiPosition playForced(XiangqiPosition position, XiangqiMove move) {
+  final board = List<XiangqiPiece?>.of(position.board);
+  final piece = board[move.from.index];
+  final captured = board[move.to.index];
+  board[move.to.index] = piece;
+  board[move.from.index] = null;
+  final side = piece?.side ?? position.turn;
+  return XiangqiPosition(
+    board: board.lock,
+    turn: side.opposite,
+    halfmoveClock: captured == null ? position.halfmoveClock + 1 : 0,
+    fullmoveNumber: side == .black ? position.fullmoveNumber + 1 : position.fullmoveNumber,
+  );
+}
+
 /// Thrown by [play] for a move that is not legal in the position.
 final class const XiangqiIllegalMoveException(
   /// The move that was refused.

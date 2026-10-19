@@ -94,6 +94,8 @@
   <string name="xiangqiLessonThinking" comment="Shown while the engine checks a lesson move.">Thinking…</string>
   <string name="xiangqiLessonWrongMove" comment="Shown when a lesson move is not the one the chapter wants.">Not that move.</string>
   <string name="xiangqiLessonNextChapter" comment="Button that moves on to the next chapter of a lesson.">Next chapter</string>
+  <string name="xiangqiLessonPreviousChapter" comment="Bottom bar button that goes back to the chapter before this one.">Previous chapter</string>
+  <string name="xiangqiLessonChapterProgress" comment="Xiangqi lesson player: which chapter of the lesson is being played. %1$s is the chapter's number and %2$s is how many chapters the lesson has.">Chapter %1$s of %2$s</string>
   <string name="xiangqiSignUp" comment="Button and screen title for creating a xiangqi.com account.">Create an account</string>
   <string name="xiangqiSignUpCode" comment="Label of the field where the emailed sign-up code is typed.">Code</string>
   <string name="xiangqiSignUpUsername" comment="Label of the username field of the sign-up form.">Username</string>

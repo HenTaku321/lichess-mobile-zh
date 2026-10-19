@@ -213,6 +213,8 @@
   "mobileXiangqiLessonThinking": "思考中…",
   "mobileXiangqiLessonWrongMove": "不是這一步。",
   "mobileXiangqiLessonNextChapter": "下一章",
+  "mobileXiangqiLessonPreviousChapter": "上一章",
+  "mobileXiangqiLessonChapterProgress": "第 {param1} 章 / 共 {param2} 章",
   "mobileXiangqiSignUp": "註冊帳號",
   "mobileXiangqiSignUpCode": "驗證碼",
   "mobileXiangqiSignUpUsername": "使用者名稱",

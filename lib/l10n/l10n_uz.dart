@@ -295,6 +295,14 @@ class AppLocalizationsUz extends AppLocalizations {
   String get mobileXiangqiLessonNextChapter => 'Next chapter';
 
   @override
+  String get mobileXiangqiLessonPreviousChapter => 'Previous chapter';
+
+  @override
+  String mobileXiangqiLessonChapterProgress(String param1, String param2) {
+    return 'Chapter $param1 of $param2';
+  }
+
+  @override
   String get mobileXiangqiSignUp => 'Create an account';
 
   @override

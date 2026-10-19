@@ -367,6 +367,8 @@
   "mobileXiangqiLessonThinking": "思考中…",
   "mobileXiangqiLessonWrongMove": "不是这一步。",
   "mobileXiangqiLessonNextChapter": "下一章",
+  "mobileXiangqiLessonPreviousChapter": "上一章",
+  "mobileXiangqiLessonChapterProgress": "第 {param1} 章 / 共 {param2} 章",
   "mobileXiangqiSignUp": "注册账号",
   "mobileXiangqiSignUpCode": "验证码",
   "mobileXiangqiSignUpUsername": "用户名",

@@ -107,6 +107,18 @@
   "mobileXiangqiLessonThinking": "Thinking…",
   "mobileXiangqiLessonWrongMove": "Not that move.",
   "mobileXiangqiLessonNextChapter": "Next chapter",
+  "mobileXiangqiLessonPreviousChapter": "Previous chapter",
+  "mobileXiangqiLessonChapterProgress": "Chapter {param1} of {param2}",
+  "@mobileXiangqiLessonChapterProgress": {
+    "placeholders": {
+      "param1": {
+        "type": "String"
+      },
+      "param2": {
+        "type": "String"
+      }
+    }
+  },
   "mobileXiangqiSignUp": "Create an account",
   "mobileXiangqiSignUpCode": "Code",
   "mobileXiangqiSignUpUsername": "Username",

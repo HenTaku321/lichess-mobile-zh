@@ -1,21 +1,15 @@
-import 'package:chessground/chessground.dart' show DragTargetKind;
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
 import 'package:lichess_mobile/src/model/xiangqi/lesson/xiangqi_lesson.dart';
 import 'package:lichess_mobile/src/model/xiangqi/lesson/xiangqi_lesson_repository.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_locale.dart';
-import 'package:lichess_mobile/src/model/xiangqi/xiangqi_move.dart';
-import 'package:lichess_mobile/src/model/xiangqi/xiangqi_notation.dart';
-import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
-import 'package:lichess_mobile/src/model/xiangqi/xiangqi_rules.dart' as rules;
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_lesson_player_screen.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
-import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// xiangqi.com's courses, as a list of topics grouped by level.
@@ -247,8 +241,14 @@ class const XiangqiLessonScreen({
                     hasLeading: true,
                     header: Text(context.l10n.mobileXiangqiLessonChapters),
                     children: [
-                      for (final chapter in chapters)
-                        _ChapterRow(chapter: chapter, lessonTitle: lessonTitle),
+                      for (final (index, chapter) in chapters.indexed)
+                        _ChapterRow(
+                          chapter: chapter,
+                          lessonTitle: lessonTitle,
+                          chapters: chapters,
+                          index: index,
+                          lessonId: lessonId,
+                        ),
                     ],
                   ),
                 ],
@@ -276,8 +276,13 @@ class const XiangqiLessonScreen({
 }
 
 /// One chapter of a lesson.
-class const _ChapterRow({required final XiangqiChapter chapter, required final String lessonTitle})
-    extends StatelessWidget {
+class const _ChapterRow({
+  required final XiangqiChapter chapter,
+  required final String lessonTitle,
+  required final IList<XiangqiChapter> chapters,
+  required final int index,
+  required final String lessonId,
+}) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // A chapter whose position this app cannot read is a row that says so rather than one that
@@ -297,105 +302,18 @@ class const _ChapterRow({required final XiangqiChapter chapter, required final S
       trailing: chapter.isCompleted
           ? Icon(Icons.check_circle, color: context.lichessColors.good)
           : null,
+      // The whole lesson goes to the player, not the one chapter: the bar at the bottom of it walks
+      // the list, and a chapter that was opened on its own would have nowhere to walk to.
       onTap: playable
-          ? () => Navigator.of(
-              context,
-              rootNavigator: true,
-            ).push(XiangqiChapterScreen.buildRoute(chapter, lessonTitle))
+          ? () => Navigator.of(context, rootNavigator: true).push(
+              XiangqiLessonPlayerScreen.buildRoute(
+                lessonId: lessonId,
+                lessonTitle: lessonTitle,
+                chapters: chapters,
+                initialIndex: index,
+              ),
+            )
           : null,
     );
-  }
-}
-
-/// One chapter: the position it starts from, and the line it wants played.
-class const XiangqiChapterScreen({
-  required final XiangqiChapter chapter,
-  required final String lessonTitle,
-  super.key,
-}) extends ConsumerWidget {
-  static Route<void> buildRoute(XiangqiChapter chapter, String lessonTitle) => buildScreenRoute(
-    screen: XiangqiChapterScreen(chapter: chapter, lessonTitle: lessonTitle),
-  );
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final boardPrefs = ref.watch(boardPreferencesProvider);
-    final position = chapter.position!;
-    final moves = chapter.moves;
-    // The line is written from the positions it is played on, which is what the notation needs. A
-    // move that does not fit the position before it ends the line there rather than throwing: a
-    // chapter whose script is not a game is exactly what this app has no player for.
-    final positions = <XiangqiPosition>[position];
-    final played = <XiangqiMove>[];
-    for (final move in moves) {
-      final next = _playSafely(positions.last, move);
-      if (next == null) break;
-      positions.add(next);
-      played.add(move);
-    }
-    final notation = played.isEmpty
-        ? const IListConst<String>([])
-        : xiangqiGameNotation(positions.lock, played.lock);
-
-    return Scaffold(
-      appBar: AppBar(title: AppBarTitleText(lessonTitle)),
-      body: SafeArea(
-        child: Column(
-          children: [
-            if (chapter.description != null)
-              Padding(padding: Styles.bodySectionPadding, child: Text(chapter.description!)),
-            Expanded(
-              child: Center(
-                child: Padding(
-                  padding: Styles.horizontalBodyPadding,
-                  child: AspectRatio(
-                    aspectRatio: boardPrefs.coordinates ? 10 / 11 : 9 / 10,
-                    child: XiangqiBoard(
-                      position: position,
-                      orientation: _sideToMove(position),
-                      selected: null,
-                      moves: const IListConst([]),
-                      onTapSquare: null,
-                      onDragMove: null,
-                      lastMove: null,
-                      animationDuration: Duration.zero,
-                      showCoordinates: boardPrefs.coordinates,
-                      showLastMove: false,
-                      showBorder: boardPrefs.showBorder,
-                      magnifyDraggedPiece: false,
-                      dragTargetKind: DragTargetKind.circle,
-                      style: XiangqiBoardStyle.fromChessboardColorScheme(
-                        boardPrefs.boardTheme.colors,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Padding(
-              padding: Styles.bodySectionPadding,
-              child: Text(
-                notation.isEmpty
-                    ? context.l10n.mobileXiangqiLessonScriptEmpty
-                    : '${context.l10n.mobileXiangqiLessonScript}: ${notation.join('  ')}',
-                style: TextTheme.of(context).bodyMedium,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// The side the board is drawn from: whoever is to move.
-XiangqiSide _sideToMove(XiangqiPosition position) => position.turn;
-
-/// [move] played on [position], or null when it does not fit.
-XiangqiPosition? _playSafely(XiangqiPosition position, XiangqiMove move) {
-  try {
-    return rules.play(position, move);
-  } catch (_) {
-    return null;
   }
 }

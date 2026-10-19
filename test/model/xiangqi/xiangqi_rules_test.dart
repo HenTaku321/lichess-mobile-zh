@@ -251,6 +251,46 @@ void main() {
       );
     });
 
+    test("a piece's own moves are offered whoever is to move", () {
+      // What a lesson board needs and a game never does: the script decides what is playable, and a
+      // chapter can ask for two red moves in a row. See [pieceMoves].
+      final position = XiangqiPosition.fromFen(
+        'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR b - - 0 1',
+      );
+      // Black is to move, and red's horse is offered all the same.
+      expect(pieceMoves(position, XiangqiSquare.parse('b0')!).map((move) => move.iccs).toSet(), {
+        'b0a2',
+        'b0c2',
+      });
+      // And a piece cannot land on its own side, whoever is to move: that is part of what a move is.
+      // The chariot walks its file until its own soldier on a3 and stops there.
+      expect(pieceMoves(position, XiangqiSquare.parse('a0')!).map((move) => move.iccs).toSet(), {
+        'a0a1',
+        'a0a2',
+      });
+      // A square with nothing on it offers nothing.
+      expect(pieceMoves(position, XiangqiSquare.parse('e5')!), isEmpty);
+    });
+
+    test('a forced move is played whether or not the rules allow it', () {
+      // The door a lesson's script comes through. Two red moves in a row is the shape measured on
+      // the site, and the second one is not a move the rules would ever offer.
+      final start = XiangqiPosition.fromFen('9/9/9/9/9/9/9/9/9/8R w - - 0 1');
+      final first = play(start, XiangqiMove.parseIccs('i0i5')!);
+      expect(first.turn, XiangqiSide.black);
+      expect(
+        () => play(first, XiangqiMove.parseIccs('i5i9')!),
+        throwsA(isA<XiangqiIllegalMoveException>()),
+      );
+
+      final forced = playForced(first, XiangqiMove.parseIccs('i5i9')!);
+      expect(forced.pieceAt(XiangqiSquare.parse('i9')!), isNotNull);
+      expect(forced.pieceAt(XiangqiSquare.parse('i5')!), isNull);
+      // The turn follows the piece that moved, not the position it moved from: the second red move
+      // leaves black to move, exactly as the first one did.
+      expect(forced.turn, XiangqiSide.black);
+    });
+
     test('a move is in the list exactly when playing it is allowed', () {
       // The one property that makes the generator and the filter one thing rather than two: every
       // move the rules offer is a move the rules accept.

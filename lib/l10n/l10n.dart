@@ -760,6 +760,18 @@ abstract class AppLocalizations {
   /// **'Next chapter'**
   String get mobileXiangqiLessonNextChapter;
 
+  /// No description provided for @mobileXiangqiLessonPreviousChapter.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous chapter'**
+  String get mobileXiangqiLessonPreviousChapter;
+
+  /// No description provided for @mobileXiangqiLessonChapterProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Chapter {param1} of {param2}'**
+  String mobileXiangqiLessonChapterProgress(String param1, String param2);
+
   /// No description provided for @mobileXiangqiSignUp.
   ///
   /// In en, this message translates to:

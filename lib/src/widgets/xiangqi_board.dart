@@ -557,6 +557,20 @@ class const XiangqiBoard({
   /// A move to hint at, drawn as a translucent circle on the square it would be played from.
   final XiangqiMove? hint,
 
+  /// The move the reader has just been told is wrong, marked in the board's own red.
+  ///
+  /// A lesson is the one place a move is refused, and a refusal has to be visible where it happened:
+  /// this is the same two square-sized highlights the last move gets, in the colour the board already
+  /// uses for a general in check. Null everywhere else — a game never draws a move as wrong.
+  final XiangqiMove? wrongMove,
+
+  /// Points to ring, for a caller that has its own idea of which ones matter.
+  ///
+  /// A lesson chapter names the intersections it is talking about, and a ring on each of them says
+  /// which ones those are without saying anything about what to do there — the arrows do that. Drawn
+  /// under the pieces, in the board's own ink, so it marks the board rather than the position.
+  final IList<XiangqiSquare> marked = const IListConst([]),
+
   /// Moves to draw as arrows over the board, best line first.
   ///
   /// An arrow is what the engine's own answer looks like on the chess board: a line from the
@@ -762,6 +776,8 @@ class _XiangqiBoardState() extends State<XiangqiBoard> with SingleTickerProvider
                   showLastMove: widget.showLastMove,
                   showBorder: widget.showBorder,
                   hint: widget.hint,
+                  wrongMove: widget.wrongMove,
+                  marked: widget.marked,
                   arrows: widget.arrows,
                   magnifyDraggedPiece: widget.magnifyDraggedPiece,
                   dragTargetKind: widget.dragTargetKind,
@@ -835,6 +851,8 @@ class XiangqiBoardPainter({
   required final bool showLastMove,
   required final bool showBorder,
   required final XiangqiMove? hint,
+  required final XiangqiMove? wrongMove,
+  required final IList<XiangqiSquare> marked,
   required final IList<XiangqiBoardArrow> arrows,
   required final bool magnifyDraggedPiece,
   required final DragTargetKind dragTargetKind,
@@ -864,7 +882,9 @@ class XiangqiBoardPainter({
     paintGrid(canvas);
     paintCoordinates(canvas);
     paintMarks(canvas);
+    paintMarked(canvas);
     paintLastMove(canvas);
+    paintWrongMove(canvas);
     paintCheck(canvas);
     paintTargets(canvas);
     paintSelection(canvas);
@@ -1036,6 +1056,22 @@ class XiangqiBoardPainter({
     }
   }
 
+  /// A ring on each point of [marked].
+  ///
+  /// Small and drawn in the board's own ink: it says "this point", the way a printed diagram rings
+  /// the square it is discussing, and it is deliberately quieter than the interaction marks — a
+  /// lesson's own highlight is part of the position being shown, not something the reader is doing.
+  void paintMarked(Canvas canvas) {
+    if (marked.isEmpty) return;
+    final ring = Paint()
+      ..color = style.ink.withValues(alpha: 0.55)
+      ..style = .stroke
+      ..strokeWidth = math.max(1, cell * 0.045);
+    for (final square in marked) {
+      canvas.drawCircle(geometry.centerOf(square, orientation), cell * 0.17, ring);
+    }
+  }
+
   /// The from and the to of the last move, under the pieces so that a piece hides the half of its
   /// own marker. The shape and colours are the chess board's last-move highlight, mapped onto a
   /// board whose squares meet at points rather than filling a grid.
@@ -1044,6 +1080,20 @@ class XiangqiBoardPainter({
     if (!showLastMove || move == null) return;
     for (final square in [move.from, move.to]) {
       _paintSquareHighlight(canvas, geometry.centerOf(square, orientation), style.lastMove);
+    }
+  }
+
+  /// The move the reader was told is wrong, in the board's own red.
+  ///
+  /// Drawn exactly like the last move's two marks — the same square-sized highlight on the point the
+  /// piece came from and the one it went to — and in [XiangqiBoardStyle.checkRing], which is the
+  /// board's existing "something is wrong here" colour.
+  void paintWrongMove(Canvas canvas) {
+    final move = wrongMove;
+    if (move == null) return;
+    final details = HighlightDetails(solidColor: style.checkRing);
+    for (final square in [move.from, move.to]) {
+      _paintSquareHighlight(canvas, geometry.centerOf(square, orientation), details);
     }
   }
 

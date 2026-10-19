@@ -217,6 +217,8 @@
   <string name="xiangqiLessonThinking" comment="Shown while the engine checks a lesson move.">思考中…</string>
   <string name="xiangqiLessonWrongMove" comment="Shown when a lesson move is not the one the chapter wants.">不是這一步。</string>
   <string name="xiangqiLessonNextChapter" comment="Button that moves on to the next chapter of a lesson.">下一章</string>
+  <string name="xiangqiLessonPreviousChapter" comment="Bottom bar button that goes back to the chapter before this one.">上一章</string>
+  <string name="xiangqiLessonChapterProgress" comment="Xiangqi lesson player: which chapter of the lesson is being played. %1$s is the chapter's number and %2$s is how many chapters the lesson has.">第 %1$s 章 / 共 %2$s 章</string>
   <string name="xiangqiSignUp" comment="Button and screen title for creating a xiangqi.com account.">註冊帳號</string>
   <string name="xiangqiSignUpCode" comment="Label of the field where the emailed sign-up code is typed.">驗證碼</string>
   <string name="xiangqiSignUpUsername" comment="Label of the username field of the sign-up form.">使用者名稱</string>

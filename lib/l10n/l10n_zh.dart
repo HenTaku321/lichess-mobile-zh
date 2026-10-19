@@ -295,6 +295,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mobileXiangqiLessonNextChapter => '下一章';
 
   @override
+  String get mobileXiangqiLessonPreviousChapter => '上一章';
+
+  @override
+  String mobileXiangqiLessonChapterProgress(String param1, String param2) {
+    return '第 $param1 章 / 共 $param2 章';
+  }
+
+  @override
   String get mobileXiangqiSignUp => '注册账号';
 
   @override
@@ -8594,6 +8602,14 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get mobileXiangqiLessonNextChapter => '下一章';
+
+  @override
+  String get mobileXiangqiLessonPreviousChapter => '上一章';
+
+  @override
+  String mobileXiangqiLessonChapterProgress(String param1, String param2) {
+    return '第 $param1 章 / 共 $param2 章';
+  }
 
   @override
   String get mobileXiangqiSignUp => '註冊帳號';

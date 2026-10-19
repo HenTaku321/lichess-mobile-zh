@@ -59,10 +59,10 @@ class const XiangqiLessonRepository(final Client _client) {
   /// `{"message":"Lesson chapter completed successfully","topic_completed":false}` and the chapter
   /// came back `completed: true` on the next read.
   ///
-  /// **This app never calls it.** A chapter is marked done by *playing* it, and this app has no
-  /// lesson player — see [XiangqiChapter.position] for why — so a button that marked a chapter done
-  /// without playing it would be a button that lies about what the reader did. It is written down
-  /// here so that the player, when it comes, has the call.
+  /// **It is called by playing the chapter, and by nothing else.** A chapter is marked done when
+  /// its whole script has been played — see [XiangqiChapterController], which is the only caller —
+  /// so a button that marked a chapter done without playing it would be a button that lies about
+  /// what the reader did.
   Future<void> completeChapter(String id) =>
       _post('lessons/chapter/$id/complete', {'solved': true});
 

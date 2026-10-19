@@ -10,6 +10,7 @@ import 'package:lichess_mobile/src/view/play/correspondence_challenges_screen.da
 import 'package:lichess_mobile/src/view/play/create_challenge_bottom_sheet.dart';
 import 'package:lichess_mobile/src/view/play/create_game_widget.dart';
 import 'package:lichess_mobile/src/view/play/tournaments_hub_screen.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_new_game_screen.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -78,6 +79,18 @@ class const PlayMenu() extends ConsumerWidget {
               },
               leading: const Icon(Icons.table_restaurant_outlined),
               title: Text(context.l10n.mobileOverTheBoard),
+            ),
+            // A game against somebody on xiangqi.com, beside the one against the app's own engine.
+            // Two rows and not a picker: lichess and xiangqi.com are two services with two accounts,
+            // and the row that starts a game on one of them is not the other's other half — the same
+            // reason the master-games database has a row of its own. See `xiangqi_new_game_screen.dart`.
+            ListTile(
+              onTap: () {
+                Navigator.of(context).popUntil((route) => route is! ModalBottomSheetRoute);
+                Navigator.of(context, rootNavigator: true).push(XiangqiNewGameScreen.buildRoute());
+              },
+              leading: const Icon(Icons.grid_on),
+              title: Text('${context.l10n.mobileXiangqi} · ${context.l10n.createAGame}'),
             ),
           ],
         ),

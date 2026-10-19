@@ -604,6 +604,276 @@ abstract class AppLocalizations {
   /// **'Evaluating your move…'**
   String get mobileXiangqiEvaluatingMove;
 
+  /// No description provided for @mobileXiangqiQuickGame.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick game'**
+  String get mobileXiangqiQuickGame;
+
+  /// No description provided for @mobileXiangqiQuickGameSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Get matched with an opponent'**
+  String get mobileXiangqiQuickGameSubtitle;
+
+  /// No description provided for @mobileXiangqiCreateGame.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a game'**
+  String get mobileXiangqiCreateGame;
+
+  /// No description provided for @mobileXiangqiCreateGameSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the time and side, then invite somebody'**
+  String get mobileXiangqiCreateGameSubtitle;
+
+  /// No description provided for @mobileXiangqiSearching.
+  ///
+  /// In en, this message translates to:
+  /// **'Looking for an opponent…'**
+  String get mobileXiangqiSearching;
+
+  /// No description provided for @mobileXiangqiSearchingCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get mobileXiangqiSearchingCancel;
+
+  /// No description provided for @mobileXiangqiChallengeOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open challenge'**
+  String get mobileXiangqiChallengeOpen;
+
+  /// No description provided for @mobileXiangqiInvite.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite'**
+  String get mobileXiangqiInvite;
+
+  /// No description provided for @mobileXiangqiInvitePlayers.
+  ///
+  /// In en, this message translates to:
+  /// **'Players online'**
+  String get mobileXiangqiInvitePlayers;
+
+  /// No description provided for @mobileXiangqiInviteSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Invitation sent.'**
+  String get mobileXiangqiInviteSent;
+
+  /// No description provided for @mobileXiangqiPrivateGame.
+  ///
+  /// In en, this message translates to:
+  /// **'Private'**
+  String get mobileXiangqiPrivateGame;
+
+  /// No description provided for @mobileXiangqiGameCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'The game is ready. Waiting for an opponent.'**
+  String get mobileXiangqiGameCreated;
+
+  /// No description provided for @mobileXiangqiChat.
+  ///
+  /// In en, this message translates to:
+  /// **'Xiangqi chat'**
+  String get mobileXiangqiChat;
+
+  /// No description provided for @mobileXiangqiChatRooms.
+  ///
+  /// In en, this message translates to:
+  /// **'Public rooms'**
+  String get mobileXiangqiChatRooms;
+
+  /// No description provided for @mobileXiangqiChatClubs.
+  ///
+  /// In en, this message translates to:
+  /// **'Clubs'**
+  String get mobileXiangqiChatClubs;
+
+  /// No description provided for @mobileXiangqiChatNoClubs.
+  ///
+  /// In en, this message translates to:
+  /// **'You are not in a club yet.'**
+  String get mobileXiangqiChatNoClubs;
+
+  /// No description provided for @mobileXiangqiChatEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No messages yet.'**
+  String get mobileXiangqiChatEmpty;
+
+  /// No description provided for @mobileXiangqiChatSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Send a message'**
+  String get mobileXiangqiChatSend;
+
+  /// No description provided for @mobileXiangqiChatGame.
+  ///
+  /// In en, this message translates to:
+  /// **'This game'**
+  String get mobileXiangqiChatGame;
+
+  /// No description provided for @mobileXiangqiLessonPlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Play the chapter'**
+  String get mobileXiangqiLessonPlay;
+
+  /// No description provided for @mobileXiangqiLessonHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Hint'**
+  String get mobileXiangqiLessonHint;
+
+  /// No description provided for @mobileXiangqiLessonUndo.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get mobileXiangqiLessonUndo;
+
+  /// No description provided for @mobileXiangqiLessonGreatJob.
+  ///
+  /// In en, this message translates to:
+  /// **'Great job!'**
+  String get mobileXiangqiLessonGreatJob;
+
+  /// No description provided for @mobileXiangqiLessonThinking.
+  ///
+  /// In en, this message translates to:
+  /// **'Thinking…'**
+  String get mobileXiangqiLessonThinking;
+
+  /// No description provided for @mobileXiangqiLessonWrongMove.
+  ///
+  /// In en, this message translates to:
+  /// **'Not that move.'**
+  String get mobileXiangqiLessonWrongMove;
+
+  /// No description provided for @mobileXiangqiLessonNextChapter.
+  ///
+  /// In en, this message translates to:
+  /// **'Next chapter'**
+  String get mobileXiangqiLessonNextChapter;
+
+  /// No description provided for @mobileXiangqiSignUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Create an account'**
+  String get mobileXiangqiSignUp;
+
+  /// No description provided for @mobileXiangqiSignUpCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Code'**
+  String get mobileXiangqiSignUpCode;
+
+  /// No description provided for @mobileXiangqiSignUpUsername.
+  ///
+  /// In en, this message translates to:
+  /// **'Username'**
+  String get mobileXiangqiSignUpUsername;
+
+  /// No description provided for @mobileXiangqiSignUpPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Password'**
+  String get mobileXiangqiSignUpPassword;
+
+  /// No description provided for @mobileXiangqiSignUpCountry.
+  ///
+  /// In en, this message translates to:
+  /// **'Country'**
+  String get mobileXiangqiSignUpCountry;
+
+  /// No description provided for @mobileXiangqiSignUpSendCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Send the code'**
+  String get mobileXiangqiSignUpSendCode;
+
+  /// No description provided for @mobileXiangqiSignUpCodeSent.
+  ///
+  /// In en, this message translates to:
+  /// **'A code was sent to {param}.'**
+  String mobileXiangqiSignUpCodeSent(String param);
+
+  /// No description provided for @mobileXiangqiSignUpInvalidCode.
+  ///
+  /// In en, this message translates to:
+  /// **'That code is not right.'**
+  String get mobileXiangqiSignUpInvalidCode;
+
+  /// No description provided for @mobileXiangqiSignUpDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome!'**
+  String get mobileXiangqiSignUpDone;
+
+  /// No description provided for @mobileXiangqiSignUpEmailTaken.
+  ///
+  /// In en, this message translates to:
+  /// **'That address already has an account.'**
+  String get mobileXiangqiSignUpEmailTaken;
+
+  /// No description provided for @mobileXiangqiLevel.
+  ///
+  /// In en, this message translates to:
+  /// **'Your level'**
+  String get mobileXiangqiLevel;
+
+  /// No description provided for @mobileXiangqiLevelBeginner.
+  ///
+  /// In en, this message translates to:
+  /// **'Beginner'**
+  String get mobileXiangqiLevelBeginner;
+
+  /// No description provided for @mobileXiangqiLevelCasual.
+  ///
+  /// In en, this message translates to:
+  /// **'Casual'**
+  String get mobileXiangqiLevelCasual;
+
+  /// No description provided for @mobileXiangqiLevelIntermediate.
+  ///
+  /// In en, this message translates to:
+  /// **'Intermediate'**
+  String get mobileXiangqiLevelIntermediate;
+
+  /// No description provided for @mobileXiangqiLevelAdvanced.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced'**
+  String get mobileXiangqiLevelAdvanced;
+
+  /// No description provided for @mobileXiangqiLevelElite.
+  ///
+  /// In en, this message translates to:
+  /// **'Elite'**
+  String get mobileXiangqiLevelElite;
+
+  /// No description provided for @mobileXiangqiDeleteAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete my xiangqi.com account'**
+  String get mobileXiangqiDeleteAccount;
+
+  /// No description provided for @mobileXiangqiDeleteAccountWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'This deletes the account on xiangqi.com. It cannot be undone.'**
+  String get mobileXiangqiDeleteAccountWarning;
+
+  /// No description provided for @mobileXiangqiSignOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign out of xiangqi.com'**
+  String get mobileXiangqiSignOut;
+
   /// No description provided for @mobileGamePoints.
   ///
   /// In en, this message translates to:

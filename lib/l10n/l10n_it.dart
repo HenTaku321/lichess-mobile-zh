@@ -217,6 +217,143 @@ class AppLocalizationsIt extends AppLocalizations {
   String get mobileXiangqiEvaluatingMove => 'Evaluating your move…';
 
   @override
+  String get mobileXiangqiQuickGame => 'Quick game';
+
+  @override
+  String get mobileXiangqiQuickGameSubtitle => 'Get matched with an opponent';
+
+  @override
+  String get mobileXiangqiCreateGame => 'Create a game';
+
+  @override
+  String get mobileXiangqiCreateGameSubtitle => 'Choose the time and side, then invite somebody';
+
+  @override
+  String get mobileXiangqiSearching => 'Looking for an opponent…';
+
+  @override
+  String get mobileXiangqiSearchingCancel => 'Cancel';
+
+  @override
+  String get mobileXiangqiChallengeOpen => 'Open challenge';
+
+  @override
+  String get mobileXiangqiInvite => 'Invite';
+
+  @override
+  String get mobileXiangqiInvitePlayers => 'Players online';
+
+  @override
+  String get mobileXiangqiInviteSent => 'Invitation sent.';
+
+  @override
+  String get mobileXiangqiPrivateGame => 'Private';
+
+  @override
+  String get mobileXiangqiGameCreated => 'The game is ready. Waiting for an opponent.';
+
+  @override
+  String get mobileXiangqiChat => 'Xiangqi chat';
+
+  @override
+  String get mobileXiangqiChatRooms => 'Public rooms';
+
+  @override
+  String get mobileXiangqiChatClubs => 'Clubs';
+
+  @override
+  String get mobileXiangqiChatNoClubs => 'You are not in a club yet.';
+
+  @override
+  String get mobileXiangqiChatEmpty => 'No messages yet.';
+
+  @override
+  String get mobileXiangqiChatSend => 'Send a message';
+
+  @override
+  String get mobileXiangqiChatGame => 'This game';
+
+  @override
+  String get mobileXiangqiLessonPlay => 'Play the chapter';
+
+  @override
+  String get mobileXiangqiLessonHint => 'Hint';
+
+  @override
+  String get mobileXiangqiLessonUndo => 'Undo';
+
+  @override
+  String get mobileXiangqiLessonGreatJob => 'Great job!';
+
+  @override
+  String get mobileXiangqiLessonThinking => 'Thinking…';
+
+  @override
+  String get mobileXiangqiLessonWrongMove => 'Not that move.';
+
+  @override
+  String get mobileXiangqiLessonNextChapter => 'Next chapter';
+
+  @override
+  String get mobileXiangqiSignUp => 'Create an account';
+
+  @override
+  String get mobileXiangqiSignUpCode => 'Code';
+
+  @override
+  String get mobileXiangqiSignUpUsername => 'Username';
+
+  @override
+  String get mobileXiangqiSignUpPassword => 'Password';
+
+  @override
+  String get mobileXiangqiSignUpCountry => 'Country';
+
+  @override
+  String get mobileXiangqiSignUpSendCode => 'Send the code';
+
+  @override
+  String mobileXiangqiSignUpCodeSent(String param) {
+    return 'A code was sent to $param.';
+  }
+
+  @override
+  String get mobileXiangqiSignUpInvalidCode => 'That code is not right.';
+
+  @override
+  String get mobileXiangqiSignUpDone => 'Welcome!';
+
+  @override
+  String get mobileXiangqiSignUpEmailTaken => 'That address already has an account.';
+
+  @override
+  String get mobileXiangqiLevel => 'Your level';
+
+  @override
+  String get mobileXiangqiLevelBeginner => 'Beginner';
+
+  @override
+  String get mobileXiangqiLevelCasual => 'Casual';
+
+  @override
+  String get mobileXiangqiLevelIntermediate => 'Intermediate';
+
+  @override
+  String get mobileXiangqiLevelAdvanced => 'Advanced';
+
+  @override
+  String get mobileXiangqiLevelElite => 'Elite';
+
+  @override
+  String get mobileXiangqiDeleteAccount => 'Delete my xiangqi.com account';
+
+  @override
+  String get mobileXiangqiDeleteAccountWarning => 'This deletes the account on xiangqi.com. It cannot be undone.';
+
+  @override
+  String get mobileXiangqiSignOut => 'Sign out of xiangqi.com';
+
+  @override
   String get mobileGamePoints => 'GP';
 
   @override

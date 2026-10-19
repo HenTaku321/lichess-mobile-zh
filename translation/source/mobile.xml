@@ -68,6 +68,51 @@
   <string name="game" comment="Generic label for a game when the game type is chosen separately.">Game</string>
   <string name="noFriendsOnline" comment="Shown in the friends hub when no friend is currently online.">No friends online.</string>
   <string name="xiangqiEvaluatingMove" comment="Shown while Pikafish evaluates the player's move in xiangqi practice mode.">Evaluating your move…</string>
+  <string name="xiangqiQuickGame" comment="Lobby card that starts a quick match. Keep it short.">Quick game</string>
+  <string name="xiangqiQuickGameSubtitle" comment="Under the quick game card: what it does.">Get matched with an opponent</string>
+  <string name="xiangqiCreateGame" comment="Lobby card that opens the custom game form. Keep it short.">Create a game</string>
+  <string name="xiangqiCreateGameSubtitle" comment="Under the create game card: what it does.">Choose the time and side, then invite somebody</string>
+  <string name="xiangqiSearching" comment="Shown while a quick match is looking for an opponent.">Looking for an opponent…</string>
+  <string name="xiangqiSearchingCancel" comment="Button that gives up on a quick match.">Cancel</string>
+  <string name="xiangqiChallengeOpen" comment="A challenge nobody has accepted yet.">Open challenge</string>
+  <string name="xiangqiInvite" comment="Button that invites an account into a game.">Invite</string>
+  <string name="xiangqiInvitePlayers" comment="Heading of the list of accounts that can be invited.">Players online</string>
+  <string name="xiangqiInviteSent" comment="Shown after an invitation was sent.">Invitation sent.</string>
+  <string name="xiangqiPrivateGame" comment="Switch that keeps a game out of the public list.">Private</string>
+  <string name="xiangqiGameCreated" comment="Shown after a custom game was created and nobody has joined yet.">The game is ready. Waiting for an opponent.</string>
+  <string name="xiangqiChat" comment="Screen title of the xiangqi chat hub.">Xiangqi chat</string>
+  <string name="xiangqiChatRooms" comment="Section heading: the public lobby rooms.">Public rooms</string>
+  <string name="xiangqiChatClubs" comment="Section heading: the clubs the account is in.">Clubs</string>
+  <string name="xiangqiChatNoClubs" comment="Shown when the account is in no club.">You are not in a club yet.</string>
+  <string name="xiangqiChatEmpty" comment="Shown in a chat room that has no messages.">No messages yet.</string>
+  <string name="xiangqiChatSend" comment="Placeholder of the chat input field.">Send a message</string>
+  <string name="xiangqiChatGame" comment="Section heading in the chat hub: the game being played, if any.">This game</string>
+  <string name="xiangqiLessonPlay" comment="Button that starts playing a lesson chapter.">Play the chapter</string>
+  <string name="xiangqiLessonHint" comment="Bottom bar button that shows the next move of a lesson.">Hint</string>
+  <string name="xiangqiLessonUndo" comment="Bottom bar button that takes the last lesson move back.">Undo</string>
+  <string name="xiangqiLessonGreatJob" comment="Shown when a lesson chapter is finished.">Great job!</string>
+  <string name="xiangqiLessonThinking" comment="Shown while the engine checks a lesson move.">Thinking…</string>
+  <string name="xiangqiLessonWrongMove" comment="Shown when a lesson move is not the one the chapter wants.">Not that move.</string>
+  <string name="xiangqiLessonNextChapter" comment="Button that moves on to the next chapter of a lesson.">Next chapter</string>
+  <string name="xiangqiSignUp" comment="Button and screen title for creating a xiangqi.com account.">Create an account</string>
+  <string name="xiangqiSignUpCode" comment="Label of the field where the emailed sign-up code is typed.">Code</string>
+  <string name="xiangqiSignUpUsername" comment="Label of the username field of the sign-up form.">Username</string>
+  <string name="xiangqiSignUpPassword" comment="Label of the password field of the sign-up form.">Password</string>
+  <string name="xiangqiSignUpCountry" comment="Label of the country field of the sign-up form.">Country</string>
+  <string name="xiangqiSignUpSendCode" comment="Button that asks for the sign-up code to be emailed.">Send the code</string>
+  <string name="xiangqiSignUpCodeSent" comment="Shown after the sign-up code was emailed. %s is the address.">A code was sent to %s.</string>
+  <string name="xiangqiSignUpInvalidCode" comment="Shown when the emailed sign-up code is refused.">That code is not right.</string>
+  <string name="xiangqiSignUpDone" comment="Shown when the new xiangqi.com account is ready.">Welcome!</string>
+  <string name="xiangqiSignUpEmailTaken" comment="Shown when the address already has a xiangqi.com account.">That address already has an account.</string>
+  <string name="xiangqiLevel" comment="Label of the playing-strength picker of the sign-up form.">Your level</string>
+  <string name="xiangqiLevelBeginner" comment="One of the five playing strengths a new account picks from.">Beginner</string>
+  <string name="xiangqiLevelCasual" comment="One of the five playing strengths a new account picks from.">Casual</string>
+  <string name="xiangqiLevelIntermediate" comment="One of the five playing strengths a new account picks from.">Intermediate</string>
+  <string name="xiangqiLevelAdvanced" comment="One of the five playing strengths a new account picks from.">Advanced</string>
+  <string name="xiangqiLevelElite" comment="One of the five playing strengths a new account picks from.">Elite</string>
+  <string name="xiangqiDeleteAccount" comment="Settings entry that deletes the xiangqi.com account.">Delete my xiangqi.com account</string>
+  <string name="xiangqiDeleteAccountWarning" comment="Confirmation body before deleting the xiangqi.com account.">This deletes the account on xiangqi.com. It cannot be undone.</string>
+  <string name="xiangqiSignOut" comment="Settings entry that signs out of xiangqi.com.">Sign out of xiangqi.com</string>
   <string name="gamePoints" comment="Column header in a broadcast team table: game points. Keep it very short.">GP</string>
   <string name="generatingGif" comment="Shown while a game is being exported as an animated GIF.">Generating GIF...</string>
   <string name="getFeedbackOnMoves" comment="Subtitle of the practice mode switch when playing against the offline computer.">Get feedback on your moves</string>

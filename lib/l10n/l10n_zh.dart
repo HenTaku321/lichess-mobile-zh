@@ -217,6 +217,143 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mobileXiangqiEvaluatingMove => '正在评估你的着法…';
 
   @override
+  String get mobileXiangqiQuickGame => '快速对局';
+
+  @override
+  String get mobileXiangqiQuickGameSubtitle => '随机匹配一位对手';
+
+  @override
+  String get mobileXiangqiCreateGame => '创建对局';
+
+  @override
+  String get mobileXiangqiCreateGameSubtitle => '选好时间与先后手，再邀请对手';
+
+  @override
+  String get mobileXiangqiSearching => '正在寻找对手…';
+
+  @override
+  String get mobileXiangqiSearchingCancel => '取消';
+
+  @override
+  String get mobileXiangqiChallengeOpen => '公开挑战';
+
+  @override
+  String get mobileXiangqiInvite => '邀请';
+
+  @override
+  String get mobileXiangqiInvitePlayers => '在线棋手';
+
+  @override
+  String get mobileXiangqiInviteSent => '邀请已发出。';
+
+  @override
+  String get mobileXiangqiPrivateGame => '私密';
+
+  @override
+  String get mobileXiangqiGameCreated => '对局已创建，等待对手加入。';
+
+  @override
+  String get mobileXiangqiChat => '象棋聊天室';
+
+  @override
+  String get mobileXiangqiChatRooms => '公共聊天室';
+
+  @override
+  String get mobileXiangqiChatClubs => '棋社';
+
+  @override
+  String get mobileXiangqiChatNoClubs => '你还没有加入任何棋社。';
+
+  @override
+  String get mobileXiangqiChatEmpty => '还没有消息。';
+
+  @override
+  String get mobileXiangqiChatSend => '发送消息';
+
+  @override
+  String get mobileXiangqiChatGame => '本局';
+
+  @override
+  String get mobileXiangqiLessonPlay => '开始这一章';
+
+  @override
+  String get mobileXiangqiLessonHint => '提示';
+
+  @override
+  String get mobileXiangqiLessonUndo => '撤销';
+
+  @override
+  String get mobileXiangqiLessonGreatJob => '做得好！';
+
+  @override
+  String get mobileXiangqiLessonThinking => '思考中…';
+
+  @override
+  String get mobileXiangqiLessonWrongMove => '不是这一步。';
+
+  @override
+  String get mobileXiangqiLessonNextChapter => '下一章';
+
+  @override
+  String get mobileXiangqiSignUp => '注册账号';
+
+  @override
+  String get mobileXiangqiSignUpCode => '验证码';
+
+  @override
+  String get mobileXiangqiSignUpUsername => '用户名';
+
+  @override
+  String get mobileXiangqiSignUpPassword => '密码';
+
+  @override
+  String get mobileXiangqiSignUpCountry => '国家/地区';
+
+  @override
+  String get mobileXiangqiSignUpSendCode => '发送验证码';
+
+  @override
+  String mobileXiangqiSignUpCodeSent(String param) {
+    return '验证码已发送至 $param。';
+  }
+
+  @override
+  String get mobileXiangqiSignUpInvalidCode => '验证码不正确。';
+
+  @override
+  String get mobileXiangqiSignUpDone => '欢迎！';
+
+  @override
+  String get mobileXiangqiSignUpEmailTaken => '该邮箱已经注册过了。';
+
+  @override
+  String get mobileXiangqiLevel => '你的水平';
+
+  @override
+  String get mobileXiangqiLevelBeginner => '新手';
+
+  @override
+  String get mobileXiangqiLevelCasual => '休闲';
+
+  @override
+  String get mobileXiangqiLevelIntermediate => '中级';
+
+  @override
+  String get mobileXiangqiLevelAdvanced => '高级';
+
+  @override
+  String get mobileXiangqiLevelElite => '精英';
+
+  @override
+  String get mobileXiangqiDeleteAccount => '注销象棋账号';
+
+  @override
+  String get mobileXiangqiDeleteAccountWarning => '这会删除 xiangqi.com 上的账号，且无法撤销。';
+
+  @override
+  String get mobileXiangqiSignOut => '退出象棋账号';
+
+  @override
   String get mobileGamePoints => '局分';
 
   @override
@@ -8379,6 +8516,143 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get mobileXiangqiEvaluatingMove => '正在評估你的着法…';
+
+  @override
+  String get mobileXiangqiQuickGame => '快速對局';
+
+  @override
+  String get mobileXiangqiQuickGameSubtitle => '隨機匹配一位對手';
+
+  @override
+  String get mobileXiangqiCreateGame => '建立對局';
+
+  @override
+  String get mobileXiangqiCreateGameSubtitle => '選好時間與先後手，再邀請對手';
+
+  @override
+  String get mobileXiangqiSearching => '正在尋找對手…';
+
+  @override
+  String get mobileXiangqiSearchingCancel => '取消';
+
+  @override
+  String get mobileXiangqiChallengeOpen => '公開挑戰';
+
+  @override
+  String get mobileXiangqiInvite => '邀請';
+
+  @override
+  String get mobileXiangqiInvitePlayers => '線上棋手';
+
+  @override
+  String get mobileXiangqiInviteSent => '邀請已送出。';
+
+  @override
+  String get mobileXiangqiPrivateGame => '私密';
+
+  @override
+  String get mobileXiangqiGameCreated => '對局已建立，等待對手加入。';
+
+  @override
+  String get mobileXiangqiChat => '象棋聊天室';
+
+  @override
+  String get mobileXiangqiChatRooms => '公共聊天室';
+
+  @override
+  String get mobileXiangqiChatClubs => '棋社';
+
+  @override
+  String get mobileXiangqiChatNoClubs => '你還沒有加入任何棋社。';
+
+  @override
+  String get mobileXiangqiChatEmpty => '還沒有訊息。';
+
+  @override
+  String get mobileXiangqiChatSend => '傳送訊息';
+
+  @override
+  String get mobileXiangqiChatGame => '本局';
+
+  @override
+  String get mobileXiangqiLessonPlay => '開始這一章';
+
+  @override
+  String get mobileXiangqiLessonHint => '提示';
+
+  @override
+  String get mobileXiangqiLessonUndo => '復原';
+
+  @override
+  String get mobileXiangqiLessonGreatJob => '做得好！';
+
+  @override
+  String get mobileXiangqiLessonThinking => '思考中…';
+
+  @override
+  String get mobileXiangqiLessonWrongMove => '不是這一步。';
+
+  @override
+  String get mobileXiangqiLessonNextChapter => '下一章';
+
+  @override
+  String get mobileXiangqiSignUp => '註冊帳號';
+
+  @override
+  String get mobileXiangqiSignUpCode => '驗證碼';
+
+  @override
+  String get mobileXiangqiSignUpUsername => '使用者名稱';
+
+  @override
+  String get mobileXiangqiSignUpPassword => '密碼';
+
+  @override
+  String get mobileXiangqiSignUpCountry => '國家/地區';
+
+  @override
+  String get mobileXiangqiSignUpSendCode => '傳送驗證碼';
+
+  @override
+  String mobileXiangqiSignUpCodeSent(String param) {
+    return '驗證碼已寄至 $param。';
+  }
+
+  @override
+  String get mobileXiangqiSignUpInvalidCode => '驗證碼不正確。';
+
+  @override
+  String get mobileXiangqiSignUpDone => '歡迎！';
+
+  @override
+  String get mobileXiangqiSignUpEmailTaken => '該信箱已經註冊過了。';
+
+  @override
+  String get mobileXiangqiLevel => '你的棋力';
+
+  @override
+  String get mobileXiangqiLevelBeginner => '新手';
+
+  @override
+  String get mobileXiangqiLevelCasual => '休閒';
+
+  @override
+  String get mobileXiangqiLevelIntermediate => '中級';
+
+  @override
+  String get mobileXiangqiLevelAdvanced => '高級';
+
+  @override
+  String get mobileXiangqiLevelElite => '菁英';
+
+  @override
+  String get mobileXiangqiDeleteAccount => '註銷象棋帳號';
+
+  @override
+  String get mobileXiangqiDeleteAccountWarning => '這會刪除 xiangqi.com 上的帳號，且無法復原。';
+
+  @override
+  String get mobileXiangqiSignOut => '登出象棋帳號';
 
   @override
   String mobileGoodDay(String param) {

@@ -360,4 +360,49 @@
   <string name="xiangqiSignIn" comment="The entry that starts the xiangqi.com sign-in, and the title of the screen it opens. Named after the service, so that it does not read as a third way of signing in to lichess.">登录象棋账号</string>
   <string name="xiangqiStalemateLoss" comment="Xiangqi game-end sentence: the side named by %s has no legal move. Unlike chess, where having no move is a draw, in xiangqi it loses the game (困毙).">%s无子可走，困毙判负。</string>
   <string name="xiangqiThreefoldRepetition" comment="Xiangqi game-end sentence: the same position occurred three times, drawing the game.">同一局面出现三次，判为和棋。</string>
+  <string name="xiangqiQuickGame" comment="Lobby card that starts a quick match. Keep it short.">快速对局</string>
+  <string name="xiangqiQuickGameSubtitle" comment="Under the quick game card: what it does.">随机匹配一位对手</string>
+  <string name="xiangqiCreateGame" comment="Lobby card that opens the custom game form. Keep it short.">创建对局</string>
+  <string name="xiangqiCreateGameSubtitle" comment="Under the create game card: what it does.">选好时间与先后手，再邀请对手</string>
+  <string name="xiangqiSearching" comment="Shown while a quick match is looking for an opponent.">正在寻找对手…</string>
+  <string name="xiangqiSearchingCancel" comment="Button that gives up on a quick match.">取消</string>
+  <string name="xiangqiChallengeOpen" comment="A challenge nobody has accepted yet.">公开挑战</string>
+  <string name="xiangqiInvite" comment="Button that invites an account into a game.">邀请</string>
+  <string name="xiangqiInvitePlayers" comment="Heading of the list of accounts that can be invited.">在线棋手</string>
+  <string name="xiangqiInviteSent" comment="Shown after an invitation was sent.">邀请已发出。</string>
+  <string name="xiangqiPrivateGame" comment="Switch that keeps a game out of the public list.">私密</string>
+  <string name="xiangqiGameCreated" comment="Shown after a custom game was created and nobody has joined yet.">对局已创建，等待对手加入。</string>
+  <string name="xiangqiChat" comment="Screen title of the xiangqi chat hub.">象棋聊天室</string>
+  <string name="xiangqiChatRooms" comment="Section heading: the public lobby rooms.">公共聊天室</string>
+  <string name="xiangqiChatClubs" comment="Section heading: the clubs the account is in.">棋社</string>
+  <string name="xiangqiChatNoClubs" comment="Shown when the account is in no club.">你还没有加入任何棋社。</string>
+  <string name="xiangqiChatEmpty" comment="Shown in a chat room that has no messages.">还没有消息。</string>
+  <string name="xiangqiChatSend" comment="Placeholder of the chat input field.">发送消息</string>
+  <string name="xiangqiChatGame" comment="Section heading in the chat hub: the game being played, if any.">本局</string>
+  <string name="xiangqiLessonPlay" comment="Button that starts playing a lesson chapter.">开始这一章</string>
+  <string name="xiangqiLessonHint" comment="Bottom bar button that shows the next move of a lesson.">提示</string>
+  <string name="xiangqiLessonUndo" comment="Bottom bar button that takes the last lesson move back.">撤销</string>
+  <string name="xiangqiLessonGreatJob" comment="Shown when a lesson chapter is finished.">做得好！</string>
+  <string name="xiangqiLessonThinking" comment="Shown while the engine checks a lesson move.">思考中…</string>
+  <string name="xiangqiLessonWrongMove" comment="Shown when a lesson move is not the one the chapter wants.">不是这一步。</string>
+  <string name="xiangqiLessonNextChapter" comment="Button that moves on to the next chapter of a lesson.">下一章</string>
+  <string name="xiangqiSignUp" comment="Button and screen title for creating a xiangqi.com account.">注册账号</string>
+  <string name="xiangqiSignUpCode" comment="Label of the field where the emailed sign-up code is typed.">验证码</string>
+  <string name="xiangqiSignUpUsername" comment="Label of the username field of the sign-up form.">用户名</string>
+  <string name="xiangqiSignUpPassword" comment="Label of the password field of the sign-up form.">密码</string>
+  <string name="xiangqiSignUpCountry" comment="Label of the country field of the sign-up form.">国家/地区</string>
+  <string name="xiangqiSignUpSendCode" comment="Button that asks for the sign-up code to be emailed.">发送验证码</string>
+  <string name="xiangqiSignUpCodeSent" comment="Shown after the sign-up code was emailed. %s is the address.">验证码已发送至 %s。</string>
+  <string name="xiangqiSignUpInvalidCode" comment="Shown when the emailed sign-up code is refused.">验证码不正确。</string>
+  <string name="xiangqiSignUpDone" comment="Shown when the new xiangqi.com account is ready.">欢迎！</string>
+  <string name="xiangqiSignUpEmailTaken" comment="Shown when the address already has a xiangqi.com account.">该邮箱已经注册过了。</string>
+  <string name="xiangqiLevel" comment="Label of the playing-strength picker of the sign-up form.">你的水平</string>
+  <string name="xiangqiLevelBeginner" comment="One of the five playing strengths a new account picks from.">新手</string>
+  <string name="xiangqiLevelCasual" comment="One of the five playing strengths a new account picks from.">休闲</string>
+  <string name="xiangqiLevelIntermediate" comment="One of the five playing strengths a new account picks from.">中级</string>
+  <string name="xiangqiLevelAdvanced" comment="One of the five playing strengths a new account picks from.">高级</string>
+  <string name="xiangqiLevelElite" comment="One of the five playing strengths a new account picks from.">精英</string>
+  <string name="xiangqiDeleteAccount" comment="Settings entry that deletes the xiangqi.com account.">注销象棋账号</string>
+  <string name="xiangqiDeleteAccountWarning" comment="Confirmation body before deleting the xiangqi.com account.">这会删除 xiangqi.com 上的账号，且无法撤销。</string>
+  <string name="xiangqiSignOut" comment="Settings entry that signs out of xiangqi.com.">退出象棋账号</string>
 </resources>

@@ -6,6 +6,7 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/account/account_preferences.dart';
+import 'package:lichess_mobile/src/model/common/game_family.dart';
 import 'package:lichess_mobile/src/model/common/local_game_clock.dart';
 import 'package:lichess_mobile/src/model/common/time_increment.dart';
 import 'package:lichess_mobile/src/model/lobby/game_setup_preferences.dart';
@@ -22,6 +23,7 @@ import 'package:lichess_mobile/src/utils/focus_detector.dart';
 import 'package:lichess_mobile/src/utils/immersive_mode.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
+import 'package:lichess_mobile/src/view/over_the_board/over_the_board_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_game_screen.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_action_sheet.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_bottom_sheet.dart';
@@ -477,6 +479,33 @@ class _ConfigureXiangqiOtbSheetState() extends ConsumerState<_ConfigureXiangqiOt
         ListSection(
           materialFilledCard: true,
           children: [
+            // The same row the chess sheet carries, saying the other way round, because it is the
+            // same choice: which of the two games is being set up. It is read after the picker has
+            // closed, and the sheet is popped before the chess board goes up — a route pushed from
+            // inside the picker's callback is the route the picker pops on its way out.
+            SettingsListTile(
+              settingsLabel: Text(context.l10n.mobileGame),
+              settingsValue: context.l10n.mobileXiangqi,
+              onTap: () async {
+                final game = await showChoicePicker<GameFamily>(
+                  context,
+                  title: Text(context.l10n.mobileGame),
+                  choices: GameFamily.values,
+                  selectedItem: GameFamily.xiangqi,
+                  labelBuilder: (game) => Text(
+                    game == GameFamily.chess
+                        ? context.l10n.mobileChess
+                        : context.l10n.mobileXiangqi,
+                  ),
+                );
+                if (!context.mounted || game != GameFamily.chess) return;
+                final navigator = Navigator.of(context, rootNavigator: true);
+                Navigator.pop(context);
+                // Replaced rather than pushed: this board is the one being left, and a chess board
+                // stacked on top of it would be a game the reader has to back out of twice.
+                navigator.pushReplacement(OverTheBoardScreen.buildRoute());
+              },
+            ),
             SettingsListTile(
               settingsLabel: Text(context.l10n.timeControl),
               settingsValue: _timeControlType.label(context.l10n),

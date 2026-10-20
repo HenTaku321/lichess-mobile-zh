@@ -13,7 +13,13 @@ import 'package:material_ui/material_ui.dart';
 /// the one caller that passes a predicate passes one that is true everywhere except
 /// on desktop, where the Cupertino renderings are unreachable. Give this parameter a
 /// meaning on iOS before passing it a predicate that can be false there.
-Future<void> showChoicePicker<T>(
+///
+/// **The future completes with the choice, once the picker is gone** — null when the reader
+/// cancelled, or when the platform's rendering delivers the choice through [onSelectedItemChanged]
+/// alone (the iOS wheel). A callback that navigates does so *while the picker is still up*, and the
+/// picker's own pop then lands on whatever the callback pushed: a caller that has to open a screen,
+/// or close the sheet under the picker, has to wait for this future instead.
+Future<T?> showChoicePicker<T>(
   BuildContext context, {
   Widget? title,
   required List<T> choices,
@@ -33,7 +39,7 @@ Future<void> showChoicePicker<T>(
     case TargetPlatform.windows:
     case TargetPlatform.fuchsia:
       final deviceHeight = MediaQuery.heightOf(context);
-      return showDialog<void>(
+      return showDialog<T>(
         context: context,
         builder: (context) {
           return AlertDialog(
@@ -55,10 +61,12 @@ Future<void> showChoicePicker<T>(
                 return RadioGroup(
                   groupValue: selectedItem,
                   onChanged: (value) {
-                    if (value is T && onSelectedItemChanged != null) {
-                      onSelectedItemChanged(value);
-                      Navigator.of(context).pop();
-                    }
+                    if (value is! T) return;
+                    // The picker closes on the choice whether or not there is a callback to hear
+                    // about it: the choice is also the future's answer, and a caller that only
+                    // wants that one would otherwise be left with a dialog that ignores taps.
+                    onSelectedItemChanged?.call(value);
+                    Navigator.of(context).pop(value);
                   },
                   child: choiceWidgets.length >= 10
                       ? SizedBox(
@@ -81,7 +89,7 @@ Future<void> showChoicePicker<T>(
       );
     case TargetPlatform.iOS:
       if (choices.length <= 10) {
-        return showCupertinoModalPopup<void>(
+        return showCupertinoModalPopup<T>(
           context: context,
           builder: (context) {
             return CupertinoActionSheet(
@@ -92,7 +100,7 @@ Future<void> showChoicePicker<T>(
                     if (onSelectedItemChanged != null) {
                       onSelectedItemChanged(value);
                     }
-                    Navigator.of(context).pop();
+                    Navigator.of(context).pop(value);
                   },
                   child: labelBuilder(value),
                 );
@@ -106,7 +114,10 @@ Future<void> showChoicePicker<T>(
           },
         );
       } else {
-        return showCupertinoModalPopup<void>(
+        // The wheel has no "chosen" moment to hand back: it reports the row it settles on, over and
+        // over, through [onSelectedItemChanged]. So this one completes with nothing, and the caller
+        // that needs a value has to take it from the callback.
+        return showCupertinoModalPopup<T>(
           context: context,
           builder: (context) {
             return NotificationListener(

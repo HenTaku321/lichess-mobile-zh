@@ -19,6 +19,7 @@ import 'package:lichess_mobile/src/model/over_the_board/over_the_board_game_cont
 import 'package:lichess_mobile/src/model/over_the_board/over_the_board_game_storage.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
 import 'package:lichess_mobile/src/view/over_the_board/over_the_board_screen.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_over_the_board_screen.dart';
 import 'package:lichess_mobile/src/widgets/clock.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:mocktail/mocktail.dart';
@@ -55,6 +56,45 @@ void main() {
   registerFallbackValue(const TimeIncrement(0, 0));
 
   group('Playing over the board (offline)', () {
+    testWidgets('the game picker opens the xiangqi board, and stays there', (tester) async {
+      // **The regression this pins.** The picker's callback used to pop the sheet and push the
+      // xiangqi board from inside itself, and the picker then popped the route that callback had
+      // just pushed: the board slid in and straight back out, and the reader was left on the chess
+      // sheet with the radio still on chess. The choice is read after the picker has closed now.
+      final gameStorage = MockOverTheBoardGameStorage();
+      when(() => gameStorage.fetchOngoingGame()).thenAnswer((_) async => null);
+
+      await tester.pumpWidget(
+        await makeTestProviderScopeApp(
+          tester,
+          home: const OverTheBoardScreen(),
+          overrides: {
+            overTheBoardGameStorageProvider: overTheBoardGameStorageProvider.overrideWith(
+              (_) => gameStorage,
+            ),
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // The sheet opens on arrival, and its first row is the game being set up.
+      expect(find.text('Game'), findsOneWidget);
+      expect(find.text('Chess'), findsOneWidget);
+      await tester.tap(find.text('Chess'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Xiangqi'));
+      await tester.pumpAndSettle();
+
+      // The xiangqi board is up, and the chess one — sheet and all — is behind it. Nothing is
+      // asserted about the route underneath, which a full-screen route above it takes out of the
+      // tree: what would have gone wrong is the board being pushed and popped again, and that
+      // leaves this screen with nothing on it.
+      expect(find.byType(XiangqiOverTheBoardScreen), findsOneWidget);
+      expect(find.text('Game'), findsNothing);
+      expect(find.byType(Chessboard), findsNothing);
+    });
+
     testWidgets('Checkmate and Rematch', (tester) async {
       await initOverTheBoardGame(tester, const TimeIncrement(60, 5));
 

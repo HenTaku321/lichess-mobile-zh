@@ -151,8 +151,13 @@ class _ConfigureOverTheBoardGameSheetState()
             SettingsListTile(
               settingsLabel: Text(context.l10n.mobileGame),
               settingsValue: context.l10n.mobileChess,
-              onTap: () {
-                showChoicePicker<GameFamily>(
+              // The xiangqi board is a screen of its own, so this row is a way out of the chess one
+              // rather than a setting: it is read *after* the picker has closed, and the sheet is
+              // popped before the board goes up. Both of those are the same point — the picker pops
+              // itself once its callback returns, and a route pushed from inside that callback is
+              // the route it pops on the way out.
+              onTap: () async {
+                final game = await showChoicePicker<GameFamily>(
                   context,
                   title: Text(context.l10n.mobileGame),
                   choices: GameFamily.values,
@@ -162,15 +167,11 @@ class _ConfigureOverTheBoardGameSheetState()
                         ? context.l10n.mobileChess
                         : context.l10n.mobileXiangqi,
                   ),
-                  onSelectedItemChanged: (game) {
-                    if (game != GameFamily.xiangqi) return;
-                    Navigator.pop(context);
-                    Navigator.of(
-                      context,
-                      rootNavigator: true,
-                    ).push(XiangqiOverTheBoardScreen.buildRoute(initialFen: widget.initialFen));
-                  },
                 );
+                if (!context.mounted || game != GameFamily.xiangqi) return;
+                final navigator = Navigator.of(context, rootNavigator: true);
+                Navigator.pop(context);
+                navigator.push(XiangqiOverTheBoardScreen.buildRoute(initialFen: widget.initialFen));
               },
             ),
             SettingsListTile(

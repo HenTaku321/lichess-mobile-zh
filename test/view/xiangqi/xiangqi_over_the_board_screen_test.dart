@@ -11,6 +11,7 @@ import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_storage.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_otb_game_storage.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
+import 'package:lichess_mobile/src/view/over_the_board/over_the_board_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_over_the_board_screen.dart';
 import 'package:lichess_mobile/src/widgets/clock.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
@@ -111,6 +112,24 @@ void main() {
   TestLichessBinding.ensureInitialized();
 
   group('XiangqiOverTheBoardScreen', () {
+    testWidgets('the game picker goes back to the chess board, and stays there', (tester) async {
+      // The other half of the chess sheet's own row: the two boards are one way of playing offered
+      // for two games, so whichever one the reader is setting up, the other is a tap away.
+      await pumpOtbScreen(tester, startGame: false);
+
+      expect(find.text('Game'), findsOneWidget);
+      expect(find.text('Xiangqi'), findsOneWidget);
+      await tester.tap(find.text('Xiangqi'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Chess'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(OverTheBoardScreen), findsOneWidget);
+      expect(find.byType(XiangqiOverTheBoardScreen), findsNothing);
+      expect(find.text('Game'), findsNothing);
+    });
+
     testWidgets("both sides move, and the moves are written in the game's own notation", (
       tester,
     ) async {

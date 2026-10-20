@@ -7,10 +7,10 @@ import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
 import 'package:lichess_mobile/src/view/auth/xiangqi_login_screen.dart';
+import 'package:lichess_mobile/src/view/play/common_play_widgets.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_online_game_screen.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_choice_picker.dart';
 import 'package:lichess_mobile/src/widgets/feedback.dart';
-import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
 import 'package:lichess_mobile/src/widgets/settings.dart';
 import 'package:material_ui/material_ui.dart';
@@ -49,6 +49,14 @@ const int xiangqiQuickMatchRounds = 12;
 /// A daily game, an email invitation and a rating window are all things the endpoint takes and this
 /// screen does not offer — see [XiangqiCustomGameRequest], which keeps the fields so that they are
 /// a screen's work and not a protocol's.
+///
+/// ## The form is the chess lobby's panel
+///
+/// Setting up a game looks the same on both boards, and it is the same widgets that make it so: the
+/// two rows of labelled buttons over a full-width action button are [PlaySetupButton], which the
+/// chess panel is built from too. What differs is the settings, because the games differ — a
+/// variant and a rating window are chess ideas, and the side and the clock are the two boards'
+/// shared ones.
 class const XiangqiNewGameScreen({super.key}) extends ConsumerWidget {
   static Route<void> buildRoute() => buildScreenRoute(screen: const XiangqiNewGameScreen());
 
@@ -109,106 +117,138 @@ class _FormState() extends ConsumerState<_Form> {
   /// second game.
   bool _busy = false;
 
+  /// Whether the settings that only a game of your own has are being asked for.
+  ///
+  /// A quick match is one field — the time control — and everything else about the game is the
+  /// server's to decide: it pairs with whoever is queued, on both sides of the board, for rating.
+  /// So the second row of controls is only there for a game of your own, which is the same
+  /// judgement the chess panel makes about its own second row.
+  bool get _isCustom => _opponent == _Opponent.custom;
+
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       children: [
-        ListSection(
-          materialFilledCard: true,
+        // The chess lobby's own panel, part for part: two rows of labelled buttons over a
+        // full-width action button, and the same widget for each button. See [PlaySetupButton],
+        // which is what the two panels share.
+        Row(
           children: [
-            SettingsListTile(
-              icon: const Icon(Icons.bolt),
-              settingsLabel: Text(context.l10n.opponent),
-              settingsValue: switch (_opponent) {
-                _Opponent.quick => context.l10n.mobileXiangqiQuickGame,
-                _Opponent.custom => context.l10n.mobileXiangqiCreateGame,
-              },
-              explanation: switch (_opponent) {
-                _Opponent.quick => context.l10n.mobileXiangqiQuickGameSubtitle,
-                _Opponent.custom => context.l10n.mobileXiangqiCreateGameSubtitle,
-              },
-              onTap: _busy
-                  ? null
-                  : () {
-                      showChoicePicker<_Opponent>(
-                        context,
-                        title: Text(context.l10n.opponent),
-                        choices: _Opponent.values,
-                        selectedItem: _opponent,
-                        labelBuilder: (opponent) => Text(switch (opponent) {
-                          _Opponent.quick => context.l10n.mobileXiangqiQuickGame,
-                          _Opponent.custom => context.l10n.mobileXiangqiCreateGame,
-                        }),
-                        onSelectedItemChanged: (opponent) => setState(() => _opponent = opponent),
-                      );
-                    },
+            Expanded(
+              child: PlaySetupButton(
+                label: context.l10n.opponent,
+                value: _opponentLabel(context),
+                icon: _isCustom ? Icons.tune : Icons.bolt,
+                onPressed: _busy
+                    ? null
+                    : () {
+                        showChoicePicker<_Opponent>(
+                          context,
+                          title: Text(context.l10n.opponent),
+                          choices: _Opponent.values,
+                          selectedItem: _opponent,
+                          labelBuilder: (opponent) => Text(switch (opponent) {
+                            _Opponent.quick => context.l10n.mobileXiangqiQuickGame,
+                            _Opponent.custom => context.l10n.mobileXiangqiCreateGame,
+                          }),
+                          onSelectedItemChanged: (opponent) => setState(() => _opponent = opponent),
+                        );
+                      },
+              ),
             ),
-            SettingsListTile(
-              settingsLabel: Text(context.l10n.clock),
-              settingsValue: _timeControlLabel(context, _timeControl),
-              onTap: _busy
-                  ? null
-                  : () {
-                      showChoicePicker<XiangqiTimeControl>(
-                        context,
-                        title: Text(context.l10n.clock),
-                        choices: XiangqiTimeControl.values,
-                        selectedItem: _timeControl,
-                        labelBuilder: (control) => Text(_timeControlLabel(context, control)),
-                        onSelectedItemChanged: (control) => setState(() => _timeControl = control),
-                      );
-                    },
-            ),
-            SettingsListTile(
-              settingsLabel: Text(context.l10n.side),
-              settingsValue: _sideLabel(context, _side),
-              onTap: _busy
-                  ? null
-                  : () {
-                      showChoicePicker<XiangqiSideChoice>(
-                        context,
-                        title: Text(context.l10n.side),
-                        choices: XiangqiSideChoice.values,
-                        selectedItem: _side,
-                        labelBuilder: (side) => Text(_sideLabel(context, side)),
-                        onSelectedItemChanged: (side) => setState(() => _side = side),
-                      );
-                    },
+            const SizedBox(width: 8.0),
+            Expanded(
+              child: PlaySetupButton(
+                label: context.l10n.clock,
+                value: _timeControlLabel(context, _timeControl),
+                icon: Icons.timer_outlined,
+                valueStyle: const TextStyle(letterSpacing: 2.0),
+                onPressed: _busy
+                    ? null
+                    : () {
+                        showChoicePicker<XiangqiTimeControl>(
+                          context,
+                          title: Text(context.l10n.clock),
+                          choices: XiangqiTimeControl.values,
+                          selectedItem: _timeControl,
+                          labelBuilder: (control) => Text(_timeControlLabel(context, control)),
+                          onSelectedItemChanged: (control) =>
+                              setState(() => _timeControl = control),
+                        );
+                      },
+              ),
             ),
           ],
         ),
-        if (_opponent == _Opponent.custom)
-          ListSection(
-            materialFilledCard: true,
+        if (_isCustom) ...[
+          const SizedBox(height: 6.0),
+          Row(
             children: [
-              SwitchSettingTile(
-                title: Text(context.l10n.rated),
-                value: _rated,
-                onChanged: _busy ? null : (value) => setState(() => _rated = value),
+              Expanded(
+                child: PlaySetupButton(
+                  label: context.l10n.side,
+                  value: _sideLabel(context, _side),
+                  onPressed: _busy
+                      ? null
+                      : () {
+                          showChoicePicker<XiangqiSideChoice>(
+                            context,
+                            title: Text(context.l10n.side),
+                            choices: XiangqiSideChoice.values,
+                            selectedItem: _side,
+                            labelBuilder: (side) => Text(_sideLabel(context, side)),
+                            onSelectedItemChanged: (side) => setState(() => _side = side),
+                          );
+                        },
+                ),
               ),
-              SwitchSettingTile(
-                title: Text(context.l10n.mobileXiangqiPrivateGame),
-                value: _private,
-                onChanged: _busy ? null : (value) => setState(() => _private = value),
+              const SizedBox(width: 8.0),
+              Expanded(
+                child: PlaySetupButton(
+                  label: context.l10n.gameMode,
+                  value: _rated ? context.l10n.rated : context.l10n.casual,
+                  onPressed: _busy
+                      ? null
+                      : () {
+                          showChoicePicker<bool>(
+                            context,
+                            title: Text(context.l10n.gameMode),
+                            choices: const [false, true],
+                            selectedItem: _rated,
+                            labelBuilder: (rated) =>
+                                Text(rated ? context.l10n.rated : context.l10n.casual),
+                            onSelectedItemChanged: (rated) => setState(() => _rated = rated),
+                          );
+                        },
+                ),
               ),
             ],
           ),
-        Padding(
-          padding: Styles.horizontalBodyPadding,
-          child: FilledButton(
-            onPressed: _busy ? null : _play,
-            child: Text(
-              _opponent == _Opponent.quick
-                  ? context.l10n.mobileXiangqiQuickGame
-                  : context.l10n.createAGame,
-              style: Styles.bold,
-            ),
+          const SizedBox(height: 6.0),
+          // The one setting that is a yes or a no rather than a choice between things, drawn the
+          // way this app draws every other one of those.
+          SwitchSettingTile(
+            title: Text(context.l10n.mobileXiangqiPrivateGame),
+            value: _private,
+            onChanged: _busy ? null : (value) => setState(() => _private = value),
+          ),
+        ],
+        const SizedBox(height: 16.0),
+        FilledButton.icon(
+          icon: Icon(_isCustom ? Icons.add : Icons.bolt),
+          onPressed: _busy ? null : _play,
+          label: Text(
+            _isCustom ? context.l10n.createAGame : context.l10n.mobileXiangqiQuickGame,
+            style: Styles.bold,
           ),
         ),
       ],
     );
   }
+
+  String _opponentLabel(BuildContext context) =>
+      _isCustom ? context.l10n.mobileXiangqiCreateGame : context.l10n.mobileXiangqiQuickGame;
 
   String _timeControlLabel(BuildContext context, XiangqiTimeControl control) {
     final increment = control.increment;

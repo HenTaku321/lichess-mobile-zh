@@ -5,7 +5,6 @@ import 'package:lichess_mobile/src/model/lobby/game_seek.dart';
 import 'package:lichess_mobile/src/model/lobby/game_setup_preferences.dart';
 import 'package:lichess_mobile/src/network/connectivity.dart';
 import 'package:lichess_mobile/src/styles/icon_extensions.dart';
-import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/view/game/game_screen.dart';
 import 'package:lichess_mobile/src/view/game/game_screen_providers.dart';
@@ -27,9 +26,6 @@ class const CreateGameWidget() extends ConsumerWidget {
     final userPerf = account?.perfs[playPrefs.realTimePerf];
     final canUseRatingRange = userPerf != null && userPerf.provisional != true;
 
-    final labelStyle = Theme.of(context).textTheme.labelMedium
-        ?.copyWith(color: textShade(context, 0.5), height: 1.0);
-
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -38,89 +34,49 @@ class const CreateGameWidget() extends ConsumerWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Expanded(
-              child: Semantics(
-                container: true,
-                button: true,
-                label: '${context.l10n.timeControl}: ${playPrefs.timeIncrement.display}',
-                excludeSemantics: true,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(context.l10n.timeControl, style: labelStyle),
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: Theme.of(context).dividerColor),
-                      ),
-                      icon: Icon(playPrefs.timeIncrement.speed.icon),
-                      label: Text(
-                        playPrefs.timeIncrement.display,
-                        style: const TextStyle(letterSpacing: 2.0),
-                      ),
-                      onPressed: () {
-                        final double screenHeight = MediaQuery.heightOf(context);
-                        showModalBottomSheet<void>(
-                          context: context,
-                          isScrollControlled: true,
-                          constraints: BoxConstraints(
-                            maxHeight: screenHeight - (screenHeight / 10),
-                          ),
-                          builder: (BuildContext context) {
-                            return TimeControlModal(
-                              timeIncrement: playPrefs.timeIncrement,
-                              onSelected: (choice) {
-                                ref
-                                    .read(gameSetupPreferencesProvider.notifier)
-                                    .setTimeIncrement(choice);
-                              },
-                            );
-                          },
-                        );
-                      },
-                    ),
-                  ],
-                ),
+              child: PlaySetupButton(
+                label: context.l10n.timeControl,
+                value: playPrefs.timeIncrement.display,
+                icon: playPrefs.timeIncrement.speed.icon,
+                valueStyle: const TextStyle(letterSpacing: 2.0),
+                onPressed: () {
+                  final double screenHeight = MediaQuery.heightOf(context);
+                  showModalBottomSheet<void>(
+                    context: context,
+                    isScrollControlled: true,
+                    constraints: BoxConstraints(maxHeight: screenHeight - (screenHeight / 10)),
+                    builder: (BuildContext context) {
+                      return TimeControlModal(
+                        timeIncrement: playPrefs.timeIncrement,
+                        onSelected: (choice) {
+                          ref.read(gameSetupPreferencesProvider.notifier).setTimeIncrement(choice);
+                        },
+                      );
+                    },
+                  );
+                },
               ),
             ),
             const SizedBox(width: 8.0),
             Expanded(
-              child: Semantics(
-                container: true,
-                button: true,
-                label: '${context.l10n.variant}: ${playPrefs.customVariant.label(context.l10n)}',
-                excludeSemantics: true,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(context.l10n.variant, style: labelStyle),
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: Theme.of(context).dividerColor),
-                      ),
-                      icon: playPrefs.customVariant != Variant.standard
-                          ? Icon(playPrefs.customVariant.icon)
-                          : null,
-                      label: Text(playPrefs.customVariant.label(context.l10n)),
-                      onPressed: () {
-                        showChoicePicker(
-                          context,
-                          title: Text(context.l10n.variant),
-                          choices: playSupportedVariants
-                              .where((v) => v != Variant.fromPosition)
-                              .toList(),
-                          selectedItem: playPrefs.customVariant,
-                          labelBuilder: (variant) => VariantLabel(variant),
-                          onSelectedItemChanged: (Variant variant) {
-                            ref
-                                .read(gameSetupPreferencesProvider.notifier)
-                                .setCustomVariant(variant);
-                          },
-                        );
-                      },
-                    ),
-                  ],
-                ),
+              child: PlaySetupButton(
+                label: context.l10n.variant,
+                value: playPrefs.customVariant.label(context.l10n),
+                icon: playPrefs.customVariant != Variant.standard
+                    ? playPrefs.customVariant.icon
+                    : null,
+                onPressed: () {
+                  showChoicePicker(
+                    context,
+                    title: Text(context.l10n.variant),
+                    choices: playSupportedVariants.where((v) => v != Variant.fromPosition).toList(),
+                    selectedItem: playPrefs.customVariant,
+                    labelBuilder: (variant) => VariantLabel(variant),
+                    onSelectedItemChanged: (Variant variant) {
+                      ref.read(gameSetupPreferencesProvider.notifier).setCustomVariant(variant);
+                    },
+                  );
+                },
               ),
             ),
           ],
@@ -130,118 +86,74 @@ class const CreateGameWidget() extends ConsumerWidget {
           Row(
             children: [
               Expanded(
-                child: Semantics(
-                  container: true,
-                  button: true,
-                  label:
-                      '${context.l10n.gameMode}: ${playPrefs.customRated ? context.l10n.rated : context.l10n.casual}',
-                  excludeSemantics: true,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(context.l10n.gameMode, style: labelStyle),
-                      OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: Theme.of(context).dividerColor),
-                        ),
-                        onPressed: () {
-                          showChoicePicker(
-                            context,
-                            title: Text(context.l10n.gameMode),
-                            choices: [context.l10n.casual, context.l10n.rated],
-                            selectedItem: playPrefs.customRated
-                                ? context.l10n.rated
-                                : context.l10n.casual,
-                            labelBuilder: (String label) => Text(label),
-                            onSelectedItemChanged: (String label) {
-                              ref
-                                  .read(gameSetupPreferencesProvider.notifier)
-                                  .setCustomRated(label == context.l10n.rated);
-                            },
-                          );
-                        },
-                        child: Text(
-                          playPrefs.customRated ? context.l10n.rated : context.l10n.casual,
-                        ),
-                      ),
-                    ],
-                  ),
+                child: PlaySetupButton(
+                  label: context.l10n.gameMode,
+                  value: playPrefs.customRated ? context.l10n.rated : context.l10n.casual,
+                  onPressed: () {
+                    showChoicePicker(
+                      context,
+                      title: Text(context.l10n.gameMode),
+                      choices: [context.l10n.casual, context.l10n.rated],
+                      selectedItem: playPrefs.customRated
+                          ? context.l10n.rated
+                          : context.l10n.casual,
+                      labelBuilder: (String label) => Text(label),
+                      onSelectedItemChanged: (String label) {
+                        ref
+                            .read(gameSetupPreferencesProvider.notifier)
+                            .setCustomRated(label == context.l10n.rated);
+                      },
+                    );
+                  },
                 ),
               ),
               const SizedBox(width: 8.0),
               Expanded(
-                child: Semantics(
-                  container: true,
-                  button: true,
-                  label:
-                      '${context.l10n.ratingFilter}: ${canUseRatingRange ? '${playPrefs.customRatingDelta.$1 == 0 ? '-' : ''}${playPrefs.customRatingDelta.$1} / +${playPrefs.customRatingDelta.$2}' : '-500 / +500'}',
-                  excludeSemantics: true,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      GestureDetector(
-                        onTap: canUseRatingRange
-                            ? null
-                            : () => _showDisabledRatingRangeExplanation(context),
-                        child: Row(
-                          mainAxisSize: .min,
-                          children: [
-                            Text(context.l10n.ratingFilter, style: labelStyle),
-                            if (!canUseRatingRange)
-                              Padding(
-                                padding: const EdgeInsets.only(left: 4.0),
-                                child: Icon(
-                                  Icons.info_outline,
-                                  size: 16.0,
-                                  color: Theme.of(context).disabledColor,
-                                ),
-                              ),
-                          ],
+                child: PlaySetupButton(
+                  label: context.l10n.ratingFilter,
+                  value: canUseRatingRange
+                      ? '${playPrefs.customRatingDelta.$1 == 0 ? '-' : ''}${playPrefs.customRatingDelta.$1} / +${playPrefs.customRatingDelta.$2}'
+                      : '-500 / +500',
+                  dimmed: !canUseRatingRange,
+                  labelTrailing: canUseRatingRange
+                      ? null
+                      : Padding(
+                          padding: const EdgeInsets.only(left: 4.0),
+                          child: Icon(
+                            Icons.info_outline,
+                            size: 16.0,
+                            color: Theme.of(context).disabledColor,
+                          ),
                         ),
-                      ),
-                      OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: Theme.of(context).dividerColor),
-                          foregroundColor: canUseRatingRange
-                              ? null
-                              : Theme.of(context).disabledColor,
-                        ),
-                        onPressed: canUseRatingRange
-                            ? () {
-                                showModalBottomSheet<void>(
-                                  context: context,
-                                  constraints: BoxConstraints(
-                                    minHeight: MediaQuery.heightOf(context) * 0.4,
+                  onLabelTap: canUseRatingRange
+                      ? null
+                      : () => _showDisabledRatingRangeExplanation(context),
+                  onPressed: canUseRatingRange
+                      ? () {
+                          showModalBottomSheet<void>(
+                            context: context,
+                            constraints: BoxConstraints(
+                              minHeight: MediaQuery.heightOf(context) * 0.4,
+                            ),
+                            isScrollControlled: true,
+                            builder: (BuildContext context) {
+                              return BottomSheetScrollableContainer(
+                                children: [
+                                  PlayRatingRange(
+                                    perf: userPerf,
+                                    ratingDelta: playPrefs.customRatingDelta,
+                                    onRatingDeltaChange: (int subtract, int add) {
+                                      ref
+                                          .read(gameSetupPreferencesProvider.notifier)
+                                          .setCustomRatingRange(subtract, add);
+                                    },
                                   ),
-                                  isScrollControlled: true,
-                                  builder: (BuildContext context) {
-                                    return BottomSheetScrollableContainer(
-                                      children: [
-                                        PlayRatingRange(
-                                          perf: userPerf,
-                                          ratingDelta: playPrefs.customRatingDelta,
-                                          onRatingDeltaChange: (int subtract, int add) {
-                                            ref
-                                                .read(gameSetupPreferencesProvider.notifier)
-                                                .setCustomRatingRange(subtract, add);
-                                          },
-                                        ),
-                                      ],
-                                    );
-                                  },
-                                );
-                              }
-                            : () => _showDisabledRatingRangeExplanation(context),
-                        child: canUseRatingRange
-                            ? Text(
-                                '${playPrefs.customRatingDelta.$1 == 0 ? '-' : ''}${playPrefs.customRatingDelta.$1} / +${playPrefs.customRatingDelta.$2}',
-                              )
-                            : const Text('-500 / +500'),
-                      ),
-                    ],
-                  ),
+                                ],
+                              );
+                            },
+                          );
+                        }
+                      : () => _showDisabledRatingRangeExplanation(context),
                 ),
               ),
             ],

@@ -240,5 +240,6 @@
   <string name="xiangqiLevelElite" comment="One of the five playing strengths a new account picks from.">菁英</string>
   <string name="xiangqiDeleteAccount" comment="Settings entry that deletes the xiangqi.com account.">註銷象棋帳號</string>
   <string name="xiangqiDeleteAccountWarning" comment="Confirmation body before deleting the xiangqi.com account.">這會刪除 xiangqi.com 上的帳號，且無法復原。</string>
+  <string name="xiangqiDeleteAccountReason" comment="Label of the field in the delete-account dialog where the reader says why they are leaving.">為什麼要離開？</string>
   <string name="xiangqiSignOut" comment="Settings entry that signs out of xiangqi.com.">登出象棋帳號</string>
 </resources>

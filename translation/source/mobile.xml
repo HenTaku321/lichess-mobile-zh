@@ -117,6 +117,7 @@
   <string name="xiangqiLevelElite" comment="One of the five playing strengths a new account picks from.">Elite</string>
   <string name="xiangqiDeleteAccount" comment="Settings entry that deletes the xiangqi.com account.">Delete my xiangqi.com account</string>
   <string name="xiangqiDeleteAccountWarning" comment="Confirmation body before deleting the xiangqi.com account.">This deletes the account on xiangqi.com. It cannot be undone.</string>
+  <string name="xiangqiDeleteAccountReason" comment="Label of the field in the delete-account dialog where the reader says why they are leaving.">Why are you leaving?</string>
   <string name="xiangqiSignOut" comment="Settings entry that signs out of xiangqi.com.">Sign out of xiangqi.com</string>
   <string name="gamePoints" comment="Column header in a broadcast team table: game points. Keep it very short.">GP</string>
   <string name="generatingGif" comment="Shown while a game is being exported as an animated GIF.">Generating GIF...</string>

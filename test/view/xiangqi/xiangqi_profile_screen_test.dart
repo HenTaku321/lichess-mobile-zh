@@ -69,14 +69,21 @@ Map<String, Object?> seat({required String name, required int result}) => {
   'country': {'name': 'Viet Nam', 'code': 'VN'},
 };
 
-/// A client that answers the five endpoints this screen reads.
-MockClient profileClient({bool withGames = true}) {
+/// A client that answers the five endpoints this screen reads, and the deletion.
+///
+/// [deleted] collects the bodies the deletion endpoint was sent, which is how the test that deletes
+/// an account reads what went out without reaching for the request itself.
+MockClient profileClient({bool withGames = true, List<String>? deleted}) {
   var bio = '';
   return MockClient((request) async {
     Object body;
     if (request.method == 'PUT' && request.url.path == '/api/users/account/$_username') {
       final json = jsonDecode(request.body) as Map<String, dynamic>;
       bio = json['bio'] as String? ?? '';
+    }
+    if (request.url.path == '/api/users/account/delete/') {
+      deleted?.add(request.body);
+      return http.Response('{"message": "User Deletion is Started"}', 200);
     }
     switch (request.url.path) {
       case '/api/users/account/$_username':
@@ -154,6 +161,7 @@ Future<void> pumpProfile(
   WidgetTester tester, {
   required MockClient client,
   String? sessionName = _username,
+  bool isGuest = true,
 }) async {
   await tester.pumpWidget(
     await makeTestProviderScope(
@@ -177,7 +185,11 @@ Future<void> pumpProfile(
                 ? null
                 // The fixture names a session after the id it is given, so the id is what has to
                 // carry the name the screen compares against.
-                : fx.xiangqiTestSession(fx.xiangqiTestToken(sessionName), userId: sessionName),
+                : fx.xiangqiTestSession(
+                    fx.xiangqiTestToken(sessionName),
+                    userId: sessionName,
+                    isGuest: isGuest,
+                  ),
           ),
         ),
       },
@@ -243,6 +255,37 @@ void main() {
       await drain(tester);
     });
 
+    testWidgets('offers to delete the account, and deletes it only through the dialog', (
+      tester,
+    ) async {
+      final sent = <String>[];
+      // A real account and not a guest: a guest has nothing to delete, and the row is not offered
+      // to one.
+      await pumpProfile(tester, client: profileClient(deleted: sent), isGuest: false);
+      await scrollDown(tester);
+
+      expect(find.text('Delete my xiangqi.com account'), findsOneWidget);
+      await tester.tap(find.text('Delete my xiangqi.com account'));
+      await tester.pumpAndSettle();
+
+      // The dialog says what deleting does, and asks for the password the endpoint wants.
+      expect(find.textContaining('cannot be undone'), findsWidgets);
+      expect(find.byType(TextField), findsNWidgets(2));
+      // Nothing has been sent yet: the row opens a dialog and does not delete anything by itself.
+      expect(sent, isEmpty);
+
+      await tester.enterText(find.byType(TextField).first, 'a-password');
+      await tester.tap(find.widgetWithText(TextButton, 'Delete my xiangqi.com account'));
+      await tester.pump();
+      await settle(tester, rounds: 20);
+      await drain(tester);
+
+      expect(sent.single, contains('"password":"a-password"'));
+      // `accountDeletion` is the field the endpoint requires, and it is filled in even when the
+      // reader leaves the reason blank.
+      expect(sent.single, contains('"accountDeletion"'));
+    });
+
     testWidgets("offers no way out on somebody else's account", (tester) async {
       // Signing out is an action on the session this device holds, and a profile of somebody else
       // has nothing to sign out of. Two tests rather than one screen pumped twice: a second
@@ -252,6 +295,9 @@ void main() {
 
       expect(find.byIcon(Icons.edit_outlined), findsNothing);
       expect(find.byIcon(Icons.logout), findsNothing);
+      // Deleting is an action on the session this device holds, for the same reason signing out is.
+      await scrollDown(tester);
+      expect(find.text('Delete my xiangqi.com account'), findsNothing);
       await drain(tester);
     });
 

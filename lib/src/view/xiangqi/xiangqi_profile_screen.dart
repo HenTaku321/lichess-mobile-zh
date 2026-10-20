@@ -19,6 +19,7 @@ import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_profile_edit_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_review_screen.dart';
+import 'package:lichess_mobile/src/widgets/feedback.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_avatar.dart';
@@ -51,7 +52,12 @@ class const XiangqiProfileScreen({required final String username, super.key})
 
     // Signing out is offered only on the account's own profile: it is an action on the session this
     // device holds, and a profile of somebody else has nothing to sign out of.
-    final isMe = ref.watch(xiangqiAuthControllerProvider)?.name == username;
+    final session = ref.watch(xiangqiAuthControllerProvider);
+    final isMe = session?.name == username;
+    // A guest has no account to delete — the session is one this app minted for a visitor — and the
+    // endpoint would refuse it. The same judgement the account menu makes about notifications and
+    // saved content.
+    final canDeleteAccount = isMe && session != null && !session.isGuest;
 
     return Scaffold(
       appBar: AppBar(
@@ -93,6 +99,11 @@ class const XiangqiProfileScreen({required final String username, super.key})
             for (final speed in XiangqiRatingType.values)
               _SpeedRecord(username: username, speed: speed),
             _RecentGames(username: username),
+            // Deleting the account is the one thing on this screen that cannot be undone, so it is
+            // the last thing on it and it is behind a dialog that asks for the password. Offered
+            // only on the account's own profile, for the same reason signing out is: it is an action
+            // on the session this device holds.
+            if (canDeleteAccount) _DeleteAccount(username: username),
           ],
         ),
         loading: () => const Center(child: CircularProgressIndicator.adaptive()),
@@ -344,3 +355,136 @@ String _speedLabel(BuildContext context, XiangqiRatingType speed) => switch (spe
 String _date(DateTime instant) =>
     '${instant.year}-${instant.month.toString().padLeft(2, '0')}-'
     '${instant.day.toString().padLeft(2, '0')}';
+
+/// The account's own deletion, and the dialog that has to be got through to reach it.
+///
+/// **The server deletes at once and there is no way back** — measured on 2026-10-19, where a
+/// throwaway account answered `404` to its own profile the moment the call returned. So the dialog
+/// is not decoration: it says so, it asks for the password the account was made with, and it asks
+/// why, which is the field the endpoint requires. See `xiangqi-com-re/docs/auth.md`.
+class const _DeleteAccount({required final String username}) extends ConsumerStatefulWidget {
+  @override
+  ConsumerState<_DeleteAccount> createState() => _DeleteAccountState();
+}
+
+class _DeleteAccountState() extends ConsumerState<_DeleteAccount> {
+  bool _deleting = false;
+
+  Future<void> _confirm() async {
+    final result = await showAdaptiveDialog<({String password, String reason})>(
+      context: context,
+      builder: (dialogContext) => _DeleteAccountDialog(username: widget.username),
+    );
+    if (result == null || !mounted) return;
+
+    setState(() => _deleting = true);
+    try {
+      await ref
+          .read(xiangqiAuthControllerProvider.notifier)
+          .deleteAccount(password: result.password, reason: result.reason);
+      if (!mounted) return;
+      // The account is gone, so this screen has nothing left to show: back to wherever it was
+      // opened from, which is the account menu and its row that now offers a sign-in again.
+      Navigator.of(context, rootNavigator: true).popUntil((route) => route.isFirst);
+    } on XiangqiWrongPasswordException {
+      if (!mounted) return;
+      setState(() => _deleting = false);
+      showSnackBar(context, context.l10n.mobileXiangqiInvalidCredentials, type: SnackBarType.error);
+    } on Object catch (error, stackTrace) {
+      if (!mounted) return;
+      setState(() => _deleting = false);
+      showSnackBar(context, context.l10n.mobileSomethingWentWrong, type: SnackBarType.error);
+      debugPrint('xiangqi account deletion failed: $error\n$stackTrace');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // No section header: the row's own title is the whole of what this section says, and a heading
+    // that repeated it would be the same sentence twice.
+    return ListSection(
+      hasLeading: true,
+      children: [
+        ListTile(
+          leading: Icon(Icons.delete_forever_outlined, color: ColorScheme.of(context).error),
+          title: Text(
+            context.l10n.mobileXiangqiDeleteAccount,
+            style: TextStyle(color: ColorScheme.of(context).error),
+          ),
+          subtitle: Text(context.l10n.mobileXiangqiDeleteAccountWarning),
+          enabled: !_deleting,
+          onTap: _deleting ? null : _confirm,
+        ),
+      ],
+    );
+  }
+}
+
+/// The dialog that stands between the row above and a deleted account.
+class const _DeleteAccountDialog({required final String username}) extends ConsumerStatefulWidget {
+  @override
+  ConsumerState<_DeleteAccountDialog> createState() => _DeleteAccountDialogState();
+}
+
+class _DeleteAccountDialogState() extends ConsumerState<_DeleteAccountDialog> {
+  final _password = TextEditingController();
+  final _reason = TextEditingController();
+
+  @override
+  void dispose() {
+    _password.dispose();
+    _reason.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog.adaptive(
+      title: Text(context.l10n.mobileXiangqiDeleteAccount),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(context.l10n.mobileXiangqiDeleteAccountWarning),
+          const SizedBox(height: 16.0),
+          TextField(
+            controller: _password,
+            autofocus: true,
+            obscureText: true,
+            autocorrect: false,
+            enableSuggestions: false,
+            decoration: InputDecoration(
+              labelText: context.l10n.password,
+              border: const OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 12.0),
+          TextField(
+            controller: _reason,
+            maxLines: 2,
+            decoration: InputDecoration(
+              // The endpoint requires a reason and does not care what it says; the reader is asked
+              // for the same thing the site's own form asks for.
+              labelText: context.l10n.mobileXiangqiDeleteAccountReason,
+              border: const OutlineInputBorder(),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(context.l10n.cancel)),
+        TextButton(
+          onPressed: () {
+            final password = _password.text;
+            if (password.isEmpty) return;
+            Navigator.of(context).pop((
+              password: password,
+              reason: _reason.text.trim().isEmpty ? 'deleted from the app' : _reason.text.trim(),
+            ));
+          },
+          child: Text(context.l10n.mobileXiangqiDeleteAccount),
+        ),
+      ],
+    );
+  }
+}

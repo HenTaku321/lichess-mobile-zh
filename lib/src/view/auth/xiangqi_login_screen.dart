@@ -4,6 +4,7 @@ import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart' show Xia
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_signup_screen.dart';
 import 'package:lichess_mobile/src/widgets/feedback.dart';
 import 'package:lichess_mobile/src/widgets/platform.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_avatar.dart';
@@ -86,6 +87,10 @@ class _XiangqiLoginScreenState() extends ConsumerState<XiangqiLoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Held for the screen's lifetime, for the reason the sign-up screen holds it: the controller is
+    // `autoDispose`, and a sign-in is a request long enough for it to be collected in the middle of
+    // one.
+    ref.watch(xiangqiAuthControllerProvider);
     return PlatformScaffold(
       appBar: PlatformAppBar(title: Text(context.l10n.mobileXiangqi)),
       body: SafeArea(
@@ -147,6 +152,19 @@ class _XiangqiLoginScreenState() extends ConsumerState<XiangqiLoginScreen> {
             FilledButton(
               onPressed: _submitting ? null : _submit,
               child: _submitting ? const ButtonLoadingIndicator() : Text(context.l10n.signIn),
+            ),
+            const SizedBox(height: _kFieldGap),
+            // The other half of the same act, and the only way to an account for a reader who has
+            // never had one. It is a link and not a second button: signing in is what this screen
+            // is for, and making an account is where a reader who cannot sign in has to go.
+            TextButton(
+              onPressed: _submitting
+                  ? null
+                  : () => Navigator.of(
+                      context,
+                      rootNavigator: true,
+                    ).push(XiangqiSignUpScreen.buildRoute()),
+              child: Text(context.l10n.mobileXiangqiSignUp),
             ),
           ],
         ),

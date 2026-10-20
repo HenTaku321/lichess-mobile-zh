@@ -368,6 +368,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mobileXiangqiDeleteAccountWarning => '这会删除 xiangqi.com 上的账号，且无法撤销。';
 
   @override
+  String get mobileXiangqiDeleteAccountReason => '为什么要离开？';
+
+  @override
   String get mobileXiangqiSignOut => '退出象棋账号';
 
   @override
@@ -8684,6 +8687,9 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get mobileXiangqiDeleteAccountWarning => '這會刪除 xiangqi.com 上的帳號，且無法復原。';
+
+  @override
+  String get mobileXiangqiDeleteAccountReason => '為什麼要離開？';
 
   @override
   String get mobileXiangqiSignOut => '登出象棋帳號';

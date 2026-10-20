@@ -236,6 +236,7 @@
   "mobileXiangqiLevelElite": "菁英",
   "mobileXiangqiDeleteAccount": "註銷象棋帳號",
   "mobileXiangqiDeleteAccountWarning": "這會刪除 xiangqi.com 上的帳號，且無法復原。",
+  "mobileXiangqiDeleteAccountReason": "為什麼要離開？",
   "mobileXiangqiSignOut": "登出象棋帳號",
   "mobileXiangqiWatchMoves": "{count, plural, other{{count} 回合}}",
   "activityActivity": "活動",

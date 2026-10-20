@@ -147,6 +147,7 @@
   "mobileXiangqiLevelElite": "Elite",
   "mobileXiangqiDeleteAccount": "Delete my xiangqi.com account",
   "mobileXiangqiDeleteAccountWarning": "This deletes the account on xiangqi.com. It cannot be undone.",
+  "mobileXiangqiDeleteAccountReason": "Why are you leaving?",
   "mobileXiangqiSignOut": "Sign out of xiangqi.com",
   "mobileGamePoints": "GP",
   "mobileGeneratingGif": "Generating GIF...",

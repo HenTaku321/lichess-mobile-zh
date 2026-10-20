@@ -17,6 +17,42 @@ class const XiangqiInvalidCredentialsException() implements Exception {
   String toString() => 'Wrong xiangqi.com email or password.';
 }
 
+/// Thrown when xiangqi.com will not take the email an account is being made for.
+///
+/// Only "somebody already has this address" is this — measured on 2026-10-19 as a `400` carrying
+/// `Email already exists. Please login`. Everything else about a sign-up is a different failure and
+/// is reported as one.
+class const XiangqiEmailTakenException() implements Exception {
+  @override
+  String toString() => 'That email address already has a xiangqi.com account.';
+}
+
+/// Thrown when the code sent to an email address is not the one the server is holding.
+///
+/// Measured on 2026-10-19: `400 {"message": "Invalid or expired verification code"}`, and — unlike
+/// every other refusal in this file — **with no `errors` object at all**, so nothing may read one.
+class const XiangqiInvalidCodeException() implements Exception {
+  @override
+  String toString() => 'That xiangqi.com verification code is wrong or has expired.';
+}
+
+/// Thrown when xiangqi.com will not take the username an account is being made with.
+///
+/// Measured on 2026-10-19: `400 {"message": "Username can only be 3-12 characters long"}`.
+class const XiangqiInvalidUsernameException() implements Exception {
+  @override
+  String toString() => 'That username is not one xiangqi.com will take.';
+}
+
+/// Thrown when the password handed to a deletion is not this account's.
+///
+/// Measured on 2026-10-19: `401 {"message": "无效密码", "errors": "Please Enter correct password"}` —
+/// the `message` is Chinese whatever the locale, so the `errors` line is what is read.
+class const XiangqiWrongPasswordException() implements Exception {
+  @override
+  String toString() => "That is not this xiangqi.com account's password.";
+}
+
 /// A provider for [XiangqiAuthController].
 final xiangqiAuthControllerProvider =
     NotifierProvider.autoDispose<XiangqiAuthController, XiangqiSession?>(
@@ -130,6 +166,163 @@ class XiangqiAuthController() extends Notifier<XiangqiSession?> {
     );
   }
 
+  /// Asks xiangqi.com to email a sign-up code to [email].
+  ///
+  /// The first of the three calls that make an account, and the only one that can be made before
+  /// there is anything to sign in with. Measured on 2026-10-19: `{"email", "locale"}` → `200
+  /// {"message": "Verification Code sent to your email"}`, and `400 {"message": "Email already
+  /// exists. Please login"}` when the address is taken.
+  Future<void> sendSignUpCode({required String email, required String locale}) async {
+    final uri = xiangqiUri('users/signup_email');
+    final response = await _client.post(
+      uri,
+      headers: const {'Content-Type': 'application/json', 'Accept': 'application/json'},
+      body: jsonEncode({'email': email, 'locale': locale}),
+    );
+    if (response.statusCode == 400) throw const XiangqiEmailTakenException();
+    if (response.statusCode >= 400) {
+      throw ServerException(response.statusCode, 'xiangqi.com sign-up failed.', uri, null);
+    }
+  }
+
+  /// Hands the code from that email back to xiangqi.com.
+  ///
+  /// Measured on 2026-10-19: `{"email", "otp", "locale"}` → `200 {"message": "Email Verified!",
+  /// "email": "..."}`, and `400 {"message": "Invalid or expired verification code"}` for a code
+  /// that is wrong or too old.
+  Future<void> verifySignUpCode({
+    required String email,
+    required String code,
+    required String locale,
+  }) async {
+    final uri = xiangqiUri('users/verify_otp');
+    final response = await _client.post(
+      uri,
+      headers: const {'Content-Type': 'application/json', 'Accept': 'application/json'},
+      body: jsonEncode({'email': email, 'otp': code, 'locale': locale}),
+    );
+    if (response.statusCode == 400) throw const XiangqiInvalidCodeException();
+    if (response.statusCode >= 400) {
+      throw ServerException(response.statusCode, 'xiangqi.com code check failed.', uri, null);
+    }
+  }
+
+  /// Makes the account, and signs in as it.
+  ///
+  /// The last of the three calls, and the one that ends with a session: measured on 2026-10-19, the
+  /// answer is `{"message": "Logged in as <name>", "access_token": ..., "refresh_token": ...}` —
+  /// the same shape a sign-in answers with, minus the `user` object — so the account is stored the
+  /// same way and there is no second sign-in afterwards.
+  ///
+  /// **`locale` is required**, and it is the one field the server refuses the whole request over:
+  /// without it the answer is `400 {"errors": {"locale": ["Missing data for required field."]}}`.
+  /// The username is 3 to 12 characters, which the server enforces and this reports rather than
+  /// guesses at.
+  Future<void> signUp({
+    required String username,
+    required String email,
+    required String password,
+    required String country,
+    required String locale,
+  }) async {
+    final uri = xiangqiUri('users/signup_details');
+    final response = await _client.post(
+      uri,
+      headers: const {'Content-Type': 'application/json', 'Accept': 'application/json'},
+      body: jsonEncode({
+        'username': username,
+        'email': email,
+        'password': password,
+        'profileImage': '',
+        'country': country,
+        'locale': locale,
+      }),
+    );
+    if (response.statusCode == 400) {
+      final message = _messageOf(_bodyText(response));
+      if (message != null && message.contains('Username')) {
+        throw const XiangqiInvalidUsernameException();
+      }
+      if (message != null && message.contains('Email already exists')) {
+        throw const XiangqiEmailTakenException();
+      }
+      throw ServerException(response.statusCode, 'xiangqi.com sign-up failed.', uri, null);
+    }
+    if (response.statusCode >= 400) {
+      throw ServerException(response.statusCode, 'xiangqi.com sign-up failed.', uri, null);
+    }
+
+    final json = _decodeObject(_bodyText(response));
+    final accessToken = _pick(json, const ['access_token', 'jwt', 'token', 'accessToken']);
+    if (accessToken == null) {
+      throw const FormatException('The xiangqi.com sign-up response carried no access token.');
+    }
+    final userId = _userIdFromToken(accessToken);
+    if (userId == null) {
+      throw const FormatException('The xiangqi.com access token carries no subject.');
+    }
+    await _store(
+      XiangqiSession(
+        userId: userId,
+        name: _username(json) ?? username,
+        accessToken: accessToken,
+        refreshToken: _pick(json, const ['refresh_token', 'refresh', 'refreshToken']),
+        isGuest: false,
+      ),
+    );
+  }
+
+  /// Deletes this account on xiangqi.com, and signs out of it here.
+  ///
+  /// **Irreversible, and immediate.** Measured on 2026-10-19 against a throwaway account: the
+  /// answer is `200 {"message": "User Deletion is Started"}`, and the account is then gone — its
+  /// profile answers `404 {"message": "Username does not exist."}` and its email can no longer sign
+  /// in. There is no grace period to undo it in.
+  ///
+  /// The body is the site's own form's, field for field: `accountDeletion` is the reason text and
+  /// is **required** (`reason` is an unknown field and is refused), and `password` is the account's
+  /// own. A social-login account has no password to send and the site omits the field; this app has
+  /// no social sign-in, so it always sends one.
+  ///
+  /// **A 401 here is not a dead session, and it must not be treated as one.** Every other call to
+  /// this host answers a 401 when the token has expired, and [XiangqiClient] reacts by refreshing
+  /// and then — if that fails too — dropping the session. This endpoint answers a 401 when the
+  /// *password* is wrong, and the two are told apart by their bodies, which were both measured:
+  ///
+  /// * a wrong password is `{"message": "无效密码", "errors": "Please Enter correct password"}`;
+  /// * a dead token is `{"msg": "...", "status": 401, "sub_status": 42}`.
+  ///
+  /// So a wrong password puts the session back: the transport dropped it on the way past, and the
+  /// account it names is still there, still signed in on this device, and still the reader's.
+  Future<void> deleteAccount({required String password, required String reason}) async {
+    final session = state;
+    if (session == null || session.isGuest) return;
+    final uri = xiangqiUri('users/account/delete/');
+    final response = await _client.post(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': 'Bearer ${session.accessToken}',
+      },
+      body: jsonEncode({'password': password, 'accountDeletion': reason}),
+    );
+    if (response.statusCode == 401) {
+      final json = _tryDecodeObject(_bodyText(response));
+      if (json != null && json.containsKey('message')) {
+        // The password, and not the token. Whatever the transport did to the session on the way
+        // past is undone here, because the account it names still exists.
+        await _store(session);
+        throw const XiangqiWrongPasswordException();
+      }
+      throw ServerException(response.statusCode, 'xiangqi.com account deletion failed.', uri, null);
+    }
+    if (response.statusCode >= 400) {
+      throw ServerException(response.statusCode, 'xiangqi.com account deletion failed.', uri, null);
+    }
+    await signOut();
+  }
+
   /// Takes a guest token from xiangqi.com, with no account behind it.
   ///
   /// `POST /api/users/guest_jwt` with an empty body answers `{"jwt": "..."}` — the one shape in
@@ -241,6 +434,39 @@ class XiangqiAuthController() extends Notifier<XiangqiSession?> {
       throw const FormatException('xiangqi.com answered with JSON that is not an object.');
     }
     return json;
+  }
+
+  /// The JSON object [body] holds, or null when it holds anything else.
+  ///
+  /// The tolerant twin of [_decodeObject], for the one place where a body that is not JSON is not a
+  /// fault: a 401 is read to find out *which* 401 it is, and a body this app cannot read leaves the
+  /// answer as "not the password".
+  static Map<String, dynamic>? _tryDecodeObject(String body) {
+    try {
+      final json = jsonDecode(body);
+      return json is Map<String, dynamic> ? json : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// The `message` of a refusal body, or null when it does not carry one.
+  ///
+  /// The only place in this file that reads a message rather than a field, and it is because the
+  /// server says which of two things went wrong in prose: a sign-up refused over its username and
+  /// one refused over its email are both a bare `400`, and the sentence is the whole of the
+  /// difference. See `xiangqi-com-re/docs/auth.md`.
+  static String? _messageOf(String body) {
+    try {
+      final json = jsonDecode(body);
+      if (json is Map<String, dynamic>) {
+        final message = json['message'];
+        if (message is String) return message;
+      }
+    } catch (_) {
+      // A body that is not JSON says nothing, which is what this answers.
+    }
+    return null;
   }
 
   /// The first non-empty string [json] holds under any of [keys], or null.

@@ -898,6 +898,12 @@ abstract class AppLocalizations {
   /// **'This deletes the account on xiangqi.com. It cannot be undone.'**
   String get mobileXiangqiDeleteAccountWarning;
 
+  /// No description provided for @mobileXiangqiDeleteAccountReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Why are you leaving?'**
+  String get mobileXiangqiDeleteAccountReason;
+
   /// No description provided for @mobileXiangqiSignOut.
   ///
   /// In en, this message translates to:

@@ -368,6 +368,9 @@ class AppLocalizationsAz extends AppLocalizations {
   String get mobileXiangqiDeleteAccountWarning => 'This deletes the account on xiangqi.com. It cannot be undone.';
 
   @override
+  String get mobileXiangqiDeleteAccountReason => 'Why are you leaving?';
+
+  @override
   String get mobileXiangqiSignOut => 'Sign out of xiangqi.com';
 
   @override

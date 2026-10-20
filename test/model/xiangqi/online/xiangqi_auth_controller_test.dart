@@ -131,6 +131,59 @@ const capturedUnknownUserBody =
     '"errors":{"error_msg":"Email or username does not exist. Please enter the valid email or '
     'username"}}';
 
+/// A client answering the sign-up and deletion endpoints, recording every body it was sent.
+///
+/// The three sign-up calls are answered with the bodies the live server answered with on
+/// 2026-10-19 — see `xiangqi-com-re/docs/auth.md` — and the deletion with the one it answered with
+/// when a throwaway account was really deleted.
+MockClient accountClient({
+  required List<(String, String)> sent,
+  String signUpStatus = '200',
+  String signUpBody = '',
+  String deleteStatus = '200',
+}) {
+  return MockClient((request) async {
+    sent.add((request.url.path, request.body));
+    switch (request.url.path) {
+      case '/api/users/signup_email':
+        return http.Response('{"message": "Verification Code sent to your email"}', 200);
+      case '/api/users/verify_otp':
+        return http.Response('{"message": "Email Verified!", "email": "a@example.com"}', 200);
+      case '/api/users/signup_details':
+        return http.Response(
+          signUpBody.isEmpty
+              ? jsonEncode({
+                  'message': 'Logged in as alice',
+                  'access_token': _accessToken,
+                  'refresh_token': 'the-refresh-token',
+                })
+              : signUpBody,
+          int.parse(signUpStatus),
+        );
+      case '/api/users/account/delete/':
+        // The refusal body is the server's own and it is **Chinese whatever the locale**, so it
+        // cannot go through `mockResponse` — that encodes a String as Latin-1, and 无效密码 is not
+        // Latin-1. The bytes are what is really on the wire.
+        if (deleteStatus != '200') {
+          return http.Response.bytes(
+            utf8.encode('{"message": "无效密码", "errors": "Please Enter correct password"}'),
+            int.parse(deleteStatus),
+            headers: const {'content-type': 'application/json'},
+          );
+        }
+        return http.Response('{"message": "User Deletion is Started"}', 200);
+      default:
+        return http.Response('', 404);
+    }
+  });
+}
+
+/// The body of a request to [path], as a map.
+Map<String, Object?> bodyOf(List<(String, String)> sent, String path) {
+  final entry = sent.lastWhere((request) => request.$1 == path);
+  return jsonDecode(entry.$2) as Map<String, Object?>;
+}
+
 void main() {
   group('signInWithPassword', () {
     test('posts the email and password and stores the session', () async {
@@ -466,6 +519,166 @@ void main() {
       await container.read(xiangqiAuthControllerProvider.notifier).checkToken();
 
       expect(container.read(xiangqiAuthControllerProvider), isNull);
+    });
+  });
+
+  group('signUp', () {
+    test('walks the three calls the site walks, and ends signed in', () async {
+      final sent = <(String, String)>[];
+      final storage = FakeXiangqiAuthStorage();
+      final container = await makeControllerContainer(
+        storage: storage,
+        client: accountClient(sent: sent),
+      );
+      container.listen(xiangqiAuthControllerProvider, (_, _) {});
+      await container.pump();
+      final auth = container.read(xiangqiAuthControllerProvider.notifier);
+
+      await auth.sendSignUpCode(email: 'a@example.com', locale: 'en');
+      expect(bodyOf(sent, '/api/users/signup_email'), {'email': 'a@example.com', 'locale': 'en'});
+
+      await auth.verifySignUpCode(email: 'a@example.com', code: '123456', locale: 'en');
+      expect(bodyOf(sent, '/api/users/verify_otp'), {
+        'email': 'a@example.com',
+        'otp': '123456',
+        'locale': 'en',
+      });
+
+      await auth.signUp(
+        username: 'alice',
+        email: 'a@example.com',
+        password: 'a-password',
+        country: '96',
+        locale: 'en',
+      );
+      // `locale` is the field the server refuses the whole request over, and `profileImage` is the
+      // site's own form's empty string; both are here because both were measured.
+      expect(bodyOf(sent, '/api/users/signup_details'), {
+        'username': 'alice',
+        'email': 'a@example.com',
+        'password': 'a-password',
+        'profileImage': '',
+        'country': '96',
+        'locale': 'en',
+      });
+
+      // The account is signed in by the last call, so there is no sign-in afterwards.
+      final session = container.read(xiangqiAuthControllerProvider);
+      expect(session, isNotNull);
+      expect(session!.name, 'alice');
+      expect(session.isGuest, isFalse);
+      expect(storage.session, isNotNull);
+    });
+
+    test('says which of the two refusals a 400 was', () async {
+      final sent = <(String, String)>[];
+      final container = await makeControllerContainer(
+        storage: FakeXiangqiAuthStorage(),
+        client: accountClient(
+          sent: sent,
+          signUpStatus: '400',
+          signUpBody:
+              '{"message": "Username can only be 3-12 characters long", '
+              '"errors": {"error_msg": "Username can only be 3-12 characters long"}}',
+        ),
+      );
+      container.listen(xiangqiAuthControllerProvider, (_, _) {});
+      await container.pump();
+
+      await expectLater(
+        container
+            .read(xiangqiAuthControllerProvider.notifier)
+            .signUp(
+              username: 'a',
+              email: 'a@example.com',
+              password: 'a-password',
+              country: '96',
+              locale: 'en',
+            ),
+        throwsA(isA<XiangqiInvalidUsernameException>()),
+      );
+    });
+
+    test('reports a taken address as one, and a wrong code as one', () async {
+      final sent = <(String, String)>[];
+      final container = await makeControllerContainer(
+        storage: FakeXiangqiAuthStorage(),
+        client: MockClient((request) async {
+          sent.add((request.url.path, request.body));
+          if (request.url.path == '/api/users/signup_email') {
+            return http.Response(
+              '{"message": "Email already exists. Please login", '
+              '"errors": {"error_msg": "Email already exists. Please login"}}',
+              400,
+            );
+          }
+          return http.Response('{"message": "Invalid or expired verification code"}', 400);
+        }),
+      );
+      container.listen(xiangqiAuthControllerProvider, (_, _) {});
+      await container.pump();
+      final auth = container.read(xiangqiAuthControllerProvider.notifier);
+
+      await expectLater(
+        auth.sendSignUpCode(email: 'taken@example.com', locale: 'en'),
+        throwsA(isA<XiangqiEmailTakenException>()),
+      );
+      await expectLater(
+        auth.verifySignUpCode(email: 'a@example.com', code: '000000', locale: 'en'),
+        throwsA(isA<XiangqiInvalidCodeException>()),
+      );
+    });
+  });
+
+  group('deleteAccount', () {
+    test('sends the password and the reason, and signs out', () async {
+      final sent = <(String, String)>[];
+      final storage = FakeXiangqiAuthStorage(
+        XiangqiSession(userId: '100001', name: 'alice', accessToken: _accessToken, isGuest: false),
+      );
+      final container = await makeControllerContainer(
+        storage: storage,
+        client: accountClient(sent: sent),
+      );
+      container.listen(xiangqiAuthControllerProvider, (_, _) {});
+      await container.pump();
+
+      await container
+          .read(xiangqiAuthControllerProvider.notifier)
+          .deleteAccount(password: 'a-password', reason: 'done probing');
+
+      // `accountDeletion` is the required field and `reason` is an unknown one; the site's own form
+      // sends exactly these two.
+      expect(bodyOf(sent, '/api/users/account/delete/'), {
+        'password': 'a-password',
+        'accountDeletion': 'done probing',
+      });
+      expect(container.read(xiangqiAuthControllerProvider), isNull);
+      expect(storage.session, isNull);
+    });
+
+    test('leaves the session alone when the password is wrong', () async {
+      final sent = <(String, String)>[];
+      final storage = FakeXiangqiAuthStorage(
+        XiangqiSession(userId: '100001', name: 'alice', accessToken: _accessToken, isGuest: false),
+      );
+      final container = await makeControllerContainer(
+        storage: storage,
+        client: accountClient(sent: sent, deleteStatus: '401'),
+      );
+      container.listen(xiangqiAuthControllerProvider, (_, _) {});
+      await container.pump();
+
+      await expectLater(
+        container
+            .read(xiangqiAuthControllerProvider.notifier)
+            .deleteAccount(password: 'wrong', reason: 'done probing'),
+        throwsA(isA<XiangqiWrongPasswordException>()),
+      );
+      // The account is still there, so the session is too: a password that was refused deleted
+      // nothing.
+      expect(container.read(xiangqiAuthControllerProvider), isNotNull);
+      expect(storage.session, isNotNull);
     });
   });
 }

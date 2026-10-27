@@ -172,6 +172,13 @@ void main() {
     expect(jsonDecode(sent.body), {'mistakes': 0, 'hints_used': 0, 'attempt_mode': 'P'});
   });
 
+  test('a submitting attempt does not expose the next action as complete', () async {
+    final attempt = await makeAttempt(client: attemptClient(requests: []));
+    final state = stateOf(attempt.container);
+    expect(state.copyWith(phase: XiangqiPuzzlePhase.submitting).isLineComplete, isFalse);
+    expect(state.copyWith(phase: XiangqiPuzzlePhase.recorded).isLineComplete, isTrue);
+  });
+
   test('the mistakes and the hints are what the server is told about', () async {
     final requests = <http.Request>[];
     final attempt = await makeAttempt(

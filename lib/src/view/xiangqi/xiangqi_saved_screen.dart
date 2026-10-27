@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/saved/xiangqi_saved.dart';
 import 'package:lichess_mobile/src/model/xiangqi/saved/xiangqi_saved_repository.dart';
+import 'package:lichess_mobile/src/network/xiangqi_session_store.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
@@ -9,6 +10,8 @@ import 'package:lichess_mobile/src/view/xiangqi/xiangqi_review_screen.dart';
 import 'package:lichess_mobile/src/widgets/feedback.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_refreshable_empty.dart';
+import 'package:lichess_mobile/src/widgets/yes_no_dialog.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// The account's own content on xiangqi.com: the puzzles it has created and the notes it has saved,
@@ -52,7 +55,9 @@ class const XiangqiSavedScreen({super.key}) extends ConsumerWidget {
             ],
           ),
         ),
-        body: username == null
+        body: ref.watch(xiangqiSessionReadyProvider).isLoading
+            ? const Center(child: CircularProgressIndicator.adaptive())
+            : username == null
             ? Center(
                 child: Padding(
                   padding: Styles.bodySectionPadding,
@@ -88,17 +93,12 @@ class const _KindTab({required final String username, required final XiangqiSave
         },
       ]),
       child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
         children: [
           ListSection(
             hasLeading: true,
             header: Text(context.l10n.mobileXiangqiSavedNewFolder),
-            children: [
-              ListTile(
-                leading: const Icon(Icons.create_new_folder_outlined),
-                title: Text(context.l10n.mobileXiangqiSavedNewFolder),
-                onTap: () => _makeFolder(context, ref, username, kind),
-              ),
-            ],
+            children: [_CreateFolderRow(username: username, kind: kind)],
           ),
           switch (folders) {
             AsyncData(:final value) when value.folders.isNotEmpty => ListSection(
@@ -108,9 +108,15 @@ class const _KindTab({required final String username, required final XiangqiSave
                   _FolderRow(folder: folder, username: username, kind: kind),
               ],
             ),
+            AsyncData() => const SizedBox.shrink(),
             AsyncError() => ListSection(
               hasLeading: true,
-              children: [ListTile(dense: true, title: Text(context.l10n.mobileSomethingWentWrong))],
+              children: [
+                _RetryRow(
+                  onRetry: () =>
+                      ref.invalidate(xiangqiSavedFoldersProvider((username, kind, null))),
+                ),
+              ],
             ),
             _ => const ListSection(
               hasLeading: true,
@@ -127,14 +133,64 @@ class const _KindTab({required final String username, required final XiangqiSave
   }
 }
 
+class const _CreateFolderRow({
+  required final String username,
+  required final XiangqiSavedKind kind,
+  final String? parentId,
+}) extends ConsumerStatefulWidget {
+  @override
+  ConsumerState<_CreateFolderRow> createState() => _CreateFolderRowState();
+}
+
+class _CreateFolderRowState() extends ConsumerState<_CreateFolderRow> {
+  bool _busy = false;
+
+  Future<void> _create() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await _makeFolder(context, ref, widget.username, widget.kind, parentId: widget.parentId);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => ListTile(
+    leading: const Icon(Icons.create_new_folder_outlined),
+    title: Text(context.l10n.mobileXiangqiSavedNewFolder),
+    onTap: _busy ? null : _create,
+  );
+}
+
 /// One folder: its name, and the two things that can be done to it.
 class const _FolderRow({
   required final XiangqiSavedFolder folder,
   required final String username,
   required final XiangqiSavedKind kind,
-}) extends ConsumerWidget {
+}) extends ConsumerStatefulWidget {
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_FolderRow> createState() => _FolderRowState();
+}
+
+class _FolderRowState() extends ConsumerState<_FolderRow> {
+  bool _busy = false;
+
+  Future<void> _perform(Future<void> Function() action) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await action();
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final folder = widget.folder;
+    final username = widget.username;
+    final kind = widget.kind;
     return ListTile(
       leading: const Icon(Icons.folder_outlined),
       title: Text(folder.name, overflow: TextOverflow.ellipsis),
@@ -144,19 +200,25 @@ class const _FolderRow({
           IconButton(
             tooltip: context.l10n.mobileXiangqiSavedRename,
             icon: const Icon(Icons.edit_outlined),
-            onPressed: () => _renameFolder(context, ref, username, kind, folder),
+            onPressed: _busy
+                ? null
+                : () => _perform(() => _renameFolder(context, ref, username, kind, folder)),
           ),
           IconButton(
             tooltip: context.l10n.mobileXiangqiSavedDelete,
             icon: const Icon(Icons.delete_outline),
-            onPressed: () => _deleteFolder(context, ref, username, kind, folder),
+            onPressed: _busy
+                ? null
+                : () => _perform(() => _deleteFolder(context, ref, username, kind, folder)),
           ),
         ],
       ),
-      onTap: () => Navigator.of(
-        context,
-        rootNavigator: true,
-      ).push(XiangqiSavedFolderScreen.buildRoute(username, kind, folder)),
+      onTap: _busy
+          ? null
+          : () => Navigator.of(
+              context,
+              rootNavigator: true,
+            ).push(XiangqiSavedFolderScreen.buildRoute(username, kind, folder)),
     );
   }
 }
@@ -178,28 +240,49 @@ class const XiangqiSavedFolderScreen({
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(xiangqiAuthControllerProvider);
+    if (session == null || session.isGuest || session.name != username) {
+      return Scaffold(
+        appBar: AppBar(title: AppBarTitleText(folder.name)),
+        body: Center(child: Text(context.l10n.mobileXiangqiSignIn)),
+      );
+    }
     final folders = ref.watch(xiangqiSavedFoldersProvider((username, kind, folder.id)));
 
     return Scaffold(
       appBar: AppBar(title: AppBarTitleText(folder.name)),
       body: folders.when(
         data: (folders) => folders.folders.isEmpty
-            ? Center(
+            ? XiangqiRefreshableEmpty(
+                onRefresh: () =>
+                    ref.refresh(xiangqiSavedFoldersProvider((username, kind, folder.id)).future),
                 child: Padding(
                   padding: Styles.bodySectionPadding,
-                  child: Text(context.l10n.mobileXiangqiSavedEmpty),
-                ),
-              )
-            : ListView(
-                children: [
-                  ListSection(
-                    hasLeading: true,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      for (final child in folders.folders)
-                        _FolderRow(folder: child, username: username, kind: kind),
+                      _CreateFolderRow(username: username, kind: kind, parentId: folder.id),
+                      Text(context.l10n.mobileXiangqiSavedEmpty),
                     ],
                   ),
-                ],
+                ),
+              )
+            : RefreshIndicator.adaptive(
+                onRefresh: () =>
+                    ref.refresh(xiangqiSavedFoldersProvider((username, kind, folder.id)).future),
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  children: [
+                    _CreateFolderRow(username: username, kind: kind, parentId: folder.id),
+                    ListSection(
+                      hasLeading: true,
+                      children: [
+                        for (final child in folders.folders)
+                          _FolderRow(folder: child, username: username, kind: kind),
+                      ],
+                    ),
+                  ],
+                ),
               ),
         loading: () => const Center(child: CircularProgressIndicator.adaptive()),
         error: (error, stackTrace) => Center(
@@ -241,7 +324,7 @@ class const _Puzzles({required final String username}) extends ConsumerWidget {
                 for (final puzzle in puzzles.puzzles)
                   ListTile(
                     dense: true,
-                    title: Text(puzzle.id),
+                    title: Text(puzzle.id, maxLines: 1, overflow: TextOverflow.ellipsis),
                     subtitle: Text(
                       [
                         if (puzzle.rating != null) '${puzzle.rating}',
@@ -255,7 +338,9 @@ class const _Puzzles({required final String username}) extends ConsumerWidget {
           error: (error, stackTrace) => ListSection(
             hasLeading: true,
             header: Text(context.l10n.mobileXiangqiSavedPuzzles),
-            children: [ListTile(dense: true, title: Text(context.l10n.mobileSomethingWentWrong))],
+            children: [
+              _RetryRow(onRetry: () => ref.invalidate(xiangqiSavedPuzzlesProvider(username))),
+            ],
           ),
         );
   }
@@ -278,8 +363,14 @@ class const _Notes({required final String username}) extends ConsumerWidget {
                 for (final note in notes.notes)
                   ListTile(
                     dense: true,
-                    title: Text(note.title ?? note.id ?? ''),
-                    subtitle: note.description == null ? null : Text(note.description!),
+                    title: Text(
+                      note.title ?? note.id ?? '',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: note.description == null
+                        ? null
+                        : Text(note.description!, maxLines: 2, overflow: TextOverflow.ellipsis),
                     // A note is a game gone through, so the way into one is the review screen — the
                     // same screen a finished game opens onto.
                     onTap: note.id == null
@@ -295,27 +386,43 @@ class const _Notes({required final String username}) extends ConsumerWidget {
           error: (error, stackTrace) => ListSection(
             hasLeading: true,
             header: Text(context.l10n.mobileXiangqiSavedNotes),
-            children: [ListTile(dense: true, title: Text(context.l10n.mobileSomethingWentWrong))],
+            children: [
+              _RetryRow(onRetry: () => ref.invalidate(xiangqiSavedNotesProvider(username))),
+            ],
           ),
         );
   }
 }
 
-/// Asks for a name and makes a folder with it.
+class const _RetryRow({required final VoidCallback onRetry}) extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => ListTile(
+    dense: true,
+    title: Text(context.l10n.mobileSomethingWentWrong),
+    trailing: IconButton(
+      tooltip: context.l10n.retry,
+      onPressed: onRetry,
+      icon: const Icon(Icons.refresh),
+    ),
+  );
+}
+
+/// Keep the editable draft in the dialog until the server acknowledges the write.
 Future<void> _makeFolder(
   BuildContext context,
   WidgetRef ref,
   String username,
-  XiangqiSavedKind kind,
-) async {
+  XiangqiSavedKind kind, {
+  String? parentId,
+}) async {
   final title = context.l10n.mobileXiangqiSavedNewFolder;
-  final name = await _askForName(context, title: title);
-  if (name == null || !context.mounted) return;
-  await _run(
+  await _askForName(
     context,
     ref,
-    () => ref.read(xiangqiSavedRepositoryProvider).createFolder(kind: kind, name: name),
-    onDone: () => ref.invalidate(xiangqiSavedFoldersProvider((username, kind, null))),
+    title: title,
+    submit: (name) => ref
+        .read(xiangqiSavedRepositoryProvider)
+        .createFolder(kind: kind, name: name, parentId: parentId),
   );
 }
 
@@ -328,59 +435,176 @@ Future<void> _renameFolder(
   XiangqiSavedFolder folder,
 ) async {
   final title = context.l10n.mobileXiangqiSavedRename;
-  final name = await _askForName(context, title: title, initial: folder.name);
-  if (name == null || !context.mounted) return;
-  await _run(
+  await _askForName(
     context,
     ref,
-    () => ref.read(xiangqiSavedRepositoryProvider).renameFolder(id: folder.id, name: name),
-    onDone: () => ref.invalidate(xiangqiSavedFoldersProvider((username, kind, null))),
+    title: title,
+    initial: folder.name,
+    submit: (name) =>
+        ref.read(xiangqiSavedRepositoryProvider).renameFolder(id: folder.id, name: name),
   );
 }
 
-/// Deletes the folder, without asking.
-///
-/// The same shape the site's own client has: a folder is a name and a place in a tree, and the one
-/// this app can make is empty until the content that goes in it exists. A confirmation for an empty
-/// folder would be a dialogue about nothing.
+/// The contents' deletion semantics are unknown, so always confirm the destructive operation.
 Future<void> _deleteFolder(
   BuildContext context,
   WidgetRef ref,
   String username,
   XiangqiSavedKind kind,
   XiangqiSavedFolder folder,
-) => _run(
-  context,
-  ref,
-  () => ref.read(xiangqiSavedRepositoryProvider).deleteFolder(folder.id),
-  onDone: () => ref.invalidate(xiangqiSavedFoldersProvider((username, kind, null))),
-);
-
-/// Asks for a name, and answers null when the reader backs out.
-Future<String?> _askForName(BuildContext context, {required String title, String? initial}) async {
-  final controller = TextEditingController(text: initial);
-  final name = await showDialog<String>(
+) async {
+  final generation = ref.read(xiangqiAccountGenerationProvider);
+  var confirmed = false;
+  await showAdaptiveDialog<void>(
     context: context,
-    builder: (context) => AlertDialog(
-      title: Text(title),
-      content: TextField(
-        controller: controller,
-        autofocus: true,
-        decoration: InputDecoration(labelText: context.l10n.mobileXiangqiSavedFolderName),
-        onSubmitted: (value) => Navigator.of(context).pop(value),
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(context.l10n.cancel)),
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(controller.text),
-          child: Text(context.l10n.accept),
-        ),
-      ],
+    builder: (dialogContext) => YesNoDialog(
+      title: Text(context.l10n.mobileXiangqiSavedDelete),
+      content: Text('${folder.name}\n${context.l10n.mobileAreYouSure}'),
+      onYes: () {
+        confirmed = true;
+        Navigator.pop(dialogContext);
+      },
+      onNo: () => Navigator.pop(dialogContext),
     ),
   );
-  controller.dispose();
-  final trimmed = name?.trim();
-  return trimmed == null || trimmed.isEmpty ? null : trimmed;
+  if (!confirmed || !context.mounted || generation != ref.read(xiangqiAccountGenerationProvider)) {
+    return;
+  }
+  await _run(
+    context,
+    ref,
+    () => ref.read(xiangqiSavedRepositoryProvider).deleteFolder(folder.id),
+    onDone: () {
+      ref.invalidate(xiangqiSavedFoldersProvider);
+      ref.invalidate(xiangqiSavedPuzzlesProvider(username));
+      ref.invalidate(xiangqiSavedNotesProvider(username));
+    },
+  );
+}
+
+/// Asks for a name, and answers null when the reader backs out.
+Future<void> _askForName(
+  BuildContext context,
+  WidgetRef ref, {
+  required String title,
+  String? initial,
+  required Future<void> Function(String) submit,
+}) async {
+  final generation = ref.read(xiangqiAccountGenerationProvider);
+  await showAdaptiveDialog<void>(
+    context: context,
+    builder: (dialogContext) => _FolderNameDialog(
+      title: title,
+      initial: initial,
+      submit: (name) async {
+        if (!context.mounted || generation != ref.read(xiangqiAccountGenerationProvider)) {
+          throw StateError('Account changed');
+        }
+        await submit(name);
+        if (context.mounted && generation == ref.read(xiangqiAccountGenerationProvider)) {
+          ref.invalidate(xiangqiSavedFoldersProvider);
+        }
+      },
+    ),
+  );
+}
+
+class const _FolderNameDialog({
+  required final String title,
+  final String? initial,
+  required final Future<void> Function(String) submit,
+}) extends ConsumerStatefulWidget {
+  @override
+  ConsumerState<_FolderNameDialog> createState() => _FolderNameDialogState();
+}
+
+class _FolderNameDialogState() extends ConsumerState<_FolderNameDialog> {
+  final _form = GlobalKey<FormState>();
+  late final _name = TextEditingController(text: widget.initial);
+  bool _busy = false;
+  String? _error;
+  late final int _generation;
+
+  @override
+  void initState() {
+    super.initState();
+    _generation = ref.read(xiangqiAccountGenerationProvider);
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_busy ||
+        _generation != ref.read(xiangqiAccountGenerationProvider) ||
+        !_form.currentState!.validate()) {
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await widget.submit(_name.text.trim());
+      if (mounted && _generation == ref.read(xiangqiAccountGenerationProvider)) {
+        Navigator.pop(context);
+      }
+    } catch (_) {
+      if (mounted && _generation == ref.read(xiangqiAccountGenerationProvider)) {
+        setState(() {
+          _busy = false;
+          _error = context.l10n.mobileSomethingWentWrong;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    ref.listen(xiangqiAccountGenerationProvider, (previous, next) {
+      if (next != _generation) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && (ModalRoute.of(context)?.isCurrent ?? false)) Navigator.pop(context);
+        });
+      }
+    });
+    return PopScope(
+      canPop: !_busy,
+      child: AlertDialog.adaptive(
+        title: Text(widget.title),
+        content: Form(
+          key: _form,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: _name,
+                autofocus: true,
+                enabled: !_busy,
+                decoration: InputDecoration(labelText: context.l10n.mobileXiangqiSavedFolderName),
+                validator: (value) =>
+                    value == null || value.trim().isEmpty ? context.l10n.required : null,
+                onFieldSubmitted: (_) => _save(),
+              ),
+              if (_error != null)
+                Text(_error!, style: TextStyle(color: ColorScheme.of(context).error)),
+              if (_busy) const CircularProgressIndicator.adaptive(),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: _busy ? null : () => Navigator.pop(context),
+            child: Text(context.l10n.cancel),
+          ),
+          TextButton(onPressed: _busy ? null : _save, child: Text(context.l10n.accept)),
+        ],
+      ),
+    );
+  }
 }
 
 /// Runs [action], says so when it fails, and refreshes when it does not.
@@ -390,11 +614,13 @@ Future<void> _run(
   Future<void> Function() action, {
   required VoidCallback onDone,
 }) async {
+  final generation = ref.read(xiangqiAccountGenerationProvider);
   try {
     await action();
+    if (!context.mounted || generation != ref.read(xiangqiAccountGenerationProvider)) return;
     onDone();
   } catch (_) {
-    if (!context.mounted) return;
+    if (!context.mounted || generation != ref.read(xiangqiAccountGenerationProvider)) return;
     showSnackBar(context, context.l10n.mobileSomethingWentWrong, type: SnackBarType.error);
   }
 }

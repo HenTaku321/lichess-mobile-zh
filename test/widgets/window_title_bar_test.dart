@@ -104,7 +104,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(service.maximized.value, isTrue);
 
-      await tester.tap(find.byIcon(Icons.restore));
+      await tester.tap(find.byIcon(Icons.filter_none));
       await tester.pumpAndSettle();
 
       expect(channel.methods.where((method) => method == 'unmaximize'), hasLength(1));
@@ -120,14 +120,14 @@ void main() {
       service.onWindowMaximize();
       await tester.pump();
 
-      expect(find.byIcon(Icons.restore), findsOneWidget);
+      expect(find.byIcon(Icons.filter_none), findsOneWidget);
       expect(find.byIcon(Icons.crop_square), findsNothing);
 
       service.onWindowUnmaximize();
       await tester.pump();
 
       expect(find.byIcon(Icons.crop_square), findsOneWidget);
-      expect(find.byIcon(Icons.restore), findsNothing);
+      expect(find.byIcon(Icons.filter_none), findsNothing);
     });
 
     testWidgets('dragging the strip asks the compositor to move the window', (tester) async {

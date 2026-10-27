@@ -30,6 +30,19 @@ void main() {
   }
 
   group('XiangqiBoardEditorController', () {
+    test('palette drops are idempotent and replace without changing the turn', () {
+      final container = makeContainer(null);
+      final provider = xiangqiBoardEditorControllerProvider(null);
+      final controller = container.read(provider.notifier);
+      controller.placePiece(squareAt('a0'), _blackRook);
+      final first = container.read(provider);
+      controller.placePiece(squareAt('a0'), _blackRook);
+      expect(container.read(provider), first);
+      expect(first.position.pieceAt(squareAt('a0')), _blackRook);
+      expect(first.pieceCount, 32);
+      expect(first.sideToPlay, XiangqiSide.red);
+    });
+
     test('opens on the position every game starts from, in drag mode', () {
       final container = makeContainer(null);
       final state = container.read(xiangqiBoardEditorControllerProvider(null));

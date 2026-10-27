@@ -31,7 +31,7 @@ const xiangqiAccountId = '100001';
 /// The first conversation: its id, and the peer it is with.
 const xiangqiFirstChatId = 'qAAAAA';
 const xiangqiFirstPeerId = 200001;
-const xiangqiFirstPeerName = '象棋高手阿豹';
+const xiangqiFirstPeerName = '棋友乙';
 
 /// The second conversation.
 const xiangqiSecondChatId = 'qBBBBB';

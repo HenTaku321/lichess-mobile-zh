@@ -7,6 +7,7 @@ import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:lichess_mobile/src/model/auth/auth_controller.dart';
 import 'package:lichess_mobile/src/model/puzzle/puzzle.dart';
 import 'package:lichess_mobile/src/model/puzzle/puzzle_angle.dart';
+import 'package:lichess_mobile/src/model/puzzle/puzzle_opening_translations.dart';
 import 'package:lichess_mobile/src/model/puzzle/puzzle_providers.dart';
 import 'package:lichess_mobile/src/model/puzzle/puzzle_theme.dart';
 import 'package:lichess_mobile/src/model/puzzle/streak_storage.dart';
@@ -480,6 +481,12 @@ class const PuzzleAnglePreview({
   final VoidCallback? onTap,
   super.key,
 }) extends ConsumerWidget {
+  /// The name to show for an opening key the flat list cannot supply — while that list is still
+  /// loading, or for a key lichess no longer offers. The overlay knows the key even offline;
+  /// without an entry for it, the key with its underscores opened up is all that is left.
+  String _nameFor(WidgetRef ref, String key) =>
+      ref.watch(puzzleOpeningTranslationsProvider).value?.ofKey(key) ?? key.replaceAll('_', ' ');
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final puzzle = ref.watch(nextPuzzlePreviewProvider(angle));
@@ -554,17 +561,20 @@ class const PuzzleAnglePreview({
                         ],
                         PuzzleOpening(key: final openingKey) => [
                           Text(
+                            // The flat list is the online answer, and is translated by the time
+                            // it gets here; when it cannot answer, [PuzzleAnglePreview._nameFor]
+                            // is what the tab shows instead.
                             flatOpenings.value
                                     ?.firstWhere(
                                       (o) => o.key == openingKey,
                                       orElse: () => (
                                         key: openingKey,
-                                        name: openingKey.replaceAll('_', ''),
+                                        name: _nameFor(ref, openingKey),
                                         count: 0,
                                       ),
                                     )
                                     .name ??
-                                openingKey.replaceAll('_', ' '),
+                                _nameFor(ref, openingKey),
                             style: Styles.boardPreviewTitle,
                             maxLines: 3,
                             overflow: TextOverflow.ellipsis,

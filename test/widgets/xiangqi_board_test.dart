@@ -581,7 +581,7 @@ void main() {
 
       // The magnified piece is the larger of the two and is drawn a whole cell above the finger;
       // the plain one is its usual size, centred exactly on the finger.
-      expect(magnified.draggedPieceScale, 1.15);
+      expect(magnified.draggedPieceScale, 2.0);
       expect(plain.draggedPieceScale, 1.0);
       expect(magnified.dragPosition! - magnified.draggedPieceCentre!, Offset(0, magnified.cell));
       expect(plain.draggedPieceCentre, plain.dragPosition);

@@ -1,13 +1,18 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:chessground/chessground.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
+import 'package:flutter/gestures.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_move.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_notation.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_rules.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_board_settings.dart';
 import 'package:material_ui/material_ui.dart';
+
+export 'package:lichess_mobile/src/widgets/xiangqi_board_settings.dart';
 
 /// The colours a board is drawn in.
 ///
@@ -60,6 +65,8 @@ final class const XiangqiBoardStyle({
   /// The dot on an empty point a selected piece may play to, and the ring around a piece it may
   /// take. These are the chess board's valid-move colour and drawing rules.
   final Color target = const Color(0x4014551E),
+
+  final Color premove = const Color(0x40203085),
 
   /// The glow at the centre of the mark behind a general that is in check, shading out to nothing
   /// at the rim: a glow rather than a flat wash, the way the chess board's own check mark is a
@@ -134,6 +141,7 @@ final class const XiangqiBoardStyle({
       lastMove: colorScheme.lastMove,
       selected: colorScheme.selected,
       target: colorScheme.validMoves,
+      premove: colorScheme.validPremoves,
       backgroundImage: backgroundImage,
     );
   }
@@ -155,6 +163,7 @@ final class const XiangqiBoardStyle({
           other.lastMove == lastMove &&
           other.selected == selected &&
           other.target == target &&
+          other.premove == premove &&
           other.checkGlow == checkGlow &&
           other.checkRing == checkRing &&
           other.hint == hint &&
@@ -175,6 +184,7 @@ final class const XiangqiBoardStyle({
     lastMove,
     selected,
     target,
+    premove,
     checkGlow,
     checkRing,
     hint,
@@ -189,7 +199,7 @@ const _cjkFallback = ['Noto Serif CJK SC', 'Source Han Serif SC', 'Songti SC', '
 
 /// A piece lifted by the finger is drawn larger and casts a deeper, softer shadow than the resting
 /// pieces — it is further from the board than any of them.
-const _draggedScale = 1.15;
+const _draggedScale = 2.0;
 const _dragShadowColor = Color(0x55000000);
 const _dragShadowBlur = 0.08;
 
@@ -257,7 +267,7 @@ final class const XiangqiBoardGeometry(
         'XiangqiBoard cannot size itself from $available: it needs a bounded width or height.',
       );
     }
-    return XiangqiBoardGeometry(cell, showCoordinates: showCoordinates);
+    return XiangqiBoardGeometry(math.max(0.0, cell), showCoordinates: showCoordinates);
   }
 
   /// The distance from the outer line to the edge of the board: half a cell of wooden frame, or a
@@ -294,6 +304,9 @@ final class const XiangqiBoardGeometry(
   /// an intersection, and the frame around it is exactly half a cell, so every point inside the
   /// board is within reach of one of the ninety.
   XiangqiSquare? squareAt(Offset local, XiangqiSide orientation) {
+    if (cell <= 0 || local.dx < 0 || local.dy < 0 || local.dx >= width || local.dy >= height) {
+      return null;
+    }
     final file = ((local.dx - pad) / cell).round();
     final rank = ((height - pad - local.dy) / cell).round();
     if (file < 0 || file > 8 || rank < 0 || rank > 9) return null;
@@ -394,14 +407,39 @@ void paintXiangqiPiece(
         ..maskFilter = MaskFilter.blur(BlurStyle.normal, cell * 0.055 * scale),
     );
   }
+  // The turned rim of the disc: a darker band all the way round, so the piece reads as a thick
+  // wooden counter with an edge rather than a flat sticker.
   canvas.drawCircle(
     centre,
     radius,
     Paint()
-      ..shader = ui.Gradient.radial(centre - Offset(radius * 0.28, radius * 0.28), radius * 1.3, [
-        style.pieceFace,
-        style.pieceFaceEnd,
+      ..shader = ui.Gradient.linear(centre - Offset(0, radius), centre + Offset(0, radius), [
+        Color.lerp(style.pieceRing, style.pieceFaceEnd, 0.45)!,
+        Color.lerp(style.pieceRing, const Color(0xFF000000), 0.25)!,
       ]),
+  );
+  // The face, inset from the rim and shaded from a lit upper-left to a darker lower-right.
+  final faceRadius = radius * 0.93;
+  canvas.drawCircle(
+    centre,
+    faceRadius,
+    Paint()
+      ..shader = ui.Gradient.radial(
+        centre - Offset(faceRadius * 0.3, faceRadius * 0.3),
+        faceRadius * 1.45,
+        [style.pieceFace, style.pieceFaceEnd],
+      ),
+  );
+  // A soft specular highlight near the top, the way a polished disc catches the light.
+  canvas.drawCircle(
+    centre - Offset(faceRadius * 0.22, faceRadius * 0.34),
+    faceRadius * 0.5,
+    Paint()
+      ..shader = ui.Gradient.radial(
+        centre - Offset(faceRadius * 0.22, faceRadius * 0.34),
+        faceRadius * 0.5,
+        [const Color(0x38FFFFFF), const Color(0x00FFFFFF)],
+      ),
   );
   canvas.drawCircle(
     centre,
@@ -474,6 +512,32 @@ final class const XiangqiBoardArrow({
   int get hashCode => Object.hash(move, color, opacity);
 }
 
+/// A locally drawn annotation, matching chessground's circle/arrow gesture without putting UI
+/// state into the xiangqi.com protocol.
+@immutable
+final class const XiangqiBoardShape({
+  required final XiangqiSquare from,
+  required final Color color,
+  final XiangqiSquare? to,
+  final double scale = 1.0,
+}) {
+  bool get isArrow => to != null && to != from;
+
+  XiangqiBoardShape newDest(XiangqiSquare destination) =>
+      XiangqiBoardShape(from: from, to: destination == from ? null : destination, color: color);
+
+  @override
+  bool operator ==(Object other) =>
+      other is XiangqiBoardShape &&
+      other.from == from &&
+      other.to == to &&
+      other.color == color &&
+      other.scale == scale;
+
+  @override
+  int get hashCode => Object.hash(from, to, color, scale);
+}
+
 /// A xiangqi board, drawn rather than assembled, and played by hand.
 ///
 /// This is a picture and not a tree of boxes: nine files crossing ten ranks at ninety points, which
@@ -498,8 +562,13 @@ final class const XiangqiBoardArrow({
 class const XiangqiBoard({
   required final XiangqiPosition position,
 
+  /// Shared board preferences. Optional to keep fixed previews and existing callers compatible.
+  final XiangqiBoardSettings? settings,
+
   /// The side that plays from the bottom of the screen.
   final XiangqiSide orientation = .red,
+
+  final PieceOrientationBehavior pieceOrientationBehavior = .facingUser,
 
   /// The piece that has been picked up, if any. Drawn with a ring around it.
   final XiangqiSquare? selected,
@@ -512,6 +581,10 @@ class const XiangqiBoard({
   /// travelling between the two when the position changes.
   final XiangqiMove? lastMove,
 
+  /// The one locally queued move, highlighted independently of last-move highlights.
+  final XiangqiMove? premove,
+  final bool isPremoveSelection = false,
+
   /// Called with the square a touch landed on. Not called when the touch lands beside the board.
   final void Function(XiangqiSquare square)? onTapSquare,
 
@@ -523,6 +596,19 @@ class const XiangqiBoard({
   /// report, so the board does not pick a piece up at all.
   final void Function(XiangqiSquare from, XiangqiSquare to)? onDragMove,
 
+  /// Editor-only hooks. Ordinary games still cancel releases outside the board.
+  final void Function(XiangqiSquare square)? onPieceDiscarded,
+  final void Function(XiangqiSquare square, XiangqiPiece piece)? onExternalPieceDrop,
+
+  /// Called when the board cancels a selected piece because a gesture ended outside the board.
+  final VoidCallback? onCancelInteraction,
+
+  /// Called for every square touch, including on a non-interactive board.
+  final void Function(XiangqiSquare square)? onTouchedSquare,
+
+  /// Whether a piece may be picked up by the drag recognizer. Defaults to the side to move.
+  final bool Function(XiangqiPiece piece)? canStartDrag,
+
   /// Whether a drag may pick a piece of either side up, rather than only the side to move.
   ///
   /// Off is what a game wants: a player moves their own pieces, and the other side's are refused.
@@ -531,6 +617,24 @@ class const XiangqiBoard({
   /// the editor is legitimately asking the board for something a game refuses to do — which is why
   /// it is a flag here rather than something the board works out for itself.
   final bool dragAnyPiece = false,
+
+  /// Whether a two-tap move, drag, or both are accepted.
+  final PieceShiftMethod pieceShiftMethod = .either,
+
+  /// Whether a selected destination is committed only when the pointer is released.
+  final bool moveOnRelease = false,
+
+  /// Whether locally drawn circles and arrows are enabled.
+  final bool enableShapeDrawings = false,
+
+  /// Colour used by a newly drawn local annotation.
+  final Color shapeColor = const Color(0xAA15781B),
+
+  /// Existing local annotations supplied by the caller.
+  final IList<XiangqiBoardShape> shapes = const IListConst([]),
+
+  /// Receives the local annotation set after a draw or clear gesture.
+  final void Function(IList<XiangqiBoardShape> shapes)? onShapesChanged,
 
   /// How long a move takes to be drawn travelling. [Duration.zero] draws it already arrived.
   final Duration animationDuration = const Duration(milliseconds: 150),
@@ -600,6 +704,9 @@ class const XiangqiBoard({
 }
 
 class _XiangqiBoardState() extends State<XiangqiBoard> with SingleTickerProviderStateMixin {
+  final _surfaceKey = GlobalKey();
+  XiangqiSquare? _externalHover;
+
   /// The pieces being drawn travelling and fading out, empty when no move is being drawn.
   IList<XiangqiTranslatingPiece> _translating = const IListConst([]);
   IList<XiangqiFadingPiece> _fading = const IListConst([]);
@@ -607,6 +714,28 @@ class _XiangqiBoardState() extends State<XiangqiBoard> with SingleTickerProvider
   /// The square a drag began on, and where the finger is now, while one is in flight.
   XiangqiSquare? _dragFrom;
   Offset? _dragPosition;
+  XiangqiSquare? _releaseFrom;
+  Offset? _releasePosition;
+  int? _gesturePointer;
+  int _activePointers = 0;
+  Offset? _pointerOrigin;
+  bool _tapOnDown = false;
+  bool _deselectOnUp = false;
+  bool _mousePointer = false;
+  bool _draggingPiece = false;
+  bool _shapeGesture = false;
+  int? _shapeLockPointer;
+  int? _shapePointer;
+  XiangqiSquare? _shapeFrom;
+  XiangqiSquare? _shapeAt;
+  Timer? _clearShapesTimer;
+  IList<XiangqiBoardShape> _shapes = const IListConst([]);
+  XiangqiMove? _lastDrop;
+
+  PieceShiftMethod get _shiftMethod => widget.settings?.pieceShiftMethod ?? widget.pieceShiftMethod;
+  bool get _moveOnRelease => widget.settings?.moveOnRelease ?? widget.moveOnRelease;
+  bool get _drawShapes => widget.settings?.enableShapeDrawings ?? widget.enableShapeDrawings;
+  Color get _shapeColor => widget.settings?.shapeColor ?? widget.shapeColor;
 
   late final AnimationController _controller;
   late final CurvedAnimation _translation;
@@ -622,6 +751,7 @@ class _XiangqiBoardState() extends State<XiangqiBoard> with SingleTickerProvider
     )..addStatusListener(_onAnimationStatus);
     _translation = CurvedAnimation(parent: _controller, curve: Curves.easeInOutCubic);
     _fade = CurvedAnimation(parent: _controller, curve: Curves.easeInQuad);
+    _shapes = widget.shapes;
   }
 
   @override
@@ -629,6 +759,7 @@ class _XiangqiBoardState() extends State<XiangqiBoard> with SingleTickerProvider
     _controller.dispose();
     _translation.dispose();
     _fade.dispose();
+    _clearShapesTimer?.cancel();
     super.dispose();
   }
 
@@ -654,6 +785,15 @@ class _XiangqiBoardState() extends State<XiangqiBoard> with SingleTickerProvider
   void didUpdateWidget(covariant XiangqiBoard oldWidget) {
     super.didUpdateWidget(oldWidget);
 
+    if (oldWidget.shapes != widget.shapes) _shapes = widget.shapes;
+
+    if (oldWidget.position != widget.position ||
+        oldWidget.orientation != widget.orientation ||
+        (oldWidget.onDragMove != null && widget.onDragMove == null)) {
+      _resetGesture();
+      _externalHover = null;
+    }
+
     if (oldWidget.animationDuration != widget.animationDuration) {
       _controller.duration = widget.animationDuration;
     }
@@ -661,6 +801,8 @@ class _XiangqiBoardState() extends State<XiangqiBoard> with SingleTickerProvider
     // A move caught mid-flight by the board being turned around is noise: the piece would travel
     // across a board it did not start on. The turn wins and the move is dropped.
     if (oldWidget.orientation != widget.orientation) {
+      _lastDrop = null;
+      _shapeLockPointer = null;
       _stopAnimation();
       return;
     }
@@ -668,7 +810,10 @@ class _XiangqiBoardState() extends State<XiangqiBoard> with SingleTickerProvider
     if (oldWidget.position == widget.position) return;
 
     final animation = xiangqiPieceAnimation(oldWidget.position, widget.position, widget.lastMove);
-    if (widget.animationDuration == Duration.zero ||
+    final wasDrop = _lastDrop != null && _lastDrop == widget.lastMove;
+    _lastDrop = null;
+    if (wasDrop ||
+        widget.animationDuration == Duration.zero ||
         (animation.translating.isEmpty && animation.fading.isEmpty)) {
       _stopAnimation();
       return;
@@ -692,10 +837,15 @@ class _XiangqiBoardState() extends State<XiangqiBoard> with SingleTickerProvider
     final square = geometry.squareAt(local, widget.orientation);
     if (square == null) return;
     final piece = widget.position.pieceAt(square);
-    if (piece == null || (!widget.dragAnyPiece && piece.side != widget.position.turn)) return;
+    if (piece == null ||
+        (!widget.dragAnyPiece &&
+            !(widget.canStartDrag?.call(piece) ?? piece.side == widget.position.turn))) {
+      return;
+    }
     setState(() {
       _dragFrom = square;
       _dragPosition = local;
+      _draggingPiece = true;
     });
   }
 
@@ -714,26 +864,189 @@ class _XiangqiBoardState() extends State<XiangqiBoard> with SingleTickerProvider
       setState(() {
         _dragFrom = null;
         _dragPosition = null;
+        _draggingPiece = false;
       });
     }
     final onDragMove = widget.onDragMove;
     if (from == null || at == null || onDragMove == null) return;
     final to = geometry.squareAt(at, widget.orientation);
-    if (to != null && to != from) onDragMove(from, to);
+    if (to != null && to != from) {
+      _lastDrop = XiangqiMove(from, to);
+      onDragMove(from, to);
+    } else if (to == null || _shiftMethod == .drag) {
+      if (to == null) widget.onPieceDiscarded?.call(from);
+      widget.onCancelInteraction?.call();
+    }
   }
 
-  void _cancelDrag() {
-    if (_dragFrom == null && _dragPosition == null) return;
-    setState(() {
-      _dragFrom = null;
-      _dragPosition = null;
-    });
+  void _resetGesture() {
+    _dragFrom = null;
+    _dragPosition = null;
+    _draggingPiece = false;
+    _releaseFrom = null;
+    _releasePosition = null;
+    _pointerOrigin = null;
+    _tapOnDown = false;
+    _deselectOnUp = false;
+    _shapeGesture = false;
+    _shapeFrom = null;
+    _shapeAt = null;
+    _shapePointer = null;
+    _gesturePointer = null;
+  }
+
+  void _cancelGesture() {
+    setState(_resetGesture);
+    widget.onCancelInteraction?.call();
+  }
+
+  bool _canTap() => widget.onTapSquare != null && _shiftMethod != .drag;
+
+  bool _canDrag() => widget.onDragMove != null && _shiftMethod != .tapTwoSquares;
+
+  bool _isEmptySquare(XiangqiSquare square) => widget.position.pieceAt(square) == null;
+
+  void _setShapes(IList<XiangqiBoardShape> shapes) {
+    setState(() => _shapes = shapes);
+    widget.onShapesChanged?.call(shapes);
+  }
+
+  void _toggleShape(XiangqiBoardGeometry geometry, Offset local) {
+    final from = _shapeFrom;
+    final at = geometry.squareAt(local, widget.orientation);
+    if (from == null || at == null) return;
+    final shape = XiangqiBoardShape(from: from, to: at == from ? null : at, color: _shapeColor);
+    final next = _shapes.contains(shape) ? _shapes.remove(shape) : _shapes.add(shape);
+    _setShapes(next);
+    _shapeGesture = false;
+    _shapeFrom = null;
+    _shapeAt = null;
+    _shapePointer = null;
+  }
+
+  void _clearShapes() {
+    _clearShapesTimer?.cancel();
+    _clearShapesTimer = null;
+    if (_shapes.isNotEmpty) _setShapes(const IListConst([]));
+  }
+
+  void _pointerDown(PointerDownEvent event, XiangqiBoardGeometry geometry) {
+    _activePointers++;
+    final square = geometry.squareAt(event.localPosition, widget.orientation);
+    if (event.buttons != kPrimaryButton || square == null) return;
+    widget.onTouchedSquare?.call(square);
+    if (_drawShapes && _shapeLockPointer != null && _shapeLockPointer != event.pointer) {
+      _cancelGesture();
+      setState(() {
+        _shapeGesture = true;
+        _shapePointer = event.pointer;
+        _shapeFrom = square;
+        _shapeAt = square;
+      });
+      return;
+    }
+    if (_activePointers > 1) {
+      _cancelGesture();
+      return;
+    }
+    _gesturePointer = event.pointer;
+    _pointerOrigin = event.localPosition;
+    _mousePointer = event.kind == PointerDeviceKind.mouse;
+    _tapOnDown = false;
+    _deselectOnUp = false;
+
+    final selected = widget.selected;
+    if (_drawShapes && _isEmptySquare(square) && selected == null) {
+      _shapeLockPointer = event.pointer;
+      if (_clearShapesTimer != null) {
+        _clearShapes();
+      } else {
+        _clearShapesTimer = Timer(const Duration(milliseconds: 200), () {
+          _clearShapesTimer = null;
+        });
+      }
+    }
+    final piece = widget.position.pieceAt(square);
+    final movable =
+        piece != null &&
+        (widget.dragAnyPiece ||
+            (widget.canStartDrag?.call(piece) ?? piece.side == widget.position.turn));
+    if (movable && (widget.onTapSquare != null || widget.onDragMove != null)) _clearShapes();
+
+    if (_canTap() && selected != null && selected != square && _moveOnRelease) {
+      setState(() {
+        _releaseFrom = selected;
+        _releasePosition = event.localPosition;
+      });
+    } else if (selected == square) {
+      _deselectOnUp = true;
+    } else if (_canTap()) {
+      _tapOnDown = true;
+      widget.onTapSquare!(square);
+    }
+    // Drag-only mode may select a piece to show its targets but must not complete a two-tap move.
+    if (_shiftMethod == .drag) {
+      if (movable && selected != square) widget.onTapSquare?.call(square);
+      _deselectOnUp = true;
+    }
+  }
+
+  void _pointerMove(PointerMoveEvent event, XiangqiBoardGeometry geometry) {
+    if (_shapePointer == event.pointer && _shapeGesture) {
+      final square = geometry.squareAt(event.localPosition, widget.orientation);
+      if (square != null) setState(() => _shapeAt = square);
+      return;
+    }
+    if (_gesturePointer != event.pointer || _activePointers != 1) return;
+    if (_releaseFrom != null) {
+      setState(() => _releasePosition = event.localPosition);
+      return;
+    }
+    final origin = _pointerOrigin;
+    if (!_canDrag() || origin == null) return;
+    if (!_draggingPiece && (event.localPosition - origin).distance > 3.0) {
+      _startDrag(geometry, origin);
+    }
+    if (_draggingPiece) _updateDrag(event.localPosition);
+  }
+
+  void _pointerUp(PointerUpEvent event, XiangqiBoardGeometry geometry) {
+    if (_activePointers > 0) _activePointers--;
+    if (_shapePointer == event.pointer) {
+      _toggleShape(geometry, event.localPosition);
+      setState(_resetGesture);
+    } else if (_gesturePointer == event.pointer) {
+      final square = geometry.squareAt(event.localPosition, widget.orientation);
+      if (_releaseFrom != null) {
+        if (square != null && square != _releaseFrom) {
+          widget.onTapSquare?.call(square);
+        } else {
+          widget.onCancelInteraction?.call();
+        }
+      } else if (_draggingPiece) {
+        _dragPosition = event.localPosition;
+        _endDrag(geometry);
+      } else if (_deselectOnUp) {
+        // Controller-specific clear avoids turning an already selected piece into a new move.
+        if (widget.onCancelInteraction != null) {
+          widget.onCancelInteraction!();
+        } else if (_canTap() && !_tapOnDown && square != null) {
+          widget.onTapSquare?.call(square);
+        }
+      }
+      setState(_resetGesture);
+    }
+    if (_shapeLockPointer == event.pointer) _shapeLockPointer = null;
+  }
+
+  void _pointerCancel(PointerCancelEvent event) {
+    if (_activePointers > 0) _activePointers--;
+    if (_shapeLockPointer == event.pointer) _shapeLockPointer = null;
+    if (_gesturePointer == event.pointer || _shapePointer == event.pointer) _cancelGesture();
   }
 
   @override
   Widget build(BuildContext context) {
-    final tap = widget.onTapSquare;
-    final drag = widget.onDragMove;
     return LayoutBuilder(
       builder: (context, constraints) {
         final geometry = XiangqiBoardGeometry.fit(
@@ -741,92 +1054,123 @@ class _XiangqiBoardState() extends State<XiangqiBoard> with SingleTickerProvider
           showCoordinates: widget.showCoordinates,
         );
         return Center(
-          child: GestureDetector(
-            behavior: .opaque,
-            // The drag begins where the finger came down and not where the pan was recognised,
-            // which is a third of a square away: the piece picked up is the one under the touch.
-            dragStartBehavior: .down,
-            onTapUp: tap == null
-                ? null
-                : (details) {
-                    final square = geometry.squareAt(details.localPosition, widget.orientation);
-                    if (square != null) tap(square);
-                  },
-            // A board that cannot report where a piece was dropped does not pick one up: with no
-            // [XiangqiBoard.onDragMove] there is nothing a drag could do, and a piece rising under
-            // the finger and sinking again would be a gesture with no meaning.
-            onPanStart: drag == null
-                ? null
-                : (details) => _startDrag(geometry, details.localPosition),
-            onPanUpdate: drag == null ? null : (details) => _updateDrag(details.localPosition),
-            onPanEnd: drag == null ? null : (details) => _endDrag(geometry),
-            onPanCancel: drag == null ? null : _cancelDrag,
-            child: () {
-              final boardWidget = CustomPaint(
-                size: Size(geometry.width, geometry.height),
-                painter: XiangqiBoardPainter(
-                  geometry: geometry,
-                  position: widget.position,
-                  orientation: widget.orientation,
-                  selected: widget.selected,
-                  moves: widget.moves,
-                  lastMove: widget.lastMove,
-                  isCheck: isCheck(widget.position),
-                  style: widget.style,
-                  showLastMove: widget.showLastMove,
-                  showBorder: widget.showBorder,
-                  hint: widget.hint,
-                  wrongMove: widget.wrongMove,
-                  marked: widget.marked,
-                  arrows: widget.arrows,
-                  magnifyDraggedPiece: widget.magnifyDraggedPiece,
-                  dragTargetKind: widget.dragTargetKind,
-                  blindfoldMode: widget.blindfoldMode,
-                  translating: _translating,
-                  fading: _fading,
-                  translation: _translation,
-                  fade: _fade,
-                  dragFrom: _dragFrom,
-                  dragPosition: _dragPosition,
-                ),
+          child: DragTarget<XiangqiPiece>(
+            onWillAcceptWithDetails: (_) => widget.onExternalPieceDrop != null,
+            onMove: (details) {
+              final box = _surfaceKey.currentContext?.findRenderObject() as RenderBox?;
+              if (box == null) return;
+              final square = geometry.squareAt(
+                box.globalToLocal(details.offset),
+                widget.orientation,
               );
-              final bgImage = widget.style.backgroundImage;
-              if (bgImage != null) {
-                return ClipRRect(
-                  borderRadius: BorderRadius.circular(widget.showBorder ? geometry.cell * 0.16 : 0),
-                  child: Stack(
-                    children: [
-                      Positioned.fill(
-                        // The board assets are complete 8x8 chessboards, not seamless material
-                        // tiles. A xiangqi board is one continuous field, so showing the whole
-                        // photograph would put an eight-by-eight checker pattern underneath a
-                        // nine-by-ten grid. Show only the top-left light square instead: an
-                        // OverflowBox lays the complete image out at eight times the board's size,
-                        // and the Stack clips away everything except that first square.
-                        child: ClipRect(
-                          child: OverflowBox(
-                            alignment: Alignment.topLeft,
-                            minWidth: geometry.width * 8,
-                            maxWidth: geometry.width * 8,
-                            minHeight: geometry.height * 8,
-                            maxHeight: geometry.height * 8,
-                            child: Image(
-                              image: bgImage,
-                              width: geometry.width * 8,
-                              height: geometry.height * 8,
-                              fit: BoxFit.fill,
-                              filterQuality: FilterQuality.high,
+              if (_externalHover != square) setState(() => _externalHover = square);
+            },
+            onLeave: (_) => setState(() => _externalHover = null),
+            onAcceptWithDetails: (details) {
+              final box = _surfaceKey.currentContext?.findRenderObject() as RenderBox?;
+              final square = box == null
+                  ? null
+                  : geometry.squareAt(box.globalToLocal(details.offset), widget.orientation);
+              setState(() => _externalHover = null);
+              if (square != null) widget.onExternalPieceDrop?.call(square, details.data);
+            },
+            builder: (context, candidates, rejected) => Listener(
+              key: _surfaceKey,
+              behavior: HitTestBehavior.opaque,
+              onPointerDown: (event) => _pointerDown(event, geometry),
+              onPointerMove: (event) => _pointerMove(event, geometry),
+              onPointerUp: (event) => _pointerUp(event, geometry),
+              onPointerCancel: _pointerCancel,
+              child: () {
+                final boardWidget = CustomPaint(
+                  size: Size(geometry.width, geometry.height),
+                  painter: XiangqiBoardPainter(
+                    geometry: geometry,
+                    position: widget.position,
+                    orientation: widget.orientation,
+                    pieceOrientationBehavior: widget.pieceOrientationBehavior,
+                    selected: widget.selected,
+                    moves: widget.moves,
+                    lastMove: widget.lastMove,
+                    premove: widget.premove,
+                    isPremoveSelection: widget.isPremoveSelection,
+                    // The check marker is a highlight, not an animation. With explicit settings
+                    // it is independent of lastMove, which is still needed by piece animation.
+                    isCheck:
+                        (widget.settings?.boardHighlights ?? widget.showLastMove) &&
+                        isCheck(widget.position),
+                    style: widget.style,
+                    showLastMove: widget.showLastMove,
+                    showBorder: widget.showBorder,
+                    hint: widget.hint,
+                    wrongMove: widget.wrongMove,
+                    marked: widget.marked,
+                    externalDropTarget: _externalHover,
+                    arrows: widget.arrows,
+                    magnifyDraggedPiece: !_mousePointer && widget.magnifyDraggedPiece,
+                    dragTargetKind: _mousePointer && widget.dragTargetKind != .none
+                        ? DragTargetKind.square
+                        : widget.dragTargetKind,
+                    blindfoldMode: widget.blindfoldMode,
+                    translating: _translating,
+                    fading: _fading,
+                    translation: _translation,
+                    fade: _fade,
+                    shapes: _shapeGesture && _shapeFrom != null && _shapeAt != null
+                        ? _shapes.add(
+                            XiangqiBoardShape(
+                              from: _shapeFrom!,
+                              to: _shapeAt == _shapeFrom ? null : _shapeAt,
+                              color: _shapeColor,
+                              scale: _shapeAt == _shapeFrom ? 0.8 : 1.0,
+                            ),
+                          )
+                        : _shapes,
+                    dragFrom: _draggingPiece ? _dragFrom : _releaseFrom,
+                    dragPosition: _draggingPiece ? _dragPosition : _releasePosition,
+                    draggingPiece: _draggingPiece,
+                  ),
+                );
+                final bgImage = widget.style.backgroundImage;
+                if (bgImage != null) {
+                  return ClipRRect(
+                    borderRadius: BorderRadius.circular(
+                      widget.showBorder ? geometry.cell * 0.16 : 0,
+                    ),
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          // The board assets are complete 8x8 chessboards, not seamless material
+                          // tiles. A xiangqi board is one continuous field, so showing the whole
+                          // photograph would put an eight-by-eight checker pattern underneath a
+                          // nine-by-ten grid. Show only the top-left light square instead: an
+                          // OverflowBox lays the complete image out at eight times the board's size,
+                          // and the Stack clips away everything except that first square.
+                          child: ClipRect(
+                            child: OverflowBox(
+                              alignment: Alignment.topLeft,
+                              minWidth: geometry.width * 8,
+                              maxWidth: geometry.width * 8,
+                              minHeight: geometry.height * 8,
+                              maxHeight: geometry.height * 8,
+                              child: Image(
+                                image: bgImage,
+                                width: geometry.width * 8,
+                                height: geometry.height * 8,
+                                fit: BoxFit.fill,
+                                filterQuality: FilterQuality.high,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      boardWidget,
-                    ],
-                  ),
-                );
-              }
-              return boardWidget;
-            }(),
+                        boardWidget,
+                      ],
+                    ),
+                  );
+                }
+                return boardWidget;
+              }(),
+            ),
           ),
         );
       },
@@ -843,9 +1187,12 @@ class XiangqiBoardPainter({
   required final XiangqiBoardGeometry geometry,
   required final XiangqiPosition position,
   required final XiangqiSide orientation,
+  final PieceOrientationBehavior pieceOrientationBehavior = .facingUser,
   required final XiangqiSquare? selected,
   required final IList<XiangqiMove> moves,
   required final XiangqiMove? lastMove,
+  required final XiangqiMove? premove,
+  required final bool isPremoveSelection,
   required final bool isCheck,
   required final XiangqiBoardStyle style,
   required final bool showLastMove,
@@ -853,7 +1200,9 @@ class XiangqiBoardPainter({
   required final XiangqiMove? hint,
   required final XiangqiMove? wrongMove,
   required final IList<XiangqiSquare> marked,
+  final XiangqiSquare? externalDropTarget,
   required final IList<XiangqiBoardArrow> arrows,
+  required final IList<XiangqiBoardShape> shapes,
   required final bool magnifyDraggedPiece,
   required final DragTargetKind dragTargetKind,
   required final bool blindfoldMode,
@@ -863,6 +1212,7 @@ class XiangqiBoardPainter({
   required final Animation<double> _fade,
   required final XiangqiSquare? dragFrom,
   required final Offset? dragPosition,
+  required final bool draggingPiece,
 }) extends CustomPainter {
   this : super(repaint: Listenable.merge([_translation, _fade]));
 
@@ -884,15 +1234,25 @@ class XiangqiBoardPainter({
     paintMarks(canvas);
     paintMarked(canvas);
     paintLastMove(canvas);
+    if (premove case final move?) {
+      for (final square in [move.from, move.to]) {
+        _paintSquareHighlight(
+          canvas,
+          geometry.centerOf(square, orientation),
+          HighlightDetails(solidColor: style.premove),
+        );
+      }
+    }
     paintWrongMove(canvas);
     paintCheck(canvas);
     paintTargets(canvas);
     paintSelection(canvas);
+    paintFading(canvas);
     paintPieces(canvas);
     paintTranslating(canvas);
-    paintFading(canvas);
     paintHint(canvas);
     paintArrows(canvas);
+    paintShapes(canvas);
     paintDragTarget(canvas);
     paintDraggedPiece(canvas);
   }
@@ -1072,6 +1432,52 @@ class XiangqiBoardPainter({
     }
   }
 
+  /// Draws locally created circles and arrows. These are deliberately separate from engine hints
+  /// and lesson annotations so a user's marks never become server state.
+  void paintShapes(Canvas canvas) {
+    for (final shape in shapes) {
+      final from = geometry.centerOf(shape.from, orientation);
+      final to = shape.to == null ? null : geometry.centerOf(shape.to!, orientation);
+      if (to == null || to == from) {
+        final lineWidth = shape.scale * cell / 16;
+        canvas.drawCircle(
+          from,
+          cell / 2 - lineWidth / 2,
+          Paint()
+            ..color = shape.color
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = lineWidth,
+        );
+        continue;
+      }
+      final angle = math.atan2(to.dy - from.dy, to.dx - from.dx);
+      final direction = Offset(math.cos(angle), math.sin(angle));
+      final arrowSize = shape.scale * cell * 0.48;
+      const arrowAngle = math.pi / 5;
+      final head = Path()
+        ..moveTo(
+          to.dx - arrowSize * math.cos(angle - arrowAngle),
+          to.dy - arrowSize * math.sin(angle - arrowAngle),
+        )
+        ..lineTo(to.dx, to.dy)
+        ..lineTo(
+          to.dx - arrowSize * math.cos(angle + arrowAngle),
+          to.dy - arrowSize * math.sin(angle + arrowAngle),
+        )
+        ..close();
+      final arrowHeight = arrowSize * math.cos(arrowAngle);
+      canvas.drawLine(
+        from + direction * (cell / 3),
+        to - direction * arrowHeight,
+        Paint()
+          ..color = shape.color
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = shape.scale * cell / 4,
+      );
+      canvas.drawPath(head, Paint()..color = shape.color);
+    }
+  }
+
   /// The from and the to of the last move, under the pieces so that a piece hides the half of its
   /// own marker. The shape and colours are the chess board's last-move highlight, mapped onto a
   /// board whose squares meet at points rather than filling a grid.
@@ -1176,7 +1582,7 @@ class XiangqiBoardPainter({
     // destination is the translating piece, and the one under the finger is the dragged piece.
     // Drawing them here as well would show two of each.
     final arrivingAt = {for (final moving in _translating) moving.to};
-    final dragFrom = this.dragFrom;
+    final dragFrom = draggingPiece ? this.dragFrom : null;
     return [
       for (var index = 0; index < kXiangqiSquares; index++)
         if (!arrivingAt.contains(XiangqiSquare(index)) &&
@@ -1203,15 +1609,29 @@ class XiangqiBoardPainter({
     XiangqiPiece piece, {
     double scale = 1,
     bool dropShadow = true,
-  }) => paintXiangqiPiece(
-    canvas,
-    centre,
-    piece,
-    cell: cell,
-    style: style,
-    scale: scale,
-    dropShadow: dropShadow,
-  );
+  }) {
+    final upsideDown = switch (pieceOrientationBehavior) {
+      .facingUser => false,
+      .opponentUpsideDown => piece.side != orientation,
+      .sideToPlay => position.turn != orientation,
+    };
+    canvas.save();
+    if (upsideDown) {
+      canvas.translate(centre.dx, centre.dy);
+      canvas.rotate(math.pi);
+      canvas.translate(-centre.dx, -centre.dy);
+    }
+    paintXiangqiPiece(
+      canvas,
+      centre,
+      piece,
+      cell: cell,
+      style: style,
+      scale: scale,
+      dropShadow: dropShadow,
+    );
+    canvas.restore();
+  }
 
   /// The pieces a move has travelling: each is the one piece that moved, drawn partway between the
   /// square it left and the square it is arriving on. Every other piece is drawn straight from the
@@ -1254,9 +1674,10 @@ class XiangqiBoardPainter({
   /// squares to points. An empty point gets the same filled dot; an occupied one gets the same
   /// clipped ring around the piece.
   void paintTargets(Canvas canvas) {
-    final fillPaint = Paint()..color = style.target;
+    final targetColor = isPremoveSelection ? style.premove : style.target;
+    final fillPaint = Paint()..color = targetColor;
     final strokePaint = Paint()
-      ..color = style.target
+      ..color = targetColor
       ..strokeWidth = cell / 5
       ..style = .stroke;
     for (final move in moves) {
@@ -1276,7 +1697,7 @@ class XiangqiBoardPainter({
   /// The chess board's selection highlight, under the picked-up piece and under the point a drag
   /// began on: both say the same thing, that this is the piece the player is holding.
   void paintSelection(Canvas canvas) {
-    for (final square in [selected, dragFrom]) {
+    for (final square in {selected, dragFrom}) {
       if (square == null) continue;
       _paintSquareHighlight(canvas, geometry.centerOf(square, orientation), style.selected);
     }
@@ -1386,8 +1807,10 @@ class XiangqiBoardPainter({
   Rect? get dragTargetBounds {
     final kind = dragTargetKind;
     final at = dragPosition;
-    if (kind == .none || dragFrom == null || at == null) return null;
-    final square = geometry.squareAt(at, orientation);
+    if (kind == .none) return null;
+    final square =
+        externalDropTarget ??
+        (dragFrom == null || at == null ? null : geometry.squareAt(at, orientation));
     if (square == null) return null;
     final side = kind == .circle ? cell * 2 : cell;
     return Rect.fromCenter(
@@ -1439,6 +1862,7 @@ class XiangqiBoardPainter({
   /// finger by one of its squares, so both games leave the piece clear of the touch point by the
   /// same one-square step.
   void paintDraggedPiece(Canvas canvas) {
+    if (!draggingPiece) return;
     if (blindfoldMode) return;
     final from = dragFrom;
     final centre = draggedPieceCentre;
@@ -1470,20 +1894,28 @@ class XiangqiBoardPainter({
       oldDelegate.geometry.showCoordinates != geometry.showCoordinates ||
       oldDelegate.position != position ||
       oldDelegate.orientation != orientation ||
+      oldDelegate.pieceOrientationBehavior != pieceOrientationBehavior ||
       oldDelegate.selected != selected ||
       oldDelegate.moves != moves ||
       oldDelegate.lastMove != lastMove ||
+      oldDelegate.premove != premove ||
+      oldDelegate.isPremoveSelection != isPremoveSelection ||
       oldDelegate.isCheck != isCheck ||
       oldDelegate.style != style ||
       oldDelegate.showLastMove != showLastMove ||
       oldDelegate.showBorder != showBorder ||
       oldDelegate.hint != hint ||
+      oldDelegate.wrongMove != wrongMove ||
+      oldDelegate.marked != marked ||
+      oldDelegate.externalDropTarget != externalDropTarget ||
       oldDelegate.arrows != arrows ||
+      oldDelegate.shapes != shapes ||
       oldDelegate.magnifyDraggedPiece != magnifyDraggedPiece ||
       oldDelegate.dragTargetKind != dragTargetKind ||
       oldDelegate.blindfoldMode != blindfoldMode ||
       oldDelegate.dragFrom != dragFrom ||
       oldDelegate.dragPosition != dragPosition ||
+      oldDelegate.draggingPiece != draggingPiece ||
       oldDelegate._translating != _translating ||
       oldDelegate._fading != _fading;
 }

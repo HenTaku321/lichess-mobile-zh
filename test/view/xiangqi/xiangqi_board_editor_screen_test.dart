@@ -1,4 +1,5 @@
 import 'package:chessground/chessground.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -131,6 +132,44 @@ Future<void> tapMenuItem(WidgetTester tester, String label) async {
 }
 
 void main() {
+  testWidgets('a palette drop places the piece and a repeated identical drop never erases it', (
+    tester,
+  ) async {
+    final container = await pumpEditor(tester);
+    final palette = find.byKey(const Key('piece-button-red-rook'));
+    final (:board, :geometry, box: _) = boardGeometry(tester);
+    final target = board.topLeft + geometry.centerOf(squareAt('e4'), .red);
+    for (var i = 0; i < 2; i++) {
+      final drag = await tester.startGesture(tester.getCenter(palette));
+      await tester.pump();
+      await drag.moveBy(const Offset(0, -12));
+      await tester.pump();
+      await drag.moveTo(target);
+      await tester.pump();
+      await drag.up();
+      await tester.pump();
+      expect(
+        editorState(container).position.pieceAt(squareAt('e4')),
+        const XiangqiPiece(.red, .rook),
+      );
+    }
+  });
+
+  testWidgets('mouse palette feedback is not magnified', (tester) async {
+    await pumpEditor(tester);
+    final palette = find.byKey(const Key('piece-button-red-rook'));
+    final drag = await tester.startGesture(
+      tester.getCenter(palette),
+      kind: PointerDeviceKind.mouse,
+    );
+    await tester.pump();
+    await drag.moveBy(const Offset(20, 0));
+    await tester.pump();
+    final feedback = find.byKey(const Key('xiangqi-palette-feedback'));
+    expect(tester.getSize(feedback), tester.getSize(palette));
+    await drag.cancel();
+    await tester.pump();
+  });
   group('XiangqiBoardEditorScreen', () {
     testWidgets('opens on the starting position, in drag mode, with a palette for each side', (
       tester,

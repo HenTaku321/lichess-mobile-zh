@@ -17,6 +17,9 @@ class const RichLinkText({
   final int? maxLines,
   final TextOverflow overflow = TextOverflow.clip,
   final TextScaler? textScaler,
+
+  /// Extra inline content, for example the invisible timestamp spacer used by chat bubbles.
+  final InlineSpan? trailing,
 }) extends StatefulWidget {
   @override
   State<RichLinkText> createState() => _RichLinkTextState();
@@ -91,6 +94,7 @@ class _RichLinkTextState() extends State<RichLinkText> {
         children.add(TextSpan(text: element.text, style: defaultStyle));
       }
     }
+    if (widget.trailing case final trailing?) children.add(trailing);
 
     return Text.rich(
       TextSpan(children: children),

@@ -12,12 +12,14 @@ import 'package:lichess_mobile/src/model/offline_computer/offline_computer_game_
 import 'package:lichess_mobile/src/model/offline_computer/xiangqi_computer_setup.dart';
 import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_clock.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_clock_warning.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_storage.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_hint.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_notation.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/service/move_feedback.dart';
+import 'package:lichess_mobile/src/service/sound_service.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/focus_detector.dart';
 import 'package:lichess_mobile/src/utils/immersive_mode.dart';
@@ -36,6 +38,7 @@ import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_difficulty_tile.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_game_layout.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_player_row.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_result_dialog.dart';
 import 'package:lichess_mobile/src/widgets/yes_no_dialog.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -189,6 +192,38 @@ class _BodyState() extends ConsumerState<_Body> {
   /// does; this is what keeps a rebuild from asking for the same position twice and dropping the
   /// search that is already running on it.
   XiangqiPosition? _evaluatedPosition;
+  final Set<Timer> _moveFeedbackTimers = {};
+  Timer? _gameResultTimer;
+  XiangqiLowTimeWarning _clockWarning = XiangqiLowTimeWarning();
+  bool _active = true;
+
+  Future<void> _playLowTime() async {
+    try {
+      if (!await ref.read(clockSoundProvider.future) || !mounted) return;
+    } catch (_) {
+      return;
+    }
+    final game = ref.read(xiangqiGameControllerProvider);
+    final clock = ref.read(xiangqiClockProvider);
+    if (!_active ||
+        !(ModalRoute.of(context)?.isCurrent ?? true) ||
+        game.isFinished ||
+        game.opponent != .engine ||
+        clock.activeClock != game.playerSide ||
+        game.viewCursor != game.moves.length) {
+      return;
+    }
+    unawaited(ref.read(soundServiceProvider).play(Sound.lowTime));
+  }
+
+  @override
+  void dispose() {
+    for (final timer in _moveFeedbackTimers) {
+      timer.cancel();
+    }
+    _gameResultTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -291,7 +326,33 @@ class _BodyState() extends ConsumerState<_Body> {
       }
     });
 
+    ref.listen(xiangqiClockProvider, (previous, next) {
+      if (next.timeIncrement.isInfinite) return;
+      if (previous?.timeIncrement != next.timeIncrement) _clockWarning = XiangqiLowTimeWarning();
+      final game = ref.read(xiangqiGameControllerProvider);
+      final time = next.timeLeft(game.playerSide);
+      if (time != null &&
+          _clockWarning.shouldNotify(
+            timeLeft: time,
+            threshold: xiangqiEmergencyThreshold(next.timeIncrement.time),
+            now: DateTime.now(),
+            active:
+                _active &&
+                !game.isFinished &&
+                game.opponent == .engine &&
+                next.activeClock == game.playerSide &&
+                game.viewCursor == game.moves.length &&
+                (ModalRoute.of(context)?.isCurrent ?? true),
+          )) {
+        unawaited(_playLowTime());
+      }
+    });
+
     ref.listen(xiangqiGameControllerProvider, (previous, newState) {
+      if (newState.moves.isEmpty && previous?.moves.isNotEmpty == true) {
+        _clockWarning = XiangqiLowTimeWarning();
+      }
+      if (newState.end == null) _gameResultTimer?.cancel();
       if (previous != null) {
         final played = newState.moves.length - previous.moves.length;
         if (played > 0) {
@@ -306,7 +367,9 @@ class _BodyState() extends ConsumerState<_Body> {
           final isCapture = previous.position.pieceAt(move.to) != null;
           final isCheck = newState.isInCheck;
           void playFeedback() {
-            if (!context.mounted) return;
+            if (!context.mounted || !_active || !(ModalRoute.of(context)?.isCurrent ?? true)) {
+              return;
+            }
             final service = ref.read(moveFeedbackServiceProvider);
             if (isCapture) {
               service.captureFeedback(null, check: isCheck);
@@ -315,11 +378,18 @@ class _BodyState() extends ConsumerState<_Body> {
             }
           }
 
-          final delay = boardPrefs.pieceAnimationDuration ~/ 2;
+          final delay = ref.read(xiangqiGameControllerProvider.notifier).lastMoveViaDrag
+              ? Duration.zero
+              : boardPrefs.pieceAnimationDuration ~/ 2;
           if (delay <= Duration.zero) {
             playFeedback();
           } else {
-            Timer(delay, playFeedback);
+            late final Timer timer;
+            timer = Timer(delay, () {
+              _moveFeedbackTimers.remove(timer);
+              playFeedback();
+            });
+            _moveFeedbackTimers.add(timer);
           }
         }
       }
@@ -327,8 +397,13 @@ class _BodyState() extends ConsumerState<_Body> {
       // the board and read before the dialog comes down over it.
       if (previous?.end == null && newState.end != null) {
         ref.read(xiangqiClockProvider.notifier).pause();
-        Timer(const Duration(milliseconds: 500), () {
-          if (!context.mounted) return;
+        _gameResultTimer?.cancel();
+        _gameResultTimer = Timer(const Duration(milliseconds: 500), () {
+          if (!context.mounted || !_active || !(ModalRoute.of(context)?.isCurrent ?? true)) return;
+          if (ref.read(xiangqiGameControllerProvider).end != newState.end ||
+              ref.read(xiangqiGameControllerProvider).positions != newState.positions) {
+            return;
+          }
           showAdaptiveDialog<void>(
             context: context,
             barrierDismissible: true,
@@ -377,8 +452,15 @@ class _BodyState() extends ConsumerState<_Body> {
     // in, so both callbacks check the context is still mounted before reading anything through the
     // ref: a read on a state that is being torn down is refused outright.
     Widget content = FocusDetector(
+      onFocusGained: () => _active = true,
       onFocusLost: () {
         if (!context.mounted) return;
+        _active = false;
+        _gameResultTimer?.cancel();
+        for (final timer in _moveFeedbackTimers) {
+          timer.cancel();
+        }
+        _moveFeedbackTimers.clear();
         unawaited(_saveGame(ref.read(xiangqiGameControllerProvider)));
         ref.read(xiangqiClockProvider.notifier).pause();
         _evaluatedPosition = null;
@@ -412,17 +494,10 @@ class _BodyState() extends ConsumerState<_Body> {
                     moves: boardPrefs.showLegalMoves
                         ? gameState.selectedMoves
                         : const IListConst([]),
-                    lastMove: boardPrefs.boardHighlights ? gameState.lastMove : null,
+                    lastMove: gameState.lastMove,
                     onTapSquare: controller.tapSquare,
-                    // A drag is the same two taps it would have been, in the order they were made:
-                    // the piece is picked up where it was let go of, and put down where it was
-                    // dropped. A drag that cannot be played that way moves nothing, because the
-                    // second tap finds the first one's piece with nowhere to go and does what a tap
-                    // on an empty square does.
-                    onDragMove: (from, to) {
-                      controller.tapSquare(from);
-                      controller.tapSquare(to);
-                    },
+                    onDragMove: controller.movePiece,
+                    onCancelInteraction: controller.clearSelection,
                     animationDuration: boardPrefs.pieceAnimationDuration,
                     showCoordinates: boardPrefs.coordinates,
                     showLastMove: boardPrefs.boardHighlights,
@@ -434,6 +509,11 @@ class _BodyState() extends ConsumerState<_Body> {
                     // not, and the square it is over is marked the way the player asked for.
                     magnifyDraggedPiece: boardPrefs.magnifyDraggedPiece,
                     dragTargetKind: boardPrefs.dragTargetKind,
+                    settings: XiangqiBoardSettings.fromPreferences(boardPrefs),
+                    canStartDrag: (piece) =>
+                        gameState.isPlayerTurn &&
+                        (gameState.opponent == XiangqiOpponent.human ||
+                            piece.side == gameState.playerSide),
                     // The board is a citizen of the app's own theming, not a board of its own: it
                     // wears the colours of whichever chessboard theme the player has picked. See
                     // [XiangqiBoardStyle.fromChessboardColorScheme] for the mapping, and what it
@@ -451,16 +531,18 @@ class _BodyState() extends ConsumerState<_Body> {
                       : Clock(
                           timeLeft: clock.timeLeft(orientation.opposite) ?? Duration.zero,
                           active: clock.activeClock == orientation.opposite,
-                          emergencyThreshold: const Duration(seconds: 20),
+                          emergencyThreshold: xiangqiEmergencyThreshold(clock.timeIncrement.time),
                           clockTenths: clockTenths,
                         ),
                   style: XiangqiBoardStyle.fromChessboardColorScheme(boardPrefs.boardTheme.colors),
                   // The engine's own name, which is a proper name and the same in every language:
                   // it is the program that is playing, not a description of it. How hard it is
                   // playing is a setting, and the sheet is where a setting is read.
-                  name: 'Pikafish',
-                  isBot: true,
-                  thinking: gameState.isEngineThinking,
+                  name: orientation.opposite == gameState.playerSide ? playerName : 'Pikafish',
+                  isBot:
+                      orientation.opposite != gameState.playerSide && gameState.opponent == .engine,
+                  thinking:
+                      orientation.opposite != gameState.playerSide && gameState.isEngineThinking,
                   status: '',
                 ),
                 bottomTable: Column(
@@ -468,20 +550,23 @@ class _BodyState() extends ConsumerState<_Body> {
                   children: [
                     XiangqiPlayerRow(
                       side: orientation,
-                      isToMove: gameState.isPlayerTurn && !gameState.isFinished,
+                      isToMove: gameState.turn == orientation && !gameState.isFinished,
                       clock: gameState.timeIncrement.isInfinite
                           ? null
                           : Clock(
                               timeLeft: clock.timeLeft(orientation) ?? Duration.zero,
                               active: clock.activeClock == orientation,
-                              emergencyThreshold: const Duration(seconds: 20),
+                              emergencyThreshold: xiangqiEmergencyThreshold(
+                                clock.timeIncrement.time,
+                              ),
                               clockTenths: clockTenths,
                             ),
                       style: XiangqiBoardStyle.fromChessboardColorScheme(
                         boardPrefs.boardTheme.colors,
                       ),
-                      name: playerName,
-                      thinking: false,
+                      name: orientation == gameState.playerSide ? playerName : 'Pikafish',
+                      isBot: orientation != gameState.playerSide && gameState.opponent == .engine,
+                      thinking: orientation != gameState.playerSide && gameState.isEngineThinking,
                       status: _statusText(context, gameState),
                     ),
                     if (gameState.practiceMode)
@@ -514,6 +599,9 @@ class _BodyState() extends ConsumerState<_Body> {
                         redWinProbability: analysisState.evaluation?.redWinProbability ?? 0.5,
                         orientation: orientation,
                         evaluation: analysisState.evaluation,
+                        outcome: gameState.isFinished && gameState.isAtLivePosition
+                            ? (winner: gameState.winner)
+                            : null,
                       )
                     : null,
                 moves: xiangqiGameNotation(gameState.positions, gameState.moves),
@@ -679,16 +767,19 @@ class const XiangqiGameResultDialog({
   Widget build(BuildContext context) {
     final winner = state.winner;
 
-    return AlertDialog.adaptive(
-      title: Text(
-        winner == null
-            ? context.l10n.draw
-            : winner == state.playerSide
-            ? context.l10n.victory
-            : context.l10n.gameOver,
-      ),
-      content: Text(xiangqiResultLabel(context, state)),
-      actions: [
+    return XiangqiResultDialog(
+      title: winner == null
+          ? context.l10n.draw
+          : winner == state.playerSide
+          ? context.l10n.victory
+          : context.l10n.gameOver,
+      score: winner == null
+          ? '½ - ½'
+          : winner == .red
+          ? '1 - 0'
+          : '0 - 1',
+      explanation: xiangqiResultLabel(context, state),
+      actionsBuilder: (context, enabled) => [
         TextButton(onPressed: () => Navigator.pop(context), child: Text(context.l10n.close)),
         TextButton(onPressed: onNewGame, child: Text(context.l10n.mobileNewGame)),
       ],
@@ -1072,6 +1163,10 @@ class _NewGameSheetState() extends ConsumerState<_NewGameSheet> {
                     height: 135.0 * (boardPrefs.coordinates ? 11 / 10 : 10 / 9),
                     child: XiangqiBoard(
                       position: _initialPosition,
+                      settings: XiangqiBoardSettings.fromPreferences(
+                        boardPrefs,
+                        annotations: false,
+                      ),
                       showCoordinates: boardPrefs.coordinates,
                       showBorder: boardPrefs.showBorder,
                       style: XiangqiBoardStyle.fromChessboardColorScheme(

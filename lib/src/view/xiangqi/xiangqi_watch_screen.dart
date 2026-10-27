@@ -9,6 +9,7 @@ import 'package:lichess_mobile/src/view/xiangqi/xiangqi_online_game_screen.dart'
 import 'package:lichess_mobile/src/widgets/misc.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_avatar.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_refreshable_empty.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// The games being played on xiangqi.com right now, and the way into watching one.
@@ -51,12 +52,14 @@ class const _Body() extends ConsumerWidget {
 
     return games.when(
       data: (games) => games.isEmpty
-          ? const Center(
-              child: Padding(padding: Styles.bodySectionPadding, child: _NoGames()),
+          ? XiangqiRefreshableEmpty(
+              onRefresh: () => ref.refresh(xiangqiLiveGamesProvider.future),
+              child: const Padding(padding: Styles.bodySectionPadding, child: _NoGames()),
             )
           : RefreshIndicator.adaptive(
               onRefresh: () => ref.refresh(xiangqiLiveGamesProvider.future),
               child: ListView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.symmetric(vertical: 8.0),
                 itemCount: games.length,
                 itemBuilder: (context, index) => _LiveGameTile(game: games[index]),
@@ -172,25 +175,8 @@ class const _SeatLine({
                 ),
               ],
               if (player.isBot) ...[
-                const SizedBox(width: 6.0),
-                // The same badge the offline game screen puts on a computer opponent, down to the
-                // colour and the letter spacing, so a bot reads as a bot wherever it is met.
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                  decoration: BoxDecoration(
-                    color: context.lichessColors.fancy,
-                    borderRadius: const BorderRadius.all(Radius.circular(3)),
-                  ),
-                  child: Text(
-                    context.l10n.computer,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ),
+                const SizedBox(width: 5.0),
+                Text('BOT', style: TextStyle(fontSize: 14, color: context.lichessColors.fancy)),
               ],
             ],
           ),

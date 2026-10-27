@@ -49,7 +49,7 @@ const lichessInboxJson = '''
 /// The shape is the capture's; the ids are stand-ins.
 const xiangqiChatId = 'qAAAAA';
 const xiangqiPeerId = 200001;
-const xiangqiPeerName = '象棋高手阿豹';
+const xiangqiPeerName = '棋友乙';
 
 /// One `inbox.chats` row, in the shape the capture wrote.
 const xiangqiChatRow = <String, Object?>{

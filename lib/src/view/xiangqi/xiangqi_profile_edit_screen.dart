@@ -13,17 +13,44 @@ import 'package:material_ui/material_ui.dart';
 /// when the username changes. The same fields are sent here; email is shown as the account's fixed
 /// identity rather than made editable, because changing it is a separate verification flow.
 class const XiangqiProfileEditScreen({required final String username, super.key})
-    extends ConsumerWidget {
+    extends ConsumerStatefulWidget {
   static Route<String?> buildRoute(String username) =>
       buildScreenRoute<String?>(screen: XiangqiProfileEditScreen(username: username));
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<XiangqiProfileEditScreen> createState() => _XiangqiProfileEditScreenState();
+}
+
+class _XiangqiProfileEditScreenState() extends ConsumerState<XiangqiProfileEditScreen> {
+  String? _ownerId;
+  int? _ownerGeneration;
+
+  @override
+  Widget build(BuildContext context) {
+    final username = widget.username;
+    final accountGeneration = ref.watch(xiangqiAccountGenerationProvider);
+    final session = ref.watch(xiangqiAuthControllerProvider);
+    // A rename publishes its name before storage finishes. Bind ownership to the id so that the
+    // form remains mounted until its successful update returns and closes the route. Bind only
+    // once: a later session, even with the same username, cannot take over this route.
+    if (_ownerId == null && session != null && !session.isGuest && session.name == username) {
+      _ownerId = session.userId;
+      _ownerGeneration = accountGeneration;
+    }
+    if (session == null ||
+        session.isGuest ||
+        session.userId != _ownerId ||
+        accountGeneration != _ownerGeneration) {
+      return Scaffold(
+        appBar: AppBar(title: Text(context.l10n.editProfile)),
+        body: Center(child: Text(context.l10n.mobileXiangqiSignIn)),
+      );
+    }
     final profile = ref.watch(xiangqiEditableProfileProvider(username));
     return Scaffold(
       appBar: AppBar(title: Text(context.l10n.editProfile)),
       body: profile.when(
-        data: (profile) => _EditForm(profile: profile),
+        data: (profile) => _EditForm(key: ValueKey(accountGeneration), profile: profile),
         loading: () => const Center(child: CircularProgressIndicator.adaptive()),
         error: (error, stackTrace) => Center(
           child: Padding(
@@ -46,7 +73,7 @@ class const XiangqiProfileEditScreen({required final String username, super.key}
   }
 }
 
-class const _EditForm({required final XiangqiEditableProfile profile})
+class const _EditForm({required final XiangqiEditableProfile profile, super.key})
     extends ConsumerStatefulWidget {
   @override
   ConsumerState<_EditForm> createState() => _EditFormState();
@@ -80,11 +107,13 @@ class _EditFormState() extends ConsumerState<_EditForm> {
   }
 
   Future<void> _save() async {
+    if (_saving) return;
     if (!_formKey.currentState!.validate()) return;
     setState(() {
       _saving = true;
       _error = null;
     });
+    final generation = ref.read(xiangqiAccountGenerationProvider);
     try {
       final updated = await updateXiangqiProfile(
         ref.read(xiangqiClientProvider),
@@ -94,17 +123,19 @@ class _EditFormState() extends ConsumerState<_EditForm> {
         countryId: _countryId,
         password: _password.text,
       );
+      if (!mounted || generation != ref.read(xiangqiAccountGenerationProvider)) return;
       await ref.read(xiangqiAuthControllerProvider.notifier).updateUsername(updated.username);
+      if (!mounted || generation != ref.read(xiangqiAccountGenerationProvider)) return;
       ref.invalidate(xiangqiEditableProfileProvider(widget.profile.username));
       ref.invalidate(xiangqiEditableProfileProvider(updated.username));
       ref.invalidate(xiangqiUserProvider(widget.profile.username));
       ref.invalidate(xiangqiUserProvider(updated.username));
       if (mounted) Navigator.of(context).pop(updated.username);
-    } on Object catch (error) {
-      if (!mounted) return;
+    } on Object catch (_) {
+      if (!mounted || generation != ref.read(xiangqiAccountGenerationProvider)) return;
       setState(() {
         _saving = false;
-        _error = error.toString();
+        _error = context.l10n.mobileSomethingWentWrong;
       });
     }
   }
@@ -120,6 +151,7 @@ class _EditFormState() extends ConsumerState<_EditForm> {
         children: [
           TextFormField(
             controller: _username,
+            enabled: !_saving,
             decoration: InputDecoration(
               labelText: context.l10n.username,
               border: const OutlineInputBorder(),
@@ -159,6 +191,7 @@ class _EditFormState() extends ConsumerState<_EditForm> {
           const SizedBox(height: 12.0),
           TextFormField(
             controller: _bio,
+            enabled: !_saving,
             decoration: InputDecoration(
               labelText: context.l10n.biography,
               alignLabelWithHint: true,
@@ -172,6 +205,7 @@ class _EditFormState() extends ConsumerState<_EditForm> {
             const SizedBox(height: 12.0),
             TextFormField(
               controller: _password,
+              enabled: !_saving,
               obscureText: true,
               autofillHints: const [AutofillHints.password],
               decoration: InputDecoration(

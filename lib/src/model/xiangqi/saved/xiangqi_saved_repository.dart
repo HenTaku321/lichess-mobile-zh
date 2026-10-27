@@ -105,6 +105,7 @@ final xiangqiSavedRepositoryProvider = Provider<XiangqiSavedRepository>((Ref ref
 /// the server will not answer for a guest: measured on 2026-10-16, a guest's own name was a `404`
 /// where the signed-in account's was a `200`. See `xiangqi-com-re/docs/saved.md`.
 Future<Object?> _getJson(Ref ref, String path, Map<String, String> query) async {
+  ref.watch(xiangqiAccountGenerationProvider);
   if (!ref.watch(isXiangqiLoggedInProvider)) {
     throw StateError('No xiangqi.com account; not asking for $path.');
   }

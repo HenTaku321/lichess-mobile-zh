@@ -369,13 +369,19 @@ class const _DeleteAccount({required final String username}) extends ConsumerSta
 
 class _DeleteAccountState() extends ConsumerState<_DeleteAccount> {
   bool _deleting = false;
+  bool _confirming = false;
 
   Future<void> _confirm() async {
+    if (_deleting || _confirming) return;
+    final generation = ref.read(xiangqiAccountGenerationProvider);
+    setState(() => _confirming = true);
     final result = await showAdaptiveDialog<({String password, String reason})>(
       context: context,
       builder: (dialogContext) => _DeleteAccountDialog(username: widget.username),
     );
-    if (result == null || !mounted) return;
+    if (!mounted) return;
+    setState(() => _confirming = false);
+    if (result == null || generation != ref.read(xiangqiAccountGenerationProvider)) return;
 
     setState(() => _deleting = true);
     try {

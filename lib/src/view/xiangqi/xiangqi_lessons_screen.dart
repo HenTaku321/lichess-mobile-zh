@@ -10,17 +10,16 @@ import 'package:lichess_mobile/src/utils/navigation.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_lesson_player_screen.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_refreshable_empty.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// xiangqi.com's courses, as a list of topics grouped by level.
 ///
 /// ## What this app does with a lesson, and what it does not
 ///
-/// It lists them, it shows a lesson's chapters, and it shows a chapter's position and the moves it
-/// wants played. It does **not** play them: a chapter is a position and a script, the script is not
-/// a legal game — a chapter with two red moves in a row was measured on 2026-10-16 — and what the
-/// shipped client does with the opponent's turns between them is not pinned. A player that guessed
-/// would be a player that taught the wrong thing.
+/// Lists topics and chapters, then opens the script-driven lesson player. Scripts are not legal
+/// games: they may ask for consecutive moves by the same side. The player follows the chapter's
+/// measured turn markers rather than imposing a normal game's alternating-turn rule.
 ///
 /// The other half of the reason is the position itself: a chapter's `initial_fen` is written in
 /// xiangqi.com's own spelling, whose general is a `j` that is not in the site's own piece set. It is
@@ -44,6 +43,7 @@ class const XiangqiLessonsScreen({super.key}) extends ConsumerWidget {
         data: (topics) => RefreshIndicator.adaptive(
           onRefresh: () => ref.refresh(xiangqiTopicsProvider(locale).future),
           child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
             children: [
               for (final level in _levelsOf(topics))
                 ListSection(
@@ -134,21 +134,26 @@ class const XiangqiTopicScreen({required final String topicId, super.key}) exten
         title: AppBarTitleText(detail.value?.topic.title ?? context.l10n.mobileXiangqiLessons),
       ),
       body: detail.when(
-        data: (detail) => ListView(
-          children: [
-            if (detail.topic.description != null)
-              Padding(
-                padding: Styles.bodySectionPadding,
-                child: Text(
-                  detail.topic.description!,
-                  style: TextTheme.of(context).bodyMedium?.copyWith(color: textShade(context, 0.7)),
+        data: (detail) => RefreshIndicator.adaptive(
+          onRefresh: () => ref.refresh(xiangqiTopicProvider((topicId, locale)).future),
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            children: [
+              if (detail.topic.description != null)
+                Padding(
+                  padding: Styles.bodySectionPadding,
+                  child: Text(
+                    detail.topic.description!,
+                    style: TextTheme.of(context).bodyMedium
+                        ?.copyWith(color: textShade(context, 0.7)),
+                  ),
                 ),
+              ListSection(
+                hasLeading: true,
+                children: [for (final lesson in detail.lessons) _LessonRow(lesson: lesson)],
               ),
-            ListSection(
-              hasLeading: true,
-              children: [for (final lesson in detail.lessons) _LessonRow(lesson: lesson)],
-            ),
-          ],
+            ],
+          ),
         ),
         loading: () => const Center(child: CircularProgressIndicator.adaptive()),
         error: (error, stackTrace) => Center(
@@ -229,29 +234,34 @@ class const XiangqiLessonScreen({
       appBar: AppBar(title: AppBarTitleText(lessonTitle)),
       body: chapters.when(
         data: (chapters) => chapters.isEmpty
-            ? Center(
+            ? XiangqiRefreshableEmpty(
+                onRefresh: () => ref.refresh(xiangqiChaptersProvider((lessonId, locale)).future),
                 child: Padding(
                   padding: Styles.bodySectionPadding,
                   child: Text(context.l10n.mobileXiangqiLessonNoChapters),
                 ),
               )
-            : ListView(
-                children: [
-                  ListSection(
-                    hasLeading: true,
-                    header: Text(context.l10n.mobileXiangqiLessonChapters),
-                    children: [
-                      for (final (index, chapter) in chapters.indexed)
-                        _ChapterRow(
-                          chapter: chapter,
-                          lessonTitle: lessonTitle,
-                          chapters: chapters,
-                          index: index,
-                          lessonId: lessonId,
-                        ),
-                    ],
-                  ),
-                ],
+            : RefreshIndicator.adaptive(
+                onRefresh: () => ref.refresh(xiangqiChaptersProvider((lessonId, locale)).future),
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  children: [
+                    ListSection(
+                      hasLeading: true,
+                      header: Text(context.l10n.mobileXiangqiLessonChapters),
+                      children: [
+                        for (final (index, chapter) in chapters.indexed)
+                          _ChapterRow(
+                            chapter: chapter,
+                            lessonTitle: lessonTitle,
+                            chapters: chapters,
+                            index: index,
+                            lessonId: lessonId,
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
         loading: () => const Center(child: CircularProgressIndicator.adaptive()),
         error: (error, stackTrace) => Center(

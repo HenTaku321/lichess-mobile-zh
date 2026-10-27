@@ -4,12 +4,12 @@ import 'package:chessground/chessground.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lichess_mobile/src/model/analysis/analysis_preferences.dart';
 import 'package:lichess_mobile/src/model/common/chess.dart' show Variant;
 import 'package:lichess_mobile/src/model/engine/evaluation_preferences.dart';
 import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_analysis_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_export.dart';
-import 'package:lichess_mobile/src/model/xiangqi/xiangqi_hint.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_move.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_notation.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
@@ -23,6 +23,7 @@ import 'package:lichess_mobile/src/utils/navigation.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_board_editor_screen.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_analysis_layout.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_game_layout.dart';
 import 'package:material_ui/material_ui.dart';
@@ -233,8 +234,9 @@ class _BodyState() extends ConsumerState<_Body> {
         _syncEngine();
       },
       child: SafeArea(
-        child: XiangqiGameLayout(
-          board: BrightnessHueFilter(
+        child: XiangqiAnalysisLayout(
+          smallBoard: ref.watch(analysisPreferencesProvider).smallBoard,
+          boardBuilder: (context, size, radius) => BrightnessHueFilter(
             brightness: boardPrefs.brightness,
             hue: boardPrefs.hue,
             child: XiangqiBoard(
@@ -242,14 +244,10 @@ class _BodyState() extends ConsumerState<_Body> {
               orientation: orientation,
               selected: analysisState.selected,
               moves: boardPrefs.showLegalMoves ? analysisState.selectedMoves : const IListConst([]),
-              lastMove: boardPrefs.boardHighlights ? analysisState.lastMove : null,
+              lastMove: analysisState.lastMove,
               onTapSquare: controller.tapSquare,
-              // A drag is the same two taps it would have been, in the order they were made — the
-              // same wiring the game screen uses, and it moves nothing that could not be moved.
-              onDragMove: (from, to) {
-                controller.tapSquare(from);
-                controller.tapSquare(to);
-              },
+              onDragMove: controller.movePiece,
+              onCancelInteraction: controller.clearSelection,
               animationDuration: boardPrefs.pieceAnimationDuration,
               showCoordinates: boardPrefs.coordinates,
               showLastMove: boardPrefs.boardHighlights,
@@ -257,18 +255,19 @@ class _BodyState() extends ConsumerState<_Body> {
               arrows: arrows,
               magnifyDraggedPiece: boardPrefs.magnifyDraggedPiece,
               dragTargetKind: boardPrefs.dragTargetKind,
+              settings: XiangqiBoardSettings.fromPreferences(boardPrefs),
+              canStartDrag: (piece) => piece.side == analysisState.position.turn,
               style: XiangqiBoardStyle.fromChessboardColorScheme(boardPrefs.boardTheme.colors),
             ),
           ),
           // Above the board: how deep the engine has got. The score is not repeated here — it is on
           // the bar beside the board, which is what a bar is for.
-          topTable: _AnalysisDepth(depth: analysisState.depth),
+          boardHeader: _AnalysisDepth(depth: analysisState.depth),
           // Under it: what the engine says, in as many lines as the player has asked to be shown.
-          bottomTable: _EngineLines(
-            state: analysisState,
-            count: numEvalLines,
-            onPlay: controller.play,
-          ),
+          engineLinesHeight: numEvalLines * _kEngineLineHeight,
+          engineLines: !evalEnabled
+              ? null
+              : _EngineLines(state: analysisState, count: numEvalLines, onPlay: controller.play),
           evalGauge: evalEnabled
               ? XiangqiEvalGauge(
                   // A bar with nothing to report yet is drawn level rather than left out: the
@@ -276,6 +275,9 @@ class _BodyState() extends ConsumerState<_Body> {
                   redWinProbability: analysisState.evaluation?.redWinProbability ?? 0.5,
                   orientation: orientation,
                   evaluation: analysisState.evaluation,
+                  outcome: analysisState.isFinished
+                      ? (winner: analysisState.position.turn.opposite)
+                      : null,
                 )
               : null,
           moves: xiangqiGameNotation(analysisState.positions, analysisState.moves),
@@ -284,7 +286,7 @@ class _BodyState() extends ConsumerState<_Body> {
           // played is the whole of what makes it an analysis board.
           currentMoveIndex: analysisState.cursor,
           onSelectMove: controller.goTo,
-          userActionsBar: BottomBar(
+          bottomBar: BottomBar(
             children: [
               BottomBarButton(
                 label: context.l10n.flipBoard,
@@ -412,7 +414,7 @@ class const _EngineLineRow({
                 ),
                 padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 2.0),
                 child: Text(
-                  _scoreLabel(line.evaluation),
+                  line.evaluation.evalString ?? '',
                   style: TextStyle(
                     color: inkOnBackground,
                     fontSize: _kEngineLineFontSize,
@@ -437,18 +439,4 @@ class const _EngineLineRow({
       ),
     );
   }
-}
-
-/// The score of [evaluation] as short text, or the empty string when there is none.
-///
-/// Red's point of view, like everything else on this screen: `+1.2` is red a soldier up and `M3` is
-/// red mating in three. The sign is carried by the badge's colour rather than by the text — the same
-/// division of labour the evaluation bar makes, and the same spelling of a score, since a board and
-/// a bar saying `+1.2` and `1.2` for the same position would be two answers to one question. See
-/// `_scoreLabel` in `xiangqi_game_layout.dart`.
-String _scoreLabel(XiangqiEvaluation evaluation) {
-  final mate = evaluation.mate;
-  if (mate != null) return mate > 0 ? 'M$mate' : 'M${-mate}';
-  final pawns = (evaluation.cp ?? 0) / 100.0;
-  return '${pawns > 0 ? '+' : ''}${pawns.toStringAsFixed(1)}';
 }

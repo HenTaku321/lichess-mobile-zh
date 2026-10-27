@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_new_game.dart';
+import 'package:lichess_mobile/src/network/xiangqi_session_store.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
@@ -68,9 +69,11 @@ class const XiangqiNewGameScreen({super.key}) extends ConsumerWidget {
       appBar: AppBar(
         title: AppBarTitleText('${context.l10n.mobileXiangqi} · ${context.l10n.createAGame}'),
       ),
-      body: session == null || session.isGuest
+      body: ref.watch(xiangqiSessionReadyProvider).isLoading
+          ? const Center(child: CircularProgressIndicator.adaptive())
+          : session == null || session.isGuest
           ? _SignInPrompt(onTap: () => Navigator.of(context).push(XiangqiLoginScreen.buildRoute()))
-          : const _Form(),
+          : _Form(key: ValueKey(ref.watch(xiangqiAccountGenerationProvider))),
     );
   }
 }
@@ -100,7 +103,7 @@ enum _Opponent() {
   custom,
 }
 
-class const _Form() extends ConsumerStatefulWidget {
+class const _Form({super.key}) extends ConsumerStatefulWidget {
   @override
   ConsumerState<_Form> createState() => _FormState();
 }
@@ -116,6 +119,67 @@ class _FormState() extends ConsumerState<_Form> {
   /// from one screen, and a second button that could be pressed while the first is out would be a
   /// second game.
   bool _busy = false;
+  bool _searching = false;
+  int _searchGeneration = 0;
+  XiangqiNewGameRepository? _searchRepository;
+  Future<void>? _quickSubmission;
+  bool _cancelling = false;
+  late final XiangqiSessionStore _sessions;
+  late final int _account;
+
+  @override
+  void initState() {
+    super.initState();
+    _sessions = ref.read(xiangqiSessionStoreProvider);
+    _account = _sessions.accountGeneration;
+  }
+
+  @override
+  void dispose() {
+    _searchGeneration++;
+    final repository = _searchRepository;
+    _searchRepository = null;
+    if (repository != null) unawaited(_cancelQueued(repository, submission: _quickSubmission));
+    super.dispose();
+  }
+
+  Future<void> _cancelQueued(
+    XiangqiNewGameRepository repository, {
+    Future<void>? submission,
+  }) async {
+    try {
+      await submission;
+    } on Object {
+      /* The queue may still need clearing after a lost response. */
+    }
+    // A shared HTTP client would otherwise cancel the newly signed-in account's queue.
+    if (_sessions.accountGeneration != _account) return;
+    try {
+      await repository.cancelQuickChallenge();
+    } on Object {
+      /* Best effort; no automatic resignation. */
+    }
+  }
+
+  Future<void> _cancelSearch() async {
+    if (_cancelling) return;
+    _searchGeneration++;
+    final repository = _searchRepository;
+    _searchRepository = null;
+    if (mounted) {
+      setState(() {
+        _cancelling = true;
+      });
+    }
+    if (repository != null) await _cancelQueued(repository, submission: _quickSubmission);
+    if (mounted) {
+      setState(() {
+        _cancelling = false;
+        _searching = false;
+        _busy = false;
+      });
+    }
+  }
 
   /// Whether the settings that only a game of your own has are being asked for.
   ///
@@ -152,7 +216,9 @@ class _FormState() extends ConsumerState<_Form> {
                             _Opponent.quick => context.l10n.mobileXiangqiQuickGame,
                             _Opponent.custom => context.l10n.mobileXiangqiCreateGame,
                           }),
-                          onSelectedItemChanged: (opponent) => setState(() => _opponent = opponent),
+                          onSelectedItemChanged: (opponent) {
+                            if (mounted) setState(() => _opponent = opponent);
+                          },
                         );
                       },
               ),
@@ -173,8 +239,9 @@ class _FormState() extends ConsumerState<_Form> {
                           choices: XiangqiTimeControl.values,
                           selectedItem: _timeControl,
                           labelBuilder: (control) => Text(_timeControlLabel(context, control)),
-                          onSelectedItemChanged: (control) =>
-                              setState(() => _timeControl = control),
+                          onSelectedItemChanged: (control) {
+                            if (mounted) setState(() => _timeControl = control);
+                          },
                         );
                       },
               ),
@@ -198,7 +265,9 @@ class _FormState() extends ConsumerState<_Form> {
                             choices: XiangqiSideChoice.values,
                             selectedItem: _side,
                             labelBuilder: (side) => Text(_sideLabel(context, side)),
-                            onSelectedItemChanged: (side) => setState(() => _side = side),
+                            onSelectedItemChanged: (side) {
+                              if (mounted) setState(() => _side = side);
+                            },
                           );
                         },
                 ),
@@ -218,7 +287,9 @@ class _FormState() extends ConsumerState<_Form> {
                             selectedItem: _rated,
                             labelBuilder: (rated) =>
                                 Text(rated ? context.l10n.rated : context.l10n.casual),
-                            onSelectedItemChanged: (rated) => setState(() => _rated = rated),
+                            onSelectedItemChanged: (rated) {
+                              if (mounted) setState(() => _rated = rated);
+                            },
                           );
                         },
                 ),
@@ -243,6 +314,14 @@ class _FormState() extends ConsumerState<_Form> {
             style: Styles.bold,
           ),
         ),
+        if (_searching) ...[
+          const Center(child: CircularProgressIndicator.adaptive()),
+          Text(context.l10n.mobileXiangqiSearching, textAlign: TextAlign.center),
+          TextButton(
+            onPressed: _cancelling ? null : _cancelSearch,
+            child: Text(context.l10n.cancel),
+          ),
+        ],
       ],
     );
   }
@@ -264,14 +343,27 @@ class _FormState() extends ConsumerState<_Form> {
   };
 
   Future<void> _play() async {
+    if (_busy) return;
+    final generation = ++_searchGeneration;
     setState(() => _busy = true);
     try {
       final repository = ref.read(xiangqiNewGameRepositoryProvider);
       if (_opponent == _Opponent.quick) {
-        await repository.quickChallenge(_timeControl);
-        if (!mounted) return;
-        final gameId = await _waitForOpponent(repository);
-        if (!mounted) return;
+        _searchRepository = repository;
+        setState(() => _searching = true);
+        _quickSubmission = repository.quickChallenge(_timeControl);
+        await _quickSubmission;
+        if (!mounted || generation != _searchGeneration) {
+          return;
+        }
+        final gameId = await _waitForOpponent(repository, generation);
+        if (!mounted ||
+            generation != _searchGeneration ||
+            !(ModalRoute.of(context)?.isCurrent ?? true)) {
+          return;
+        }
+        _searchRepository = null;
+        setState(() => _searching = false);
         if (gameId == null) {
           showSnackBar(context, context.l10n.mobileXiangqiNoGames);
           return;
@@ -288,16 +380,29 @@ class _FormState() extends ConsumerState<_Form> {
           private: _private,
         ),
       );
-      if (!mounted) return;
+      if (!mounted ||
+          generation != _searchGeneration ||
+          !(ModalRoute.of(context)?.isCurrent ?? true)) {
+        return;
+      }
       await Navigator.of(context).push(XiangqiOnlineGameScreen.buildRoute(gameId));
     } on Object catch (error, stackTrace) {
+      if (generation != _searchGeneration) return;
+      final repository = _searchRepository;
+      _searchRepository = null;
+      if (repository != null) await _cancelQueued(repository);
       if (!mounted) return;
       showSnackBar(context, context.l10n.mobileSomethingWentWrong, type: SnackBarType.error);
       // The stack is not shown to the reader; it is here so that a failure that only happens on one
       // machine is not a failure with nothing behind it.
       debugPrint('$error\n$stackTrace');
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted && generation == _searchGeneration) {
+        setState(() {
+          _busy = false;
+          _searching = false;
+        });
+      }
     }
   }
 
@@ -307,11 +412,12 @@ class _FormState() extends ConsumerState<_Form> {
   /// the account with somebody after the screen that asked for it had gone, and the game would be
   /// sitting there waiting for a player who never comes back. The cancel is best-effort — a failed
   /// cancel is not worth an error over a screen that is leaving anyway.
-  Future<String?> _waitForOpponent(XiangqiNewGameRepository repository) async {
+  Future<String?> _waitForOpponent(XiangqiNewGameRepository repository, int generation) async {
     for (var round = 0; round < xiangqiQuickMatchRounds; round++) {
       await Future<void>.delayed(kXiangqiQuickMatchPollInterval);
-      if (!mounted) return null;
+      if (!mounted || generation != _searchGeneration) return null;
       final status = await repository.challengeStatus();
+      if (!mounted || generation != _searchGeneration) return null;
       if (status case XiangqiChallengeMatched(:final gameId)) return gameId;
     }
     try {

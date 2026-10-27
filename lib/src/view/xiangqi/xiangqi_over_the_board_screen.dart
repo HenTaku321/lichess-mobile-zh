@@ -10,8 +10,10 @@ import 'package:lichess_mobile/src/model/common/game_family.dart';
 import 'package:lichess_mobile/src/model/common/local_game_clock.dart';
 import 'package:lichess_mobile/src/model/common/time_increment.dart';
 import 'package:lichess_mobile/src/model/lobby/game_setup_preferences.dart';
+import 'package:lichess_mobile/src/model/over_the_board/over_the_board_preferences.dart';
 import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_clock.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_clock_warning.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_storage.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_notation.dart';
@@ -36,6 +38,7 @@ import 'package:lichess_mobile/src/widgets/settings.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_game_layout.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_player_row.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_result_dialog.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// A game of xiangqi played by two people at one device, over the board.
@@ -84,6 +87,15 @@ class const _Body({final String? initialFen}) extends ConsumerStatefulWidget {
 }
 
 class _BodyState() extends ConsumerState<_Body> {
+  Timer? _resultTimer;
+  bool _active = true;
+
+  @override
+  void dispose() {
+    _resultTimer?.cancel();
+    super.dispose();
+  }
+
   /// The side drawn at the bottom of the board.
   ///
   /// Red until the board is turned round. This is a way of looking at the game and not a fact about
@@ -144,8 +156,15 @@ class _BodyState() extends ConsumerState<_Body> {
   /// The delay is the chess screens' own, and for the same reason: the move that ended the game, or
   /// the flag that did, should be on the board and read before a dialog comes down over it.
   void _showResultDialog(XiangqiGameState gameState) {
-    Timer(const Duration(milliseconds: 500), () {
-      if (!context.mounted) return;
+    _resultTimer?.cancel();
+    _resultTimer = Timer(const Duration(milliseconds: 500), () {
+      if (!context.mounted ||
+          !_active ||
+          !(ModalRoute.of(context)?.isCurrent ?? true) ||
+          ref.read(xiangqiGameControllerProvider).end != gameState.end ||
+          ref.read(xiangqiGameControllerProvider).positions != gameState.positions) {
+        return;
+      }
       showAdaptiveDialog<void>(
         context: context,
         barrierDismissible: true,
@@ -164,6 +183,7 @@ class _BodyState() extends ConsumerState<_Body> {
   Widget build(BuildContext context) {
     final gameState = ref.watch(xiangqiGameControllerProvider);
     final boardPrefs = ref.watch(boardPreferencesProvider);
+    final otbPrefs = ref.watch(overTheBoardPreferencesProvider);
 
     // The clock follows the game rather than the game following the clock, and the two are put
     // together here rather than in the controller: what a move means to a clock is a fact about this
@@ -175,11 +195,12 @@ class _BodyState() extends ConsumerState<_Body> {
     // side that has the move again, and without an increment, since no move was made to earn one.
     ref.listen(xiangqiGameControllerProvider, (previous, newState) {
       if (previous == null) return;
+      if (newState.end == null) _resultTimer?.cancel();
       final played = newState.moves.length - previous.moves.length;
       if (played > 0) {
         ref.read(xiangqiClockProvider.notifier).onMove(newSideToMove: newState.turn);
         unawaited(_saveGame());
-        if (played == 1) {
+        if (played == 1 && _active && (ModalRoute.of(context)?.isCurrent ?? true)) {
           final move = newState.moves.last;
           final isCapture = previous.position.pieceAt(move.to) != null;
           final service = ref.read(moveFeedbackServiceProvider);
@@ -217,6 +238,11 @@ class _BodyState() extends ConsumerState<_Body> {
 
     return WakelockWidget(
       child: FocusDetector(
+        onFocusGained: () => _active = true,
+        onFocusLost: () {
+          _active = false;
+          _resultTimer?.cancel();
+        },
         // Time does not run while the app is away: the clock is this screen's, and the screen is not
         // playing the game while it is in the background. Nothing resumes it on the way back — the
         // pause button in the bar below, which is where pausing is done anyway, is also the way back.
@@ -232,12 +258,20 @@ class _BodyState() extends ConsumerState<_Body> {
               Expanded(
                 child: SafeArea(
                   child: XiangqiGameLayout(
+                    topTableUpsideDown:
+                        !otbPrefs.flipPiecesAfterMove || _orientation != gameState.turn,
+                    bottomTableUpsideDown:
+                        otbPrefs.flipPiecesAfterMove && _orientation != gameState.turn,
                     board: BrightnessHueFilter(
                       brightness: boardPrefs.brightness,
                       hue: boardPrefs.hue,
                       child: XiangqiBoard(
                         position: gameState.position,
                         orientation: _orientation,
+                        pieceOrientationBehavior: otbPrefs.flipPiecesAfterMove
+                            ? .sideToPlay
+                            : .opponentUpsideDown,
+                        blindfoldMode: otbPrefs.blindfoldMode,
                         selected: gameState.selected,
                         // The legal moves and the last move are things the board draws, so the two
                         // settings that turn them off turn them off here as well as on the computer
@@ -245,22 +279,23 @@ class _BodyState() extends ConsumerState<_Body> {
                         moves: boardPrefs.showLegalMoves
                             ? gameState.selectedMoves
                             : const IListConst([]),
-                        lastMove: boardPrefs.boardHighlights ? gameState.lastMove : null,
+                        lastMove: gameState.lastMove,
                         onTapSquare: ref.read(xiangqiGameControllerProvider.notifier).tapSquare,
-                        // A drag is the same two taps in the order they were made, as it is on the
-                        // computer screen: the piece is picked up where it was let go of and put down
-                        // where it was dropped.
-                        onDragMove: (from, to) {
-                          final controller = ref.read(xiangqiGameControllerProvider.notifier);
-                          controller.tapSquare(from);
-                          controller.tapSquare(to);
-                        },
+                        onDragMove: ref.read(xiangqiGameControllerProvider.notifier).movePiece,
+                        onCancelInteraction: ref
+                            .read(xiangqiGameControllerProvider.notifier)
+                            .clearSelection,
                         animationDuration: boardPrefs.pieceAnimationDuration,
                         showCoordinates: boardPrefs.coordinates,
                         showLastMove: boardPrefs.boardHighlights,
                         showBorder: boardPrefs.showBorder,
                         magnifyDraggedPiece: boardPrefs.magnifyDraggedPiece,
                         dragTargetKind: boardPrefs.dragTargetKind,
+                        settings: XiangqiBoardSettings.fromPreferences(
+                          boardPrefs,
+                          annotations: false,
+                        ),
+                        canStartDrag: (_) => true,
                         style: XiangqiBoardStyle.fromChessboardColorScheme(
                           boardPrefs.boardTheme.colors,
                         ),
@@ -326,9 +361,7 @@ class const _OtbPlayer({required final XiangqiSide side, required final Key cloc
               key: clockKey,
               timeLeft: Duration(milliseconds: max(0, clock.timeLeft(side)!.inMilliseconds)),
               active: clock.activeClock == side,
-              emergencyThreshold: Duration(
-                seconds: (clock.timeIncrement.time * 0.125).clamp(10, 60).toInt(),
-              ),
+              emergencyThreshold: xiangqiEmergencyThreshold(clock.timeIncrement.time),
               clockTenths: clockTenths,
             ),
     );
@@ -422,10 +455,15 @@ class const _XiangqiOtbResultDialog({
 }) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return AlertDialog.adaptive(
-      title: Text(state.winner == null ? context.l10n.draw : context.l10n.gameOver),
-      content: Text(xiangqiResultLabel(context, state)),
-      actions: [
+    return XiangqiResultDialog(
+      title: state.winner == null ? context.l10n.draw : context.l10n.gameOver,
+      score: state.winner == null
+          ? '½ - ½'
+          : state.winner == .red
+          ? '1 - 0'
+          : '0 - 1',
+      explanation: xiangqiResultLabel(context, state),
+      actionsBuilder: (context, enabled) => [
         TextButton(onPressed: () => Navigator.pop(context), child: Text(context.l10n.close)),
         TextButton(onPressed: onNewGame, child: Text(context.l10n.mobileNewGame)),
       ],
@@ -474,6 +512,7 @@ class _ConfigureXiangqiOtbSheetState() extends ConsumerState<_ConfigureXiangqiOt
 
   @override
   Widget build(BuildContext context) {
+    final display = ref.watch(overTheBoardPreferencesProvider);
     return BottomSheetScrollableContainer(
       children: [
         ListSection(
@@ -519,6 +558,18 @@ class _ConfigureXiangqiOtbSheetState() extends ConsumerState<_ConfigureXiangqiOt
                   onSelectedItemChanged: (control) => setState(() => _timeControlType = control),
                 );
               },
+            ),
+            SwitchSettingTile(
+              title: Text(context.l10n.mobileFlipPiecesAfterMove),
+              value: display.flipPiecesAfterMove,
+              onChanged: (_) =>
+                  ref.read(overTheBoardPreferencesProvider.notifier).toggleFlipPiecesAfterMove(),
+            ),
+            SwitchSettingTile(
+              title: Text(context.l10n.preferencesBlindfold),
+              value: display.blindfoldMode,
+              onChanged: (_) =>
+                  ref.read(overTheBoardPreferencesProvider.notifier).toggleBlindfoldMode(),
             ),
             AnimatedSize(
               duration: const Duration(milliseconds: 150),

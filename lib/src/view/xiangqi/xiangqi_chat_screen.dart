@@ -7,9 +7,13 @@ import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
+import 'package:lichess_mobile/src/view/chat/chat_context_menu.dart';
+import 'package:lichess_mobile/src/widgets/feedback.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
+import 'package:lichess_mobile/src/widgets/rich_link_text.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// xiangqi.com's chat: the public rooms, and the clubs the account is in.
 ///
@@ -37,6 +41,7 @@ class const XiangqiChatScreen({super.key}) extends ConsumerWidget {
         data: (rooms) => RefreshIndicator.adaptive(
           onRefresh: () => ref.refresh(xiangqiChatRoomsProvider.future),
           child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
             children: [
               ListSection(
                 hasLeading: true,
@@ -122,6 +127,8 @@ class const XiangqiChatRoomScreen({
 }
 
 class _XiangqiChatRoomScreenState() extends ConsumerState<XiangqiChatRoomScreen> {
+  bool _sending = false;
+  String? _submittedText;
   final _input = TextEditingController();
 
   @override
@@ -131,14 +138,45 @@ class _XiangqiChatRoomScreenState() extends ConsumerState<XiangqiChatRoomScreen>
   }
 
   Future<void> _send() async {
+    if (_sending) return;
     final text = _input.text.trim();
     if (text.isEmpty) return;
-    _input.clear();
-    await ref.read(xiangqiChatControllerProvider(widget.roomKey).notifier).send(text);
+    setState(() => _sending = true);
+    try {
+      final submitted = await ref
+          .read(xiangqiChatControllerProvider(widget.roomKey).notifier)
+          .send(text);
+      if (!mounted) return;
+      if (submitted && _input.text.trim() == text) {
+        _submittedText = text;
+        _input.clear();
+      }
+      if (!submitted) {
+        showSnackBar(context, context.l10n.mobileXiangqiChatOffline, type: SnackBarType.error);
+      }
+    } on Object {
+      if (mounted) {
+        showSnackBar(context, context.l10n.mobileSomethingWentWrong, type: SnackBarType.error);
+      }
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(xiangqiChatControllerProvider(widget.roomKey).select((s) => s.error), (
+      before,
+      after,
+    ) {
+      if (after == XiangqiChatError.send &&
+          after != before &&
+          _input.text.isEmpty &&
+          _submittedText != null) {
+        _input.text = _submittedText!;
+        _submittedText = null;
+      }
+    });
     final state = ref.watch(xiangqiChatControllerProvider(widget.roomKey));
     final controller = ref.read(xiangqiChatControllerProvider(widget.roomKey).notifier);
     final myId = int.tryParse(ref.watch(xiangqiAuthControllerProvider)?.userId ?? '');
@@ -149,11 +187,18 @@ class _XiangqiChatRoomScreenState() extends ConsumerState<XiangqiChatRoomScreen>
         child: Column(
           children: [
             Expanded(
-              child: _Messages(state: state, myId: myId, onLoadMore: controller.loadMore),
+              child: _Messages(
+                state: state,
+                myId: myId,
+                onLoadMore: controller.loadMore,
+                onRetry: controller.retry,
+              ),
             ),
+            if (state.messages.isNotEmpty && state.error != null)
+              TextButton(onPressed: controller.retry, child: Text(context.l10n.retry)),
             _Composer(
               controller: _input,
-              enabled: state.isConnected,
+              enabled: state.isConnected && !_sending,
               onSend: _send,
               hint: context.l10n.mobileXiangqiChatSend,
             ),
@@ -169,17 +214,31 @@ class const _Messages({
   required final XiangqiChatState state,
   required final int? myId,
   required final VoidCallback onLoadMore,
+  required final VoidCallback onRetry,
 }) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    if (state.isLoading) return const Center(child: CircularProgressIndicator.adaptive());
-    if (state.error == XiangqiChatError.offline) {
+    if (state.error != null && state.messages.isEmpty) {
       return Center(
         child: Padding(
           padding: Styles.bodySectionPadding,
-          child: Text(context.l10n.mobileXiangqiChatOffline, textAlign: TextAlign.center),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                state.error == XiangqiChatError.offline
+                    ? context.l10n.mobileXiangqiChatOffline
+                    : context.l10n.mobileSomethingWentWrong,
+                textAlign: TextAlign.center,
+              ),
+              FilledButton(onPressed: onRetry, child: Text(context.l10n.retry)),
+            ],
+          ),
         ),
       );
+    }
+    if (state.isLoading && state.messages.isEmpty) {
+      return const Center(child: CircularProgressIndicator.adaptive());
     }
     if (state.isEmpty) {
       return Center(
@@ -223,45 +282,47 @@ class const _Bubble({required final XiangqiChatMessage message, required final b
     extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final time = message.timestamp?.toLocal();
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
-      child: Column(
-        crossAxisAlignment: isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                message.senderName ?? '',
-                style: theme.textTheme.labelMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: isMine ? context.lichessColors.fancy : null,
-                ),
-              ),
-              if (time != null) ...[
-                const SizedBox(width: 6.0),
-                Text(
-                  '${time.hour.toString().padLeft(2, '0')}:'
-                  '${time.minute.toString().padLeft(2, '0')}',
-                  style: theme.textTheme.labelSmall?.copyWith(color: textShade(context, 0.5)),
+    final scheme = ColorScheme.of(context);
+    final textColor = isMine ? scheme.onSecondary : scheme.onSurface;
+    return ChatBubbleContextMenu(
+      message: message.message,
+      child: FractionallySizedBox(
+        alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
+        widthFactor: 0.9,
+        child: Align(
+          alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
+          child: Container(
+            margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 16.0),
+            padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 15.0),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16.0),
+              color: isMine ? scheme.secondary : scheme.surfaceContainerHigh,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (!isMine && message.senderName != null)
+                  Text(
+                    message.senderName!,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontWeight: FontWeight.bold, color: textColor),
+                  ),
+                RichLinkText(
+                  text: message.message,
+                  style: TextStyle(color: textColor),
+                  linkStyle: Styles.linkStyle,
+                  onOpen: (link) async {
+                    final uri = Uri.tryParse(link.url);
+                    if (uri != null && const {'http', 'https', 'mailto'}.contains(uri.scheme)) {
+                      await launchUrl(uri);
+                    }
+                  },
                 ),
               ],
-            ],
-          ),
-          const SizedBox(height: 2.0),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-            decoration: BoxDecoration(
-              color: isMine
-                  ? context.lichessColors.fancy.withValues(alpha: 0.14)
-                  : theme.colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(12.0),
             ),
-            child: Text(message.message),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -277,28 +338,29 @@ class const _Composer({
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12.0, 4.0, 4.0, 8.0),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: controller,
-              enabled: enabled,
-              textInputAction: TextInputAction.send,
-              onSubmitted: (_) => onSend(),
-              decoration: InputDecoration(
-                hintText: enabled ? hint : context.l10n.mobileXiangqiChatOffline,
-                border: const OutlineInputBorder(),
-                isDense: true,
-              ),
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      child: TextField(
+        controller: controller,
+        enabled: enabled,
+        textInputAction: TextInputAction.send,
+        keyboardType: TextInputType.text,
+        textCapitalization: TextCapitalization.sentences,
+        minLines: 1,
+        maxLines: 4,
+        onSubmitted: (_) => onSend(),
+        decoration: InputDecoration(
+          hintText: enabled ? hint : context.l10n.mobileXiangqiChatOffline,
+          contentPadding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 15.0),
+          border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(20.0))),
+          suffixIcon: ValueListenableBuilder<TextEditingValue>(
+            valueListenable: controller,
+            builder: (context, value, _) => IconButton(
+              onPressed: enabled && value.text.trim().isNotEmpty ? () => onSend() : null,
+              icon: const Icon(Icons.send),
+              tooltip: hint,
             ),
           ),
-          IconButton(
-            onPressed: enabled ? () => onSend() : null,
-            icon: const Icon(CupertinoIcons.paperplane),
-            tooltip: hint,
-          ),
-        ],
+        ),
       ),
     );
   }

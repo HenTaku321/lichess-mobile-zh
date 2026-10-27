@@ -1,8 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lichess_mobile/src/model/message/xiangqi_inbox_repository.dart'
+    show xiangqiLightUser;
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_live_game.dart';
 import 'package:lichess_mobile/src/model/xiangqi/social/xiangqi_social.dart';
 import 'package:lichess_mobile/src/model/xiangqi/social/xiangqi_social_repository.dart';
+import 'package:lichess_mobile/src/network/xiangqi_session_store.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
@@ -11,6 +14,7 @@ import 'package:lichess_mobile/src/widgets/feedback.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
 import 'package:lichess_mobile/src/widgets/platform_search_bar.dart';
+import 'package:lichess_mobile/src/widgets/user.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// The account's friends on xiangqi.com, and the requests waiting to be answered.
@@ -49,6 +53,12 @@ class _XiangqiFriendsScreenState() extends ConsumerState<XiangqiFriendsScreen> {
     // a guest's own name is not one the server will answer for, and the requests under it are
     // `401` to anybody but a signed-in account — measured both ways on 2026-10-16.
     final session = ref.watch(xiangqiAuthControllerProvider);
+    if (ref.watch(xiangqiSessionReadyProvider).isLoading) {
+      return Scaffold(
+        appBar: AppBar(title: AppBarTitleText(context.l10n.friends)),
+        body: const Center(child: CircularProgressIndicator.adaptive()),
+      );
+    }
     final username = session != null && !session.isGuest ? session.name : null;
     if (username == null) {
       return Scaffold(
@@ -69,49 +79,79 @@ class _XiangqiFriendsScreenState() extends ConsumerState<XiangqiFriendsScreen> {
       appBar: AppBar(
         title: AppBarTitleText('${context.l10n.mobileXiangqi} · ${context.l10n.friends}'),
       ),
-      body: ListView(
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: PlatformSearchBar(
-              controller: _searchController,
-              hintText: context.l10n.search,
-              onChanged: (value) => setState(() => _search = value),
+      body: RefreshIndicator.adaptive(
+        onRefresh: () async {
+          await Future.wait([
+            ref.refresh(
+              xiangqiFriendsProvider((username, _search.isEmpty ? null : _search)).future,
             ),
-          ),
-          ListSection(
-            hasLeading: true,
-            header: Text(context.l10n.mobileXiangqiFriendRequests),
-            children: switch (requests) {
-              AsyncData(:final value) when value.isEmpty => [
-                ListTile(dense: true, title: Text(context.l10n.mobileXiangqiFriendRequestsEmpty)),
-              ],
-              AsyncData(:final value) => [
-                for (final request in value) _RequestRow(request: request, username: username),
-              ],
-              AsyncError() => [
-                ListTile(dense: true, title: Text(context.l10n.mobileSomethingWentWrong)),
-              ],
-              _ => [const ListTile(dense: true, title: Text('…'))],
-            },
-          ),
-          ListSection(
-            hasLeading: true,
-            header: Text(context.l10n.friends),
-            children: switch (friends) {
-              AsyncData(:final value) when value.friends.isEmpty => [
-                ListTile(dense: true, title: Text(context.l10n.mobileXiangqiFriendsEmpty)),
-              ],
-              AsyncData(:final value) => [
-                for (final friend in value.friends) _FriendRow(friend: friend, username: username),
-              ],
-              AsyncError() => [
-                ListTile(dense: true, title: Text(context.l10n.mobileSomethingWentWrong)),
-              ],
-              _ => [const ListTile(dense: true, title: Text('…'))],
-            },
-          ),
-        ],
+            ref.refresh(xiangqiFriendRequestsProvider.future),
+          ]);
+        },
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: PlatformSearchBar(
+                controller: _searchController,
+                hintText: context.l10n.search,
+                onChanged: (value) => setState(() => _search = value),
+              ),
+            ),
+            ListSection(
+              hasLeading: true,
+              header: Text(context.l10n.mobileXiangqiFriendRequests),
+              children: switch (requests) {
+                AsyncData(:final value) when value.isEmpty => [
+                  ListTile(dense: true, title: Text(context.l10n.mobileXiangqiFriendRequestsEmpty)),
+                ],
+                AsyncData(:final value) => [
+                  for (final request in value) _RequestRow(request: request, username: username),
+                ],
+                AsyncError() => [
+                  ListTile(
+                    dense: true,
+                    title: Text(context.l10n.mobileSomethingWentWrong),
+                    trailing: IconButton(
+                      tooltip: context.l10n.retry,
+                      icon: const Icon(Icons.refresh),
+                      onPressed: () => ref.invalidate(xiangqiFriendRequestsProvider),
+                    ),
+                  ),
+                ],
+                _ => [const ListTile(dense: true, title: Text('…'))],
+              },
+            ),
+            ListSection(
+              hasLeading: true,
+              header: Text(context.l10n.friends),
+              children: switch (friends) {
+                AsyncData(:final value) when value.friends.isEmpty => [
+                  ListTile(dense: true, title: Text(context.l10n.mobileXiangqiFriendsEmpty)),
+                ],
+                AsyncData(:final value) => [
+                  for (final friend in value.friends)
+                    _FriendRow(friend: friend, username: username),
+                ],
+                AsyncError() => [
+                  ListTile(
+                    dense: true,
+                    title: Text(context.l10n.mobileSomethingWentWrong),
+                    trailing: IconButton(
+                      tooltip: context.l10n.retry,
+                      icon: const Icon(Icons.refresh),
+                      onPressed: () => ref.invalidate(
+                        xiangqiFriendsProvider((username, _search.isEmpty ? null : _search)),
+                      ),
+                    ),
+                  ),
+                ],
+                _ => [const ListTile(dense: true, title: Text('…'))],
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -119,11 +159,34 @@ class _XiangqiFriendsScreenState() extends ConsumerState<XiangqiFriendsScreen> {
 
 /// One friend: who it is, and the way to stop being one.
 class const _FriendRow({required final XiangqiFriend friend, required final String username})
-    extends ConsumerWidget {
+    extends ConsumerStatefulWidget {
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final player = friend.player;
+  ConsumerState<_FriendRow> createState() => _FriendRowState();
+}
+
+class _FriendRowState() extends ConsumerState<_FriendRow> {
+  bool _busy = false;
+
+  Future<void> _remove() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await _run(
+        context,
+        ref,
+        () => ref.read(xiangqiSocialRepositoryProvider).unfriend(widget.friend.player.name),
+        onDone: () => ref.invalidate(xiangqiFriendsProvider),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final player = widget.friend.player;
     return ListTile(
+      leading: UserAvatar(xiangqiLightUser(player.id, player.name), radius: 16),
       title: Text(player.name, overflow: TextOverflow.ellipsis),
       subtitle: player.rating == null ? null : Text('${player.rating}'),
       onTap: () => Navigator.of(
@@ -132,13 +195,10 @@ class const _FriendRow({required final XiangqiFriend friend, required final Stri
       ).push(XiangqiProfileScreen.buildRoute(player.name)),
       trailing: IconButton(
         tooltip: context.l10n.mobileXiangqiUnfriend,
-        icon: const Icon(Icons.person_remove_outlined),
-        onPressed: () => _run(
-          context,
-          ref,
-          () => ref.read(xiangqiSocialRepositoryProvider).unfriend(player.name),
-          onDone: () => ref.invalidate(xiangqiFriendsProvider((username, null))),
-        ),
+        icon: _busy
+            ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator.adaptive())
+            : const Icon(Icons.person_remove_outlined),
+        onPressed: _busy ? null : _remove,
       ),
     );
   }
@@ -148,11 +208,20 @@ class const _FriendRow({required final XiangqiFriend friend, required final Stri
 class const _RequestRow({
   required final XiangqiFriendRequest request,
   required final String username,
-}) extends ConsumerWidget {
+}) extends ConsumerStatefulWidget {
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final player = request.player;
+  ConsumerState<_RequestRow> createState() => _RequestRowState();
+}
+
+class _RequestRowState() extends ConsumerState<_RequestRow> {
+  bool _busy = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final player = widget.request.player;
+    final enabled = !_busy && int.tryParse(player.id) != null;
     return ListTile(
+      leading: UserAvatar(xiangqiLightUser(player.id, player.name), radius: 16),
       title: Text(player.name, overflow: TextOverflow.ellipsis),
       subtitle: player.rating == null ? null : Text('${player.rating}'),
       trailing: Row(
@@ -161,38 +230,40 @@ class const _RequestRow({
           IconButton(
             tooltip: context.l10n.accept,
             icon: const Icon(Icons.check),
-            onPressed: () => _answer(context, ref, player, accept: true, username: username),
+            onPressed: enabled ? () => _answer(player, accept: true) : null,
           ),
           IconButton(
             tooltip: context.l10n.decline,
             icon: const Icon(Icons.close),
-            onPressed: () => _answer(context, ref, player, accept: false, username: username),
+            onPressed: enabled ? () => _answer(player, accept: false) : null,
           ),
         ],
       ),
     );
   }
 
-  Future<void> _answer(
-    BuildContext context,
-    WidgetRef ref,
-    XiangqiLivePlayer player, {
-    required bool accept,
-    required String username,
-  }) async {
+  Future<void> _answer(XiangqiLivePlayer player, {required bool accept}) async {
     // The request is answered by the **sender's id**, which is what the endpoint takes — the name
     // is what the row draws. A seat without an id is a request this app cannot answer, and the
     // button does nothing rather than sending a body the server would refuse.
     final senderId = int.tryParse(player.id);
-    if (senderId == null) return;
-    await _run(
-      context,
-      ref,
-      () => ref
-          .read(xiangqiSocialRepositoryProvider)
-          .replyToFriendRequest(senderId: senderId, accept: accept),
-      onDone: () => ref.invalidate(xiangqiFriendRequestsProvider),
-    );
+    if (senderId == null || _busy) return;
+    setState(() => _busy = true);
+    try {
+      await _run(
+        context,
+        ref,
+        () => ref
+            .read(xiangqiSocialRepositoryProvider)
+            .replyToFriendRequest(senderId: senderId, accept: accept),
+        onDone: () {
+          ref.invalidate(xiangqiFriendRequestsProvider);
+          ref.invalidate(xiangqiFriendsProvider);
+        },
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 }
 
@@ -206,11 +277,13 @@ Future<void> _run(
   Future<void> Function() action, {
   required VoidCallback onDone,
 }) async {
+  final generation = ref.read(xiangqiAccountGenerationProvider);
   try {
     await action();
+    if (!context.mounted || generation != ref.read(xiangqiAccountGenerationProvider)) return;
     onDone();
   } catch (_) {
-    if (!context.mounted) return;
+    if (!context.mounted || generation != ref.read(xiangqiAccountGenerationProvider)) return;
     showSnackBar(context, context.l10n.mobileSomethingWentWrong, type: SnackBarType.error);
   }
 }

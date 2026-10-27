@@ -162,6 +162,12 @@ class XiangqiBoardEditorController(final String? initialFen)
     _setPosition(board: state.position.board.replace(square.index, null));
   }
 
+  /// A drop places a piece; unlike a palette tap it never toggles an identical piece off.
+  void placePiece(XiangqiSquare square, XiangqiPiece piece) {
+    if (state.position.pieceAt(square) == piece) return;
+    _setPosition(board: state.position.board.replace(square.index, piece));
+  }
+
   /// Moves whatever is on [from] to [to].
   ///
   /// The piece is put on [to] whatever is standing there, because a capture and a replacement are

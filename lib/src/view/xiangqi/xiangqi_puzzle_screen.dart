@@ -4,6 +4,7 @@ import 'package:chessground/chessground.dart' show BrightnessHueFilter;
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lichess_mobile/src/model/puzzle/puzzle_preferences.dart';
 import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/puzzle/xiangqi_puzzle.dart';
@@ -17,12 +18,14 @@ import 'package:lichess_mobile/src/model/xiangqi/xiangqi_rules.dart' as rules;
 import 'package:lichess_mobile/src/service/move_feedback.dart';
 import 'package:lichess_mobile/src/service/sound_service.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
+import 'package:lichess_mobile/src/utils/focus_detector.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
 import 'package:lichess_mobile/src/view/auth/xiangqi_login_screen.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
 import 'package:lichess_mobile/src/widgets/feedback.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
+import 'package:lichess_mobile/src/widgets/settings.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_avatar.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_game_layout.dart';
@@ -56,15 +59,51 @@ class const XiangqiPuzzleScreen({super.key}) extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
-      appBar: AppBar(title: AppBarTitleText(context.l10n.mobileXiangqiPuzzle)),
-      body: const _Body(),
+      appBar: AppBar(
+        title: AppBarTitleText(context.l10n.mobileXiangqiPuzzle),
+        actions: [
+          IconButton(
+            tooltip: context.l10n.preferencesPreferences,
+            icon: const Icon(Icons.settings),
+            onPressed: () => showModalBottomSheet<void>(
+              context: context,
+              builder: (context) => Consumer(
+                builder: (context, ref, _) => SafeArea(
+                  child: SwitchSettingTile(
+                    title: Text(context.l10n.puzzleJumpToNextPuzzleImmediately),
+                    value: ref.watch(puzzlePreferencesProvider).autoNext,
+                    onChanged: (value) =>
+                        ref.read(puzzlePreferencesProvider.notifier).setAutoNext(value),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+      body: _Body(key: ValueKey(ref.watch(xiangqiAccountGenerationProvider))),
     );
   }
 }
 
-class const _Body() extends ConsumerWidget {
+class const _Body({super.key}) extends ConsumerStatefulWidget {
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_Body> createState() => _BodyState();
+}
+
+class _BodyState() extends ConsumerState<_Body> {
+  XiangqiPuzzle? _replacement;
+  int _replacementAttempt = 0;
+
+  void _replace(XiangqiPuzzle puzzle) {
+    setState(() {
+      _replacement = puzzle;
+      _replacementAttempt++;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     // **A real account, and the server is why.** Finding a puzzle and reading one are open to
     // anybody — measured on 2026-10-16, both answered `200` with no token at all — but *solving* one
     // is not: `POST /api/puzzle/<id>/complete` and `POST /api/quota/usage` both answer
@@ -78,12 +117,21 @@ class const _Body() extends ConsumerWidget {
       return const _SignInPrompt();
     }
 
+    if (_replacement case final puzzle?) {
+      return _PuzzleBody(
+        key: ValueKey((puzzle.id, _replacementAttempt)),
+        puzzle: puzzle,
+        attempt: _replacementAttempt,
+        onNext: _replace,
+      );
+    }
+
     final search = ref.watch(xiangqiPuzzleSearchProvider(xiangqiDefaultPuzzleSearch));
     return search.when(
       // A refresh is a solver asking for the next puzzle, and the board they just finished is not
       // what they are waiting for. See [_PuzzleBody.nextPuzzle].
       skipLoadingOnRefresh: false,
-      data: (id) => id == null ? const _NoPuzzle() : _Puzzle(id: id),
+      data: (id) => id == null ? const _NoPuzzle() : _Puzzle(id: id, onNext: _replace),
       loading: () => const Center(child: CircularProgressIndicator.adaptive()),
       error: (error, stackTrace) => _Failed(
         onRetry: () => ref.invalidate(xiangqiPuzzleSearchProvider(xiangqiDefaultPuzzleSearch)),
@@ -93,12 +141,13 @@ class const _Body() extends ConsumerWidget {
 }
 
 /// The puzzle [id] names, once it has arrived.
-class const _Puzzle({required final String id}) extends ConsumerWidget {
+class const _Puzzle({required final String id, required final ValueChanged<XiangqiPuzzle> onNext})
+    extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final puzzle = ref.watch(xiangqiPuzzleProvider(id));
     return puzzle.when(
-      data: (puzzle) => _PuzzleBody(key: ValueKey(puzzle.id), puzzle: puzzle),
+      data: (puzzle) => _PuzzleBody(key: ValueKey(puzzle.id), puzzle: puzzle, onNext: onNext),
       loading: () => const Center(child: CircularProgressIndicator.adaptive()),
       error: (error, stackTrace) => _Failed(
         onRetry: () => ref.invalidate(xiangqiPuzzleProvider(id)),
@@ -112,8 +161,12 @@ class const _Puzzle({required final String id}) extends ConsumerWidget {
 }
 
 /// One puzzle, and the attempt at it.
-class const _PuzzleBody({required final XiangqiPuzzle puzzle, super.key})
-    extends ConsumerStatefulWidget {
+class const _PuzzleBody({
+  required final XiangqiPuzzle puzzle,
+  final int attempt = 0,
+  required final ValueChanged<XiangqiPuzzle> onNext,
+  super.key,
+}) extends ConsumerStatefulWidget {
   @override
   ConsumerState<_PuzzleBody> createState() => _PuzzleBodyState();
 }
@@ -122,18 +175,29 @@ class _PuzzleBodyState() extends ConsumerState<_PuzzleBody> {
   /// The square the solver has picked up, if any.
   XiangqiSquare? _selected;
 
-  /// Which attempt at the puzzle this is. Bumped by [nextPuzzle]; see [XiangqiPuzzleAttemptKey].
-  int _attempt = 0;
+  bool _autoAdvanced = false;
+  bool _loadingNext = false;
+  bool _active = true;
+  int _requestGeneration = 0;
+  final Set<Timer> _feedbackTimers = {};
+
+  @override
+  void dispose() {
+    for (final timer in _feedbackTimers) {
+      timer.cancel();
+    }
+    super.dispose();
+  }
 
   /// The attempt this screen is showing.
-  XiangqiPuzzleAttemptKey get _key => (puzzle: widget.puzzle, attempt: _attempt);
+  XiangqiPuzzleAttemptKey get _key => (puzzle: widget.puzzle, attempt: widget.attempt);
 
   @override
   Widget build(BuildContext context) {
     final puzzle = widget.puzzle;
     final provider = xiangqiPuzzleControllerProvider(_key);
     ref.listen(provider, (previous, next) {
-      if (previous == null) return;
+      if (!_active || previous == null || !(ModalRoute.of(context)?.isCurrent ?? true)) return;
       if (next.wrongMove != null && previous.wrongMove == null) {
         unawaited(ref.read(soundServiceProvider).play(Sound.error));
         return;
@@ -144,7 +208,7 @@ class _PuzzleBodyState() extends ConsumerState<_PuzzleBody> {
       final isCapture = before.pieceAt(move.to) != null;
       final isCheck = rules.isCheck(next.position);
       void playFeedback() {
-        if (!context.mounted) return;
+        if (!context.mounted || !_active || !(ModalRoute.of(context)?.isCurrent ?? true)) return;
         final feedback = ref.read(moveFeedbackServiceProvider);
         if (isCapture) {
           feedback.captureFeedback(null, check: isCheck);
@@ -157,8 +221,29 @@ class _PuzzleBodyState() extends ConsumerState<_PuzzleBody> {
       if (delay <= Duration.zero) {
         playFeedback();
       } else {
-        Timer(delay, playFeedback);
+        late final Timer timer;
+        timer = Timer(delay, () {
+          _feedbackTimers.remove(timer);
+          playFeedback();
+        });
+        _feedbackTimers.add(timer);
       }
+    });
+    ref.listen(provider, (previous, next) {
+      if (_autoAdvanced ||
+          !_active ||
+          previous?.phase == next.phase ||
+          next.phase != XiangqiPuzzlePhase.recorded ||
+          next.recordedStatus != XiangqiPuzzleAttemptStatus.solved ||
+          !(ModalRoute.of(context)?.isCurrent ?? true) ||
+          !ref.read(puzzlePreferencesProvider).autoNext) {
+        return;
+      }
+      _autoAdvanced = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_autoAdvanced || !(ModalRoute.of(context)?.isCurrent ?? true)) return;
+        unawaited(nextPuzzle());
+      });
     });
     final state = ref.watch(provider);
     final controller = ref.read(provider.notifier);
@@ -174,71 +259,96 @@ class _PuzzleBodyState() extends ConsumerState<_PuzzleBody> {
         ? const IListConst<XiangqiMove>([])
         : rules.legalMovesFrom(state.position, selected);
 
-    return SafeArea(
-      child: XiangqiGameLayout(
-        board: BrightnessHueFilter(
-          brightness: boardPrefs.brightness,
-          hue: boardPrefs.hue,
-          child: XiangqiBoard(
-            position: state.position,
-            orientation: orientation,
-            selected: selected,
-            moves: boardPrefs.showLegalMoves ? selectedMoves : const IListConst([]),
-            lastMove: boardPrefs.boardHighlights ? state.lastMove : null,
-            onTapSquare: _onTapSquare,
-            // A drag is the same two taps it would have been, in the order they were made: the piece
-            // is picked up where it was let go of, and put down where it was dropped. A drag that
-            // cannot be played that way moves nothing.
-            onDragMove: (from, to) {
-              _onTapSquare(from);
-              _onTapSquare(to);
-            },
-            animationDuration: boardPrefs.pieceAnimationDuration,
-            showCoordinates: boardPrefs.coordinates,
-            showLastMove: boardPrefs.boardHighlights,
-            showBorder: boardPrefs.showBorder,
-            hint: state.hint,
-            arrows: state.hint == null
-                ? const IListConst([])
-                : IList([XiangqiBoardArrow(move: state.hint!)]),
-            magnifyDraggedPiece: boardPrefs.magnifyDraggedPiece,
-            dragTargetKind: boardPrefs.dragTargetKind,
-            style: style,
+    return FocusDetector(
+      onFocusGained: () => _active = true,
+      onFocusLost: () {
+        _active = false;
+        _requestGeneration++;
+        for (final timer in _feedbackTimers) {
+          timer.cancel();
+        }
+        _feedbackTimers.clear();
+      },
+      child: SafeArea(
+        child: XiangqiGameLayout(
+          board: BrightnessHueFilter(
+            brightness: boardPrefs.brightness,
+            hue: boardPrefs.hue,
+            child: XiangqiBoard(
+              position: state.position,
+              orientation: orientation,
+              selected: selected,
+              moves: boardPrefs.showLegalMoves ? selectedMoves : const IListConst([]),
+              lastMove: state.lastMove,
+              onTapSquare: _onTapSquare,
+              onDragMove: (from, to) {
+                final move = XiangqiMove(from, to);
+                if (!state.isPlayable ||
+                    !state.isSolverTurn ||
+                    !rules.isLegal(state.position, move)) {
+                  return;
+                }
+                setState(() => _selected = null);
+                controller.onUserMove(move);
+              },
+              onCancelInteraction: () => setState(() => _selected = null),
+              animationDuration: boardPrefs.pieceAnimationDuration,
+              showCoordinates: boardPrefs.coordinates,
+              showLastMove: boardPrefs.boardHighlights,
+              showBorder: boardPrefs.showBorder,
+              hint: state.hint,
+              arrows: state.hint == null
+                  ? const IListConst([])
+                  : IList([XiangqiBoardArrow(move: state.hint!)]),
+              magnifyDraggedPiece: boardPrefs.magnifyDraggedPiece,
+              dragTargetKind: boardPrefs.dragTargetKind,
+              settings: XiangqiBoardSettings.fromPreferences(boardPrefs),
+              canStartDrag: (piece) =>
+                  state.isPlayable && state.isSolverTurn && piece.side == state.position.turn,
+              style: style,
+            ),
           ),
-        ),
-        topTable: _PuzzleFacts(puzzle: puzzle),
-        bottomTable: _SolverRow(
-          side: orientation,
-          style: style,
-          status: _statusText(context, state),
-          mistakes: state.mistakes,
-          hintsUsed: state.hintsUsed,
-        ),
-        moves: xiangqiGameNotation(state.positions, state.moves),
-        // There is no cursor: the attempt only ever goes forwards, so the move the list marks is
-        // always the one just played.
-        currentMoveIndex: state.moves.length,
-        onSelectMove: null,
-        userActionsBar: BottomBar(
-          children: [
-            BottomBarButton(
-              label: context.l10n.getAHint,
-              onTap: state.canHint ? _hint : null,
-              icon: CupertinoIcons.lightbulb,
-              highlighted: state.hint != null,
-            ),
-            if (state.phase == XiangqiPuzzlePhase.unrecorded)
-              BottomBarButton(
-                label: context.l10n.retry,
-                onTap: () => unawaited(controller.retrySubmit()),
-                icon: CupertinoIcons.arrow_clockwise,
+          topTable: _PuzzleFacts(puzzle: puzzle),
+          bottomTable: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _SolverRow(
+                side: orientation,
+                style: style,
+                status: _statusText(context, state),
+                mistakes: state.mistakes,
+                hintsUsed: state.hintsUsed,
               ),
-            BottomBarButton(
-              label: context.l10n.puzzleNextPuzzle,
-              onTap: state.isLineComplete ? nextPuzzle : null,
-              icon: CupertinoIcons.arrow_right,
-            ),
-          ],
+              if (_loadingNext || state.phase == XiangqiPuzzlePhase.submitting)
+                const LinearProgressIndicator(),
+            ],
+          ),
+          moves: xiangqiGameNotation(state.positions, state.moves),
+          // There is no cursor: the attempt only ever goes forwards, so the move the list marks is
+          // always the one just played.
+          currentMoveIndex: state.moves.length,
+          onSelectMove: null,
+          userActionsBar: BottomBar(
+            children: [
+              BottomBarButton(
+                label: context.l10n.getAHint,
+                onTap: state.canHint ? _hint : null,
+                icon: CupertinoIcons.lightbulb,
+                highlighted: state.hint != null,
+              ),
+              if (state.phase == XiangqiPuzzlePhase.unrecorded)
+                BottomBarButton(
+                  label: context.l10n.retry,
+                  onTap: () => unawaited(controller.retrySubmit()),
+                  icon: CupertinoIcons.arrow_clockwise,
+                ),
+              BottomBarButton(
+                label: context.l10n.puzzleNextPuzzle,
+                onTap: state.isLineComplete && !_loadingNext ? () => unawaited(nextPuzzle()) : null,
+                icon: CupertinoIcons.arrow_right,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -266,7 +376,11 @@ class _PuzzleBodyState() extends ConsumerState<_PuzzleBody> {
 
     final piece = state.position.pieceAt(square);
     setState(() {
-      _selected = piece != null && piece.side == state.position.turn && state.isSolverTurn
+      _selected =
+          selected != square &&
+              piece != null &&
+              piece.side == state.position.turn &&
+              state.isSolverTurn
           ? square
           : null;
     });
@@ -295,17 +409,46 @@ class _PuzzleBodyState() extends ConsumerState<_PuzzleBody> {
 
   /// Moves on to another puzzle.
   ///
-  /// The search is invalidated rather than re-keyed, because the queue it draws from is the server's
-  /// and `previously_played: false` is what keeps it from handing back the one just solved. The
-  /// attempt counter is bumped at the same time, for the case where it hands it back anyway — see
-  /// [XiangqiPuzzleAttemptKey] — and the search's own loading state is what the solver sees while
-  /// the next one is on its way, so the finished board never comes back reset under them.
-  void nextPuzzle() {
-    setState(() {
-      _selected = null;
-      _attempt++;
-    });
-    ref.invalidate(xiangqiPuzzleSearchProvider(xiangqiDefaultPuzzleSearch));
+  /// Keep the completed board until both the search and the charged fetch succeed.
+  Future<void> nextPuzzle() async {
+    if (_loadingNext || !ref.read(xiangqiPuzzleControllerProvider(_key)).isLineComplete) return;
+    final generation = ref.read(xiangqiAccountGenerationProvider);
+    final request = ++_requestGeneration;
+    final repository = ref.read(xiangqiPuzzleRepositoryProvider);
+    final noPuzzleMessage = context.l10n.mobileXiangqiPuzzleNoPuzzle;
+    final solutionWithheldMessage = context.l10n.mobileXiangqiPuzzleSolutionWithheld;
+    final failedMessage = context.l10n.mobileSomethingWentWrong;
+    bool current() =>
+        mounted &&
+        _active &&
+        request == _requestGeneration &&
+        generation == ref.read(xiangqiAccountGenerationProvider) &&
+        (ModalRoute.of(context)?.isCurrent ?? true);
+    setState(() => _loadingNext = true);
+    try {
+      final id = await repository.search(xiangqiDefaultPuzzleSearch);
+      if (!current()) return;
+      if (id == null) {
+        if (!mounted) return;
+        showSnackBar(context, noPuzzleMessage);
+        return;
+      }
+      final puzzle = await repository.fetch(id);
+      if (!current()) return;
+      if (puzzle.solution == null) {
+        if (!mounted) return;
+        showSnackBar(context, solutionWithheldMessage, type: SnackBarType.error);
+        return;
+      }
+      widget.onNext(puzzle);
+    } catch (_) {
+      if (current()) {
+        if (!mounted) return;
+        showSnackBar(context, failedMessage, type: SnackBarType.error);
+      }
+    } finally {
+      if (mounted) setState(() => _loadingNext = false);
+    }
   }
 }
 
@@ -424,11 +567,11 @@ String _statusText(BuildContext context, XiangqiPuzzleAttemptState state) {
         state.puzzle.playerSide.label(context.l10n),
       );
     case XiangqiPuzzlePhase.submitting:
-      return '';
+      return '${context.l10n.save} · ${context.l10n.waiting}';
     case XiangqiPuzzlePhase.recorded:
       return context.l10n.puzzleSolved;
     case XiangqiPuzzlePhase.unrecorded:
-      return context.l10n.mobileSomethingWentWrong;
+      return '${context.l10n.save} · ${context.l10n.mobileSomethingWentWrong}';
   }
 }
 

@@ -4,6 +4,7 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' show Client, Request, Response;
 import 'package:lichess_mobile/src/model/xiangqi/lesson/xiangqi_lesson.dart';
+import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
 import 'package:lichess_mobile/src/network/connectivity.dart';
 import 'package:lichess_mobile/src/network/http.dart' show ServerException;
 import 'package:lichess_mobile/src/network/xiangqi_http.dart';
@@ -100,6 +101,7 @@ final xiangqiLessonRepositoryProvider = Provider<XiangqiLessonRepository>((Ref r
 /// provider gives — `lichessProviderRetry` never retries an [Error], so being offline is settled at
 /// once instead of six times over with a back-off in between.
 Future<Object?> _getJson(Ref ref, String path, Map<String, String> query) async {
+  ref.watch(xiangqiAccountGenerationProvider);
   if (!ref.watch(isDeviceOnlineProvider)) {
     throw StateError('The device is offline; not asking xiangqi.com for $path.');
   }

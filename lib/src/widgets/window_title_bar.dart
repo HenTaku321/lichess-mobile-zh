@@ -104,7 +104,10 @@ class const WindowTitleBar({super.key}) extends ConsumerWidget {
                   onPressed: service.minimize,
                 ),
                 _TitleBarButton(
-                  icon: maximized ? Icons.restore : Icons.crop_square,
+                  // Not [Icons.restore]: that one is the history glyph, a clock with an arrow
+                  // around it, and at 16 px it reads as a clock rather than as "give the window
+                  // its size back". The two offset squares are what desktops draw for this.
+                  icon: maximized ? Icons.filter_none : Icons.crop_square,
                   label: maximized ? 'Restore' : 'Maximize',
                   onPressed: service.toggleMaximized,
                 ),

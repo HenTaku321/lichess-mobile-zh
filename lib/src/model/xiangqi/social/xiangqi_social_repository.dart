@@ -9,6 +9,7 @@ import 'package:lichess_mobile/src/model/xiangqi/social/xiangqi_social.dart';
 import 'package:lichess_mobile/src/network/connectivity.dart';
 import 'package:lichess_mobile/src/network/http.dart' show ServerException;
 import 'package:lichess_mobile/src/network/xiangqi_http.dart';
+import 'package:lichess_mobile/src/network/xiangqi_session_store.dart';
 import 'package:lichess_mobile/src/network/xiangqi_socket.dart';
 import 'package:lichess_mobile/src/network/xiangqi_uri.dart';
 import 'package:logging/logging.dart';
@@ -68,6 +69,8 @@ class const XiangqiSocialException(final XiangqiSocialFailure reason) implements
 /// measured on 2026-10-16, a guest's `get.notifications` was answered by the server **disconnecting
 /// the namespace** (`41/xiangqi,`) rather than by a message. See `xiangqi-com-re/docs/social.md`.
 final xiangqiNotificationsProvider = FutureProvider.autoDispose<XiangqiNotifications>((ref) async {
+  ref.watch(xiangqiAccountGenerationProvider);
+  await ref.watch(xiangqiSessionReadyProvider.future);
   if (!ref.watch(isXiangqiLoggedInProvider)) {
     throw const XiangqiSocialException(XiangqiSocialFailure.noSession);
   }
@@ -103,6 +106,7 @@ final xiangqiFriendsProvider = FutureProvider.autoDispose
 final xiangqiFriendRequestsProvider = FutureProvider.autoDispose<IList<XiangqiFriendRequest>>((
   ref,
 ) async {
+  await ref.watch(xiangqiSessionReadyProvider.future);
   if (!ref.watch(isXiangqiLoggedInProvider)) {
     throw const XiangqiSocialException(XiangqiSocialFailure.noSession);
   }
@@ -229,6 +233,7 @@ Future<XiangqiSocketClient> _socketOf(Ref ref) =>
 ///
 /// `watch` and not `read` for the network, for the reason [_socketOf] gives.
 Future<Object?> _getJson(Ref ref, String path, Map<String, String> query) async {
+  ref.watch(xiangqiAccountGenerationProvider);
   if (!ref.watch(isDeviceOnlineProvider)) {
     throw const XiangqiSocialException(XiangqiSocialFailure.offline);
   }

@@ -14,6 +14,7 @@ import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:lichess_mobile/src/constants.dart';
 import 'package:lichess_mobile/src/model/ui_events.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_session.dart';
 import 'package:lichess_mobile/src/network/http.dart';
@@ -59,6 +60,21 @@ final testEpoch = DateTime(2026, 1, 1);
 
 void main() {
   group('headers and routing', () {
+    test('xiangqi requests never inject the Lichess translation gate', () async {
+      final client = XiangqiClient(
+        inner: MockClient((request) async {
+          expect(request.url.host, 'api.xiangqi.com');
+          expect(request.headers.containsKey(kZhProxyTokenHeader), isFalse);
+          expect(request.headers['Authorization'], 'Bearer access-old');
+          return http.Response('{}', 200);
+        }),
+        storage: FakeXiangqiAuthStorage(signedInSession),
+        uiEventBus: UiEventBus(),
+      );
+      addTearDown(client.close);
+      await client.get(xiangqiUri('me'));
+    });
+
     test('sends the fixed user agent and no bearer when nobody is signed in', () async {
       final seen = <http.Request>[];
       final client = XiangqiClient(

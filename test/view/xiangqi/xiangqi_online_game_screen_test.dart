@@ -231,6 +231,7 @@ void main() {
       expect(find.byType(XiangqiOnlineResultDialog), findsNothing);
 
       await receive(tester, factory, fx.xiangqiEndFrame());
+      await tester.pump(const Duration(milliseconds: 400));
       // A dialog is pushed as a route, so it takes one more frame to be built than the state change
       // that asks for it.
       await tester.pump();

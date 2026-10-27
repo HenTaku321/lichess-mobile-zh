@@ -8,17 +8,23 @@
 // What is pinned here is the screen's own behaviour: that the board takes the reader's moves, that a
 // finished chapter says so, and that the bar at the bottom walks the lesson.
 
+import 'dart:async';
+
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:lichess_mobile/src/model/xiangqi/lesson/xiangqi_lesson.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_move.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
+import 'package:lichess_mobile/src/network/http.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_lesson_player_screen.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
 
 import '../../binding.dart';
+import '../../network/fake_http_client_factory.dart';
 import '../../test_provider_scope.dart';
 
 XiangqiSquare squareAt(String name) {
@@ -68,6 +74,7 @@ Future<void> pumpPlayer(
   WidgetTester tester, {
   required IList<XiangqiChapter> chapters,
   int initialIndex = 0,
+  MockClient? client,
 }) async {
   await tester.pumpWidget(
     await makeTestProviderScopeApp(
@@ -78,6 +85,12 @@ Future<void> pumpPlayer(
         chapters: chapters,
         initialIndex: initialIndex,
       ),
+      overrides: {
+        if (client != null)
+          httpClientFactoryProvider: httpClientFactoryProvider.overrideWith(
+            (_) => FakeHttpClientFactory(() => client),
+          ),
+      },
     ),
   );
   await tester.pumpAndSettle();
@@ -87,6 +100,49 @@ void main() {
   TestLichessBinding.ensureInitialized();
 
   group('XiangqiLessonPlayerScreen', () {
+    testWidgets('auto-transition waits for a late save without restarting the two-second pause', (
+      tester,
+    ) async {
+      final response = Completer<http.Response>();
+      await pumpPlayer(
+        tester,
+        chapters: IList([
+          chapter(id: 'one', description: 'The first one', autoTransition: true),
+          chapter(id: 'two', order: 2, description: 'The second one'),
+        ]),
+        client: MockClient((_) => response.future),
+      );
+      await tapSquare(tester, 'i0');
+      await tapSquare(tester, 'i9');
+      await tester.pump(const Duration(seconds: 4));
+      expect(find.text('The first one'), findsOneWidget);
+      response.complete(http.Response('{}', 200));
+      await tester.pump();
+      await tester.pump();
+      await tester.pumpAndSettle();
+      expect(find.text('The second one'), findsOneWidget);
+    });
+
+    testWidgets('save failure keeps the solved chapter and exposes retry instead of navigating', (
+      tester,
+    ) async {
+      await pumpPlayer(
+        tester,
+        chapters: IList([
+          chapter(id: 'one', description: 'The first one', autoTransition: true),
+          chapter(id: 'two', order: 2, description: 'The second one'),
+        ]),
+        client: MockClient((_) async => http.Response('{}', 503)),
+      );
+      await tapSquare(tester, 'i0');
+      await tapSquare(tester, 'i9');
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pump();
+      expect(find.text('Great job!'), findsOneWidget);
+      expect(find.text('The first one'), findsOneWidget);
+      expect(find.byIcon(CupertinoIcons.arrow_clockwise), findsOneWidget);
+      expect(barButton(tester, CupertinoIcons.chevron_right).onTap, isNotNull);
+    });
     testWidgets('draws the chapter and takes the move it asks for', (tester) async {
       await pumpPlayer(tester, chapters: IList([chapter()]));
 

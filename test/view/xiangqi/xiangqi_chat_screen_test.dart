@@ -8,7 +8,6 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:async/src/stream_sink_transformer.dart';
-import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -309,14 +308,15 @@ void main() {
       expect(find.text('second'), findsOneWidget);
 
       await tester.enterText(find.byType(TextField), 'hello');
-      await tester.tap(find.byIcon(CupertinoIcons.paperplane));
+      await tester.tap(find.byIcon(Icons.send));
       await tester.pump();
-      // The field is cleared at once: a message has no receipt to wait for, and an input that kept
-      // the text until one arrived would keep it forever.
-      expect(tester.widget<TextField>(find.byType(TextField)).controller?.text, isEmpty);
+      // Keep the draft while waiting for the throttle; it has not reached the socket yet.
+      expect(tester.widget<TextField>(find.byType(TextField)).controller?.text, 'hello');
 
       // The frame is queued behind the spacing the server needs between two requests.
       await tester.pump(const Duration(seconds: 2));
+      await tester.pump();
+      expect(tester.widget<TextField>(find.byType(TextField)).controller?.text, isEmpty);
       final frames = channel.sent.whereType<String>().where((f) => f.contains('new.message'));
       expect(frames.length, 1);
       expect(frames.single, contains('"message":"hello"'));

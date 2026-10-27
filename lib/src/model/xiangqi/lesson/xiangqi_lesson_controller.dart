@@ -8,6 +8,7 @@ import 'package:lichess_mobile/src/model/common/chess.dart';
 import 'package:lichess_mobile/src/model/engine/engine.dart';
 import 'package:lichess_mobile/src/model/xiangqi/lesson/xiangqi_lesson.dart';
 import 'package:lichess_mobile/src/model/xiangqi/lesson/xiangqi_lesson_repository.dart';
+import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_controller.dart'
     show xiangqiEngineProvider;
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_move.dart';
@@ -18,6 +19,32 @@ import 'package:logging/logging.dart';
 part 'xiangqi_lesson_controller.freezed.dart';
 
 final _logger = Logger('XiangqiLesson');
+
+enum XiangqiLessonSaveState() {
+  idle,
+  saving,
+  saved,
+  failed,
+}
+
+final xiangqiLessonSaveStateProvider = NotifierProvider.autoDispose
+    .family<XiangqiLessonSaveController, XiangqiLessonSaveState, String>(
+      XiangqiLessonSaveController.new,
+      name: 'XiangqiLessonSaveStateProvider',
+    );
+
+class XiangqiLessonSaveController(final String chapterId) extends Notifier<XiangqiLessonSaveState> {
+  @override
+  XiangqiLessonSaveState build() {
+    ref.watch(xiangqiAccountGenerationProvider);
+    return XiangqiLessonSaveState.idle;
+  }
+
+  void saving() => state = XiangqiLessonSaveState.saving;
+  void saved() => state = XiangqiLessonSaveState.saved;
+  void failed() => state = XiangqiLessonSaveState.failed;
+  void reset() => state = XiangqiLessonSaveState.idle;
+}
 
 /// How long the chapter waits before playing the other side's move itself.
 ///
@@ -150,6 +177,9 @@ class XiangqiChapterController(final XiangqiChapter chapter) extends Notifier<Xi
 
   @override
   XiangqiChapterState build() {
+    ref.watch(xiangqiAccountGenerationProvider);
+    ref.watch(xiangqiLessonSaveStateProvider(chapter.id).notifier);
+    _generation++;
     ref.onDispose(() {
       _reply?.cancel();
       _revert?.cancel();
@@ -161,6 +191,16 @@ class XiangqiChapterController(final XiangqiChapter chapter) extends Notifier<Xi
   }
 
   /// Picks up the piece on [square], or plays the picked-up piece onto it.
+  void clearSelection() => state = state.copyWith(selected: null);
+
+  void movePiece(XiangqiSquare from, XiangqiSquare to) {
+    if (!state.isPlayable) return;
+    final move = XiangqiMove(from, to);
+    if (!rules.pieceMoves(state.position, from).contains(move)) return;
+    state = state.copyWith(selected: null);
+    _play(move);
+  }
+
   void tapSquare(XiangqiSquare square) {
     if (!state.isPlayable) return;
 
@@ -172,7 +212,7 @@ class XiangqiChapterController(final XiangqiChapter chapter) extends Notifier<Xi
     // Either side's piece, for the reason [selectedMoves] gives: the chapter's script decides what
     // is playable here, not the position's turn.
     final piece = state.position.pieceAt(square);
-    state = state.copyWith(selected: piece != null ? square : null);
+    state = state.copyWith(selected: piece != null && selected != square ? square : null);
   }
 
   /// Shows the move the chapter wants next.
@@ -180,6 +220,15 @@ class XiangqiChapterController(final XiangqiChapter chapter) extends Notifier<Xi
     final move = state.expectedMove;
     if (move == null || !state.isPlayable) return;
     state = state.copyWith(hint: move);
+  }
+
+  /// Retries saving a chapter that was solved locally but not acknowledged by the server.
+  Future<void> retryComplete() async {
+    if (!state.isSolved ||
+        ref.read(xiangqiLessonSaveStateProvider(chapter.id)) != XiangqiLessonSaveState.failed) {
+      return;
+    }
+    await _markComplete();
   }
 
   /// Takes a wrong move back, so the reader can try again.
@@ -197,10 +246,13 @@ class XiangqiChapterController(final XiangqiChapter chapter) extends Notifier<Xi
 
   /// Takes the reader's last correct move back, which is the whole of what "undo" means here.
   void undo() {
-    if (state.cursor == 0 || state.isVerifying) return;
+    if (state.cursor == 0 || state.isVerifying) {
+      return;
+    }
     _reply?.cancel();
     _reply = null;
     _generation++;
+    ref.read(xiangqiLessonSaveStateProvider(chapter.id).notifier).reset();
     state = state.copyWith(
       positions: state.positions.sublist(0, state.cursor),
       cursor: state.cursor - 1,
@@ -386,13 +438,35 @@ class XiangqiChapterController(final XiangqiChapter chapter) extends Notifier<Xi
 
   /// Tells the server the chapter is done.
   ///
-  /// Best effort: the chapter is finished whether or not the server hears about it, and a reader
-  /// who played the whole line should not be shown an error because a request did not land.
+  /// Saving is separate from solving: failed writes leave the solved board available for retry.
   Future<void> _markComplete() async {
+    if (ref.read(xiangqiLessonSaveStateProvider(chapter.id)) == XiangqiLessonSaveState.saving) {
+      return;
+    }
+    final generation = _generation;
+    final account = ref.read(xiangqiAccountGenerationProvider);
+    final alive = ref.keepAlive();
+    final save = ref.read(xiangqiLessonSaveStateProvider(chapter.id).notifier);
+    save.saving();
     try {
       await ref.read(xiangqiLessonRepositoryProvider).completeChapter(chapter.id);
+      if (ref.mounted &&
+          generation == _generation &&
+          account == ref.read(xiangqiAccountGenerationProvider)) {
+        save.saved();
+        ref.invalidate(xiangqiChaptersProvider);
+        ref.invalidate(xiangqiTopicsProvider);
+        ref.invalidate(xiangqiTopicProvider);
+      }
     } on Object catch (error, stackTrace) {
       _logger.warning('Could not mark a lesson chapter complete', error, stackTrace);
+      if (ref.mounted &&
+          generation == _generation &&
+          account == ref.read(xiangqiAccountGenerationProvider)) {
+        save.failed();
+      }
+    } finally {
+      alive.close();
     }
   }
 }

@@ -316,10 +316,18 @@ class XiangqiAnalysisController() extends Notifier<XiangqiAnalysisState> {
     }
     final piece = state.position.pieceAt(square);
     final selectable =
+        selected != square &&
         piece != null &&
         piece.side == state.position.turn &&
         rules.legalMovesFrom(state.position, square).isNotEmpty;
     state = _latest = state.copyWith(selected: selectable ? square : null);
+  }
+
+  void clearSelection() => state = _latest = state.copyWith(selected: null);
+
+  void movePiece(XiangqiSquare from, XiangqiSquare to) {
+    final move = XiangqiMove(from, to);
+    if (rules.isLegal(state.position, move)) play(move);
   }
 
   /// Sets the board up from [fen], which becomes the start of a new line.

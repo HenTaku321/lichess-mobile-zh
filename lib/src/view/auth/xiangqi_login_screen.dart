@@ -56,6 +56,7 @@ class _XiangqiLoginScreenState() extends ConsumerState<XiangqiLoginScreen> {
   }
 
   Future<void> _submit() async {
+    if (_submitting) return;
     FocusScope.of(context).unfocus();
     setState(() {
       _submitting = true;
@@ -96,6 +97,7 @@ class _XiangqiLoginScreenState() extends ConsumerState<XiangqiLoginScreen> {
       body: SafeArea(
         child: ListView(
           padding: Styles.bodySectionPadding,
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           children: [
             const SizedBox(height: _kSectionGap),
             // The service's own mark: a red general, the piece every xiangqi board opens with.

@@ -6,6 +6,7 @@ import 'package:lichess_mobile/src/model/puzzle/puzzle.dart';
 import 'package:lichess_mobile/src/model/puzzle/puzzle_angle.dart';
 import 'package:lichess_mobile/src/model/puzzle/puzzle_batch_storage.dart';
 import 'package:lichess_mobile/src/model/puzzle/puzzle_opening.dart';
+import 'package:lichess_mobile/src/model/puzzle/puzzle_opening_translations.dart';
 import 'package:lichess_mobile/src/model/puzzle/puzzle_preferences.dart';
 import 'package:lichess_mobile/src/model/puzzle/puzzle_repository.dart';
 import 'package:lichess_mobile/src/model/puzzle/puzzle_storage.dart';
@@ -192,14 +193,21 @@ final puzzleThemesProvider = FutureProvider.autoDispose<IMap<PuzzleThemeKey, Puz
 }, name: 'PuzzleThemesProvider');
 
 /// Fetches available puzzle openings.
+///
+/// The names are overlaid with the Chinese ones in `assets/openings.zh.json` when the app is set
+/// to a language that ships an overlay — lila serves them in English in every language. Applying
+/// it here rather than at each call site is what carries it into everything built from these
+/// families, `flatOpeningsListProvider` included.
 final puzzleOpeningsProvider = FutureProvider.autoDispose
-    .family<IList<PuzzleOpeningFamily>, PuzzleOpeningSort>((Ref ref, PuzzleOpeningSort sort) {
-      return ref.withClientCacheFor(
+    .family<IList<PuzzleOpeningFamily>, PuzzleOpeningSort>((Ref ref, PuzzleOpeningSort sort) async {
+      final translations = await ref.watch(puzzleOpeningTranslationsProvider.future);
+      final families = await ref.withClientCacheFor(
         (client) =>
             PuzzleRepository(client)
                 .puzzleOpenings(alphabetical: sort == PuzzleOpeningSort.alphabetical),
         const Duration(days: 1),
       );
+      return translations?.apply(families) ?? families;
     }, name: 'PuzzleOpeningsProvider');
 
 /// Returns a flattened list of openings with their respective counts.

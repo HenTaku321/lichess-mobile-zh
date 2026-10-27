@@ -60,6 +60,10 @@ class const XiangqiOngoingGamePreview({
                       brightness: boardPrefs.brightness,
                       hue: boardPrefs.hue,
                       child: XiangqiBoard(
+                        settings: XiangqiBoardSettings.fromPreferences(
+                          boardPrefs,
+                          annotations: false,
+                        ),
                         position: XiangqiPosition.fromFen(game.fen),
                         orientation: game.mySide,
                         showCoordinates: boardPrefs.coordinates,
@@ -265,6 +269,7 @@ class const _XiangqiBoardCarouselItem({
                   brightness: boardPrefs.brightness,
                   hue: boardPrefs.hue,
                   child: XiangqiBoard(
+                    settings: XiangqiBoardSettings.fromPreferences(boardPrefs, annotations: false),
                     position: position,
                     orientation: orientation,
                     showCoordinates: boardPrefs.coordinates,

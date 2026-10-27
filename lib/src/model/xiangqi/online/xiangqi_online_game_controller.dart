@@ -9,8 +9,9 @@ import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_com_protocol.dar
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_controller.dart' show XiangqiGameEnd;
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_move.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_premove.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_rules.dart' as rules;
-import 'package:lichess_mobile/src/network/xiangqi_http.dart' show xiangqiAuthStorageProvider;
+import 'package:lichess_mobile/src/network/xiangqi_session_store.dart';
 import 'package:lichess_mobile/src/network/xiangqi_socket.dart';
 import 'package:logging/logging.dart';
 
@@ -199,7 +200,8 @@ sealed class const XiangqiOnlineGameState._() with _$XiangqiOnlineGameState {
   bool get isSpectator => isLoaded && mySide == null;
 
   /// Whether it is this device's move and a move may be played.
-  bool get isMyTurn => mySide != null && !isFinished && isAtLivePosition && turn == mySide;
+  bool get isMyTurn =>
+      isConnected && mySide != null && !isFinished && isAtLivePosition && turn == mySide;
 
   /// The side that won, or null for a draw — and for a game that has not ended.
   ///
@@ -216,7 +218,9 @@ sealed class const XiangqiOnlineGameState._() with _$XiangqiOnlineGameState {
   /// The pieces [square] may be played to, or none when it holds nothing of the side to move.
   IList<XiangqiMove> get selectedMoves => selected == null || !isAtLivePosition
       ? const IListConst([])
-      : rules.legalMovesFrom(gamePosition, selected!);
+      : turn == mySide
+      ? rules.legalMovesFrom(gamePosition, selected!)
+      : xiangqiPremovesFrom(gamePosition, selected!);
 
   /// How long [side] has left, counted from the last frame, or null when the game is untimed.
   ///
@@ -239,6 +243,20 @@ sealed class const XiangqiOnlineGameState._() with _$XiangqiOnlineGameState {
     final left = atFrame - elapsed ~/ 1000;
     return left < 0 ? 0 : left;
   }
+
+  /// Keep the server's sub-second remainder for Clock's tenths display. The wire itself remains
+  /// integer seconds; only elapsed wall time is subtracted here.
+  Duration? timeLeftFor(XiangqiSide side, DateTime now) {
+    final seconds = side == .red ? redSeconds : blackSeconds;
+    if (seconds == null) return null;
+    final atFrame = Duration(seconds: seconds);
+    final stamp = serverClock;
+    if (stamp == null || isFinished || turn != side) return atFrame;
+    final elapsed = now.millisecondsSinceEpoch - stamp;
+    if (elapsed <= 0) return atFrame;
+    final left = atFrame - Duration(milliseconds: elapsed);
+    return left < Duration.zero ? Duration.zero : left;
+  }
 }
 
 /// A provider for the game with the given id: the id is the family argument, and it is xiangqi.com's
@@ -251,6 +269,32 @@ final xiangqiOnlineGameControllerProvider = AsyncNotifierProvider.autoDispose
       XiangqiOnlineGameController.new,
       name: 'XiangqiOnlineGameControllerProvider',
     );
+
+typedef XiangqiQueuedPremove = ({XiangqiMove move, XiangqiPosition position});
+typedef XiangqiConfirmedMove = ({
+  XiangqiMove move,
+  XiangqiPosition before,
+  XiangqiPosition after,
+  bool viaDragAndDrop,
+});
+
+/// Local, per-game state. Never serialised or forwarded to xiangqi.com as a premove packet.
+final xiangqiPendingPremoveProvider = NotifierProvider.autoDispose
+    .family<XiangqiPendingPremove, XiangqiQueuedPremove?, String>(
+      XiangqiPendingPremove.new,
+      name: 'XiangqiPendingPremoveProvider',
+    );
+
+class XiangqiPendingPremove(final String gameId) extends Notifier<XiangqiQueuedPremove?> {
+  @override
+  XiangqiQueuedPremove? build() => null;
+
+  void queue(XiangqiQueuedPremove premove) {
+    if (state != premove) state = premove;
+  }
+
+  void clear() => state = null;
+}
 
 /// One game on xiangqi.com, played or watched.
 ///
@@ -293,6 +337,19 @@ class XiangqiOnlineGameController(final String gameId)
     extends AsyncNotifier<XiangqiOnlineGameState> {
   StreamSubscription<XiangqiSocketEvent>? _events;
   StreamSubscription<void>? _connections;
+  StreamSubscription<XiangqiConnectionStatus>? _status;
+  Timer? _moveConfirmation;
+  Timer? _snapshotTimeout;
+  int _buildGeneration = 0;
+  bool _pendingMove = false;
+  XiangqiMove? _submittedDragMove;
+
+  /// Only confirmed incremental moves reach this stream; snapshots never produce feedback.
+  final _confirmedMoves = StreamController<XiangqiConfirmedMove>.broadcast();
+  Stream<XiangqiConfirmedMove> get confirmedMoves => _confirmedMoves.stream;
+  bool get pendingMove => _pendingMove;
+  bool _animateUpdate = false;
+  bool get animateUpdate => _animateUpdate;
 
   /// The state as this controller last made it, readable before [build] has returned.
   late XiangqiOnlineGameState _latest;
@@ -307,24 +364,40 @@ class XiangqiOnlineGameController(final String gameId)
   /// The event names whose arrival is a whole snapshot rather than a patch.
   final Set<String> _snapshotEvents = {'game.get.success'};
 
-  /// The event names already subscribed to, so a redirect cannot be followed in a circle.
-  final Set<String> _subscribed = {kXiangqiGetEvent};
-
   /// Whether a `g_v2.get` is already on its way. Two of them would be two snapshots racing.
   bool _subscribing = false;
 
   /// When the side to move got the move, for the `thinking_time` a move is sent with.
   DateTime? _turnStartedAt;
 
-  XiangqiSocketClient get _socket => ref.read(xiangqiSocketProvider);
+  XiangqiSocketClient get _socket => ref.read(xiangqiGameSocketProvider(gameId));
 
   @override
   Future<XiangqiOnlineGameState> build() async {
-    final socket = ref.read(xiangqiSocketProvider);
+    final generation = ++_buildGeneration;
+    _built = false;
+    _subscribing = false;
+    _pendingMove = false;
+    // Hold the per-game local state without rebuilding the network controller when it changes.
+    ref.listen(xiangqiPendingPremoveProvider(gameId), (_, _) {});
+    ref.onDispose(() {
+      unawaited(_events?.cancel());
+      _events = null;
+      unawaited(_connections?.cancel());
+      _connections = null;
+      unawaited(_status?.cancel());
+      _moveConfirmation?.cancel();
+      _snapshotTimeout?.cancel();
+      // Keep feedback through a retry rebuilding this notifier; close on final disposal.
+      scheduleMicrotask(() {
+        if (!ref.mounted && !_confirmedMoves.isClosed) unawaited(_confirmedMoves.close());
+      });
+    });
+    final socket = ref.watch(xiangqiGameSocketProvider(gameId));
     // The token is read from storage, not from the auth controller — see [_userIdFromToken]. The
     // socket reads the same token for itself; the only thing this controller needs it for is the
     // subject, which is how "which of these two seats is mine?" gets an answer at all.
-    final storage = ref.read(xiangqiAuthStorageProvider);
+    final storage = ref.read(xiangqiSessionStoreProvider);
     String? token;
     try {
       token = (await storage.read())?.accessToken;
@@ -335,6 +408,7 @@ class XiangqiOnlineGameController(final String gameId)
         stackTrace,
       );
     }
+    if (!ref.mounted || generation != _buildGeneration) throw StateError('Game load cancelled.');
     _userId = token == null ? null : _userIdFromToken(token);
 
     _latest = XiangqiOnlineGameState(
@@ -347,11 +421,10 @@ class XiangqiOnlineGameController(final String gameId)
 
     _events = socket.stream.listen(_onEvent);
     _connections = socket.connectedStream.listen(_onConnected);
-    ref.onDispose(() {
-      unawaited(_events?.cancel());
-      _events = null;
-      unawaited(_connections?.cancel());
-      _connections = null;
+    _status = socket.statusStream.listen((status) {
+      if (status != XiangqiConnectionStatus.connected) {
+        _set(_latest.copyWith(isConnected: false, selected: null));
+      }
     });
 
     // Connected after this build has returned, so that the snapshot the first frames bring cannot
@@ -374,15 +447,22 @@ class XiangqiOnlineGameController(final String gameId)
   /// that says "OK" either way — never appears on the board.
   ///
   /// Returns whether anything was sent.
-  Future<bool> playMove(XiangqiMove move) async {
+  Future<bool> playMove(XiangqiMove move, {bool viaDragAndDrop = false}) async {
     final state = _latest;
-    if (!state.isMyTurn || move.from == move.to) return false;
+    if (!state.isMyTurn || !state.isConnected || _pendingMove || move.from == move.to) return false;
     if (!rules.isLegal(state.position, move)) return false;
 
     // `thinking_time` is seconds, not milliseconds — the probe sent milliseconds and the move was
     // dropped, and the field is read by the server as the number of seconds the player thought.
     final thought = clock.now().difference(_turnStartedAt ?? clock.now());
     final seconds = thought.inSeconds < 0 ? 0 : thought.inSeconds;
+    final submittedPly = state.moves.length;
+    _pendingMove = true;
+    _submittedDragMove = viaDragAndDrop ? move : null;
+    _moveConfirmation = Timer(const Duration(seconds: 10), () {
+      _pendingMove = false;
+      if (ref.mounted) unawaited(_subscribe());
+    });
     try {
       await _socket.emit(
         kXiangqiMoveEvent,
@@ -390,6 +470,11 @@ class XiangqiOnlineGameController(final String gameId)
       );
       return true;
     } on Object catch (error, stackTrace) {
+      // The confirmation event is authoritative even if its separate ack was
+      // absent. Do not turn an already confirmed move into a connection error.
+      if (_latest.moves.length > submittedPly && _latest.moves[submittedPly] == move) return true;
+      _pendingMove = false;
+      _moveConfirmation?.cancel();
       _logger.warning('Could not send a move for game $gameId.', error, stackTrace);
       _set(_latest.copyWith(error: kXiangqiOnlineConnectionFailed, isConnected: false));
       return false;
@@ -398,7 +483,9 @@ class XiangqiOnlineGameController(final String gameId)
 
   /// Puts the board back on an earlier position in the recorded game.
   void goTo(int index) {
+    cancelPremove();
     final clamped = index.clamp(0, _latest.positions.length - 1);
+    _animateUpdate = (clamped - _latest.viewCursor).abs() == 1;
     _set(_latest.copyWith(cursor: clamped, selected: null));
   }
 
@@ -414,12 +501,50 @@ class XiangqiOnlineGameController(final String gameId)
   ///
   /// The same two-taps-or-a-drag contract the offline screen's board has, kept here rather than in
   /// the widget because the selection is part of the state the board is drawn from.
-  void tapSquare(XiangqiSquare square) {
+  void clearSelection() => _set(_latest.copyWith(selected: null));
+
+  void cancelPremove() {
+    if (ref.mounted) ref.read(xiangqiPendingPremoveProvider(gameId).notifier).clear();
+  }
+
+  bool _canPremove(bool enabled) =>
+      enabled &&
+      _latest.isConnected &&
+      _latest.mySide != null &&
+      !_latest.isFinished &&
+      _latest.isAtLivePosition &&
+      _latest.turn != _latest.mySide &&
+      !_pendingMove;
+
+  void movePiece(XiangqiSquare from, XiangqiSquare to, {bool premoveEnabled = false}) {
+    final move = XiangqiMove(from, to);
+    if (_canPremove(premoveEnabled)) {
+      if (_latest.position.pieceAt(from)?.side != _latest.mySide ||
+          !xiangqiPremovesFrom(_latest.position, from).contains(move)) {
+        return;
+      }
+      ref.read(xiangqiPendingPremoveProvider(gameId).notifier).queue((
+        move: move,
+        position: _latest.gamePosition,
+      ));
+      clearSelection();
+      return;
+    }
+    if (!_latest.isMyTurn || _pendingMove || !rules.isLegal(_latest.gamePosition, move)) return;
+    cancelPremove();
+    clearSelection();
+    unawaited(playMove(move, viaDragAndDrop: true));
+  }
+
+  void tapSquare(XiangqiSquare square, {bool premoveEnabled = false}) {
     final state = _latest;
-    if (!state.isMyTurn) return;
+    if ((!state.isMyTurn && !_canPremove(premoveEnabled)) || _pendingMove) return;
 
     final selected = state.selected;
     if (selected == null) {
+      final queued = ref.read(xiangqiPendingPremoveProvider(gameId));
+      cancelPremove();
+      if (queued?.move.from == square) return;
       final piece = state.gamePosition.pieceAt(square);
       if (piece == null || piece.side != state.mySide) return;
       _set(state.copyWith(selected: square));
@@ -427,6 +552,16 @@ class XiangqiOnlineGameController(final String gameId)
     }
     if (selected == square) {
       _set(state.copyWith(selected: null));
+      return;
+    }
+    if (_canPremove(premoveEnabled)) {
+      if (xiangqiPremovesFrom(state.position, selected).contains(XiangqiMove(selected, square))) {
+        movePiece(selected, square, premoveEnabled: true);
+      } else {
+        final piece = state.position.pieceAt(square);
+        cancelPremove();
+        _set(state.copyWith(selected: piece?.side == state.mySide ? square : null));
+      }
       return;
     }
     final move = XiangqiMove(selected, square);
@@ -445,7 +580,7 @@ class XiangqiOnlineGameController(final String gameId)
   /// nothing to wait for, and the state changes when `game.server.end` arrives.
   Future<void> resign() async {
     final state = _latest;
-    if (state.mySide == null || state.isFinished) return;
+    if (state.mySide == null || state.isFinished || !state.isConnected) return;
     try {
       await _socket.emit(
         kXiangqiFinishEvent,
@@ -470,18 +605,33 @@ class XiangqiOnlineGameController(final String gameId)
     // and the other is dropped by [_subscribing]. The case this exists for is the socket having
     // been opened by something else already, where no event will fire at all.
     if (socket.isConnected) {
-      _set(_latest.copyWith(isConnected: true));
+      _set(_latest.copyWith(isConnected: false));
       unawaited(_subscribe());
     }
   }
 
-  void _onConnected(void _) {
-    _set(_latest.copyWith(isConnected: true));
+  Future<void> _onConnected(void _) async {
+    if (!ref.mounted) return;
+    final generation = _buildGeneration;
+    final session = await ref.read(xiangqiSessionStoreProvider).read();
+    if (!ref.mounted || generation != _buildGeneration) return;
+    _userId = session == null ? null : _userIdFromToken(session.accessToken);
+    _set(_latest.copyWith(isConnected: false));
     unawaited(_subscribe());
   }
 
   /// Asks the server for the game, under the one name this client ever subscribes with.
-  Future<void> _subscribe() => _subscribeTo(kXiangqiGetEvent);
+  Future<void> _subscribe() {
+    if (!ref.mounted || _subscribing) return Future<void>.value();
+    _set(_latest.copyWith(isConnected: false, selected: null));
+    _snapshotTimeout?.cancel();
+    _snapshotTimeout = Timer(const Duration(seconds: 20), () {
+      if (ref.mounted) {
+        _set(_latest.copyWith(error: kXiangqiOnlineConnectionFailed, isConnected: false));
+      }
+    });
+    return _subscribeTo(kXiangqiGetEvent);
+  }
 
   /// Sends [event] and follows the ack's redirect, and any redirect *it* is answered with.
   ///
@@ -492,6 +642,8 @@ class XiangqiOnlineGameController(final String gameId)
   Future<void> _subscribeTo(String event) async {
     if (_subscribing) return;
     _subscribing = true;
+    final generation = _buildGeneration;
+    final followed = <String>{event};
     try {
       var name = event;
       while (true) {
@@ -503,6 +655,7 @@ class XiangqiOnlineGameController(final String gameId)
           _set(_latest.copyWith(error: kXiangqiOnlineConnectionFailed, isConnected: false));
           return;
         }
+        if (!ref.mounted || generation != _buildGeneration) return;
         // A finished game answers `g_v2.get` with a redirect rather than a failure: the snapshot is
         // not on `game.get.success` but on the event the ack names. Follow that name — it is the
         // server's to choose, and it has been seen spelling it `game.archived.get`. A name already
@@ -511,18 +664,22 @@ class XiangqiOnlineGameController(final String gameId)
         if (map == null) return;
         final redirect = map['event'];
         if (map['status'] != 'REDIRECT' || redirect is! String || redirect.isEmpty) return;
-        if (!_subscribed.add(redirect)) return;
+        if (!followed.add(redirect) || followed.length > 8) return;
         _snapshotEvents.add('$redirect.success');
         name = redirect;
       }
     } finally {
-      _subscribing = false;
+      if (generation == _buildGeneration) _subscribing = false;
     }
   }
 
   void _onEvent(XiangqiSocketEvent event) {
     final data = _unwrap(event.data);
+    final map = _asMap(data);
+    final id = map?['game_id'] ?? map?['id'];
+    if (id != null && id.toString() != gameId) return;
     if (_snapshotEvents.contains(event.name)) {
+      _snapshotTimeout?.cancel();
       if (!_applySnapshot(data)) {
         _set(_latest.copyWith(error: kXiangqiOnlineUnreadableGame));
       }
@@ -554,8 +711,14 @@ class XiangqiOnlineGameController(final String gameId)
   /// half a game is worse than none — the board would show a position that never happened and the
   /// clock would run on it as if it had.
   bool _applySnapshot(Object? data) {
+    cancelPremove();
+    _submittedDragMove = null;
     final map = _asMap(data);
     if (map == null) return false;
+    _animateUpdate = false;
+    _snapshotTimeout?.cancel();
+    _pendingMove = false;
+    _moveConfirmation?.cancel();
     final red = _player(map['rplayer']);
     final black = _player(map['bplayer']);
     final moves = _movesOf(map['move_history']);
@@ -581,7 +744,7 @@ class XiangqiOnlineGameController(final String gameId)
         end: parsedEnd?.end ?? _latest.end,
         resignedBy: parsedEnd?.resignedBy ?? _latest.resignedBy,
         flaggedSide: parsedEnd?.flaggedSide ?? _latest.flaggedSide,
-        isConnected: _latest.isConnected,
+        isConnected: _socket.isConnected,
         isLoaded: true,
       ),
     );
@@ -598,7 +761,6 @@ class XiangqiOnlineGameController(final String gameId)
     final map = _asMap(data);
     final raw = map?['move'];
     if (map == null || raw is! String) return;
-
     final clocks = _clocksOf(map['timers']);
     final move = xiangqiMoveFromComUci(_uciOf(raw));
     if (move == null) {
@@ -626,7 +788,7 @@ class XiangqiOnlineGameController(final String gameId)
 
     final XiangqiPosition next;
     try {
-      next = rules.play(_latest.position, move);
+      next = rules.play(_latest.gamePosition, move);
     } on rules.XiangqiIllegalMoveException {
       _logger.warning(
         'Game $gameId played $move, which is not legal in ${_latest.position.toFen()}.',
@@ -635,6 +797,12 @@ class XiangqiOnlineGameController(final String gameId)
       return;
     }
 
+    final previousPosition = _latest.gamePosition;
+    _pendingMove = false;
+    _moveConfirmation?.cancel();
+    final viaDragAndDrop = _submittedDragMove == move && previousPosition.turn == _latest.mySide;
+    _submittedDragMove = null;
+    _animateUpdate = !viaDragAndDrop;
     _set(
       _withClocks(_latest, clocks).copyWith(
         positions: _latest.positions.add(next),
@@ -643,7 +811,24 @@ class XiangqiOnlineGameController(final String gameId)
         error: null,
       ),
     );
+    _confirmedMoves.add((
+      move: move,
+      before: previousPosition,
+      after: next,
+      viaDragAndDrop: viaDragAndDrop,
+    ));
     _turnStartedAt = clock.now();
+    final premove = ref.read(xiangqiPendingPremoveProvider(gameId));
+    if (premove != null && _latest.isMyTurn) {
+      cancelPremove();
+      final validated = validateXiangqiPremove(
+        premove.position,
+        next,
+        premove.move,
+        _latest.mySide!,
+      );
+      if (validated != null) unawaited(playMove(validated));
+    }
   }
 
   /// Reads `game.server.end`.
@@ -850,11 +1035,21 @@ class XiangqiOnlineGameController(final String gameId)
   /// assembled. [_built] closes that window — the state is kept either way, and the build hands
   /// back the latest one it has.
   void _set(XiangqiOnlineGameState next) {
+    if (!ref.mounted) return;
+    if (!next.isConnected || next.isFinished || next.mySide != _latest.mySide) {
+      _submittedDragMove = null;
+      cancelPremove();
+    }
     _latest = next;
     if (!_built || !ref.mounted) return;
     state = AsyncData(next);
   }
 }
+
+final xiangqiConfirmedMoveProvider = StreamProvider.autoDispose
+    .family<XiangqiConfirmedMove, String>((ref, gameId) {
+      return ref.watch(xiangqiOnlineGameControllerProvider(gameId).notifier).confirmedMoves;
+    }, name: 'XiangqiConfirmedMoveProvider');
 
 /// The UCI at the head of one of xiangqi.com's move strings.
 ///

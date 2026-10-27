@@ -2,6 +2,7 @@ import 'package:chessground/chessground.dart' show BrightnessHueFilter;
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lichess_mobile/src/model/analysis/analysis_preferences.dart';
 import 'package:lichess_mobile/src/model/common/chess.dart' show Variant;
 import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_live_game.dart';
@@ -15,6 +16,7 @@ import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_analysis_layout.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_game_layout.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_player_row.dart';
@@ -94,6 +96,7 @@ class _ReviewState() extends ConsumerState<_Review> {
   /// Which position is on the board: an index into the game's positions, so 0 is before the first
   /// move and `moves.length` is after the last one.
   int _cursor = 0;
+  bool _animate = false;
 
   @override
   void initState() {
@@ -106,9 +109,14 @@ class _ReviewState() extends ConsumerState<_Review> {
   void _goTo(int target) {
     final clamped = target.clamp(0, widget.review.moves.length);
     if (clamped == _cursor) return;
-    if (clamped > 0) {
-      final before = widget.review.positions[clamped - 1];
-      final move = widget.review.moves[clamped - 1];
+    _animate = (clamped - _cursor).abs() == 1;
+    if (_animate && widget.review.moves.isNotEmpty) {
+      final index = (clamped > _cursor ? clamped - 1 : _cursor - 1).clamp(
+        0,
+        widget.review.moves.length - 1,
+      );
+      final before = widget.review.positions[index];
+      final move = widget.review.moves[index];
       final sound = ref.read(soundServiceProvider);
       if (before.pieceAt(move.to) != null) {
         sound.playCaptureSound(Variant.standard);
@@ -134,11 +142,13 @@ class _ReviewState() extends ConsumerState<_Review> {
         : review.reviews[cursor - 1].evaluation;
 
     return SafeArea(
-      child: XiangqiGameLayout(
-        board: BrightnessHueFilter(
+      child: XiangqiAnalysisLayout(
+        smallBoard: ref.watch(analysisPreferencesProvider).smallBoard,
+        boardBuilder: (context, size, radius) => BrightnessHueFilter(
           brightness: boardPrefs.brightness,
           hue: boardPrefs.hue,
           child: XiangqiBoard(
+            settings: XiangqiBoardSettings.fromPreferences(boardPrefs),
             position: review.positions[cursor],
             orientation: XiangqiSide.red,
             selected: null,
@@ -147,8 +157,8 @@ class _ReviewState() extends ConsumerState<_Review> {
             // is no move to make.
             onTapSquare: null,
             onDragMove: null,
-            lastMove: boardPrefs.boardHighlights && cursor > 0 ? review.moves[cursor - 1] : null,
-            animationDuration: Duration.zero,
+            lastMove: cursor > 0 ? review.moves[cursor - 1] : null,
+            animationDuration: _animate ? boardPrefs.pieceAnimationDuration : Duration.zero,
             showCoordinates: boardPrefs.coordinates,
             showLastMove: boardPrefs.boardHighlights,
             showBorder: boardPrefs.showBorder,
@@ -162,28 +172,23 @@ class _ReviewState() extends ConsumerState<_Review> {
           orientation: XiangqiSide.red,
           evaluation: evaluation,
         ),
-        topTable: _PlayerRow(
+        boardHeader: _PlayerRow(
           side: XiangqiSide.black,
           player: review.black,
           accuracy: review.accuracyOf(XiangqiSide.black),
           style: style,
         ),
-        bottomTable: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _PlayerRow(
-              side: XiangqiSide.red,
-              player: review.red,
-              accuracy: review.accuracyOf(XiangqiSide.red),
-              style: style,
-            ),
-            _Verdict(review: review, cursor: cursor, current: current),
-          ],
+        boardFooter: _PlayerRow(
+          side: XiangqiSide.red,
+          player: review.red,
+          accuracy: review.accuracyOf(XiangqiSide.red),
+          style: style,
         ),
+        panelHeader: _Verdict(review: review, cursor: cursor, current: current),
         moves: xiangqiGameNotation(review.positions, review.moves),
         currentMoveIndex: cursor,
         onSelectMove: _goTo,
-        userActionsBar: BottomBar(
+        bottomBar: BottomBar(
           children: [
             BottomBarButton(
               label: context.l10n.mobileXiangqiReviewPrevious,
@@ -216,6 +221,9 @@ class const _PlayerRow({
   @override
   Widget build(BuildContext context) {
     return XiangqiPlayerRow(
+      avatarSize: 24,
+      compact: true,
+      clockPosition: .right,
       side: side,
       style: style,
       name: player?.name,
@@ -224,7 +232,9 @@ class const _PlayerRow({
           ? null
           : Text(
               '${context.l10n.mobileXiangqiReviewAccuracy} $accuracy',
-              style: TextStyle(fontSize: 14, color: textShade(context, 0.7)),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 11, color: textShade(context, 0.7)),
             ),
     );
   }

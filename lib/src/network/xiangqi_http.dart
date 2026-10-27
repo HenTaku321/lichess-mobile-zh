@@ -4,12 +4,14 @@ import 'dart:typed_data';
 
 import 'package:clock/clock.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:http/http.dart' show BaseRequest, Client, Request, Response, StreamedResponse;
+import 'package:http/http.dart'
+    show Abortable, AbortableRequest, BaseRequest, Client, Request, Response, StreamedResponse;
 import 'package:lichess_mobile/src/db/secure_storage.dart';
 import 'package:lichess_mobile/src/model/ui_events.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_session.dart';
 import 'package:lichess_mobile/src/network/http.dart'
     show ServerException, httpClientFactoryProvider;
+import 'package:lichess_mobile/src/network/xiangqi_session_store.dart';
 import 'package:lichess_mobile/src/network/xiangqi_uri.dart';
 import 'package:logging/logging.dart';
 
@@ -113,6 +115,7 @@ final xiangqiClientProvider = Provider<XiangqiClient>((Ref ref) {
     inner: ref.read(httpClientFactoryProvider)(),
     storage: ref.read(xiangqiAuthStorageProvider),
     uiEventBus: ref.read(uiEventBusProvider),
+    sessionStore: ref.read(xiangqiSessionStoreProvider),
   );
   ref.onDispose(client.close);
   return client;
@@ -131,7 +134,12 @@ class XiangqiClient({
   required final Client _inner,
   required final XiangqiAuthStorage _storage,
   required final UiEventBus _uiEventBus,
+  final XiangqiSessionStore? sessionStore,
 }) implements Client {
+  late final XiangqiSessionStore _sessions = sessionStore ?? XiangqiSessionStore(_storage);
+  final Set<_RequestDeadline> _requests = {};
+  bool _closed = false;
+
   /// How long a request may wait for the response headers.
   static const defaultRequestTimeout = Duration(seconds: 30);
 
@@ -144,7 +152,7 @@ class XiangqiClient({
   ///
   /// Two requests that 401 at the same moment share this: the second waits on the first's future
   /// instead of firing a refresh of its own.
-  Future<bool>? _refreshInFlight;
+  Future<_RefreshResult>? _refreshInFlight;
 
   /// The access token whose session has already been cleared.
   ///
@@ -154,6 +162,29 @@ class XiangqiClient({
 
   @override
   Future<StreamedResponse> send(BaseRequest request) async {
+    if (_closed) throw StateError('The xiangqi.com HTTP client is closed.');
+    late final _RequestDeadline deadline;
+    deadline = _RequestDeadline(defaultRequestTimeout, onFinish: () => _requests.remove(deadline));
+    _requests.add(deadline);
+    try {
+      final response = await deadline.run(_send(request, deadline));
+      return StreamedResponse(
+        deadline.bind(response.stream),
+        response.statusCode,
+        contentLength: response.contentLength,
+        request: response.request,
+        headers: response.headers,
+        isRedirect: response.isRedirect,
+        persistentConnection: response.persistentConnection,
+        reasonPhrase: response.reasonPhrase,
+      );
+    } on Object {
+      deadline.cancel();
+      rethrow;
+    }
+  }
+
+  Future<StreamedResponse> _send(BaseRequest request, _RequestDeadline deadline) async {
     // A Request is snapshotted before it is sent, because the 401 retry needs a second, unsent copy
     // of it and a BaseRequest can only be finalised once. A streamed body cannot be replayed and is
     // simply not retried.
@@ -161,32 +192,86 @@ class XiangqiClient({
         ? _ReplayData(request.method, request.url, Map.of(request.headers), request.bodyBytes)
         : null;
 
-    await _throttle.acquire();
-    _applyHeaders(request, await _storage.read());
+    var session = await deadline.run(_sessions.read());
+    final ownsAuth = !request.headers.containsKey('Authorization') && !_anonymous(request.url);
+    await deadline.run(_throttle.acquire());
+    final beforeSend = await _sessions.read();
+    if (ownsAuth && !_sameIdentity(beforeSend, session)) {
+      throw StateError('The xiangqi.com session changed while the request was queued.');
+    }
+    if (ownsAuth) session = beforeSend;
+    _applyHeaders(request, ownsAuth ? session : null);
 
-    var response = await _inner.send(request).timeout(defaultRequestTimeout);
+    var response = await _sendAttempt(request, deadline);
 
-    if (response.statusCode != 401 || replay == null) return response;
-
-    final refreshed = await _refresh();
-    if (!refreshed) {
-      await _clearSessionOnce();
+    if (response.statusCode != 401 || replay == null || !ownsAuth || session == null) {
       return response;
+    }
+
+    final bytes = await deadline.run(response.stream.toBytes());
+    final original = StreamedResponse(
+      Stream.value(bytes),
+      response.statusCode,
+      headers: response.headers,
+      request: response.request,
+      reasonPhrase: response.reasonPhrase,
+    );
+    final current = await _sessions.read();
+    if (!_sameIdentity(current, session)) {
+      throw StateError('The xiangqi.com session changed during the request.');
+    }
+
+    final refreshed = current?.accessToken != session.accessToken
+        ? _RefreshResult.refreshed
+        : await deadline.run(_refresh(budget: deadline.remaining));
+    if (refreshed != _RefreshResult.refreshed) {
+      if (refreshed == _RefreshResult.rejected) await _clearSessionOnce(session.accessToken);
+      return original;
     }
 
     // The 401 body is of no use now that it is about to be replaced; draining it lets the
     // connection go back to the pool.
-    await response.stream.drain<void>().catchError((Object _) {});
-
     final retry = replay.build();
-    await _throttle.acquire();
-    _applyHeaders(retry, await _storage.read());
-    response = await _inner.send(retry).timeout(defaultRequestTimeout);
+    await deadline.run(_throttle.acquire());
+    final latest = await _sessions.read();
+    if (!_sameIdentity(latest, session)) {
+      throw StateError('The xiangqi.com session changed before retry.');
+    }
+    _applyHeaders(retry, latest);
+    response = await _sendAttempt(retry, deadline);
 
     if (response.statusCode == 401) {
-      await _clearSessionOnce();
+      await _clearSessionOnce(latest!.accessToken);
     }
     return response;
+  }
+
+  bool _anonymous(Uri uri) =>
+      uri.host != 'api.xiangqi.com' ||
+      const {
+        '/api/users/signin',
+        '/api/users/guest_jwt',
+        '/api/users/signup_email',
+        '/api/users/signup_details',
+        '/api/users/verify_otp',
+      }.contains(uri.path);
+
+  bool _sameIdentity(XiangqiSession? a, XiangqiSession? b) =>
+      a?.userId == b?.userId && a?.refreshToken == b?.refreshToken && a?.isGuest == b?.isGuest;
+
+  Future<StreamedResponse> _sendAttempt(BaseRequest request, _RequestDeadline deadline) {
+    if (request is! Request) return deadline.run(_inner.send(request));
+    final wire = AbortableRequest(request.method, request.url, abortTrigger: deadline.abort.future)
+      ..headers.addAll(request.headers)
+      ..bodyBytes = request.bodyBytes
+      ..followRedirects = request.followRedirects
+      ..maxRedirects = request.maxRedirects
+      ..persistentConnection = request.persistentConnection;
+    if (request is Abortable) {
+      final trigger = (request as Abortable).abortTrigger;
+      if (trigger != null) unawaited(trigger.then((_) => deadline.cancel()));
+    }
+    return deadline.run(_inner.send(wire));
   }
 
   /// Puts the identity headers on [request], leaving the caller's own alone.
@@ -202,11 +287,11 @@ class XiangqiClient({
   }
 
   /// Refreshes the access token, at most one refresh at a time.
-  Future<bool> _refresh() {
+  Future<_RefreshResult> _refresh({Duration budget = defaultRequestTimeout}) {
     final existing = _refreshInFlight;
     if (existing != null) return existing;
-    late final Future<bool> future;
-    future = _doRefresh().whenComplete(() {
+    late final Future<_RefreshResult> future;
+    future = _doRefresh(budget).whenComplete(() {
       if (identical(_refreshInFlight, future)) _refreshInFlight = null;
     });
     _refreshInFlight = future;
@@ -214,51 +299,95 @@ class XiangqiClient({
   }
 
   /// Asks for a new access token, keeping the refresh token (the server does not rotate it).
-  Future<bool> _doRefresh() async {
+  Future<_RefreshResult> _doRefresh(Duration budget) async {
+    final deadline = _RequestDeadline(budget);
     try {
-      final session = await _storage.read();
+      final session = await _sessions.read();
+      final generation = _sessions.generation;
       final refreshToken = session?.refreshToken;
-      if (session == null || refreshToken == null || refreshToken.isEmpty) return false;
+      if (session == null || refreshToken == null || refreshToken.isEmpty) {
+        return _RefreshResult.rejected;
+      }
 
-      await _throttle.acquire();
+      await deadline.run(_throttle.acquire());
       final request = Request('POST', xiangqiUri('users/jwt/refresh'));
       request.headers['Authorization'] = 'Bearer $refreshToken';
       request.headers['User-Agent'] = kXiangqiUserAgent;
       request.headers['Accept'] = 'application/json';
 
-      final response = await _inner.send(request).timeout(defaultRequestTimeout);
+      final response = await _sendAttempt(request, deadline);
+      final body = await deadline.run(response.stream.toBytes());
       if (response.statusCode != 200) {
         _logger.warning('xiangqi.com token refresh answered ${response.statusCode}.');
-        return false;
+        return response.statusCode == 401 || response.statusCode == 403
+            ? _RefreshResult.rejected
+            : _RefreshResult.unavailable;
       }
-      final body = await response.stream.toBytes();
       final json = jsonDecode(utf8.decode(body));
-      if (json is! Map<String, dynamic>) return false;
+      if (json is! Map<String, dynamic>) return _RefreshResult.unavailable;
       final accessToken = json['jwt'] ?? json['access_token'] ?? json['accessToken'];
-      if (accessToken is! String || accessToken.isEmpty) return false;
+      if (accessToken is! String || accessToken.isEmpty) return _RefreshResult.unavailable;
 
       // The refresh token is not rotated, so only the access token changes.
-      await _storage.write(session.copyWith(accessToken: accessToken));
-      return true;
+      final saved = await _sessions.write(
+        session.copyWith(accessToken: accessToken),
+        expectedGeneration: generation,
+      );
+      return saved ? _RefreshResult.refreshed : _RefreshResult.unavailable;
     } catch (e, st) {
       _logger.warning('xiangqi.com token refresh failed.', e, st);
-      return false;
+      return _RefreshResult.unavailable;
+    } finally {
+      deadline.finish();
     }
   }
 
   /// Clears the session and tells the user, once per dead token.
-  Future<void> _clearSessionOnce() async {
-    final session = await _storage.read();
+  Future<void> _clearSessionOnce(String expectedToken) async {
+    final session = await _sessions.read();
     final token = session?.accessToken;
-    if (token == null || token == _clearedToken) return;
+    if (token == null || token != expectedToken || token == _clearedToken) return;
     _clearedToken = token;
-    await _storage.delete();
+    await _sessions.write(null, expectedGeneration: _sessions.generation);
     _uiEventBus.emit(const ShowErrorEvent(kXiangqiSessionExpiredMessage));
     _logger.warning('xiangqi.com session cleared after a second 401.');
   }
 
+  /// Refresh an expired JWT before a socket handshake; transient failures keep its credential.
+  Future<String?> socketToken({bool forceRefresh = false}) async {
+    final session = await _sessions.read();
+    if (session == null) return null;
+    var expired = false;
+    try {
+      final claims = jsonDecode(
+        utf8.decode(base64Url.decode(base64Url.normalize(session.accessToken.split('.')[1]))),
+      );
+      final exp = (claims as Map<String, dynamic>)['exp'];
+      expired = exp is num && exp * 1000 <= clock.now().millisecondsSinceEpoch + 30000;
+    } on Object {
+      /* A malformed token is refused by the server, never trusted here. */
+    }
+    if (expired || forceRefresh) {
+      final result = await _refresh();
+      if (result == _RefreshResult.rejected) {
+        await _clearSessionOnce(session.accessToken);
+        return null;
+      }
+      if (result == _RefreshResult.unavailable) {
+        throw StateError('xiangqi.com session refresh is temporarily unavailable.');
+      }
+    }
+    return (await _sessions.read())?.accessToken;
+  }
+
   @override
   void close() {
+    if (_closed) return;
+    _closed = true;
+    for (final request in _requests.toList()) {
+      request.cancel();
+    }
+    if (sessionStore == null) _sessions.dispose();
     _inner.close();
   }
 
@@ -360,6 +489,92 @@ class _ReplayData(
     request.headers.addAll(headers);
     request.bodyBytes = bodyBytes;
     return request;
+  }
+}
+
+enum _RefreshResult() {
+  refreshed,
+  rejected,
+  unavailable,
+}
+
+/// One wall-clock deadline, including throttling, retries and response consumption.
+class _RequestDeadline(final Duration duration, {final void Function()? onFinish}) {
+  final abort = Completer<void>();
+  final _expired = Completer<void>();
+  Timer? _timer;
+  bool _finished = false;
+  final Stopwatch _elapsed = Stopwatch();
+  Duration get remaining {
+    final left = duration - _elapsed.elapsed;
+    return left > Duration.zero ? left : Duration.zero;
+  }
+
+  Future<T> run<T>(Future<T> work) {
+    _elapsed.start();
+    _timer ??= Timer(duration, () {
+      if (!_expired.isCompleted) _expired.complete();
+      if (!abort.isCompleted) abort.complete();
+      finish();
+    });
+    return Future.any([
+      work,
+      _expired.future.then<T>(
+        (_) => throw TimeoutException('xiangqi.com request deadline exceeded', duration),
+      ),
+    ]);
+  }
+
+  Stream<List<int>> bind(Stream<List<int>> source) {
+    late StreamController<List<int>> controller;
+    StreamSubscription<List<int>>? subscription;
+    controller = StreamController<List<int>>(
+      onListen: () {
+        subscription = source.listen(
+          controller.add,
+          onError: (Object error, StackTrace stack) {
+            finish();
+            controller.addError(error, stack);
+            unawaited(controller.close());
+          },
+          onDone: () {
+            finish();
+            unawaited(controller.close());
+          },
+        );
+        unawaited(
+          _expired.future.then((_) {
+            if (controller.isClosed) return;
+            unawaited(subscription?.cancel());
+            controller.addError(
+              TimeoutException('xiangqi.com response deadline exceeded', duration),
+            );
+            unawaited(controller.close());
+          }),
+        );
+      },
+      onPause: () => subscription?.pause(),
+      onResume: () => subscription?.resume(),
+      onCancel: () {
+        cancel();
+        unawaited(subscription?.cancel());
+      },
+    );
+    return controller.stream;
+  }
+
+  void finish() {
+    _timer?.cancel();
+    if (!_finished) {
+      _finished = true;
+      onFinish?.call();
+    }
+  }
+
+  void cancel() {
+    finish();
+    if (!_expired.isCompleted) _expired.complete();
+    if (!abort.isCompleted) abort.complete();
   }
 }
 

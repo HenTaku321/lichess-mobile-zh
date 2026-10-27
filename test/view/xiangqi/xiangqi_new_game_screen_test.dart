@@ -5,8 +5,10 @@
 // settings the two games do not share replaced. The values are invented; the shapes come from
 // `xiangqi-com-re/docs/game.md`.
 
+import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -14,6 +16,7 @@ import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_session.dart';
 import 'package:lichess_mobile/src/network/connectivity.dart';
 import 'package:lichess_mobile/src/network/http.dart';
 import 'package:lichess_mobile/src/network/xiangqi_http.dart';
+import 'package:lichess_mobile/src/network/xiangqi_session_store.dart';
 import 'package:lichess_mobile/src/view/play/common_play_widgets.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_new_game_screen.dart';
 import 'package:material_ui/material_ui.dart';
@@ -108,6 +111,31 @@ Future<void> choose(WidgetTester tester, String label, String value) async {
 
 void main() {
   group('XiangqiNewGameScreen', () {
+    testWidgets(
+      'account switching drops a pending match without cancelling the new account queue',
+      (tester) async {
+        final response = Completer<http.Response>();
+        final sent = await pumpNewGame(
+          tester,
+          handler: (request) async =>
+              request.url.path.endsWith('quick-challenge') ? await response.future : null,
+        );
+        await tester.tap(find.widgetWithText(FilledButton, 'Quick game'));
+        await tester.pump();
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(XiangqiNewGameScreen)),
+        );
+        await container
+            .read(xiangqiSessionStoreProvider)
+            .write(_session.copyWith(userId: '100002', name: 'B'));
+        await tester.pumpAndSettle();
+        response.complete(http.Response('{"game_id":"old-game"}', 200));
+        await tester.pump(const Duration(seconds: 2));
+        await tester.pumpAndSettle();
+        expect(sent.where((item) => item.$1 == '/api/games/cancel-quick-challenge'), isEmpty);
+        expect(find.widgetWithText(FilledButton, 'Quick game'), findsOneWidget);
+      },
+    );
     testWidgets('sets a game up with the same panel the chess lobby uses', (tester) async {
       await pumpNewGame(tester);
 
@@ -175,7 +203,8 @@ void main() {
       await choose(tester, 'Clock', '5 + 0');
 
       await tester.tap(find.widgetWithText(FilledButton, 'Quick game'));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
       // One field, and it is the clock's own string — the server pairs on nothing else.
       final quick = sent.firstWhere((request) => request.$1 == '/api/v2/games/quick-challenge');

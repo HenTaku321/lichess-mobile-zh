@@ -1,7 +1,8 @@
 import 'dart:math' as math;
 
-import 'package:chessground/chessground.dart' show BrightnessHueFilter;
+import 'package:chessground/chessground.dart' show BrightnessHueFilter, PieceShiftMethod;
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
@@ -159,13 +160,22 @@ class const _BoardArea({
           onDragMove: editorState.editorPointerMode == .drag
               ? (from, to) => ref.read(editorController.notifier).movePiece(from, to)
               : null,
+          onExternalPieceDrop: ref.read(editorController.notifier).placePiece,
+          onPieceDiscarded: editorState.editorPointerMode == .drag
+              ? ref.read(editorController.notifier).discardPiece
+              : null,
           // A game lets a player pick up their own side's pieces only; the editor is one person
           // holding both sides, so either side's pieces are theirs to move.
           dragAnyPiece: true,
+          showLastMove: false,
           showCoordinates: boardPrefs.coordinates,
           showBorder: boardPrefs.showBorder,
           magnifyDraggedPiece: boardPrefs.magnifyDraggedPiece,
           dragTargetKind: boardPrefs.dragTargetKind,
+          pieceShiftMethod: editorState.editorPointerMode == .drag
+              ? PieceShiftMethod.drag
+              : PieceShiftMethod.tapTwoSquares,
+          enableShapeDrawings: false,
           style: XiangqiBoardStyle.fromChessboardColorScheme(boardPrefs.boardTheme.colors),
         ),
       ),
@@ -239,30 +249,64 @@ class const _PalettePiece({
   required final XiangqiBoardStyle style,
   required final bool active,
   required final VoidCallback onTap,
-}) extends StatelessWidget {
+}) extends ConsumerStatefulWidget {
+  @override
+  ConsumerState<_PalettePiece> createState() => _PalettePieceState();
+}
+
+class _PalettePieceState() extends ConsumerState<_PalettePiece> {
+  bool _mouse = false;
+
   @override
   Widget build(BuildContext context) {
     // The piece in hand is marked rather than flooded: the scheme's primary as a wash and a ring,
     // with the button's own rounding, and a ripple so the touch is answered.
     final primary = ColorScheme.of(context).primary;
+    final piece = widget.piece;
+    final cell = widget.cell;
+    final style = widget.style;
+    final active = widget.active;
+    final magnified = !_mouse && ref.watch(boardPreferencesProvider).magnifyDraggedPiece;
+    final feedbackSize = cell * (magnified ? 2 : 1);
     const radius = BorderRadius.all(Radius.circular(8));
 
-    return SizedBox(
-      key: Key('piece-button-${piece.side.name}-${piece.type.name}'),
-      width: cell,
-      height: cell,
-      child: Material(
-        type: MaterialType.transparency,
-        child: Ink(
-          decoration: BoxDecoration(
-            borderRadius: radius,
-            color: active ? primary.withValues(alpha: 0.18) : null,
-            border: active ? Border.all(color: primary, width: 1.5) : null,
+    return Semantics(
+      label: '${piece.side.label(context.l10n)} ${piece.glyph}',
+      button: true,
+      selected: active,
+      child: Listener(
+        onPointerDown: (event) => setState(() => _mouse = event.kind == PointerDeviceKind.mouse),
+        child: Draggable<XiangqiPiece>(
+          data: piece,
+          dragAnchorStrategy: pointerDragAnchorStrategy,
+          feedback: Transform.translate(
+            offset: Offset(-feedbackSize / 2, -feedbackSize / 2 - (magnified ? cell : 0)),
+            child: SizedBox(
+              key: const Key('xiangqi-palette-feedback'),
+              width: feedbackSize,
+              height: feedbackSize,
+              child: CustomPaint(painter: _PalettePiecePainter(piece, feedbackSize, style)),
+            ),
           ),
-          child: InkWell(
-            borderRadius: radius,
-            onTap: onTap,
-            child: CustomPaint(painter: _PalettePiecePainter(piece, cell, style)),
+          child: SizedBox(
+            key: Key('piece-button-${piece.side.name}-${piece.type.name}'),
+            width: cell,
+            height: cell,
+            child: Material(
+              type: MaterialType.transparency,
+              child: Ink(
+                decoration: BoxDecoration(
+                  borderRadius: radius,
+                  color: active ? primary.withValues(alpha: 0.18) : null,
+                  border: active ? Border.all(color: primary, width: 1.5) : null,
+                ),
+                child: InkWell(
+                  borderRadius: radius,
+                  onTap: widget.onTap,
+                  child: CustomPaint(painter: _PalettePiecePainter(piece, cell, style)),
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -293,18 +337,27 @@ class const _ToolButton({
     return SizedBox(
       width: size,
       height: size,
-      child: Material(
-        type: MaterialType.transparency,
-        child: Ink(
-          decoration: BoxDecoration(
-            borderRadius: radius,
-            color: active ? color.withValues(alpha: 0.18) : null,
-            border: active ? Border.all(color: color, width: 1.5) : null,
-          ),
-          child: InkWell(
-            borderRadius: radius,
-            onTap: onTap,
-            child: Icon(icon, size: 0.85 * size, color: active ? color : null),
+      child: Tooltip(
+        message: icon == CupertinoIcons.delete
+            ? context.l10n.delete
+            : context.l10n.preferencesHowDoYouMovePieces,
+        child: Semantics(
+          button: true,
+          selected: active,
+          child: Material(
+            type: MaterialType.transparency,
+            child: Ink(
+              decoration: BoxDecoration(
+                borderRadius: radius,
+                color: active ? color.withValues(alpha: 0.18) : null,
+                border: active ? Border.all(color: color, width: 1.5) : null,
+              ),
+              child: InkWell(
+                borderRadius: radius,
+                onTap: onTap,
+                child: Icon(icon, size: 0.85 * size, color: active ? color : null),
+              ),
+            ),
           ),
         ),
       ),

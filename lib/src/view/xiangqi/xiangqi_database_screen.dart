@@ -2,6 +2,7 @@ import 'package:chessground/chessground.dart' show BrightnessHueFilter;
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lichess_mobile/src/model/analysis/analysis_preferences.dart';
 import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
 import 'package:lichess_mobile/src/model/xiangqi/database/xiangqi_master_game.dart';
 import 'package:lichess_mobile/src/model/xiangqi/database/xiangqi_master_game_repository.dart';
@@ -9,6 +10,7 @@ import 'package:lichess_mobile/src/model/xiangqi/xiangqi_country_names.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_locale.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_notation.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
+import 'package:lichess_mobile/src/service/sound_service.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
@@ -16,8 +18,8 @@ import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
 import 'package:lichess_mobile/src/widgets/platform_search_bar.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_analysis_layout.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
-import 'package:lichess_mobile/src/widgets/xiangqi_game_layout.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// The master-games database: famous players, and the games of theirs it holds.
@@ -304,6 +306,20 @@ class const _Game({required final XiangqiMasterGame game}) extends ConsumerState
 class _GameState() extends ConsumerState<_Game> {
   /// Which position is on the board: 0 is before the first move.
   int _cursor = 0;
+  bool _animate = false;
+
+  void _goTo(int target) {
+    final game = widget.game;
+    final next = target.clamp(0, game.moves.length);
+    if (next == _cursor) return;
+    _animate = (next - _cursor).abs() == 1;
+    if (_animate && game.moves.isNotEmpty) {
+      final i = (next > _cursor ? next - 1 : _cursor - 1).clamp(0, game.moves.length - 1);
+      final capture = game.positions[i].pieceAt(game.moves[i].to) != null;
+      ref.read(soundServiceProvider).play(capture ? Sound.capture : Sound.move);
+    }
+    setState(() => _cursor = next);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -322,11 +338,13 @@ class _GameState() extends ConsumerState<_Game> {
     final cursor = _cursor.clamp(0, game.moves.length);
 
     return SafeArea(
-      child: XiangqiGameLayout(
-        board: BrightnessHueFilter(
+      child: XiangqiAnalysisLayout(
+        smallBoard: ref.watch(analysisPreferencesProvider).smallBoard,
+        boardBuilder: (context, size, radius) => BrightnessHueFilter(
           brightness: boardPrefs.brightness,
           hue: boardPrefs.hue,
           child: XiangqiBoard(
+            settings: XiangqiBoardSettings.fromPreferences(boardPrefs),
             position: game.positions[cursor],
             orientation: XiangqiSide.red,
             selected: null,
@@ -334,8 +352,8 @@ class _GameState() extends ConsumerState<_Game> {
             // A game out of a book is read, not played: no tap, no drag, no legal-move dots.
             onTapSquare: null,
             onDragMove: null,
-            lastMove: boardPrefs.boardHighlights && cursor > 0 ? game.moves[cursor - 1] : null,
-            animationDuration: Duration.zero,
+            lastMove: cursor > 0 ? game.moves[cursor - 1] : null,
+            animationDuration: _animate ? boardPrefs.pieceAnimationDuration : Duration.zero,
             showCoordinates: boardPrefs.coordinates,
             showLastMove: boardPrefs.boardHighlights,
             showBorder: boardPrefs.showBorder,
@@ -344,13 +362,13 @@ class _GameState() extends ConsumerState<_Game> {
             style: style,
           ),
         ),
-        topTable: _PlayerLine(
+        boardHeader: _PlayerLine(
           name: game.blackPlayer,
           title: game.blackTitle,
           country: game.blackCountry,
           isWinner: game.winner == XiangqiSide.black,
         ),
-        bottomTable: _PlayerLine(
+        boardFooter: _PlayerLine(
           name: game.redPlayer,
           title: game.redTitle,
           country: game.redCountry,
@@ -358,17 +376,17 @@ class _GameState() extends ConsumerState<_Game> {
         ),
         moves: xiangqiGameNotation(game.positions, game.moves),
         currentMoveIndex: cursor,
-        onSelectMove: (index) => setState(() => _cursor = index),
-        userActionsBar: BottomBar(
+        onSelectMove: _goTo,
+        bottomBar: BottomBar(
           children: [
             BottomBarButton(
               label: context.l10n.mobileXiangqiReviewPrevious,
-              onTap: cursor > 0 ? () => setState(() => _cursor = cursor - 1) : null,
+              onTap: cursor > 0 ? () => _goTo(cursor - 1) : null,
               icon: CupertinoIcons.chevron_back,
             ),
             BottomBarButton(
               label: context.l10n.mobileXiangqiReviewNext,
-              onTap: cursor < game.moves.length ? () => setState(() => _cursor = cursor + 1) : null,
+              onTap: cursor < game.moves.length ? () => _goTo(cursor + 1) : null,
               icon: CupertinoIcons.chevron_forward,
             ),
           ],
@@ -395,21 +413,26 @@ class const _PlayerLine({
             child: Icon(Icons.emoji_events, size: 18, color: context.lichessColors.brag),
           ),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                name,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w600),
+          child: Tooltip(
+            message: [name, title, country].nonNulls.join(' · '),
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: name,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  if (title != null || country != null)
+                    TextSpan(
+                      text: ' · ${[title, country].nonNulls.join(' · ')}',
+                      style: TextStyle(color: textShade(context, 0.7)),
+                    ),
+                ],
               ),
-              if (title != null || country != null)
-                Text(
-                  [title, country].nonNulls.join(' · '),
-                  style: TextStyle(fontSize: 12, color: textShade(context, 0.7)),
-                ),
-            ],
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 13),
+            ),
           ),
         ),
       ],

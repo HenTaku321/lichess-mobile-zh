@@ -55,8 +55,10 @@ import 'package:lichess_mobile/src/model/auth/auth_controller.dart';
 import 'package:lichess_mobile/src/model/common/id.dart';
 import 'package:lichess_mobile/src/model/message/message.dart';
 import 'package:lichess_mobile/src/model/user/user.dart';
+import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
 import 'package:lichess_mobile/src/network/xiangqi_http.dart'
     show XiangqiAuthStorage, kXiangqiMinRequestSpacing, xiangqiAuthStorageProvider;
+import 'package:lichess_mobile/src/network/xiangqi_session_store.dart';
 import 'package:lichess_mobile/src/network/xiangqi_socket.dart';
 import 'package:logging/logging.dart';
 
@@ -188,8 +190,8 @@ class XiangqiConversationController(final XiangqiConversationKey key)
   /// `late final` would throw on the second build. Both readers run only on a built state, so it is
   /// never read before it is set.
   UserId? _myId;
-
-  StreamSubscription<Message>? _incoming;
+  int _generation = 0;
+  bool _sending = false;
 
   /// The texts this device has sent that the server has not echoed back yet.
   ///
@@ -200,24 +202,34 @@ class XiangqiConversationController(final XiangqiConversationKey key)
 
   @override
   Future<XiangqiConversationState> build() async {
-    final session = await ref.read(xiangqiAuthStorageProvider).read();
+    final generation = ++_generation;
+    _sending = false;
+    _pendingEchoes.clear();
+    ref.onDispose(() => _generation++);
+    ref.watch(xiangqiAccountGenerationProvider);
+    final lichessMe = ref.watch(authControllerProvider)?.user;
+    final repo = ref.watch(xiangqiInboxRepositoryProvider);
+    final session = await ref.read(xiangqiSessionStoreProvider).read();
+    if (!ref.mounted || generation != _generation) throw StateError('Conversation load cancelled.');
     if (session == null) {
       throw const XiangqiInboxException('No xiangqi.com session to open a conversation with.');
     }
     final xiangqiMe = xiangqiLightUser(session.userId, session.name);
     _myId = xiangqiMe.id;
-    final repo = ref.watch(xiangqiInboxRepositoryProvider);
     final messages = await repo.loadMessages(key.chatId);
+    if (!ref.mounted || generation != _generation) throw StateError('Conversation load cancelled.');
 
     // Best effort: the server keeps the unread count, and the chat list is refreshed when this
     // screen pops, so a marker that never lands is corrected by the next `inbox.join` rather than
     // kept wrong here.
     unawaited(repo.markRead(key.chatId).catchError((Object _) {}));
 
-    _incoming = repo.incomingMessages.listen(_onIncomingMessage);
+    final incoming = repo.incomingMessages.listen((message) {
+      if (!ref.mounted || generation != _generation) return;
+      _onIncomingMessage(message);
+    });
     ref.onDispose(() {
-      unawaited(_incoming?.cancel());
-      _incoming = null;
+      unawaited(incoming.cancel());
     });
 
     return XiangqiConversationState(
@@ -225,7 +237,7 @@ class XiangqiConversationController(final XiangqiConversationKey key)
       // lichess account when there is one, the xiangqi one only when there is not. It is the
       // identity the app knows this user by, not the identity its messages are stamped with — which
       // is [_myId] — so which side a bubble sits on is decided against the peer, not against this.
-      me: ref.watch(authControllerProvider)?.user ?? xiangqiMe,
+      me: lichessMe ?? xiangqiMe,
       convo: Convo(
         user: key.peer,
         messages: messages,
@@ -252,12 +264,14 @@ class XiangqiConversationController(final XiangqiConversationKey key)
   /// The message is inserted optimistically and the server's own echo replaces it when it arrives:
   /// the echo carries the server's timestamp, but waiting for it would leave the input standing
   /// silent for as long as the round trip takes.
-  Future<void> sendMessage(String text) async {
+  Future<bool> sendMessage(String text) async {
     final trimmed = text.trim();
-    if (trimmed.isEmpty || !state.hasValue) return;
+    if (trimmed.isEmpty || !state.hasValue || _sending) return false;
     final current = state.requireValue;
     final myId = _myId;
-    if (myId == null) return;
+    if (myId == null) return false;
+    final generation = _generation;
+    _sending = true;
     final repo = ref.read(xiangqiInboxRepositoryProvider);
     final optimistic = Message(userId: myId, text: trimmed, date: clock.now());
 
@@ -275,14 +289,16 @@ class XiangqiConversationController(final XiangqiConversationKey key)
         peerName: key.peer.name,
         text: trimmed,
       );
+      return ref.mounted && generation == _generation;
     } on Object catch (error, stackTrace) {
       _logger.warning(
         'Could not send to ${key.peer.name} (chat ${key.chatId}).',
         error,
         stackTrace,
       );
+      if (!ref.mounted || generation != _generation) return false;
       _pendingEchoes.remove(trimmed);
-      if (!state.hasValue) return;
+      if (!state.hasValue) return false;
       final latest = state.requireValue;
       // The row is rolled back by identity, not by position: a message from the peer can land at
       // the front while this send is in flight, and dropping whatever is first would drop theirs.
@@ -293,6 +309,9 @@ class XiangqiConversationController(final XiangqiConversationKey key)
           ),
         );
       }
+      return false;
+    } finally {
+      if (generation == _generation) _sending = false;
     }
   }
 
@@ -337,11 +356,12 @@ class XiangqiConversationController(final XiangqiConversationKey key)
 ///
 /// One of these per app, not one per screen: the "at most one `inbox.chat.user` in flight" rule is
 /// a property of the connection, so the queue that enforces it has to outlive any one conversation.
-/// The socket itself is **not** owned here and is never closed — it is shared with the online-game
-/// controller, and its lifetime is the app's.
+/// The socket itself is **not** owned here and is never closed — it is the account's shared
+/// connection for inbox and notifications. Online games use independent transports.
 class XiangqiInboxRepository({
   required final XiangqiSocketClient _socket,
   required final XiangqiAuthStorage _storage,
+  final XiangqiSessionStore? sessionStore,
   final Duration _spacing = kXiangqiMinRequestSpacing,
   final Duration _responseTimeout = kXiangqiInboxResponseTimeout,
 }) {
@@ -445,7 +465,7 @@ class XiangqiInboxRepository({
     required String peerName,
     required String text,
   }) async {
-    final session = await _storage.read();
+    final session = await (sessionStore?.read() ?? _storage.read());
     if (session == null) {
       throw const XiangqiInboxException('No xiangqi.com session to send with.');
     }
@@ -531,10 +551,14 @@ class XiangqiInboxRepository({
   /// followed by one `inbox.chat.user` per conversation, and the server drops whatever arrives
   /// inside the window without saying so.
   Future<void> _emitThrottled(String event, Object? data) async {
+    final generation = sessionStore?.generation;
     final last = _lastEmitAt;
     if (last != null) {
       final wait = _spacing - clock.now().difference(last);
       if (wait > Duration.zero) await Future<void>.delayed(wait);
+    }
+    if (_disposed || generation != sessionStore?.generation) {
+      throw const XiangqiInboxException('The xiangqi.com session changed before sending.');
     }
     _lastEmitAt = clock.now();
     _socket.emitNoAck(event, data: data);
@@ -542,8 +566,7 @@ class XiangqiInboxRepository({
 
   /// Drops the subscription, tells the server this client left, and fails anything still waiting.
   ///
-  /// The socket is deliberately left alone: it is shared, and closing it here would take the
-  /// online-game screen's connection down with it.
+  /// The socket is deliberately left alone: it is shared with account notifications.
   void dispose() {
     if (_disposed) return;
     _disposed = true;
@@ -736,9 +759,12 @@ int? _asInt(Object? value) => value is int
 /// queue that went away with the contacts screen would let two screens ask at once. The socket it
 /// uses is the app's, read from [xiangqiSocketProvider] and never closed here.
 final xiangqiInboxRepositoryProvider = Provider<XiangqiInboxRepository>((Ref ref) {
+  ref.watch(xiangqiAccountGenerationProvider);
+  final sessions = ref.read(xiangqiSessionStoreProvider);
   final repository = XiangqiInboxRepository(
     socket: ref.read(xiangqiSocketProvider),
     storage: ref.read(xiangqiAuthStorageProvider),
+    sessionStore: sessions,
   );
   ref.onDispose(repository.dispose);
   return repository;
@@ -749,11 +775,14 @@ final xiangqiInboxRepositoryProvider = Provider<XiangqiInboxRepository>((Ref ref
 /// Empty, not an error, when there is no xiangqi.com session: there is nothing to ask for and no
 /// token to ask with, and an empty list is exactly what "no conversations" looks like. When there
 /// *is* a session the same frames go out whatever kind of session it is — see the file header on
-/// why guests are not special-cased here.
+/// why guests are not special-cased here. Follow account boundaries, not token revisions, so a
+/// refresh does not clear the loaded list or enqueue another inbox request.
 final xiangqiContactsProvider = FutureProvider.autoDispose<IList<Contact>>((ref) async {
-  final session = await ref.read(xiangqiAuthStorageProvider).read();
-  if (session == null) return const IListConst<Contact>([]);
+  ref.watch(xiangqiAccountGenerationProvider);
   final repository = ref.watch(xiangqiInboxRepositoryProvider);
+  final store = ref.read(xiangqiSessionStoreProvider);
+  final session = await store.read();
+  if (!ref.mounted || session == null) return const IListConst<Contact>([]);
   final contacts = await repository.loadChats();
   return contacts;
 }, name: 'XiangqiContactsProvider');
@@ -763,6 +792,6 @@ final xiangqiContactsProvider = FutureProvider.autoDispose<IList<Contact>>((ref)
 /// The namespaced id is this device's identity *inside xiangqi.com*, which is what a conversation's
 /// messages are compared against — a lichess id could never match a xiangqi `sender_id`.
 Future<LightUser?> xiangqiSelfLightUser(Ref ref) async {
-  final session = await ref.read(xiangqiAuthStorageProvider).read();
+  final session = await ref.read(xiangqiSessionStoreProvider).read();
   return session == null ? null : xiangqiLightUser(session.userId, session.name);
 }

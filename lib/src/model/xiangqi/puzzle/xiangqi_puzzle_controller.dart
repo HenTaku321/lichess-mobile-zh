@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/puzzle/xiangqi_puzzle.dart';
 import 'package:lichess_mobile/src/model/xiangqi/puzzle/xiangqi_puzzle_repository.dart';
 import 'package:lichess_mobile/src/model/xiangqi/quota/xiangqi_quota.dart';
@@ -21,7 +22,7 @@ final _logger = Logger('XiangqiPuzzleController');
 /// plays them — so this is not a delay in an answer, it is the pause that makes the answer
 /// readable. Both moves landing in the same frame would show the solver's move and the reply as one
 /// jump, and the reply is the half of the line that proves the tactic worked.
-const xiangqiPuzzleReplyDelay = Duration(milliseconds: 400);
+const xiangqiPuzzleReplyDelay = Duration(milliseconds: 500);
 
 /// The pause [XiangqiPuzzleController] takes before playing the opponent's answer.
 ///
@@ -146,7 +147,8 @@ sealed class const XiangqiPuzzleAttemptState._() with _$XiangqiPuzzleAttemptStat
   }
 
   /// Whether the whole line is on the board.
-  bool get isLineComplete => phase != XiangqiPuzzlePhase.solving;
+  bool get isLineComplete =>
+      phase == XiangqiPuzzlePhase.recorded || phase == XiangqiPuzzlePhase.unrecorded;
 
   /// Whether the board takes the solver's moves at all.
   ///
@@ -321,6 +323,11 @@ class XiangqiPuzzleController(final XiangqiPuzzleAttemptKey key)
   /// solver's line is on the board either way, and what is lost is the server's side of the record.
   /// The screen offers [retrySubmit] for it.
   Future<void> _submit() async {
+    if (state.phase == XiangqiPuzzlePhase.submitting ||
+        state.phase == XiangqiPuzzlePhase.recorded) {
+      return;
+    }
+    final account = ref.read(xiangqiAccountGenerationProvider);
     state = state.copyWith(phase: XiangqiPuzzlePhase.submitting);
     try {
       final result = await ref
@@ -334,11 +341,11 @@ class XiangqiPuzzleController(final XiangqiPuzzleAttemptKey key)
             // `xiangqi-com-re/docs/puzzle.md`.
             mode: XiangqiPuzzleAttemptMode.practice,
           );
-      if (!ref.mounted) return;
+      if (!ref.mounted || account != ref.read(xiangqiAccountGenerationProvider)) return;
       state = state.copyWith(phase: XiangqiPuzzlePhase.recorded, recordedStatus: result.status);
     } catch (error, stackTrace) {
       _logger.warning('Could not submit the attempt at puzzle ${puzzle.id}.', error, stackTrace);
-      if (!ref.mounted) return;
+      if (!ref.mounted || account != ref.read(xiangqiAccountGenerationProvider)) return;
       state = state.copyWith(phase: XiangqiPuzzlePhase.unrecorded);
     }
   }

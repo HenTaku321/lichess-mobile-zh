@@ -404,6 +404,24 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
   }
 
   /// Acts on a touch on [square]: picks a piece up, puts one down, or ignores it.
+  void clearSelection() => state = state.copyWith(selected: null);
+
+  /// Plays a drag as one move, independently of any earlier two-tap selection.
+  bool _lastMoveViaDrag = false;
+  bool get lastMoveViaDrag => _lastMoveViaDrag;
+
+  void movePiece(XiangqiSquare from, XiangqiSquare to) {
+    if (state.isFinished ||
+        state.isEngineThinking ||
+        !state.isAtLivePosition ||
+        !state.isPlayerTurn) {
+      return;
+    }
+    final move = XiangqiMove(from, to);
+    if (!isLegal(state.gamePosition, move)) return;
+    _play(move, viaDragAndDrop: true);
+  }
+
   void tapSquare(XiangqiSquare square) {
     if (state.isFinished ||
         state.isEngineThinking ||
@@ -419,7 +437,7 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
     }
     // Either nothing was picked up, or what was picked up cannot go there — in which case a piece of
     // the player's own under the finger is picked up instead, and anything else clears the selection.
-    state = state.copyWith(selected: _isPlayerPiece(square) ? square : null);
+    state = state.copyWith(selected: selected != square && _isPlayerPiece(square) ? square : null);
   }
 
   /// Takes the player's last move back.
@@ -493,7 +511,8 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
   }
 
   /// Makes [move] and, if the game is still running, hands the turn to the engine.
-  void _play(XiangqiMove move) {
+  void _play(XiangqiMove move, {bool viaDragAndDrop = false}) {
+    _lastMoveViaDrag = viaDragAndDrop;
     final positionBefore = state.gamePosition;
     final wasPlayerMove = state.isPlayerTurn;
     final wasAtLive = state.isAtLivePosition;

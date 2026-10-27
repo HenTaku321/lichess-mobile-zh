@@ -4,6 +4,7 @@ import 'dart:io' show HttpDate;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:http/http.dart' show Response;
+import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
 import 'package:lichess_mobile/src/network/connectivity.dart';
 import 'package:lichess_mobile/src/network/http.dart' show ServerException;
 import 'package:lichess_mobile/src/network/xiangqi_http.dart';
@@ -147,6 +148,7 @@ final class const XiangqiProfileUpdateException(final String message) implements
 /// The edit form's starting values for [username].
 final xiangqiEditableProfileProvider = FutureProvider.autoDispose
     .family<XiangqiEditableProfile, String>((Ref ref, String username) async {
+      ref.watch(xiangqiAccountGenerationProvider);
       if (!ref.watch(isDeviceOnlineProvider)) {
         throw StateError('The device is offline; not asking xiangqi.com for $username.');
       }

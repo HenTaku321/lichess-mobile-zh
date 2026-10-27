@@ -74,8 +74,10 @@ Map<String, Object?> board({
 Future<void> pumpLeaderboard(
   WidgetTester tester, {
   required Map<String, Object?> Function(String mode) boards,
+  void Function(http.Request)? onRequest,
 }) async {
   final client = MockClient((request) async {
+    onRequest?.call(request);
     if (request.url.path == '/api/leaders/v2/list') {
       final mode = request.url.queryParameters['mode'] ?? '';
       return http.Response.bytes(
@@ -129,6 +131,33 @@ void main() {
   TestLichessBinding.ensureInitialized();
 
   group('XiangqiLeaderboardScreen', () {
+    testWidgets('dismissing the country picker preserves the current country filter', (
+      tester,
+    ) async {
+      final requests = <http.Request>[];
+      await pumpLeaderboard(
+        tester,
+        boards: (mode) => board(data: const []),
+        onRequest: requests.add,
+      );
+      await tester.tap(find.byIcon(Icons.flag_outlined));
+      await settle(tester);
+      await tester.tap(find.byType(ListTile).last);
+      await settle(tester);
+      expect(
+        requests
+            .lastWhere((request) => request.url.path.endsWith('/list'))
+            .url
+            .queryParameters['country'],
+        'VN',
+      );
+      final count = requests.length;
+      await tester.tap(find.byIcon(Icons.flag_outlined));
+      await tester.pumpAndSettle();
+      Navigator.of(tester.element(find.byType(ListTile).last)).pop();
+      await settle(tester);
+      expect(requests, hasLength(count));
+    });
     testWidgets('lists the rows with their rank, their rating and their country', (tester) async {
       await pumpLeaderboard(
         tester,

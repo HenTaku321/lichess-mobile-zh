@@ -17,6 +17,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:lichess_mobile/src/model/puzzle/puzzle_preferences.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_session.dart';
 import 'package:lichess_mobile/src/model/xiangqi/puzzle/xiangqi_puzzle.dart';
 import 'package:lichess_mobile/src/model/xiangqi/puzzle/xiangqi_puzzle_controller.dart';
@@ -60,8 +61,10 @@ class PuzzleServer({
 
   /// Whether the fetch answers the way a spent allowance does: the position, and no answer.
   final bool withholdAnswer = false,
+  final int completionStatus = 4,
 }) {
   final List<http.Request> requests = [];
+  bool failNextSearch = false;
 
   MockClient get client => MockClient(_answer);
 
@@ -69,6 +72,7 @@ class PuzzleServer({
     requests.add(request);
     switch (request.url.path) {
       case '/api/puzzle/search':
+        if (failNextSearch) return xiangqiJsonResponse('{}', 503);
         return searchPuzzleId == null
             ? xiangqiJsonResponse(jsonEncode({'message': "There's no next puzzle available"}), 200)
             : xiangqiJsonResponse(jsonEncode({'title': null, 'puzzle_id': searchPuzzleId}), 200);
@@ -77,7 +81,7 @@ class PuzzleServer({
             ? xiangqiJsonResponse(jsonEncode(xiangqiPuzzleQuotaExceededBody()), 429)
             : xiangqiJsonResponse(jsonEncode(xiangqiPuzzlePayload()), 200);
       case '/api/puzzle/$xiangqiTestPuzzleId/complete':
-        return xiangqiJsonResponse('{"p_rating":1833,"status":4}', 200);
+        return xiangqiJsonResponse(jsonEncode({'p_rating': 1833, 'status': completionStatus}), 200);
       case '/api/quota/state':
         return xiangqiJsonResponse(
           jsonEncode({
@@ -207,6 +211,47 @@ void main() {
   TestLichessBinding.ensureInitialized();
 
   group('XiangqiPuzzleScreen', () {
+    testWidgets('auto-next loads exactly once using the shared Lichess preference', (tester) async {
+      final server = PuzzleServer();
+      await pumpPuzzleScreen(tester, server: server);
+      final container = ProviderScope.containerOf(tester.element(find.byType(XiangqiPuzzleScreen)));
+      await container.read(puzzlePreferencesProvider.notifier).setAutoNext(true);
+      await playTheLine(tester);
+      expect(
+        server.requests.where((request) => request.url.path == '/api/puzzle/search'),
+        hasLength(2),
+      );
+      expect(board(tester).position, rules.play(xiangqiTestLine.before, xiangqiTestLine.blunder));
+    });
+
+    testWidgets('auto-next failure retains the completed board for a manual retry', (tester) async {
+      final server = PuzzleServer();
+      await pumpPuzzleScreen(tester, server: server);
+      final container = ProviderScope.containerOf(tester.element(find.byType(XiangqiPuzzleScreen)));
+      await container.read(puzzlePreferencesProvider.notifier).setAutoNext(true);
+      server.failNextSearch = true;
+      await playTheLine(tester);
+      expect(attemptState(tester).phase, XiangqiPuzzlePhase.recorded);
+      expect(board(tester).position, attemptState(tester).position);
+      expect(barButton(tester, CupertinoIcons.arrow_right).onTap, isNotNull);
+      server.failNextSearch = false;
+      await tester.tap(find.byIcon(CupertinoIcons.arrow_right));
+      await settle(tester);
+      expect(board(tester).position, rules.play(xiangqiTestLine.before, xiangqiTestLine.blunder));
+    });
+
+    testWidgets('a hinted completion does not trigger auto-next', (tester) async {
+      final server = PuzzleServer(completionStatus: 3);
+      await pumpPuzzleScreen(tester, server: server);
+      final container = ProviderScope.containerOf(tester.element(find.byType(XiangqiPuzzleScreen)));
+      await container.read(puzzlePreferencesProvider.notifier).setAutoNext(true);
+      await playTheLine(tester);
+      expect(
+        server.requests.where((request) => request.url.path == '/api/puzzle/search'),
+        hasLength(1),
+      );
+      expect(attemptState(tester).recordedStatus, XiangqiPuzzleAttemptStatus.solvedByHint);
+    });
     testWidgets('a device with no session is offered the way in, and no board', (tester) async {
       await pumpPuzzleScreen(tester, server: PuzzleServer(), session: null);
 

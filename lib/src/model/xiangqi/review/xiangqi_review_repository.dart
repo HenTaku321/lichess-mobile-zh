@@ -78,7 +78,7 @@ final xiangqiReviewProvider = FutureProvider.autoDispose.family<XiangqiReview, S
     throw const XiangqiReviewException(XiangqiReviewFailure.offline);
   }
 
-  final socket = ref.read(xiangqiSocketProvider);
+  final socket = ref.watch(xiangqiReviewSocketProvider(gameId));
   final subscription = socket.stream.listen((_) {});
   ref.onDispose(subscription.cancel);
 
@@ -117,6 +117,9 @@ final xiangqiReviewProvider = FutureProvider.autoDispose.family<XiangqiReview, S
   } catch (error, stackTrace) {
     _logger.warning('The review of game $gameId failed.', error, stackTrace);
     throw const XiangqiReviewException(XiangqiReviewFailure.failed);
+  } finally {
+    // The finite review conversation needs no idle heartbeat after its result.
+    socket.close();
   }
 }, name: 'XiangqiReviewProvider');
 
@@ -135,21 +138,29 @@ Future<Map<String, dynamic>> _snapshotOf(XiangqiSocketClient socket, String game
   // `game.get.success` and not as `game.archived.get.success`. The derived name is kept as well
   // because the server is the one that chooses, and a name it chose is a name to listen for.
   final events = <String>{'game.get.success'};
-  final snapshot = socket.stream.firstWhere((event) => events.contains(event.name));
-
-  var name = 'g_v2.get';
-  final followed = <String>{name};
-  while (true) {
-    final ack = _asMap(await socket.emit(name, data: {'game_id': gameId}));
-    if (ack == null) throw const XiangqiReviewException(XiangqiReviewFailure.failed);
-    final redirect = ack['event'];
-    if (ack['status'] != 'REDIRECT' || redirect is! String || redirect.isEmpty) break;
-    if (!followed.add(redirect)) throw const XiangqiReviewException(XiangqiReviewFailure.failed);
-    events.add('$redirect.success');
-    name = redirect;
-  }
-
-  final frame = await snapshot.timeout(kXiangqiReviewTimeout);
+  final frame = await _requestFrame(
+    socket,
+    (event) {
+      if (!events.contains(event.name)) return false;
+      final map = _asMap(_unwrap(event.data));
+      return map?['id'] == gameId || map?['game_id'] == gameId;
+    },
+    () async {
+      var name = 'g_v2.get';
+      final followed = <String>{name};
+      while (true) {
+        final ack = _asMap(await socket.emit(name, data: {'game_id': gameId}));
+        if (ack == null) throw const XiangqiReviewException(XiangqiReviewFailure.failed);
+        final redirect = ack['event'];
+        if (ack['status'] != 'REDIRECT' || redirect is! String || redirect.isEmpty) break;
+        if (!followed.add(redirect) || followed.length > 8) {
+          throw const XiangqiReviewException(XiangqiReviewFailure.failed);
+        }
+        events.add('$redirect.success');
+        name = redirect;
+      }
+    },
+  );
   final map = _asMap(_unwrap(frame.data));
   if (map == null) throw const XiangqiReviewException(XiangqiReviewFailure.failed);
   return map;
@@ -165,15 +176,17 @@ Future<IList<XiangqiMoveReview>> _analysisOf(
   String gameId,
   IList<XiangqiMove> moves,
 ) async {
-  final answer = socket.stream
-      .firstWhere((event) => event.name == kXiangqiReviewSuccessEvent)
-      .timeout(kXiangqiReviewTimeout);
-  await socket.emit(
-    kXiangqiReviewEvent,
-    data: {'game_id': gameId, 'skip_missions': true},
-    timeout: kXiangqiReviewTimeout,
+  final frame = await _requestFrame(
+    socket,
+    (event) => event.name == kXiangqiReviewSuccessEvent,
+    () async {
+      await socket.emit(
+        kXiangqiReviewEvent,
+        data: {'game_id': gameId, 'skip_missions': true},
+        timeout: kXiangqiReviewTimeout,
+      );
+    },
   );
-  final frame = await answer;
   final data = _asMap(_unwrap(frame.data));
   final entries = data?['analysis'];
   if (entries is! List) throw const XiangqiReviewException(XiangqiReviewFailure.failed);
@@ -211,6 +224,38 @@ Future<IList<XiangqiMoveReview>> _analysisOf(
     bestMoves: bestMoves.lock,
     depths: depths.lock,
   );
+}
+
+/// Subscribe before sending, and always release the listener/timer on failure or disposal.
+Future<XiangqiSocketEvent> _requestFrame(
+  XiangqiSocketClient socket,
+  bool Function(XiangqiSocketEvent) matches,
+  Future<void> Function() send,
+) async {
+  final answer = Completer<XiangqiSocketEvent>();
+  answer.future.ignore();
+  final subscription = socket.stream.listen(
+    (event) {
+      if (!answer.isCompleted && matches(event)) answer.complete(event);
+    },
+    onDone: () {
+      if (!answer.isCompleted) {
+        answer.completeError(const XiangqiReviewException(XiangqiReviewFailure.failed));
+      }
+    },
+  );
+  final timer = Timer(kXiangqiReviewTimeout, () {
+    if (!answer.isCompleted) {
+      answer.completeError(TimeoutException('xiangqi.com review response timed out'));
+    }
+  });
+  try {
+    await send().timeout(kXiangqiReviewTimeout);
+    return await answer.future;
+  } finally {
+    timer.cancel();
+    await subscription.cancel();
+  }
 }
 
 /// The position [value] names, or null when it is not one this app can read.

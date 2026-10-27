@@ -4,9 +4,6 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:lichess_mobile/src/model/xiangqi/chat/xiangqi_chat.dart';
-import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
-import 'package:lichess_mobile/src/network/socket.dart' show webSocketChannelFactoryProvider;
-import 'package:lichess_mobile/src/network/xiangqi_http.dart' show xiangqiAuthStorageProvider;
 import 'package:lichess_mobile/src/network/xiangqi_socket.dart';
 import 'package:logging/logging.dart';
 
@@ -102,6 +99,8 @@ class XiangqiChatController(final XiangqiChatRoomKey key) extends Notifier<Xiang
   XiangqiSocketClient? _socket;
   StreamSubscription<XiangqiSocketEvent>? _events;
   StreamSubscription<void>? _connections;
+  StreamSubscription<XiangqiConnectionStatus>? _status;
+  Timer? _historyTimeout;
 
   /// The page the last history request asked for, which is the page its answer is about.
   int _pendingPage = 1;
@@ -120,35 +119,43 @@ class XiangqiChatController(final XiangqiChatRoomKey key) extends Notifier<Xiang
     ref.onDispose(() {
       _events?.cancel();
       _connections?.cancel();
+      _status?.cancel();
+      _historyTimeout?.cancel();
       final socket = _socket;
       _socket = null;
       if (socket != null) unawaited(socket.dispose());
     });
 
-    final storage = ref.read(xiangqiAuthStorageProvider);
-    final auth = ref.read(xiangqiAuthControllerProvider.notifier);
-    final socket = XiangqiSocketClient(
-      channelFactory: ref.read(webSocketChannelFactoryProvider),
-      getToken: () async {
-        final stored = await storage.read();
-        if (stored != null) return stored.accessToken;
-        try {
-          await auth.ensureGuestSession();
-        } on Object catch (error, stackTrace) {
-          _logger.warning('Could not mint a session for the chat.', error, stackTrace);
-          return null;
-        }
-        return (await storage.read())?.accessToken;
-      },
-    );
+    final socket = ref.read(xiangqiSocketProvider).fork();
     _socket = socket;
 
     _events = socket.stream.listen(_onEvent);
     _connections = socket.connectedStream.listen((_) => unawaited(_onConnected()));
+    _status = socket.statusStream.listen((status) {
+      if (!ref.mounted ||
+          status == XiangqiConnectionStatus.connected ||
+          status == XiangqiConnectionStatus.connecting) {
+        return;
+      }
+      _historyTimeout?.cancel();
+      state = state.copyWith(
+        isConnected: false,
+        isLoading: false,
+        isLoadingMore: false,
+        error: XiangqiChatError.offline,
+      );
+    });
     unawaited(
       socket.connect().catchError((Object error, StackTrace stackTrace) {
         _logger.warning('The chat socket could not connect.', error, stackTrace);
-        if (ref.mounted) state = state.copyWith(error: XiangqiChatError.offline);
+        if (ref.mounted) {
+          state = state.copyWith(
+            error: XiangqiChatError.offline,
+            isLoading: false,
+            isLoadingMore: false,
+            isConnected: false,
+          );
+        }
       }),
     );
 
@@ -176,6 +183,17 @@ class XiangqiChatController(final XiangqiChatRoomKey key) extends Notifier<Xiang
     }
     _pendingPage = page;
     await _waitForTurn();
+    if (!ref.mounted || !socket.isConnected) return;
+    _historyTimeout?.cancel();
+    _historyTimeout = Timer(const Duration(seconds: 20), () {
+      if (ref.mounted) {
+        state = state.copyWith(
+          isLoading: false,
+          isLoadingMore: false,
+          error: XiangqiChatError.history,
+        );
+      }
+    });
     // No ack is asked for: the answer to this request is the `chat.lobby.messages.success` event,
     // and the site's own client sends the same frame without an ack id. See the class doc.
     socket.emitNoAck(
@@ -190,19 +208,35 @@ class XiangqiChatController(final XiangqiChatRoomKey key) extends Notifier<Xiang
     await _requestHistory(page: _page + 1);
   }
 
+  Future<void> retry() async {
+    final socket = _socket;
+    if (socket == null) return;
+    if (!socket.isConnected) {
+      try {
+        await socket.connect();
+      } on Object {
+        if (ref.mounted) state = state.copyWith(isLoading: false, error: XiangqiChatError.offline);
+      }
+    } else {
+      await _requestHistory(page: 1);
+    }
+  }
+
   /// Sends [text] to the room.
   ///
   /// Nothing is awaited that would say whether it arrived, because nothing would: see the class
   /// doc. The message is shown when the server echoes it back.
-  Future<void> send(String text) async {
+  Future<bool> send(String text) async {
     final message = text.trim();
     final socket = _socket;
-    if (message.isEmpty || socket == null || !socket.isConnected) return;
+    if (message.isEmpty || socket == null || !socket.isConnected) return false;
     await _waitForTurn();
+    if (!ref.mounted || !socket.isConnected) return false;
     socket.emitNoAck(
       'chat_v2.new.message',
       data: {'type': key.kind.wire, 'room': key.room, 'message': message},
     );
+    return true;
   }
 
   /// Waits out [kXiangqiChatRequestSpacing] since the last request, and marks this one as sent.
@@ -235,12 +269,20 @@ class XiangqiChatController(final XiangqiChatRoomKey key) extends Notifier<Xiang
       case 'chat.error':
       case 'chat.new.lobby.message.error':
         if (!ref.mounted) return;
-        state = state.copyWith(error: XiangqiChatError.send);
+        _historyTimeout?.cancel();
+        state = state.copyWith(
+          error: state.isLoading || state.isLoadingMore
+              ? XiangqiChatError.history
+              : XiangqiChatError.send,
+          isLoading: false,
+          isLoadingMore: false,
+        );
     }
   }
 
   void _onHistory(Object? data) {
     if (!ref.mounted) return;
+    _historyTimeout?.cancel();
     final page = xiangqiChatMessagesFromJson(data);
     // An older page goes in front of what is already read; the first page replaces it, which is
     // also what makes a reconnect that re-asks for page one land on the same list rather than on a

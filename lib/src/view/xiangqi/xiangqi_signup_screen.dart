@@ -75,6 +75,7 @@ class _XiangqiSignUpScreenState() extends ConsumerState<XiangqiSignUpScreen> {
 
   /// Runs one step of the form, with the busy flag and the error line handled in one place.
   Future<void> _run(Future<void> Function() action, {required String onFailure}) async {
+    if (_busy) return;
     FocusScope.of(context).unfocus();
     setState(() {
       _busy = true;

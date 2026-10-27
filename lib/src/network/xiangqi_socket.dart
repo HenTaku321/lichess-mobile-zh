@@ -19,7 +19,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
 import 'package:lichess_mobile/src/network/socket.dart'
     show WebSocketChannelFactory, webSocketChannelFactoryProvider;
-import 'package:lichess_mobile/src/network/xiangqi_http.dart' show xiangqiAuthStorageProvider;
+import 'package:lichess_mobile/src/network/xiangqi_http.dart' show xiangqiClientProvider;
+import 'package:lichess_mobile/src/network/xiangqi_session_store.dart';
 import 'package:logging/logging.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
@@ -353,6 +354,7 @@ int? _findMatchingClose(String s, int open) {
 class XiangqiSocketClient({
   required final WebSocketChannelFactory _channelFactory,
   required final Future<String?> Function() _getToken,
+  final Stream<Object?>? sessionChanges,
   final Uri Function(String token)? uriBuilder,
 
   /// The Socket.IO namespace this client talks to.
@@ -378,6 +380,30 @@ class XiangqiSocketClient({
 
   final _events = StreamController<XiangqiSocketEvent>.broadcast();
   final _connected = StreamController<void>.broadcast();
+  final _statuses = StreamController<XiangqiConnectionStatus>.broadcast();
+  StreamSubscription<Object?>? _identitySubscription;
+  XiangqiConnectionStatus _status = XiangqiConnectionStatus.closed;
+  int _attemptGeneration = 0;
+  bool _gettingToken = false;
+
+  XiangqiConnectionStatus get status => _status;
+  Stream<XiangqiConnectionStatus> get statusStream => _statuses.stream;
+  void _setStatus(XiangqiConnectionStatus status) {
+    if (_status == status || _statuses.isClosed) return;
+    _status = status;
+    _statuses.add(status);
+  }
+
+  /// A separate transport and request/ack namespace, sharing only session acquisition.
+  XiangqiSocketClient fork() => XiangqiSocketClient(
+    channelFactory: _channelFactory,
+    getToken: _getToken,
+    sessionChanges: sessionChanges,
+    uriBuilder: _uriBuilder,
+    namespace: namespace,
+    connectTimeout: connectTimeout,
+    ackTimeout: ackTimeout,
+  );
   final Completer<void> _firstConnection = Completer<void>();
 
   /// Acks still being waited on, by ack id.
@@ -393,6 +419,7 @@ class XiangqiSocketClient({
   bool _isConnected = false;
   bool _isDisposed = false;
   bool _manualClose = false;
+  bool _wantsConnection = false;
   Future<void>? _connecting;
 
   /// The incoming events, one per `42` frame.
@@ -421,7 +448,30 @@ class XiangqiSocketClient({
     if (_isDisposed) {
       return Future.error(const XiangqiSocketException('This socket has been disposed.'));
     }
+    _wantsConnection = true;
     if (_isConnected) return Future<void>.value();
+    _identitySubscription ??= sessionChanges?.listen((session) {
+      // Token creation/refresh while acquiring credentials belongs to this handshake.
+      if (_gettingToken && session != null) return;
+      final reconnect = _wantsConnection;
+      final pending = _connecting;
+      close();
+      // Logout must not mint a guest behind the user's back. Remember active
+      // consumers so a later explicit login can reopen their connection.
+      _wantsConnection = reconnect;
+      if (session != null && reconnect) {
+        Future<void> reopen() async {
+          try {
+            await pending;
+          } on Object {
+            /* The old handshake was deliberately cancelled. */
+          }
+          if (!_isDisposed) await connect();
+        }
+
+        reopen().ignore();
+      }
+    });
     final existing = _connecting;
     if (existing != null) return existing;
     late final Future<void> future;
@@ -434,16 +484,29 @@ class XiangqiSocketClient({
 
   Future<void> _connect() async {
     _manualClose = false;
-    final token = await _getToken();
-    if (_isDisposed) return;
+    _setStatus(XiangqiConnectionStatus.connecting);
+    final generation = ++_attemptGeneration;
+    final String? token;
+    _gettingToken = true;
+    try {
+      token = await _getToken();
+    } on Object {
+      _scheduleReconnect();
+      rethrow;
+    } finally {
+      _gettingToken = false;
+    }
+    if (_isDisposed || generation != _attemptGeneration) {
+      throw const XiangqiSocketException('Connection attempt cancelled.');
+    }
     if (token == null || token.isEmpty) {
       throw const XiangqiSocketException('No xiangqi.com session to connect with.');
     }
 
     final channel = await _openChannel(_uriBuilder(token), token);
-    if (_isDisposed) {
+    if (_isDisposed || generation != _attemptGeneration) {
       await channel.sink.close();
-      return;
+      throw const XiangqiSocketException('Connection attempt cancelled.');
     }
 
     _channel = channel;
@@ -451,7 +514,7 @@ class XiangqiSocketClient({
     _handshake = handshake;
     _subscription = channel.stream.listen(
       _onMessage,
-      onError: (Object error) => _failOnAttempt('socket error: ${_redact('$error', token)}'),
+      onError: (Object error) => _failOnAttempt('socket error: ${_redact('$error', token ?? '')}'),
       onDone: () => _failOnAttempt('socket closed'),
       cancelOnError: false,
     );
@@ -461,7 +524,12 @@ class XiangqiSocketClient({
     _restartPingWatchdog();
 
     _send('40$namespace,${jsonEncode({'token': token})}');
-    await handshake.future;
+    try {
+      await handshake.future.timeout(connectTimeout);
+    } on TimeoutException {
+      _failOnAttempt('namespace handshake timed out');
+      rethrow;
+    }
   }
 
   /// Opens the channel, with the token taken out of whatever the failure says.
@@ -515,6 +583,7 @@ class XiangqiSocketClient({
 
   void _onConnected() {
     _isConnected = true;
+    _setStatus(XiangqiConnectionStatus.connected);
     _reconnectAttempts = 0;
     if (!_firstConnection.isCompleted) _firstConnection.complete();
     final handshake = _handshake;
@@ -544,6 +613,7 @@ class XiangqiSocketClient({
 
   void _scheduleReconnect() {
     if (_isDisposed || _manualClose) return;
+    _setStatus(XiangqiConnectionStatus.reconnecting);
     final delay = _backoff();
     _reconnectTimer?.cancel();
     _reconnectTimer = Timer(delay, () {
@@ -631,8 +701,15 @@ class XiangqiSocketClient({
   /// Closes the connection. The client can be connected again afterwards.
   void close() {
     _manualClose = true;
+    _wantsConnection = false;
+    _attemptGeneration++;
+    final handshake = _handshake;
+    if (handshake != null && !handshake.isCompleted) {
+      handshake.completeError(const XiangqiSocketException('Connection closed.'));
+    }
     _handshake = null;
     _teardown();
+    _setStatus(XiangqiConnectionStatus.closed);
   }
 
   /// Closes the connection and the streams. The client cannot be used again.
@@ -640,8 +717,10 @@ class XiangqiSocketClient({
     if (_isDisposed) return;
     _isDisposed = true;
     close();
+    await _identitySubscription?.cancel();
     await _events.close();
     await _connected.close();
+    await _statuses.close();
   }
 }
 
@@ -683,7 +762,7 @@ String _redact(String message, String token) {
 /// between the read that finds no session and the write that stores the guest one unless something
 /// is listening to it — and a controller collected mid-flight is a guest token that never lands.
 final xiangqiSocketProvider = Provider<XiangqiSocketClient>((Ref ref) {
-  final storage = ref.read(xiangqiAuthStorageProvider);
+  final sessions = ref.read(xiangqiSessionStoreProvider);
   final auth = ref.read(xiangqiAuthControllerProvider.notifier);
 
   // Held for the provider's own lifetime, which is the app's: see the class doc.
@@ -691,10 +770,13 @@ final xiangqiSocketProvider = Provider<XiangqiSocketClient>((Ref ref) {
   ref.onDispose(keepAlive.close);
 
   final client = XiangqiSocketClient(
+    sessionChanges: sessions.changes
+        .map((s) => s == null ? null : (s.userId, s.accessToken))
+        .distinct(),
     channelFactory: ref.read(webSocketChannelFactoryProvider),
     getToken: () async {
-      final stored = await storage.read();
-      if (stored != null) return stored.accessToken;
+      final stored = await sessions.read();
+      if (stored != null) return await ref.read(xiangqiClientProvider).socketToken();
       try {
         await auth.ensureGuestSession();
       } on Object catch (error, stackTrace) {
@@ -703,9 +785,35 @@ final xiangqiSocketProvider = Provider<XiangqiSocketClient>((Ref ref) {
         _logger.warning('Could not mint a guest xiangqi.com session.', error, stackTrace);
         return null;
       }
-      return (await storage.read())?.accessToken;
+      return (await sessions.read())?.accessToken;
     },
   );
   ref.onDispose(client.dispose);
   return client;
 }, name: 'XiangqiSocketProvider');
+
+enum XiangqiConnectionStatus() {
+  connecting,
+  connected,
+  reconnecting,
+  closed,
+}
+
+/// Replies without game ids are safe only inside their own transport lifetime.
+final xiangqiGameSocketProvider = Provider.autoDispose.family<XiangqiSocketClient, String>((
+  ref,
+  gameId,
+) {
+  final client = ref.read(xiangqiSocketProvider).fork();
+  ref.onDispose(client.dispose);
+  return client;
+}, name: 'XiangqiGameSocketProvider');
+
+final xiangqiReviewSocketProvider = Provider.autoDispose.family<XiangqiSocketClient, String>((
+  ref,
+  gameId,
+) {
+  final client = ref.read(xiangqiSocketProvider).fork();
+  ref.onDispose(client.dispose);
+  return client;
+}, name: 'XiangqiReviewSocketProvider');

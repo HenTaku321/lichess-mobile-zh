@@ -7,6 +7,7 @@ import 'package:lichess_mobile/src/utils/navigation.dart';
 import 'package:lichess_mobile/src/widgets/feedback.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_refreshable_empty.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -57,12 +58,14 @@ class _XiangqiNotificationsScreenState() extends ConsumerState<XiangqiNotificati
       ),
       body: notifications.when(
         data: (notifications) => notifications.items.isEmpty
-            ? const Center(
-                child: Padding(padding: Styles.bodySectionPadding, child: _Empty()),
+            ? XiangqiRefreshableEmpty(
+                onRefresh: () => ref.refresh(xiangqiNotificationsProvider.future),
+                child: const Padding(padding: Styles.bodySectionPadding, child: _Empty()),
               )
             : RefreshIndicator.adaptive(
                 onRefresh: () => ref.refresh(xiangqiNotificationsProvider.future),
                 child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
                   children: [
                     ListSection(
                       hasLeading: true,
@@ -102,6 +105,7 @@ class _XiangqiNotificationsScreenState() extends ConsumerState<XiangqiNotificati
 
   /// Marks every notification read, and redraws the list once the server has said so.
   Future<void> _markAllRead() async {
+    if (_marking) return;
     setState(() => _marking = true);
     try {
       await markAllXiangqiNotificationsRead(ref);

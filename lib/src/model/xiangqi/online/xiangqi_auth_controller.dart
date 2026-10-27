@@ -6,6 +6,7 @@ import 'package:http/http.dart' show Client, Response;
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_session.dart';
 import 'package:lichess_mobile/src/network/http.dart' show ServerException;
 import 'package:lichess_mobile/src/network/xiangqi_http.dart';
+import 'package:lichess_mobile/src/network/xiangqi_session_store.dart';
 import 'package:lichess_mobile/src/network/xiangqi_uri.dart';
 
 /// Thrown when xiangqi.com refuses an email/password pair.
@@ -60,6 +61,13 @@ final xiangqiAuthControllerProvider =
       name: 'XiangqiAuthControllerProvider',
     );
 
+/// An account boundary, not an access-token revision. Refreshing the same account must not
+/// discard a lesson save or a pending UI action; signing out and back in must discard it.
+final xiangqiAccountGenerationProvider = Provider<int>((ref) {
+  ref.watch(xiangqiAuthControllerProvider);
+  return ref.read(xiangqiSessionStoreProvider).accountGeneration;
+}, name: 'XiangqiAccountGenerationProvider');
+
 /// Whether a real xiangqi.com account — not a guest — is signed in.
 final isXiangqiLoggedInProvider = Provider.autoDispose<bool>((Ref ref) {
   return ref.watch(
@@ -74,34 +82,33 @@ final hasXiangqiSessionProvider = Provider.autoDispose<bool>((Ref ref) {
 
 /// Holds the signed-in xiangqi.com session: the account, or the guest token, or none.
 ///
-/// ## The state is synchronous, and "not known yet" is the same as "none"
-///
-/// [build] returns a plain [XiangqiSession] — not an `AsyncValue` — because the online xiangqi
-/// screens of the next wave have to read a token string *synchronously*, off the same `ref.watch`
-/// that draws the UI. [XiangqiAuthStorage.read] is asynchronous, though, so [build] answers `null`
-/// at once and [_restore] fills the state in when storage comes back. On a cold start that makes
-/// "the app does not know yet" and "there is definitely no session" the very same state.
-///
-/// Merging the two is honest, not lazy: the whole app treats "no session" as "make a guest session
-/// on demand, the first time online xiangqi data is needed" ([ensureGuestSession]), so the two
-/// cases are handled the same way anyway — the only difference is a few milliseconds of lag before
-/// a stored session appears.
+/// The synchronous facade of [XiangqiSessionStore]. Screens that need to distinguish cold-start
+/// restoration from a signed-out account also observe [xiangqiSessionReadyProvider]. HTTP refresh
+/// and invalidation are published by the store rather than silently changing storage behind the UI.
 class XiangqiAuthController() extends Notifier<XiangqiSession?> {
   Client get _client => ref.read(xiangqiClientProvider);
+  XiangqiSessionStore get _sessions => ref.read(xiangqiSessionStoreProvider);
+  Future<void>? _guestInFlight;
 
   @override
   XiangqiSession? build() {
+    final store = _sessions;
+    final subscription = store.changes.listen((session) {
+      if (ref.mounted) state = session;
+    });
+    ref.onDispose(subscription.cancel);
     // Not awaited: [build] has to return synchronously, and the session is only ever read after
     // this microtask-sized window. See the class doc.
     unawaited(_restore());
-    return null;
+    return store.current;
   }
 
   /// Reads the stored session and, if there is one, adopts it.
   Future<void> _restore() async {
-    final session = await ref.read(xiangqiAuthStorageProvider).read();
-    if (!ref.mounted) return;
-    if (session != null) state = session;
+    final generation = _sessions.generation;
+    final session = await _sessions.read();
+    if (!ref.mounted || generation != _sessions.generation) return;
+    state = session;
   }
 
   /// Signs in to xiangqi.com with an email and password.
@@ -109,6 +116,7 @@ class XiangqiAuthController() extends Notifier<XiangqiSession?> {
   /// Throws a [XiangqiInvalidCredentialsException] when the pair is wrong, a [ServerException] on
   /// any other HTTP failure, and lets a network error propagate.
   Future<void> signInWithPassword({required String email, required String password}) async {
+    final generation = await _sessions.beginOperation();
     final response = await _client.post(
       xiangqiUri('users/signin'),
       headers: const {'Content-Type': 'application/json', 'Accept': 'application/json'},
@@ -163,6 +171,7 @@ class XiangqiAuthController() extends Notifier<XiangqiSession?> {
         refreshToken: refreshToken,
         isGuest: false,
       ),
+      expectedGeneration: generation,
     );
   }
 
@@ -225,6 +234,7 @@ class XiangqiAuthController() extends Notifier<XiangqiSession?> {
     required String country,
     required String locale,
   }) async {
+    final generation = await _sessions.beginOperation();
     final uri = xiangqiUri('users/signup_details');
     final response = await _client.post(
       uri,
@@ -269,6 +279,7 @@ class XiangqiAuthController() extends Notifier<XiangqiSession?> {
         refreshToken: _pick(json, const ['refresh_token', 'refresh', 'refreshToken']),
         isGuest: false,
       ),
+      expectedGeneration: generation,
     );
   }
 
@@ -331,6 +342,7 @@ class XiangqiAuthController() extends Notifier<XiangqiSession?> {
   /// Reached through [ensureGuestSession], which is what the socket provider calls when it is asked
   /// to connect with nothing in storage.
   Future<void> signInAsGuest() async {
+    final generation = await _sessions.beginOperation();
     final response = await _client.post(
       xiangqiUri('users/guest_jwt'),
       headers: const {'Content-Type': 'application/json', 'Accept': 'application/json'},
@@ -359,7 +371,10 @@ class XiangqiAuthController() extends Notifier<XiangqiSession?> {
       throw const FormatException('The xiangqi.com guest token carries no subject.');
     }
 
-    await _store(XiangqiSession(userId: userId, name: userId, accessToken: token, isGuest: true));
+    await _store(
+      XiangqiSession(userId: userId, name: userId, accessToken: token, isGuest: true),
+      expectedGeneration: generation,
+    );
   }
 
   /// Makes sure a session exists, creating a guest one when there is none.
@@ -374,15 +389,23 @@ class XiangqiAuthController() extends Notifier<XiangqiSession?> {
   /// account screens still do not touch it — signing in is the reader's own act, and making a guest
   /// behind their back while they are looking at an account page is not.
   Future<void> ensureGuestSession() async {
-    if (state != null) return;
-    await signInAsGuest();
+    if (await _sessions.read() != null) return;
+    final existing = _guestInFlight;
+    if (existing != null) return await existing;
+    final future = signInAsGuest();
+    _guestInFlight = future;
+    try {
+      await future;
+    } finally {
+      _guestInFlight = null;
+    }
   }
 
   /// Signs out of xiangqi.com, dropping the session from storage and from the UI.
   Future<void> signOut() async {
-    await ref.read(xiangqiAuthStorageProvider).delete();
+    await _sessions.write(null);
     if (!ref.mounted) return;
-    state = null;
+    state = _sessions.current;
   }
 
   /// Adopts [username] after the account endpoint has renamed this account.
@@ -398,22 +421,20 @@ class XiangqiAuthController() extends Notifier<XiangqiSession?> {
 
   /// Re-reads the stored session and makes [state] agree with it again.
   ///
-  /// There is no measured xiangqi.com endpoint that tests a token, and this repo does not invent
-  /// protocol, so this does not ask the server. What it is for is the reverse direction:
-  /// [XiangqiClient] clears the stored session by itself when a call 401s twice, without telling
-  /// this controller, so the screen's "signed in" and the disk can drift apart. Re-reading the disk
-  /// closes that gap — and, on an empty disk, correctly drops back to no session.
+  /// Compatibility entrypoint for explicitly reloading secure storage. Ordinary HTTP refresh and
+  /// invalidation already notify this controller through the shared session store.
   Future<void> checkToken() async {
-    final session = await ref.read(xiangqiAuthStorageProvider).read();
+    await _sessions.reload();
     if (!ref.mounted) return;
-    state = session;
+    state = _sessions.current;
   }
 
   /// Writes [session] to storage, then adopts it as the state.
-  Future<void> _store(XiangqiSession session) async {
-    await ref.read(xiangqiAuthStorageProvider).write(session);
+  Future<void> _store(XiangqiSession session, {int? expectedGeneration}) async {
+    final saved = await _sessions.write(session, expectedGeneration: expectedGeneration);
+    if (!saved) return;
     if (!ref.mounted) return;
-    state = session;
+    state = _sessions.current;
   }
 
   /// The response body as text, decoded as UTF-8 whatever the headers claim.

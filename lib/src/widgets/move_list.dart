@@ -22,6 +22,9 @@ class const MoveList({
   final Color? inlineColor,
   final BoxDecoration? inlineDecoration,
 
+  /// AnalysisLayout supplies its own panel surface. All existing callers keep their card.
+  final bool wrapInCard = true,
+
   /// The piece notation to draw the moves in, instead of the user's own preference.
   ///
   /// Chess moves are written in algebraic and can only ever differ in the font their pieces are
@@ -115,7 +118,8 @@ class _MoveListState() extends ConsumerState<MoveList> {
               ),
             ),
           )
-        : Card(
+        : _MoveListCard(
+            enabled: widget.wrapInCard,
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(16.0),
               child: Column(
@@ -153,6 +157,12 @@ class _MoveListState() extends ConsumerState<MoveList> {
             ),
           );
   }
+}
+
+class const _MoveListCard({required final bool enabled, required final Widget child})
+    extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => enabled ? Card(child: child) : child;
 }
 
 class const InlineMoveCount({required final int count, final Color? color})

@@ -24,11 +24,17 @@ import 'package:intl/intl.dart';
 import 'package:lichess_mobile/src/model/message/message.dart';
 import 'package:lichess_mobile/src/model/message/xiangqi_inbox_repository.dart';
 import 'package:lichess_mobile/src/model/user/user.dart';
+import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
+import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
+import 'package:lichess_mobile/src/view/chat/chat_context_menu.dart';
+import 'package:lichess_mobile/src/widgets/feedback.dart';
 import 'package:lichess_mobile/src/widgets/platform.dart';
+import 'package:lichess_mobile/src/widgets/rich_link_text.dart';
 import 'package:lichess_mobile/src/widgets/user.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class const XiangqiConversationScreen({
   required final String chatId,
@@ -86,25 +92,49 @@ class const _Body({required final XiangqiConversationKey conversation}) extends 
                     final item = items[index];
                     return switch (item) {
                       _DateItem(:final date) => _DateBubble(date: date),
-                      _MessageItem(:final message, :final isMe) => _MessageBubble(
-                        message: message,
-                        isMe: isMe,
-                      ),
+                      _MessageItem(
+                        :final message,
+                        :final isMe,
+                        :final groupLength,
+                        :final groupIndex,
+                      ) =>
+                        _MessageBubble(
+                          message: message,
+                          isMe: isMe,
+                          groupLength: groupLength,
+                          groupIndex: groupIndex,
+                        ),
                     };
                   },
                 ),
               ),
             ),
-            _MessageInput(conversation: conversation),
+            _MessageInput(
+              key: ValueKey(ref.watch(xiangqiAccountGenerationProvider)),
+              conversation: conversation,
+            ),
           ],
         );
       case AsyncError(:final error, :final stackTrace):
         debugPrint(
           'Error loading xiangqi conversation ${conversation.chatId}: $error\n$stackTrace',
         );
-        return Center(child: Text('Error: $error'));
+        return Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(context.l10n.mobileSomethingWentWrong),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: () =>
+                    ref.invalidate(xiangqiConversationControllerProvider(conversation)),
+                child: Text(context.l10n.retry),
+              ),
+            ],
+          ),
+        );
       case _:
-        return const Center(child: CircularProgressIndicator());
+        return const Center(child: CircularProgressIndicator.adaptive());
     }
   }
 
@@ -121,7 +151,25 @@ class const _Body({required final XiangqiConversationKey conversation}) extends 
     final dayMessages = <Message>[];
 
     void flushDay() {
-      items.addAll(dayMessages.map((m) => _MessageItem(m, isMe: m.userId != peerUserId)));
+      var start = 0;
+      while (start < dayMessages.length) {
+        var end = start + 1;
+        while (end < dayMessages.length && dayMessages[end].userId == dayMessages[start].userId) {
+          end++;
+        }
+        for (var index = start; index < end; index++) {
+          final message = dayMessages[index];
+          items.add(
+            _MessageItem(
+              message,
+              isMe: message.userId != peerUserId,
+              groupLength: end - start,
+              groupIndex: index - start,
+            ),
+          );
+        }
+        start = end;
+      }
       items.add(_DateItem(currentDay!));
       dayMessages.clear();
     }
@@ -145,7 +193,12 @@ sealed class _DisplayItem();
 
 class _DateItem(final DateTime date) extends _DisplayItem;
 
-class _MessageItem(final Message message, {required final bool isMe}) extends _DisplayItem;
+class _MessageItem(
+  final Message message, {
+  required final bool isMe,
+  required final int groupLength,
+  required final int groupIndex,
+}) extends _DisplayItem;
 
 /// The day label, built to the lichess conversation's own: today, yesterday, or a short date.
 class const _DateBubble({required final DateTime date}) extends StatelessWidget {
@@ -183,40 +236,76 @@ class const _DateBubble({required final DateTime date}) extends StatelessWidget 
 }
 
 /// One message, drawn with the lichess conversation's bubble colours and side.
-class const _MessageBubble({required final Message message, required final bool isMe})
-    extends StatelessWidget {
+class const _MessageBubble({
+  required final Message message,
+  required final bool isMe,
+  required final int groupLength,
+  required final int groupIndex,
+}) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = ColorScheme.of(context);
     final textColor = isMe ? colorScheme.onSecondaryContainer : colorScheme.onSurface;
     final time = DateFormat.Hm().format(message.date);
+    final timeStyle = TextStyle(fontSize: 11, color: textColor.withValues(alpha: 0.6));
+    final grouped = groupLength > 1;
+    final first = groupIndex == 0;
+    final last = groupIndex == groupLength - 1;
+    const radius = Radius.circular(16);
+    const inGroupRadius = Radius.circular(4);
 
-    return FractionallySizedBox(
-      alignment: isMe ? .centerRight : .centerLeft,
-      widthFactor: 0.85,
-      child: Align(
+    return ChatBubbleContextMenu(
+      message: message.text,
+      child: FractionallySizedBox(
         alignment: isMe ? .centerRight : .centerLeft,
-        child: Container(
-          margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
-          decoration: BoxDecoration(
-            color: isMe ? colorScheme.secondaryContainer : colorScheme.surfaceContainer,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Stack(
-            children: [
-              Text(message.text, style: TextStyle(color: textColor)),
-              // The timestamp sits over the text's own last line, so the bubble grows with its
-              // content and the time never pushes the text around.
-              Positioned(
-                right: 0,
-                bottom: 0,
-                child: Text(
-                  time,
-                  style: TextStyle(fontSize: 11, color: textColor.withValues(alpha: 0.6)),
-                ),
+        widthFactor: 0.85,
+        child: Align(
+          alignment: isMe ? .centerRight : .centerLeft,
+          child: Container(
+            margin: EdgeInsets.only(
+              bottom: !grouped || first ? 8 : 2,
+              top: !grouped || last ? 8 : 2,
+              left: 8,
+              right: 8,
+            ),
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+            decoration: BoxDecoration(
+              color: isMe ? colorScheme.secondaryContainer : colorScheme.surfaceContainer,
+              borderRadius: BorderRadius.only(
+                topLeft: !isMe && grouped && !last ? inGroupRadius : radius,
+                topRight: isMe && grouped && !last ? inGroupRadius : radius,
+                bottomLeft: !isMe && grouped && !first ? inGroupRadius : radius,
+                bottomRight: isMe && grouped && !first ? inGroupRadius : radius,
               ),
-            ],
+            ),
+            child: Stack(
+              children: [
+                RichLinkText(
+                  text: message.text,
+                  style: TextStyle(color: textColor),
+                  linkStyle: Styles.linkStyle,
+                  onOpen: (link) async {
+                    final uri = Uri.tryParse(link.url);
+                    if (uri != null && const {'https', 'http', 'mailto'}.contains(uri.scheme)) {
+                      await launchUrl(uri);
+                    }
+                  },
+                  // Reserve the same last-line timestamp space as the Lichess conversation.
+                  trailing: WidgetSpan(
+                    alignment: PlaceholderAlignment.baseline,
+                    baseline: TextBaseline.alphabetic,
+                    child: Opacity(
+                      opacity: 0,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: Text(time, style: timeStyle),
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(right: 0, bottom: 0, child: Text(time, style: timeStyle)),
+              ],
+            ),
           ),
         ),
       ),
@@ -224,7 +313,7 @@ class const _MessageBubble({required final Message message, required final bool 
   }
 }
 
-class const _MessageInput({required final XiangqiConversationKey conversation})
+class const _MessageInput({required final XiangqiConversationKey conversation, super.key})
     extends ConsumerStatefulWidget {
   @override
   ConsumerState<_MessageInput> createState() => _MessageInputState();
@@ -232,6 +321,7 @@ class const _MessageInput({required final XiangqiConversationKey conversation})
 
 class _MessageInputState() extends ConsumerState<_MessageInput> {
   final controller = TextEditingController();
+  bool _sending = false;
 
   @override
   void dispose() {
@@ -239,11 +329,29 @@ class _MessageInputState() extends ConsumerState<_MessageInput> {
     super.dispose();
   }
 
-  void send() {
-    final text = controller.text.trim();
-    if (text.isEmpty) return;
-    ref.read(xiangqiConversationControllerProvider(widget.conversation).notifier).sendMessage(text);
-    controller.clear();
+  Future<void> send() async {
+    final original = controller.text;
+    final text = original.trim();
+    if (text.isEmpty || _sending) return;
+    final generation = ref.read(xiangqiAccountGenerationProvider);
+    setState(() => _sending = true);
+    try {
+      final dispatched = await ref
+          .read(xiangqiConversationControllerProvider(widget.conversation).notifier)
+          .sendMessage(text);
+      if (!mounted || generation != ref.read(xiangqiAccountGenerationProvider)) return;
+      if (dispatched) {
+        if (controller.text == original) controller.clear();
+      } else {
+        showSnackBar(context, context.l10n.mobileSomethingWentWrong, type: SnackBarType.error);
+      }
+    } on Object {
+      if (mounted && generation == ref.read(xiangqiAccountGenerationProvider)) {
+        showSnackBar(context, context.l10n.mobileSomethingWentWrong, type: SnackBarType.error);
+      }
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
   }
 
   @override
@@ -255,7 +363,16 @@ class _MessageInputState() extends ConsumerState<_MessageInput> {
         child: TextField(
           decoration: InputDecoration(
             contentPadding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 15.0),
-            suffixIcon: IconButton(icon: const Icon(Icons.send), onPressed: send),
+            suffixIcon: IconButton(
+              tooltip: context.l10n.send,
+              icon: _sending
+                  ? const SizedBox.square(
+                      dimension: 20,
+                      child: CircularProgressIndicator.adaptive(),
+                    )
+                  : const Icon(Icons.send),
+              onPressed: _sending ? null : send,
+            ),
             border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(20.0))),
           ),
           controller: controller,

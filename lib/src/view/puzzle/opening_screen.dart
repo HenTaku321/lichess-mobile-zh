@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:lichess_mobile/src/model/puzzle/puzzle_angle.dart';
 import 'package:lichess_mobile/src/model/puzzle/puzzle_opening.dart';
+import 'package:lichess_mobile/src/model/puzzle/puzzle_opening_translations.dart';
 import 'package:lichess_mobile/src/model/puzzle/puzzle_providers.dart';
 import 'package:lichess_mobile/src/network/connectivity.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
@@ -168,8 +169,12 @@ class const _OpeningFamily({
 class const _SavedOpeningTile({required final String openingKey}) extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Offline, a saved opening leaves nothing but its key, so this is the one place the overlay has
+    // to be asked by key; without an entry for it, the key with its underscores opened up is the
+    // best the app can do.
+    final overlay = ref.watch(puzzleOpeningTranslationsProvider).value;
     return _OpeningTile(
-      name: openingKey.replaceAll('_', ' '),
+      name: overlay?.ofKey(openingKey) ?? openingKey.replaceAll('_', ' '),
       openingKey: openingKey,
       count: ref.watch(savedBatchNbUnsolvedProvider(PuzzleOpening(openingKey))).value,
       titleStyle: null,

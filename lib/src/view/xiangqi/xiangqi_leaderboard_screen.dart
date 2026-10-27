@@ -7,9 +7,11 @@ import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_profile_screen.dart';
+import 'package:lichess_mobile/src/widgets/feedback.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
 import 'package:lichess_mobile/src/widgets/platform_search_bar.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_refreshable_empty.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// xiangqi.com's leaderboards, one board per rating.
@@ -41,6 +43,7 @@ class _XiangqiLeaderboardScreenState() extends ConsumerState<XiangqiLeaderboardS
   String? _country;
 
   int _page = 1;
+  bool _pickingCountry = false;
 
   @override
   Widget build(BuildContext context) {
@@ -58,7 +61,7 @@ class _XiangqiLeaderboardScreenState() extends ConsumerState<XiangqiLeaderboardS
             IconButton(
               tooltip: context.l10n.mobileXiangqiLeaderboardCountry,
               icon: const Icon(Icons.flag_outlined),
-              onPressed: () => _pickCountry(context),
+              onPressed: _pickingCountry ? null : () => _pickCountry(context),
             ),
           ],
           bottom: TabBar(
@@ -75,24 +78,31 @@ class _XiangqiLeaderboardScreenState() extends ConsumerState<XiangqiLeaderboardS
         ),
         body: board.when(
           data: (board) => board.entries.isEmpty
-              ? const Center(
-                  child: Padding(padding: Styles.bodySectionPadding, child: _Empty()),
+              ? XiangqiRefreshableEmpty(
+                  onRefresh: () =>
+                      ref.refresh(xiangqiLeaderboardProvider((_mode, _country, _page)).future),
+                  child: const Padding(padding: Styles.bodySectionPadding, child: _Empty()),
                 )
-              : ListView(
-                  children: [
-                    ListSection(
-                      header: Text(
-                        context.l10n.mobileXiangqiLeaderboardPlayers('${board.totalPlayers}'),
+              : RefreshIndicator.adaptive(
+                  onRefresh: () =>
+                      ref.refresh(xiangqiLeaderboardProvider((_mode, _country, _page)).future),
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: [
+                      ListSection(
+                        header: Text(
+                          context.l10n.mobileXiangqiLeaderboardPlayers('${board.totalPlayers}'),
+                        ),
+                        hasLeading: true,
+                        children: [for (final entry in board.entries) _LeaderRow(entry: entry)],
                       ),
-                      hasLeading: true,
-                      children: [for (final entry in board.entries) _LeaderRow(entry: entry)],
-                    ),
-                    _Pager(
-                      page: board.currentPage,
-                      hasNext: board.hasNextPage,
-                      onChanged: (page) => setState(() => _page = page),
-                    ),
-                  ],
+                      _Pager(
+                        page: board.currentPage,
+                        hasNext: board.hasNextPage,
+                        onChanged: (page) => setState(() => _page = page),
+                      ),
+                    ],
+                  ),
                 ),
           loading: () => const Center(child: CircularProgressIndicator.adaptive()),
           error: (error, stackTrace) => Center(
@@ -120,27 +130,36 @@ class _XiangqiLeaderboardScreenState() extends ConsumerState<XiangqiLeaderboardS
   /// Asks which country to filter by, and clears the filter when asked for none.
   ///
   /// The list is the server's own country table, which is fetched once and kept for the session —
-  /// see [xiangqiCountriesProvider]. A table that has not arrived yet is an empty picker rather than
-  /// a spinner: this is a filter, and a filter that cannot be set is not a reason to hold the board
-  /// back.
+  /// see [xiangqiCountriesProvider]. Wait for that table, and preserve the filter on dismissal.
   Future<void> _pickCountry(BuildContext context) async {
-    final countries = ref.read(xiangqiCountriesProvider).value ?? const IMapConst({});
-    String? choice;
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useRootNavigator: true,
-      builder: (context) => _CountrySheet(
-        countries: countries,
-        selected: _country,
-        onSelected: (code) => choice = code,
-      ),
-    );
-    if (!mounted || choice == _country) return;
-    setState(() {
-      _country = choice;
-      _page = 1;
-    });
+    if (_pickingCountry) return;
+    setState(() => _pickingCountry = true);
+    try {
+      final countries = await ref.read(xiangqiCountriesProvider.future);
+      if (!context.mounted) return;
+      String? choice = _country;
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useRootNavigator: true,
+        builder: (context) => _CountrySheet(
+          countries: countries,
+          selected: _country,
+          onSelected: (code) => choice = code,
+        ),
+      );
+      if (!mounted || choice == _country) return;
+      setState(() {
+        _country = choice;
+        _page = 1;
+      });
+    } catch (_) {
+      if (context.mounted) {
+        showSnackBar(context, context.l10n.mobileSomethingWentWrong, type: SnackBarType.error);
+      }
+    } finally {
+      if (mounted) setState(() => _pickingCountry = false);
+    }
   }
 }
 

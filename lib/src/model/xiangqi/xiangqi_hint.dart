@@ -61,6 +61,10 @@ sealed class const XiangqiEvaluation._() with _$XiangqiEvaluation {
     int? mate,
   }) = _XiangqiEvaluation;
 
+  /// Shared signed label for the gauge and engine lines, already in red's point of view.
+  String? get evalString =>
+      cp == null && mate == null ? null : ExternalEval(cp: cp, mate: mate).evalString;
+
   /// How likely red is to win, on a bar's scale: 0 is black winning outright, 1 is red, and 0.5 is
   /// level.
   ///

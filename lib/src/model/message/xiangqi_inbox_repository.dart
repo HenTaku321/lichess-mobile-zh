@@ -373,6 +373,14 @@ class XiangqiInboxRepository({
 
   /// The `inbox.chat.user` requests, oldest first. Only the head may be in flight.
   final Queue<_PendingMessages> _messageQueue = Queue();
+
+  /// The queued request for each conversation, so a rebuild does not ask for the same page twice.
+  ///
+  /// A conversation controller can be rebuilt while its first load is still in flight (the app's
+  /// auth state is loaded asynchronously). A duplicate `inbox.chat.user` would take a second turn in
+  /// the queue and wait for a second response the server has no reason to send. Sharing the pending
+  /// future lets both builds read the one answer, while different chat ids remain serialised below.
+  final Map<String, _PendingMessages> _pendingMessages = {};
   bool _pumping = false;
 
   /// The messages the server pushed, for whichever conversation is open to hear them.
@@ -423,8 +431,12 @@ class XiangqiInboxRepository({
     if (_disposed) {
       return Future.error(const XiangqiInboxException('This repository is disposed.'));
     }
+    final existing = _pendingMessages[chatId];
+    if (existing != null) return existing.completer.future;
     final completer = Completer<IList<Message>>();
-    _messageQueue.add(_PendingMessages(chatId, completer));
+    final pending = _PendingMessages(chatId, completer);
+    _pendingMessages[chatId] = pending;
+    _messageQueue.add(pending);
     unawaited(_pumpMessages());
     return completer.future;
   }
@@ -444,6 +456,9 @@ class XiangqiInboxRepository({
         } finally {
           if (_messageQueue.isNotEmpty && identical(_messageQueue.first, head)) {
             _messageQueue.removeFirst();
+          }
+          if (identical(_pendingMessages[head.chatId], head)) {
+            _pendingMessages.remove(head.chatId);
           }
         }
       }
@@ -593,6 +608,7 @@ class XiangqiInboxRepository({
         head.completer.completeError(const XiangqiInboxException('The repository was disposed.'));
       }
     }
+    _pendingMessages.clear();
     _incoming.close();
   }
 }

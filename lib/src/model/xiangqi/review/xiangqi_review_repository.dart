@@ -66,62 +66,63 @@ class const XiangqiReviewException(final XiangqiReviewFailure reason) implements
 /// `xiangqi_online_game_controller.dart` makes, and it is made again here rather than shared
 /// because the two controllers have different lifetimes and a shared walk would be a shared
 /// subscription.
-final xiangqiReviewProvider = FutureProvider.autoDispose.family<XiangqiReview, String>((
-  Ref ref,
-  String gameId,
-) async {
-  // **No session is needed.** A review is a socket conversation, and the socket opens a guest
-  // session of its own when there is none — measured on 2026-10-16, where a guest token was handed
-  // the whole analysis of an archived game. Gating this on a signed-in account would leave the one
-  // screen that reads a game back unavailable to a reader who has never signed in.
-  if (!ref.watch(isDeviceOnlineProvider)) {
-    throw const XiangqiReviewException(XiangqiReviewFailure.offline);
-  }
-
-  final socket = ref.watch(xiangqiReviewSocketProvider(gameId));
-  final subscription = socket.stream.listen((_) {});
-  ref.onDispose(subscription.cancel);
-
-  try {
-    await socket.connect();
-
-    // The snapshot first: without the moves there is nothing for the analysis to be keyed against.
-    final snapshot = await _snapshotOf(socket, gameId);
-    final moves = xiangqiReviewMovesFromHistory(snapshot['move_history']);
-    final initial = _positionOf(snapshot['initial_fen']);
-    if (moves == null || initial == null) {
-      _logger.warning('The snapshot of game $gameId did not replay.');
-      throw const XiangqiReviewException(XiangqiReviewFailure.failed);
-    }
-    final positions = xiangqiReviewPositions(initial, moves);
-    if (positions == null) {
-      _logger.warning('The moves of game $gameId do not fit its own starting position.');
-      throw const XiangqiReviewException(XiangqiReviewFailure.failed);
+final xiangqiReviewProvider = FutureProvider.autoDispose.family<XiangqiReview, String>(
+  (Ref ref, String gameId) async {
+    // **No session is needed.** A review is a socket conversation, and the socket opens a guest
+    // session of its own when there is none — measured on 2026-10-16, where a guest token was handed
+    // the whole analysis of an archived game. Gating this on a signed-in account would leave the one
+    // screen that reads a game back unavailable to a reader who has never signed in.
+    if (!ref.watch(isDeviceOnlineProvider)) {
+      throw const XiangqiReviewException(XiangqiReviewFailure.offline);
     }
 
-    final analysis = await _analysisOf(socket, gameId, moves);
+    final socket = ref.watch(xiangqiReviewSocketProvider(gameId));
+    final subscription = socket.stream.listen((_) {});
+    ref.onDispose(subscription.cancel);
 
-    return XiangqiReview(
-      gameId: gameId,
-      initialPosition: initial,
-      positions: positions,
-      moves: moves,
-      reviews: analysis,
-      red: xiangqiLivePlayerFromJson(snapshot['rplayer']),
-      black: xiangqiLivePlayerFromJson(snapshot['bplayer']),
-      endReason: _int(snapshot['end_reason']),
-      endedAt: _httpDate(snapshot['endedAt']),
-    );
-  } on XiangqiReviewException {
-    rethrow;
-  } catch (error, stackTrace) {
-    _logger.warning('The review of game $gameId failed.', error, stackTrace);
-    throw const XiangqiReviewException(XiangqiReviewFailure.failed);
-  } finally {
-    // The finite review conversation needs no idle heartbeat after its result.
-    socket.close();
-  }
-}, name: 'XiangqiReviewProvider');
+    try {
+      await socket.connect();
+
+      // The snapshot first: without the moves there is nothing for the analysis to be keyed against.
+      final snapshot = await _snapshotOf(socket, gameId);
+      final moves = xiangqiReviewMovesFromHistory(snapshot['move_history']);
+      final initial = _positionOf(snapshot['initial_fen']);
+      if (moves == null || initial == null) {
+        _logger.warning('The snapshot of game $gameId did not replay.');
+        throw const XiangqiReviewException(XiangqiReviewFailure.failed);
+      }
+      final positions = xiangqiReviewPositions(initial, moves);
+      if (positions == null) {
+        _logger.warning('The moves of game $gameId do not fit its own starting position.');
+        throw const XiangqiReviewException(XiangqiReviewFailure.failed);
+      }
+
+      final analysis = await _analysisOf(socket, gameId, moves);
+
+      return XiangqiReview(
+        gameId: gameId,
+        initialPosition: initial,
+        positions: positions,
+        moves: moves,
+        reviews: analysis,
+        red: xiangqiLivePlayerFromJson(snapshot['rplayer']),
+        black: xiangqiLivePlayerFromJson(snapshot['bplayer']),
+        endReason: _int(snapshot['end_reason']),
+        endedAt: _httpDate(snapshot['endedAt']),
+      );
+    } on XiangqiReviewException {
+      rethrow;
+    } catch (error, stackTrace) {
+      _logger.warning('The review of game $gameId failed.', error, stackTrace);
+      throw const XiangqiReviewException(XiangqiReviewFailure.failed);
+    } finally {
+      // The finite review conversation needs no idle heartbeat after its result.
+      socket.close();
+    }
+  },
+  name: 'XiangqiReviewProvider',
+  retry: (_, _) => null,
+);
 
 /// The game's snapshot, following the redirect a finished game answers with.
 ///

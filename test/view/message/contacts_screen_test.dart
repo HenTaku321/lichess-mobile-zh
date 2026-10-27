@@ -124,15 +124,20 @@ Future<fx.FakeXiangqiChannelFactory> pumpScreen(WidgetTester tester) async {
 
   // The chat list is asked for by the first read of the provider, which is the socket's own
   // handshake's cue; the server's half of it is pushed here.
-  await tester.pump();
-  await tester.runAsync(() async {
-    await pumpEventQueue();
-    factory.channel.fromServer(fx.openFrame);
-    factory.channel.fromServer(fx.connectAckFrame);
-    await pumpEventQueue();
-    factory.channel.fromServer(xiangqiChatsFrame);
-    await pumpEventQueue();
-  });
+  await pumpUntil(
+    tester,
+    () => factory.channels.isNotEmpty && factory.channel.sentConnect,
+    reason: 'the contacts screen is expected to open a xiangqi socket',
+  );
+  final channel = factory.channel;
+  channel.fromServer(fx.openFrame);
+  channel.fromServer(fx.connectAckFrame);
+  await pumpUntil(
+    tester,
+    () => channel.hasSentEvent(kXiangqiInboxJoinEvent),
+    reason: 'the chat list is expected to be asked for once the socket is open',
+  );
+  channel.fromServer(xiangqiChatsFrame);
   await tester.pumpAndSettle();
 
   return factory;
@@ -182,28 +187,30 @@ void main() {
       // pushed here. This also exercises the controller's second build: it watches the app's auth
       // state, which lands after the first, and a controller that initialised itself only once would
       // fail on that second build rather than draw the page.
-      await tester.runAsync(() async {
-        await pumpEventQueue();
-        factory.channel.fromServer(
-          fx.xiangqiEventFrame(kXiangqiInboxUserMessagesEvent, {
-            'data': {
-              'has_next_page': false,
-              'items': [
-                {
-                  'created_on': '2024-05-06T09:12:33.123456',
-                  'message': 'c',
-                  'read': false,
-                  'sender_id': xiangqiPeerId,
-                },
-              ],
-              'next_page_num': null,
-              'prev_page_num': null,
-              'total_pages': 1,
-            },
-          }),
-        );
-        await pumpEventQueue();
-      });
+      final channel = factory.channel;
+      await pumpUntil(
+        tester,
+        () => channel.hasSentEvent(kXiangqiInboxChatUserEvent),
+        reason: 'opening the conversation is expected to ask for its first page',
+      );
+      channel.fromServer(
+        fx.xiangqiEventFrame(kXiangqiInboxUserMessagesEvent, {
+          'data': {
+            'has_next_page': false,
+            'items': [
+              {
+                'created_on': '2024-05-06T09:12:33.123456',
+                'message': 'c',
+                'read': false,
+                'sender_id': xiangqiPeerId,
+              },
+            ],
+            'next_page_num': null,
+            'prev_page_num': null,
+            'total_pages': 1,
+          },
+        }),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('c'), findsWidgets);

@@ -86,10 +86,22 @@ class const XiangqiPlayerRow({
                     Icon(Icons.person, size: 16, color: textShade(context, 0.5)),
                   ],
                   if (isBot) ...[
-                    const SizedBox(width: 5),
-                    Text(
-                      'BOT',
-                      style: TextStyle(fontSize: fontSize, color: context.lichessColors.fancy),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: context.lichessColors.fancy,
+                        borderRadius: const BorderRadius.all(Radius.circular(3)),
+                      ),
+                      child: Text(
+                        context.l10n.computer,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
                     ),
                   ],
                   if (thinking) ...const [SizedBox(width: 8), Icon(Icons.hourglass_top, size: 16)],

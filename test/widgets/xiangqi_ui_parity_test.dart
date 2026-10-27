@@ -125,7 +125,7 @@ void main() {
         ),
       ),
     );
-    expect(find.text('#-3'), findsOneWidget);
+    expect(find.text('M-3'), findsOneWidget);
     final tween = tester.widget<TweenAnimationBuilder<double>>(
       find.byType(TweenAnimationBuilder<double>),
     );

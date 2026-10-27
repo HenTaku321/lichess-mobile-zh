@@ -12,6 +12,7 @@ import '../../binding.dart';
 import '../../model/message/xiangqi_inbox_repository_test.dart' as fixture;
 import '../../model/xiangqi/online/xiangqi_online_game_fixture.dart' as fx;
 import '../../network/xiangqi_http_test.dart' show FakeXiangqiAuthStorage, signedInSession;
+import '../../test_helpers.dart';
 import '../../test_provider_scope.dart';
 
 Future<ProviderContainer> pumpConversation(WidgetTester tester) async {
@@ -42,19 +43,24 @@ Future<ProviderContainer> pumpConversation(WidgetTester tester) async {
       },
     ),
   );
-  await tester.pump();
-  await tester.runAsync(() async {
-    await pumpEventQueue();
-    factory.channel.fromServer(fx.openFrame);
-    factory.channel.fromServer(fx.connectAckFrame);
-    await pumpEventQueue();
-    factory.channel.fromServer(
-      fixture.xiangqiMessagesFrame([
-        fixture.xiangqiMessageRow('Hello', senderId: fixture.xiangqiFirstPeerId),
-      ]),
-    );
-    await pumpEventQueue();
-  });
+  await pumpUntil(
+    tester,
+    () => factory.channels.isNotEmpty && factory.channel.sentConnect,
+    reason: 'the conversation screen is expected to open a socket',
+  );
+  final channel = factory.channel;
+  channel.fromServer(fx.openFrame);
+  channel.fromServer(fx.connectAckFrame);
+  await pumpUntil(
+    tester,
+    () => channel.hasSentEvent(kXiangqiInboxChatUserEvent),
+    reason: 'the open conversation is expected to ask for its first page',
+  );
+  channel.fromServer(
+    fixture.xiangqiMessagesFrame([
+      fixture.xiangqiMessageRow('Hello', senderId: fixture.xiangqiFirstPeerId),
+    ]),
+  );
   await tester.pumpAndSettle();
   return ProviderScope.containerOf(tester.element(find.byType(XiangqiConversationScreen)));
 }

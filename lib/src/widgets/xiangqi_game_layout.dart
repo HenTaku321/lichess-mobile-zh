@@ -397,7 +397,9 @@ String? _scoreLabel(XiangqiEvaluation? evaluation) {
   if (evaluation == null) return null;
   if (evaluation.cp == null && evaluation.mate == null) return null;
   final label = evaluation.evalString!;
-  if (label.startsWith('#')) return label;
+  // xiangqi.com writes a mate count as `M3`/`M-3`; keep the sign but use that convention rather
+  // than leaking the chess notation used by the shared evaluation string.
+  if (label.startsWith('#')) return 'M${label.substring(1)}';
   final integerPart = label.split('.').first;
   return integerPart.length > 2 ? integerPart : label;
 }

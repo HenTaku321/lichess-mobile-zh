@@ -305,6 +305,16 @@ class FakeXiangqiChannel() implements WebSocketChannel {
   /// Whether the client asked for the channel to be closed.
   bool closed = false;
 
+  /// Whether the client has written its namespace CONNECT frame.
+  ///
+  /// The client attaches its stream listener immediately before writing that frame, so this is the
+  /// safe point at which a test may start pushing the server's frames into the broadcast stream.
+  bool get sentConnect => sent.whereType<String>().any((frame) => frame.startsWith('40/xiangqi,'));
+
+  /// Whether [event] has been emitted on this channel.
+  bool hasSentEvent(String event) =>
+      sent.whereType<String>().any((frame) => frame.contains('"$event"'));
+
   /// Pushes one raw frame from the server.
   void fromServer(dynamic data) {
     if (!_incoming.isClosed) _incoming.add(data);

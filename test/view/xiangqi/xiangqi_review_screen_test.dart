@@ -25,6 +25,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../binding.dart';
 import '../../model/xiangqi/online/xiangqi_online_game_fixture.dart' as fx;
+import '../../test_helpers.dart';
 import '../../test_provider_scope.dart';
 
 /// The game the review is of, and one that is not the fixture's own.
@@ -115,12 +116,14 @@ Future<fx.FakeXiangqiChannelFactory> pumpReview(WidgetTester tester, {bool signe
     ),
   );
 
-  // The client opens its channel from a chain of microtasks — the token read, the factory call, the
-  // connect frame — and a pump is what lets one of them run. Nothing in the chain is a timer, so a
-  // few pumps see the whole of it.
-  for (var pump = 0; pump < 5 && factory.channels.isEmpty; pump++) {
-    await tester.pump();
-  }
+  // Wait for the CONNECT frame, not merely for the channel object: the client attaches its stream
+  // listener immediately before writing that frame, and this fake stream does not replay frames
+  // pushed before there is a listener.
+  await pumpUntil(
+    tester,
+    () => factory.channels.isNotEmpty && factory.channel.sentConnect,
+    reason: 'the review screen is expected to open a socket',
+  );
   return factory;
 }
 
@@ -130,31 +133,36 @@ Future<fx.FakeXiangqiChannelFactory> pumpReview(WidgetTester tester, {bool signe
 /// with an ack naming another event, and the snapshot only comes after that event is sent. The
 /// fixture's channel answers the redirect itself, so the test only has to push the two frames.
 Future<void> loadReview(WidgetTester tester, fx.FakeXiangqiChannelFactory factory) async {
-  factory.channel.ackOverrides['g_v2.get'] = fx.xiangqiRedirectAck;
-  factory.channel.fromServer(fx.openFrame);
-  factory.channel.fromServer(fx.connectAckFrame);
-  await settle(tester);
+  final channel = factory.channel;
+  channel.ackOverrides['g_v2.get'] = fx.xiangqiRedirectAck;
+  channel.fromServer(fx.openFrame);
+  channel.fromServer(fx.connectAckFrame);
+
+  // The redirect is emitted only after the `g_v2.get` acknowledgement. Waiting for that second
+  // request is a stronger synchronisation point than pumping a fixed number of frames.
+  await pumpUntil(
+    tester,
+    () => channel.hasSentEvent('game.archived.get'),
+    reason: 'the archived game is expected to be requested after the redirect',
+  );
 
   // The snapshot, which arrives under the plain name however it was asked for — measured on
   // 2026-10-16, where `game.archived.get` came back as `game.get.success`.
-  factory.channel.fromServer(fx.xiangqiEventFrame('game.get.success', snapshotPayload()));
-  await settle(tester);
+  channel.fromServer(fx.xiangqiEventFrame('game.get.success', snapshotPayload()));
 
   // The analysis, which is only asked for once the snapshot has been read: the request is keyed by
   // the game's moves, so a review cannot be asked for before they are in hand.
-  factory.channel.fromServer(reviewFrame());
-  await settle(tester);
-}
-
-/// Pumps until nothing more is coming.
-///
-/// Every step of the review is a chain of microtasks — the token read, the connect frame, the ack,
-/// the next emit — and none of them is a timer, so a handful of pumps sees the whole of it. The
-/// loop is here so that a test does not depend on how many.
-Future<void> settle(WidgetTester tester, {int rounds = 30}) async {
-  for (var round = 0; round < rounds; round++) {
-    await tester.pump();
-  }
+  await pumpUntil(
+    tester,
+    () => channel.hasSentEvent('g_v2.review'),
+    reason: 'the review is expected to be requested once the moves are in hand',
+  );
+  channel.fromServer(reviewFrame());
+  await pumpUntil(
+    tester,
+    () => find.byType(XiangqiBoard).evaluate().isNotEmpty,
+    reason: 'the answered review is expected to draw its board',
+  );
 }
 
 /// The board the screen has drawn.
@@ -257,15 +265,23 @@ void main() {
 
     testWidgets('a review the server does not answer offers the way to ask again', (tester) async {
       final factory = await pumpReview(tester);
-      factory.channel.fromServer(fx.openFrame);
-      factory.channel.fromServer(fx.connectAckFrame);
-      await tester.pump();
-      await tester.pump();
+      final channel = factory.channel;
+      channel.fromServer(fx.openFrame);
+      channel.fromServer(fx.connectAckFrame);
+      await pumpUntil(
+        tester,
+        () => channel.hasSentEvent('g_v2.get'),
+        reason: 'the review is expected to ask for its game before the server hangs up',
+      );
 
       // The ack is not a redirect, so the screen waits for a snapshot that never comes. The socket
       // is closed instead, which is the failure the screen has to survive.
-      factory.channel.closeFromServer();
-      await tester.pumpAndSettle();
+      channel.closeFromServer();
+      await pumpUntil(
+        tester,
+        () => find.text('The review could not be loaded.').evaluate().isNotEmpty,
+        reason: 'closing the socket is expected to surface the review error',
+      );
 
       expect(find.text('The review could not be loaded.'), findsOneWidget);
       expect(find.text('Retry'), findsOneWidget);

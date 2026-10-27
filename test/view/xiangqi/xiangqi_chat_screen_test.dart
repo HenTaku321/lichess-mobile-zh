@@ -310,8 +310,8 @@ void main() {
       await tester.enterText(find.byType(TextField), 'hello');
       await tester.tap(find.byIcon(Icons.send));
       await tester.pump();
-      // Keep the draft while waiting for the throttle; it has not reached the socket yet.
-      expect(tester.widget<TextField>(find.byType(TextField)).controller?.text, 'hello');
+      // The composer clears as soon as the send is accepted; a failure puts the draft back.
+      expect(tester.widget<TextField>(find.byType(TextField)).controller?.text, isEmpty);
 
       // The frame is queued behind the spacing the server needs between two requests.
       await tester.pump(const Duration(seconds: 2));

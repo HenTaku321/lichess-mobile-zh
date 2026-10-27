@@ -72,10 +72,11 @@ void main() {
       tester,
       const XiangqiSavedScreen(),
       MockClient((request) async {
-        if (request.method != 'GET') {
+        if (request.method != 'GET' && request.url.path.contains('/folders')) {
           writes.add(request);
           return jsonReply({}, fail ? 503 : 201);
         }
+        if (request.method != 'GET') return jsonReply({});
         return jsonReply({'items': <Object?>[]});
       }),
     );

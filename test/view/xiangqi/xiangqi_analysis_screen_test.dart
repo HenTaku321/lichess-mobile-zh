@@ -157,7 +157,7 @@ void main() {
       );
 
       // Nothing has been played, so there is no line to show and nowhere to step through it.
-      expect(find.byType(InlineMoveItem), findsNothing);
+      expect(find.byType(StackedMoveItem), findsNothing);
       expect(board(tester).position, XiangqiPosition.initial());
       expect(barButton(tester, CupertinoIcons.chevron_back).onTap, isNull);
       expect(barButton(tester, CupertinoIcons.chevron_forward).onTap, isNull);
@@ -298,7 +298,7 @@ void main() {
       await tapSquare(tester, 'e2');
       await tapSquare(tester, 'h9');
       await tapSquare(tester, 'g7');
-      expect(find.byType(InlineMoveItem), findsNWidgets(2));
+      expect(find.byType(StackedMoveItem), findsNWidgets(2));
       final afterBothMoves = board(tester).position;
 
       // The list counts the way a scoresheet does — the first move of the line is move 1 — and its
@@ -434,13 +434,13 @@ void main() {
       await pumpAnalysisScreen(tester, engineEvaluation: false);
       await tapSquare(tester, 'h2');
       await tapSquare(tester, 'e2');
-      expect(find.byType(InlineMoveItem), findsOneWidget);
+      expect(find.byType(StackedMoveItem), findsOneWidget);
       expect(find.text('炮二平五'), findsOneWidget);
 
       await tester.tap(find.byIcon(Icons.restart_alt));
       await tester.pump();
 
-      expect(find.byType(InlineMoveItem), findsNothing);
+      expect(find.byType(StackedMoveItem), findsNothing);
       expect(board(tester).position, XiangqiPosition.initial());
       expect(barButton(tester, CupertinoIcons.chevron_back).onTap, isNull);
     });

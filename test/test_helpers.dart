@@ -64,6 +64,26 @@ Future<void> meetsTapTargetGuideline(WidgetTester tester) async {
   }
 }
 
+/// Pumps until [condition] is true, then returns.
+///
+/// Widget tests that drive a socket need to wait for the client to write a frame, not for a timer or
+/// a fixed number of pumps: the token read and channel setup are a chain of microtasks whose length
+/// is an implementation detail. Keeping this on a pump budget rather than the wall clock also keeps
+/// the helper inside the widget tester's fake time.
+Future<void> pumpUntil(
+  WidgetTester tester,
+  bool Function() condition, {
+  int maxPumps = 100,
+  String? reason,
+}) async {
+  for (var pump = 0; pump < maxPumps; pump++) {
+    if (condition()) return;
+    await tester.pump();
+  }
+  if (condition()) return;
+  fail(reason ?? 'Condition was not met after $maxPumps pumps.');
+}
+
 /// Finds either an interactive [Chessboard] or a [StaticChessboard].
 Finder _anyBoard() => find.byWidgetPredicate((w) => w is Chessboard || w is StaticChessboard);
 

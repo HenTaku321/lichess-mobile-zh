@@ -248,9 +248,17 @@ void main() {
     });
 
     testWidgets('offers the way out on the account this device is signed in as', (tester) async {
-      await pumpProfile(tester, client: profileClient());
+      await pumpProfile(tester, client: profileClient(), isGuest: false);
 
       expect(find.byIcon(Icons.edit_outlined), findsOneWidget);
+      expect(find.byIcon(Icons.logout), findsOneWidget);
+      await drain(tester);
+    });
+
+    testWidgets('a guest can sign out but cannot edit the account', (tester) async {
+      await pumpProfile(tester, client: profileClient());
+
+      expect(find.byIcon(Icons.edit_outlined), findsNothing);
       expect(find.byIcon(Icons.logout), findsOneWidget);
       await drain(tester);
     });
@@ -302,7 +310,7 @@ void main() {
     });
 
     testWidgets('edits the biography and draws the saved text on the profile', (tester) async {
-      await pumpProfile(tester, client: profileClient());
+      await pumpProfile(tester, client: profileClient(), isGuest: false);
 
       await tester.tap(find.byIcon(Icons.edit_outlined));
       await tester.pumpAndSettle();

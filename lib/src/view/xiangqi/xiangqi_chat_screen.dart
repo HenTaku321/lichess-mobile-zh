@@ -141,26 +141,33 @@ class _XiangqiChatRoomScreenState() extends ConsumerState<XiangqiChatRoomScreen>
     if (_sending) return;
     final text = _input.text.trim();
     if (text.isEmpty) return;
-    setState(() => _sending = true);
+    setState(() {
+      _sending = true;
+      _submittedText = text;
+      _input.clear();
+    });
     try {
       final submitted = await ref
           .read(xiangqiChatControllerProvider(widget.roomKey).notifier)
           .send(text);
       if (!mounted) return;
-      if (submitted && _input.text.trim() == text) {
-        _submittedText = text;
-        _input.clear();
-      }
       if (!submitted) {
+        _restoreDraft(text);
         showSnackBar(context, context.l10n.mobileXiangqiChatOffline, type: SnackBarType.error);
       }
     } on Object {
       if (mounted) {
+        _restoreDraft(text);
         showSnackBar(context, context.l10n.mobileSomethingWentWrong, type: SnackBarType.error);
       }
     } finally {
       if (mounted) setState(() => _sending = false);
     }
+  }
+
+  void _restoreDraft(String text) {
+    if (_input.text.isEmpty) _input.text = text;
+    _submittedText = null;
   }
 
   @override

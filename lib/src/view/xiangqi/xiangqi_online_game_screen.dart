@@ -560,7 +560,7 @@ class const XiangqiOnlinePlayerRow({
           : Clock(
               timeLeft: timeLeft ?? Duration(seconds: seconds),
               active: isTurn,
-              emergencyThreshold: isMe ? const Duration(seconds: 30) : null,
+              emergencyThreshold: const Duration(seconds: 30),
               clockTenths:
                   ref.watch(clockTenthsProvider).value ?? defaultAccountPreferences.clockTenths,
             ),

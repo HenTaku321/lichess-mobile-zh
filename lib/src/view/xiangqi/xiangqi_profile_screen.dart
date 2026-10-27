@@ -54,6 +54,7 @@ class const XiangqiProfileScreen({required final String username, super.key})
     // device holds, and a profile of somebody else has nothing to sign out of.
     final session = ref.watch(xiangqiAuthControllerProvider);
     final isMe = session?.name == username;
+    final canEditProfile = isMe && session != null && !session.isGuest;
     // A guest has no account to delete — the session is one this app minted for a visitor — and the
     // endpoint would refuse it. The same judgement the account menu makes about notifications and
     // saved content.
@@ -63,7 +64,7 @@ class const XiangqiProfileScreen({required final String username, super.key})
       appBar: AppBar(
         title: AppBarTitleText(username),
         actions: [
-          if (isMe)
+          if (canEditProfile)
             IconButton(
               tooltip: context.l10n.editProfile,
               icon: const Icon(Icons.edit_outlined),

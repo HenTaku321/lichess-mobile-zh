@@ -325,6 +325,23 @@ void main() {
       expect((await second).single.text, '哈哈哈');
     });
 
+    test('shares one in-flight page when the same conversation is loaded twice', () async {
+      final harness = await makeHarness();
+
+      // A conversation controller can rebuild while its first build is still loading. The second
+      // read must join that request: a second emit would wait for a response that is already being
+      // delivered to the first.
+      final first = harness.repository.loadMessages(xiangqiFirstChatId);
+      final second = harness.repository.loadMessages(xiangqiFirstChatId);
+      await completeHandshake(harness);
+
+      expect(harness.events, [kXiangqiInboxChatUserEvent]);
+      harness.channel.fromServer(xiangqiMessagesFrame([xiangqiMessageRow('one answer')]));
+      final pages = await Future.wait([first, second]);
+
+      expect(pages.map((page) => page.single.text), ['one answer', 'one answer']);
+    });
+
     test('drops a page no request is waiting for instead of attaching it to the next', () async {
       final harness = await makeHarness();
       harness.repository.loadChats().ignore();

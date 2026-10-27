@@ -1,7 +1,9 @@
 name: Debug xiangqi review
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - debug/xiangqi-review-ci
 
 permissions: read-all
 

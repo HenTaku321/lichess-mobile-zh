@@ -308,6 +308,8 @@ void main() {
       expect(find.text('second'), findsOneWidget);
 
       await tester.enterText(find.byType(TextField), 'hello');
+      // Rebuild the ValueListenableBuilder before tapping its formerly disabled button.
+      await tester.pump();
       await tester.tap(find.byIcon(Icons.send));
       await tester.pump();
       // The composer clears as soon as the send is accepted; a failure puts the draft back.

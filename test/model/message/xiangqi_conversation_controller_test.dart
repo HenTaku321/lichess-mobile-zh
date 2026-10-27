@@ -62,7 +62,7 @@ makeControllerHarness() async {
 }
 
 void main() {
-  test('an identity change during a message load discards the superseded build', () async {
+  test('a lichess identity change shares history from the unchanged xiangqi session', () async {
     final harness = await makeControllerHarness();
     final container = harness.container;
     final provider = xiangqiConversationControllerProvider(conversation);
@@ -77,18 +77,14 @@ void main() {
       fixture.xiangqiMessagesFrame([fixture.xiangqiMessageRow('Superseded history')]),
     );
     await pumpEventQueue();
-    expect(container.read(provider).isLoading, isTrue);
     expect(
       harness.inbox.events.where((event) => event == kXiangqiInboxChatUserEvent),
-      hasLength(2),
+      hasLength(1),
     );
 
-    harness.inbox.channel.fromServer(
-      fixture.xiangqiMessagesFrame([fixture.xiangqiMessageRow('Current history')]),
-    );
     final current = await container.read(provider.future);
     expect(current.me.id, xiangqiUserId(fixture.xiangqiAccountId));
-    expect(current.convo.messages.map((message) => message.text), ['Current history']);
+    expect(current.convo.messages.map((message) => message.text), ['Superseded history']);
   });
 
   test('rebuilding the conversation retains only the current incoming subscription', () async {

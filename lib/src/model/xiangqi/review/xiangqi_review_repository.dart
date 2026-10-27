@@ -85,6 +85,7 @@ final xiangqiReviewProvider = FutureProvider.autoDispose.family<XiangqiReview, S
 
       // The snapshot first: without the moves there is nothing for the analysis to be keyed against.
       final snapshot = await _snapshotOf(socket, gameId);
+      _logger.fine('Snapshot received for game $gameId.');
       final moves = xiangqiReviewMovesFromHistory(snapshot['move_history']);
       final initial = _positionOf(snapshot['initial_fen']);
       if (moves == null || initial == null) {
@@ -237,7 +238,9 @@ Future<XiangqiSocketEvent> _requestFrame(
   answer.future.ignore();
   final subscription = socket.stream.listen(
     (event) {
-      if (!answer.isCompleted && matches(event)) answer.complete(event);
+      final matched = matches(event);
+      _logger.fine('Review response ${event.name}: matched=$matched.');
+      if (!answer.isCompleted && matched) answer.complete(event);
     },
     onDone: () {
       if (!answer.isCompleted) {
@@ -245,6 +248,12 @@ Future<XiangqiSocketEvent> _requestFrame(
       }
     },
   );
+  // The event stream survives reconnection, so onDone alone does not signal a dropped transport.
+  final statuses = socket.statusStream.listen((status) {
+    if (status != XiangqiConnectionStatus.connected && !answer.isCompleted) {
+      answer.completeError(const XiangqiReviewException(XiangqiReviewFailure.failed));
+    }
+  });
   final timer = Timer(kXiangqiReviewTimeout, () {
     if (!answer.isCompleted) {
       answer.completeError(TimeoutException('xiangqi.com review response timed out'));
@@ -252,10 +261,12 @@ Future<XiangqiSocketEvent> _requestFrame(
   });
   try {
     await send().timeout(kXiangqiReviewTimeout);
+    _logger.fine('Review request acknowledged; waiting for response.');
     return await answer.future;
   } finally {
     timer.cancel();
     await subscription.cancel();
+    await statuses.cancel();
   }
 }
 

@@ -176,7 +176,10 @@ class const _SeatLine({
               ],
               if (player.isBot) ...[
                 const SizedBox(width: 5.0),
-                Text('BOT', style: TextStyle(fontSize: 14, color: context.lichessColors.fancy)),
+                Text(
+                  context.l10n.computer,
+                  style: TextStyle(fontSize: 14, color: context.lichessColors.fancy),
+                ),
               ],
             ],
           ),

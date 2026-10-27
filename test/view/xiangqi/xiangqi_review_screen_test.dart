@@ -22,6 +22,7 @@ import 'package:lichess_mobile/src/view/xiangqi/xiangqi_review_screen.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:logging/logging.dart';
 
 import '../../binding.dart';
 import '../../model/xiangqi/online/xiangqi_online_game_fixture.dart' as fx;
@@ -175,6 +176,22 @@ BottomBarButton barButton(WidgetTester tester, IconData icon) => tester.widget<B
 
 void main() {
   TestLichessBinding.ensureInitialized();
+
+  setUp(() {
+    final previousLevel = Logger.root.level;
+    Logger.root.level = Level.FINE;
+    final logs = Logger.root.onRecord.listen((record) {
+      if (record.loggerName == 'XiangqiReviewRepository' ||
+          record.loggerName == 'XiangqiSocketClient') {
+        // CI is the execution environment; retain the failing protocol stage in its logs.
+        debugPrint('${record.loggerName}: ${record.message} ${record.error ?? ''}');
+      }
+    });
+    addTearDown(() async {
+      await logs.cancel();
+      Logger.root.level = previousLevel;
+    });
+  });
 
   group('XiangqiReviewScreen', () {
     testWidgets('opens on the last position, with the game marked up', (tester) async {

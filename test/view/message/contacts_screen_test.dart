@@ -23,6 +23,7 @@ import 'package:lichess_mobile/src/network/http.dart';
 import 'package:lichess_mobile/src/network/xiangqi_http.dart' show xiangqiAuthStorageProvider;
 import 'package:lichess_mobile/src/network/xiangqi_socket.dart';
 import 'package:lichess_mobile/src/view/message/contacts_screen.dart';
+import 'package:lichess_mobile/src/widgets/rich_link_text.dart';
 import 'package:lichess_mobile/src/view/message/conversation_screen.dart';
 import 'package:lichess_mobile/src/view/message/xiangqi_conversation_screen.dart';
 
@@ -213,7 +214,11 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('c'), findsWidgets);
+      // The inline timestamp spacer contributes a placeholder to Text.rich's plain text.
+      expect(
+        find.byWidgetPredicate((widget) => widget is RichLinkText && widget.text == 'c'),
+        findsOneWidget,
+      );
       // The page is drawn, not an error state: a controller that initialised itself only on its
       // first build would have failed here.
       expect(find.textContaining('LateInitializationError'), findsNothing);

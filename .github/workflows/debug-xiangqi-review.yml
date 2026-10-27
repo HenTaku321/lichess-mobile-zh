@@ -1,0 +1,41 @@
+name: Debug xiangqi review
+
+on:
+  workflow_dispatch:
+
+permissions: read-all
+
+jobs:
+  review-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          cache: true
+          flutter-version-file: pubspec.yaml
+
+      - name: Install requirements
+        run: sudo apt-get -y install libsqlite3-0 libsqlite3-dev
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Code generation
+        run: dart run build_runner build
+
+      - name: Install translation script dependencies
+        run: npm ci --no-audit --no-fund
+        working-directory: scripts
+
+      - name: Generate translations
+        run: ./scripts/gen-translations.sh
+
+      - name: Fetch the Pikafish network
+        run: ./scripts/fetch-pikafish-nnue.sh
+
+      - name: Run the review screen test
+        run: flutter test test/view/xiangqi/xiangqi_review_screen_test.dart --reporter expanded

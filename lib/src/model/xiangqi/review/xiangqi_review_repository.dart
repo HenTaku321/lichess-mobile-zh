@@ -87,18 +87,23 @@ final xiangqiReviewProvider = FutureProvider.autoDispose.family<XiangqiReview, S
       final snapshot = await _snapshotOf(socket, gameId);
       _logger.fine('Snapshot received for game $gameId.');
       final moves = xiangqiReviewMovesFromHistory(snapshot['move_history']);
+      _logger.fine('Snapshot history parsed: ${moves?.length} moves.');
       final initial = _positionOf(snapshot['initial_fen']);
+      _logger.fine('Initial position parsed: ${initial != null}.');
       if (moves == null || initial == null) {
         _logger.warning('The snapshot of game $gameId did not replay.');
         throw const XiangqiReviewException(XiangqiReviewFailure.failed);
       }
       final positions = xiangqiReviewPositions(initial, moves);
+      _logger.fine('Review positions replayed: ${positions?.length}.');
       if (positions == null) {
         _logger.warning('The moves of game $gameId do not fit its own starting position.');
         throw const XiangqiReviewException(XiangqiReviewFailure.failed);
       }
 
+      _logger.fine('Requesting analysis for game $gameId.');
       final analysis = await _analysisOf(socket, gameId, moves);
+      _logger.fine('Analysis received for game $gameId.');
 
       return XiangqiReview(
         gameId: gameId,
@@ -182,11 +187,13 @@ Future<IList<XiangqiMoveReview>> _analysisOf(
     socket,
     (event) => event.name == kXiangqiReviewSuccessEvent,
     () async {
+      _logger.fine('Emitting review request.');
       await socket.emit(
         kXiangqiReviewEvent,
         data: {'game_id': gameId, 'skip_missions': true},
         timeout: kXiangqiReviewTimeout,
       );
+      _logger.fine('Review emit acknowledged.');
     },
   );
   final data = _asMap(_unwrap(frame.data));
@@ -262,11 +269,15 @@ Future<XiangqiSocketEvent> _requestFrame(
   try {
     await send().timeout(kXiangqiReviewTimeout);
     _logger.fine('Review request acknowledged; waiting for response.');
-    return await answer.future;
+    final event = await answer.future;
+    _logger.fine('Review waiter completed for ${event.name}.');
+    return event;
   } finally {
+    _logger.fine('Releasing review waiter.');
     timer.cancel();
     await subscription.cancel();
     await statuses.cancel();
+    _logger.fine('Review waiter released.');
   }
 }
 

@@ -23,9 +23,9 @@ import 'package:lichess_mobile/src/network/http.dart';
 import 'package:lichess_mobile/src/network/xiangqi_http.dart' show xiangqiAuthStorageProvider;
 import 'package:lichess_mobile/src/network/xiangqi_socket.dart';
 import 'package:lichess_mobile/src/view/message/contacts_screen.dart';
-import 'package:lichess_mobile/src/widgets/rich_link_text.dart';
 import 'package:lichess_mobile/src/view/message/conversation_screen.dart';
 import 'package:lichess_mobile/src/view/message/xiangqi_conversation_screen.dart';
+import 'package:lichess_mobile/src/widgets/rich_link_text.dart';
 
 import '../../binding.dart';
 import '../../model/auth/fake_auth_storage.dart';

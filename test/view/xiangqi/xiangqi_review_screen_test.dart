@@ -21,8 +21,8 @@ import 'package:lichess_mobile/src/network/xiangqi_socket.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_review_screen.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
-import 'package:material_ui/material_ui.dart';
 import 'package:logging/logging.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../binding.dart';
 import '../../model/xiangqi/online/xiangqi_online_game_fixture.dart' as fx;

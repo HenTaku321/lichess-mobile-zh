@@ -275,8 +275,11 @@ Future<XiangqiSocketEvent> _requestFrame(
   } finally {
     _logger.fine('Releasing review waiter.');
     timer.cancel();
-    await subscription.cancel();
-    await statuses.cancel();
+    // Cleanup must not gate the response. Awaiting a broadcast stream's cancel
+    // future here can leave the caller parked even though the event it waited
+    // for has already arrived.
+    subscription.cancel().ignore();
+    statuses.cancel().ignore();
     _logger.fine('Review waiter released.');
   }
 }

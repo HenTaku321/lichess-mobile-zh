@@ -398,9 +398,8 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
       practiceMode: practiceMode,
       cursor: 0,
     );
-    if (timeIncrement != null) {
-      ref.read(xiangqiClockProvider.notifier).setupClock(timeIncrement);
-    }
+    // Retaining the control is not retaining the old remaining times or timeout flag.
+    ref.read(xiangqiClockProvider.notifier).setupClock(effectiveTimeIncrement);
     // Over the board it is never the computer's turn, so this never starts a search — see
     // [XiangqiGameState.isPlayerTurn].
     if (!state.isPlayerTurn) unawaited(_playEngineMove());

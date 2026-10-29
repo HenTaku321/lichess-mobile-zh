@@ -59,7 +59,15 @@ Future<void> searchStarted(
       break;
     }
   }
-  expect(started, isTrue, reason: 'search never started; scoring=$scoring; commands=$commands');
+  final state = game.containerOf(tester).read(xiangqiGameControllerProvider);
+  expect(
+    started,
+    isTrue,
+    reason:
+        'search never started; scoring=$scoring; commands=$commands; '
+        'moves=${state.moves.length}; grading=${state.isEvaluatingMove}; thinking=${state.isEngineThinking}; '
+        'generation=${game.containerOf(tester).read(xiangqiGameControllerProvider.notifier).generation}',
+  );
 }
 
 Future<void> reply(WidgetTester tester, FakeTransport transport, String move) async {
@@ -68,6 +76,12 @@ Future<void> reply(WidgetTester tester, FakeTransport transport, String move) as
   await tester.pump(const Duration(milliseconds: 1));
   await tester.pump();
   await tester.pump();
+  final state = game.containerOf(tester).read(xiangqiGameControllerProvider);
+  debugPrint(
+    'UI scoring trace: $move; grading=${state.isEvaluatingMove}; '
+    'thinking=${state.isEngineThinking}; comment=${state.practiceComment != null}; '
+    'commands=${transport.commands}',
+  );
 }
 
 Future<void> score(WidgetTester tester, FakeTransport transport, int cp, String move) async {

@@ -116,33 +116,40 @@ class _RepeatButtonState() extends State<RepeatButton> {
 
   @override
   void dispose() {
-    _holdTimer?.cancel();
+    _onPressEnd();
     super.dispose();
   }
 
-  Future<void> _onLongPress() async {
+  void _onLongPress() {
+    _onPressEnd();
+    if (!mounted || widget.onLongPress == null) return;
     _isPressed = true;
 
-    HapticFeedback.selectionClick();
+    unawaited(HapticFeedback.selectionClick());
 
     widget.onLongPress?.call();
+    _scheduleRepeat(0);
+  }
 
-    for (final time in widget.triggerDelays) {
-      await Future.delayed(time, () {});
-      if (!_isPressed) return;
+  void _scheduleRepeat(int step) {
+    if (!mounted || !_isPressed || widget.onLongPress == null) return;
+    final delay = step < widget.triggerDelays.length
+        ? widget.triggerDelays[step]
+        : widget.holdDelay;
+    // A single cancellable timer also covers the acceleration phase. Future.delayed callbacks
+    // cannot be cancelled and otherwise outlive a disposed button and its owning screen.
+    _holdTimer = Timer(delay, () {
+      _holdTimer = null;
+      if (!mounted || !_isPressed) return;
       widget.onLongPress?.call();
-    }
-
-    _holdTimer = Timer.periodic(widget.holdDelay, (_) {
-      if (_isPressed) {
-        widget.onLongPress?.call();
-      }
+      _scheduleRepeat(step + 1);
     });
   }
 
   void _onPressEnd() {
     _isPressed = false;
     _holdTimer?.cancel();
+    _holdTimer = null;
   }
 
   @override

@@ -329,7 +329,8 @@ typedef XiangqiFadingPiece = ({XiangqiSquare square, XiangqiPiece piece});
 /// The whole correctness of the animation is that a move explains exactly one change: a piece
 /// leaves one square and arrives on another. [move] explains the change between the two positions
 /// only when the piece that stood on `move.from` is now on `move.to` and `move.from` is now empty;
-/// when all three hold, one translating piece comes back and, if something stood on `move.to` in
+/// when all three hold and every other square is unchanged, one translating piece comes back and,
+/// if something stood on `move.to` in
 /// [from], one fading piece for the capture. In every other case both lists are empty, and empty
 /// means "draw [to] and animate nothing".
 ///
@@ -356,6 +357,17 @@ xiangqiPieceAnimation(XiangqiPosition from, XiangqiPosition to, XiangqiMove? mov
       translating: const IListConst<XiangqiTranslatingPiece>([]),
       fading: const IListConst<XiangqiFadingPiece>([]),
     );
+  }
+  // The move must explain the entire board change, not just one matching piece in a larger jump.
+  for (var index = 0; index < kXiangqiSquares; index++) {
+    if (index != move.from.index &&
+        index != move.to.index &&
+        from.board[index] != to.board[index]) {
+      return (
+        translating: const IListConst<XiangqiTranslatingPiece>([]),
+        fading: const IListConst<XiangqiFadingPiece>([]),
+      );
+    }
   }
   final captured = from.pieceAt(move.to);
   return (
@@ -723,6 +735,7 @@ class _XiangqiBoardState() extends State<XiangqiBoard> with SingleTickerProvider
   bool _deselectOnUp = false;
   bool _mousePointer = false;
   bool _draggingPiece = false;
+  bool _reverseAnimation = false;
   bool _shapeGesture = false;
   int? _shapeLockPointer;
   int? _shapePointer;
@@ -768,6 +781,7 @@ class _XiangqiBoardState() extends State<XiangqiBoard> with SingleTickerProvider
   void _clearAnimation() {
     _translating = const IListConst([]);
     _fading = const IListConst([]);
+    _reverseAnimation = false;
   }
 
   void _onAnimationStatus(AnimationStatus status) {
@@ -809,7 +823,21 @@ class _XiangqiBoardState() extends State<XiangqiBoard> with SingleTickerProvider
 
     if (oldWidget.position == widget.position) return;
 
-    final animation = xiangqiPieceAnimation(oldWidget.position, widget.position, widget.lastMove);
+    var animation = xiangqiPieceAnimation(oldWidget.position, widget.position, widget.lastMove);
+    var reverse = false;
+    if (animation.translating.isEmpty && oldWidget.lastMove != widget.lastMove) {
+      final undone = xiangqiPieceAnimation(widget.position, oldWidget.position, oldWidget.lastMove);
+      if (undone.translating.isNotEmpty) {
+        reverse = true;
+        animation = (
+          translating: [
+            for (final piece in undone.translating)
+              (from: piece.to, to: piece.from, piece: piece.piece),
+          ].lock,
+          fading: undone.fading,
+        );
+      }
+    }
     final wasDrop = _lastDrop != null && _lastDrop == widget.lastMove;
     _lastDrop = null;
     if (wasDrop ||
@@ -826,6 +854,7 @@ class _XiangqiBoardState() extends State<XiangqiBoard> with SingleTickerProvider
     // lets its own.
     _translating = animation.translating;
     _fading = animation.fading;
+    _reverseAnimation = reverse;
     _controller.forward(from: 0.0);
   }
 
@@ -1114,6 +1143,7 @@ class _XiangqiBoardState() extends State<XiangqiBoard> with SingleTickerProvider
                     blindfoldMode: widget.blindfoldMode,
                     translating: _translating,
                     fading: _fading,
+                    reverseAnimation: _reverseAnimation,
                     translation: _translation,
                     fade: _fade,
                     shapes: _shapeGesture && _shapeFrom != null && _shapeAt != null
@@ -1208,6 +1238,7 @@ class XiangqiBoardPainter({
   required final bool blindfoldMode,
   required final IList<XiangqiTranslatingPiece> _translating,
   required final IList<XiangqiFadingPiece> _fading,
+  final bool reverseAnimation = false,
   required final Animation<double> _translation,
   required final Animation<double> _fade,
   required final XiangqiSquare? dragFrom,
@@ -1582,10 +1613,14 @@ class XiangqiBoardPainter({
     // destination is the translating piece, and the one under the finger is the dragged piece.
     // Drawing them here as well would show two of each.
     final arrivingAt = {for (final moving in _translating) moving.to};
+    final appearingAt = reverseAnimation
+        ? {for (final piece in _fading) piece.square}
+        : <XiangqiSquare>{};
     final dragFrom = draggingPiece ? this.dragFrom : null;
     return [
       for (var index = 0; index < kXiangqiSquares; index++)
         if (!arrivingAt.contains(XiangqiSquare(index)) &&
+            !appearingAt.contains(XiangqiSquare(index)) &&
             XiangqiSquare(index) != dragFrom &&
             position.board[index] != null)
           XiangqiSquare(index),
@@ -1658,7 +1693,7 @@ class XiangqiBoardPainter({
   void paintFading(Canvas canvas) {
     if (blindfoldMode) return;
     if (_fading.isEmpty) return;
-    final opacity = 1 - _fade.value;
+    final opacity = reverseAnimation ? _fade.value : 1 - _fade.value;
     if (opacity <= 0) return;
     canvas.saveLayer(
       Rect.fromLTWH(0, 0, geometry.width, geometry.height),

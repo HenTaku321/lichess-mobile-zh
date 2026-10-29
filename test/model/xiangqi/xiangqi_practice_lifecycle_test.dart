@@ -109,6 +109,42 @@ void main() {
     expect(restored!.state.practiceComment, isNotNull);
     expect(restored.state.practiceComment!.bestMove, harness.state.practiceComment!.bestMove);
     expect(restored.state.practiceComment!.verdict, harness.state.practiceComment!.verdict);
+
+    final legacy = saved.toJson()..remove('practiceComments');
+    expect(SavedXiangqiGame.fromJson(legacy)!.state.practiceComment, isNull);
+    final damagedFeedback = saved.toJson();
+    damagedFeedback['practiceComments'] = [
+      {'ply': 99, 'verdict': 'blunder', 'cp': 50},
+      {'ply': 1, 'verdict': 'mistake', 'cp': 'not-a-score'},
+    ];
+    final damaged = SavedXiangqiGame.fromJson(damagedFeedback);
+    expect(damaged, isNotNull);
+    expect(damaged!.state.positions, harness.state.positions);
+    expect(damaged.state.practiceComment, isNull);
+  });
+
+  test('undo restores the surviving prior verdict instead of the removed move', () async {
+    final harness = await game.makeHarness();
+    harness.controller.startNewGame(side: .red, difficulty: .level4, practiceMode: true);
+    harness.controller.tapSquare(game.square('h2'));
+    harness.controller.tapSquare(game.square('e2'));
+    await score(harness, 20, 'b2e2');
+    await score(harness, -30, 'h9g7');
+    await game.answer(harness.transport, 'h9g7');
+    final first = harness.state.practiceComment;
+    harness.controller.tapSquare(game.square('a3'));
+    harness.controller.tapSquare(game.square('a4'));
+    expect(harness.state.previousPracticeComment, same(first));
+    await score(harness, 20, 'h0g2');
+    await score(harness, -300, 'b9c7');
+    await game.answer(harness.transport, 'b9c7');
+    expect(harness.state.practiceComment, isNot(same(first)));
+    harness.controller.undo();
+    expect(harness.state.practiceComment, same(first));
+    expect(harness.state.practiceComments.keys, [1]);
+    harness.controller.startNewGame(side: .red, difficulty: .level4, practiceMode: true);
+    expect(harness.state.practiceComment, isNull);
+    expect(harness.state.previousPracticeComment, isNull);
   });
 
   test('corrupt saved history is refused rather than silently dropping bad moves', () async {

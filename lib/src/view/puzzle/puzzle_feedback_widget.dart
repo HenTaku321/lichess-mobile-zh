@@ -8,7 +8,10 @@ import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/string.dart';
 import 'package:lichess_mobile/src/view/account/rating_pref_aware.dart';
+import 'package:lichess_mobile/src/widgets/training_feedback.dart';
 import 'package:material_ui/material_ui.dart';
+
+export 'package:lichess_mobile/src/widgets/training_feedback.dart' show FeedbackTile;
 
 class const PuzzleFeedbackWidget({
   required final Puzzle puzzle,
@@ -52,32 +55,16 @@ class const PuzzleFeedbackWidget({
       case PuzzleMode.load:
       case PuzzleMode.play:
         if (state.feedback == PuzzleFeedback.bad) {
-          return FeedbackTile(
-            leading: Icon(Icons.close, size: 36, color: context.lichessColors.error),
-            title: Text(context.l10n.puzzleNotTheMove, overflow: TextOverflow.ellipsis),
-            subtitle: Text(
-              context.l10n.puzzleTrySomethingElse,
-              overflow: TextOverflow.ellipsis,
-              maxLines: 2,
-            ),
-          );
+          return const TrainingMoveFeedbackTile(phase: TrainingFeedbackPhase.incorrect);
         } else if (state.feedback == PuzzleFeedback.good) {
-          return FeedbackTile(
-            leading: Icon(Icons.check, size: 36, color: context.lichessColors.good),
-            title: Text(context.l10n.puzzleBestMove),
-            subtitle: Text(context.l10n.puzzleKeepGoing),
-          );
+          return const TrainingMoveFeedbackTile(phase: TrainingFeedbackPhase.correct);
         } else {
-          return FeedbackTile(
-            leading: SideToPlayPiece(side: state.pov),
-            title: Text(context.l10n.yourTurn, overflow: TextOverflow.ellipsis),
-            subtitle: Text(
-              state.pov == Side.white
-                  ? context.l10n.puzzleFindTheBestMoveForWhite
-                  : context.l10n.puzzleFindTheBestMoveForBlack,
-              overflow: TextOverflow.ellipsis,
-              maxLines: 2,
-            ),
+          return TrainingMoveFeedbackTile(
+            phase: TrainingFeedbackPhase.prompt,
+            promptLeading: SideToPlayPiece(side: state.pov),
+            promptSubtitle: state.pov == Side.white
+                ? context.l10n.puzzleFindTheBestMoveForWhite
+                : context.l10n.puzzleFindTheBestMoveForBlack,
           );
         }
     }
@@ -119,40 +106,6 @@ class const SideToPlayPiece({required final Side side}) extends ConsumerWidget {
           height: 48,
           bundle: asset.bundle,
           package: asset.package,
-        ),
-      ],
-    );
-  }
-}
-
-class const FeedbackTile({
-  final Widget? leading,
-  required final Widget title,
-  final Widget? subtitle,
-}) extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final defaultFontSize = DefaultTextStyle.of(context).style.fontSize;
-
-    return Row(
-      children: [
-        if (leading != null) ...[leading!, const SizedBox(width: 16.0)],
-        Flexible(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DefaultTextStyle.merge(
-                style: TextStyle(
-                  fontSize: defaultFontSize != null ? defaultFontSize * 1.2 : null,
-                  fontWeight: FontWeight.bold,
-                ),
-                child: title,
-              ),
-              ?subtitle,
-            ],
-          ),
         ),
       ],
     );

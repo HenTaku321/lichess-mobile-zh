@@ -26,10 +26,10 @@ import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
 import 'package:lichess_mobile/src/widgets/feedback.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
 import 'package:lichess_mobile/src/widgets/settings.dart';
+import 'package:lichess_mobile/src/widgets/training_feedback.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_avatar.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_game_layout.dart';
-import 'package:lichess_mobile/src/widgets/xiangqi_player_row.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// Solves xiangqi.com's puzzles, on this app's own board.
@@ -312,13 +312,10 @@ class _PuzzleBodyState() extends ConsumerState<_PuzzleBody> {
           bottomTable: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _SolverRow(
-                side: orientation,
-                style: style,
-                status: _statusText(context, state),
-                mistakes: state.mistakes,
-                hintsUsed: state.hintsUsed,
-              ),
+              _SolverRow(side: orientation, style: style, state: state),
+              if (state.phase == XiangqiPuzzlePhase.submitting ||
+                  state.phase == XiangqiPuzzlePhase.unrecorded)
+                Text(_statusText(context, state)),
               if (_loadingNext || state.phase == XiangqiPuzzlePhase.submitting)
                 const LinearProgressIndicator(),
             ],
@@ -505,31 +502,60 @@ class const _QuotaLine() extends ConsumerWidget {
   }
 }
 
-/// The solver's own row: which side they are, and how the attempt is going.
+/// The solver's decision is shown using the same feedback as chess puzzles. An automatic reply
+/// does not become a new solver decision; a wrong move remains marked after its visual rollback.
 class const _SolverRow({
   required final XiangqiSide side,
   required final XiangqiBoardStyle style,
-  required final String status,
-  required final int mistakes,
-  required final int hintsUsed,
+  required final XiangqiPuzzleAttemptState state,
 }) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final counts = mistakes > 0 || hintsUsed > 0
+    final counts = state.mistakes > 0 || state.hintsUsed > 0
         ? Row(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              if (mistakes > 0) _Count(icon: CupertinoIcons.xmark, value: mistakes),
-              if (hintsUsed > 0) _Count(icon: CupertinoIcons.lightbulb, value: hintsUsed),
+              if (state.mistakes > 0) _Count(icon: CupertinoIcons.xmark, value: state.mistakes),
+              if (state.hintsUsed > 0)
+                _Count(icon: CupertinoIcons.lightbulb, value: state.hintsUsed),
             ],
           )
         : null;
-    return XiangqiPlayerRow(
-      side: side,
-      style: style,
-      name: side.label(context.l10n),
-      status: status,
-      clock: counts,
+    final piece = XiangqiPieceAvatar(side: side, size: 50, style: style);
+    final Widget feedback;
+    if (state.puzzle.solution == null) {
+      feedback = FeedbackTile(
+        leading: piece,
+        title: Text(
+          context.l10n.mobileXiangqiPuzzleSolutionWithheld,
+          overflow: TextOverflow.ellipsis,
+          maxLines: 3,
+        ),
+      );
+    } else if (state.phase != XiangqiPuzzlePhase.solving) {
+      final solved = state.recordedStatus == XiangqiPuzzleAttemptStatus.solved;
+      feedback = FeedbackTile(
+        leading: solved ? Icon(Icons.check, size: 36, color: context.lichessColors.good) : null,
+        title: Text(
+          solved ? context.l10n.puzzlePuzzleSuccess : context.l10n.puzzlePuzzleComplete,
+          overflow: TextOverflow.ellipsis,
+        ),
+      );
+    } else {
+      feedback = TrainingMoveFeedbackTile(
+        phase: state.wrongMove != null
+            ? TrainingFeedbackPhase.incorrect
+            : state.moves.length > 1
+            ? TrainingFeedbackPhase.correct
+            : TrainingFeedbackPhase.prompt,
+        promptLeading: piece,
+        promptSubtitle: context.l10n.mobileXiangqiPuzzleFindBestMoveFor(side.label(context.l10n)),
+      );
+    }
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [feedback, ?counts],
     );
   }
 }

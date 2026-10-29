@@ -295,7 +295,7 @@ void main() {
 
       await playTheLine(tester);
 
-      expect(find.text('solved'), findsOneWidget);
+      expect(find.text('Success!'), findsOneWidget);
       // The whole line, the blunder first, is what the attempt holds.
       expect(attemptState(tester).moves.length, xiangqiTestLine.answer.length);
 
@@ -321,13 +321,13 @@ void main() {
       expect(board(tester).position, rules.play(before, wrong));
       expect(attemptState(tester).mistakes, 1);
       expect(attemptState(tester).wrongMove, wrong);
-      expect(find.text('That is not the move.'), findsOneWidget);
+      expect(find.text("That's not the move!"), findsOneWidget);
 
       await tester.pump(const Duration(milliseconds: 500));
 
       expect(board(tester).position, before, reason: 'the wrong move is taken back');
       expect(attemptState(tester).wrongMove, wrong);
-      expect(find.text('That is not the move.'), findsOneWidget);
+      expect(find.text("That's not the move!"), findsOneWidget);
     });
 
     testWidgets('a queue with nothing in it says so rather than showing an empty board', (

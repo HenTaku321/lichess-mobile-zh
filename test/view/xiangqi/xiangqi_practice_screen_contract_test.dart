@@ -9,8 +9,8 @@ import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_game_screen.dart';
 import 'package:lichess_mobile/src/widgets/practice_feedback_card.dart';
 import 'package:lichess_mobile/src/widgets/settings.dart';
-import 'package:lichess_mobile/src/widgets/xiangqi_difficulty_tile.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_difficulty_tile.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_player_row.dart';
 import 'package:lichess_mobile/src/widgets/yes_no_dialog.dart';
 import 'package:material_ui/material_ui.dart';
@@ -41,9 +41,15 @@ Future<void> tap(WidgetTester tester, String square) async {
 
 Future<void> score(WidgetTester tester, FakeTransport transport, int cp, String move) async {
   await game.startSearch(tester, transport);
+  await tester.pump(const Duration(milliseconds: 1));
+  final searches = transport.takeCommands().where((command) => command.startsWith('go ')).toList();
+  expect(searches, isNotEmpty, reason: 'the scoring search must actually be started');
+  expect(searches.last, 'go depth 9');
   transport.emit('info depth 9 score cp $cp pv $move');
+  await tester.pump(const Duration(milliseconds: 1));
   await tester.pump();
   transport.emit('bestmove $move');
+  await tester.pump(const Duration(milliseconds: 1));
   await tester.pump();
   await tester.pump();
 }
@@ -119,9 +125,16 @@ void main() {
         if (side == .black) await game.answer(tester, transport, 'h2e2');
         await tap(tester, side == .red ? 'h2' : 'h9');
         await tap(tester, side == .red ? 'e2' : 'g7');
+        final moved = game.containerOf(tester).read(xiangqiGameControllerProvider);
+        expect(moved.moves.length, side == .red ? 1 : 2);
+        expect(moved.isEvaluatingMove, isTrue);
         await score(tester, transport, 20, side == .red ? 'b2e2' : 'b9c7');
         final reply = side == .red ? 'h9g7' : 'h0g2';
         await score(tester, transport, -30, reply);
+        expect(
+          game.containerOf(tester).read(xiangqiGameControllerProvider).practiceComment,
+          isNotNull,
+        );
         final verdict = tester
             .widget<PracticeFeedbackCard>(find.byType(PracticeFeedbackCard))
             .feedback!

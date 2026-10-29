@@ -87,19 +87,26 @@ class const XiangqiPlayerRow({
                   ],
                   if (isBot) ...[
                     const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                      decoration: BoxDecoration(
-                        color: context.lichessColors.fancy,
-                        borderRadius: const BorderRadius.all(Radius.circular(3)),
-                      ),
-                      child: Text(
-                        context.l10n.computer,
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          letterSpacing: 0.5,
+                    Flexible(
+                      child: Tooltip(
+                        message: context.l10n.computer,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: context.lichessColors.fancy,
+                            borderRadius: const BorderRadius.all(Radius.circular(3)),
+                          ),
+                          child: Text(
+                            context.l10n.computer,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
                         ),
                       ),
                     ),

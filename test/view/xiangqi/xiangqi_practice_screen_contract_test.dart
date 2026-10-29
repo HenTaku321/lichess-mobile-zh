@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lichess_mobile/src/model/common/time_increment.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_clock.dart';
@@ -13,6 +14,7 @@ import 'package:lichess_mobile/src/widgets/xiangqi_player_row.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../binding.dart';
+import '../../model/engine/fake_transport.dart';
 import 'xiangqi_game_screen_test.dart' as game;
 
 const practiceScreen = XiangqiGameScreen(
@@ -21,6 +23,28 @@ const practiceScreen = XiangqiGameScreen(
   initialTimeIncrement: TimeIncrement.infinite(),
   initialPracticeMode: true,
 );
+
+Future<void> tap(WidgetTester tester, String square) async {
+  final board = tester.widget<XiangqiBoard>(find.byType(XiangqiBoard));
+  final rect = tester.getRect(find.byType(XiangqiBoard));
+  final geometry = XiangqiBoardGeometry.fit(rect.size, showCoordinates: true);
+  final drawn = Rect.fromCenter(
+    center: rect.center,
+    width: geometry.width,
+    height: geometry.height,
+  );
+  await tester.tapAt(drawn.topLeft + geometry.centerOf(game.squareAt(square), board.orientation));
+  await tester.pump();
+}
+
+Future<void> score(WidgetTester tester, FakeTransport transport, int cp, String move) async {
+  await game.startSearch(tester, transport);
+  transport.emit('info depth 9 score cp $cp pv $move');
+  await tester.pump();
+  transport.emit('bestmove $move');
+  await tester.pump();
+  await tester.pump();
+}
 
 void main() {
   TestLichessBinding.ensureInitialized();
@@ -35,6 +59,72 @@ void main() {
   });
 
   final human = find.byWidgetPredicate((widget) => widget is XiangqiPlayerRow && !widget.isBot);
+
+  for (final size in const [Size(480, 480), Size(1280, 720), Size(1920, 1080)]) {
+    for (final side in XiangqiSide.values) {
+      testWidgets('$side practice complete round stays coherent at $size', (tester) async {
+        final transport = await game.pumpGameScreen(
+          tester,
+          surfaceSize: size,
+          failOnOverflow: true,
+          screen: XiangqiGameScreen(
+            initialSide: side,
+            initialDifficulty: .level4,
+            initialTimeIncrement: const TimeIncrement.infinite(),
+            initialPracticeMode: true,
+          ),
+        );
+        if (side == .black) await game.answer(tester, transport, 'h2e2');
+        await tap(tester, side == .red ? 'h2' : 'h9');
+        await tap(tester, side == .red ? 'e2' : 'g7');
+        await score(tester, transport, 20, side == .red ? 'b2e2' : 'b9c7');
+        final reply = side == .red ? 'h9g7' : 'h0g2';
+        await score(tester, transport, -30, reply);
+        final verdict = tester
+            .widget<PracticeFeedbackCard>(find.byType(PracticeFeedbackCard))
+            .feedback!
+            .verdict;
+        await game.answer(tester, transport, reply);
+        expect(
+          tester.widget<PracticeFeedbackCard>(find.byType(PracticeFeedbackCard)).feedback!.verdict,
+          verdict,
+        );
+        final origin = side == .red ? 'a3' : 'a6';
+        await tap(tester, origin);
+        await tap(tester, side == .red ? 'a5' : 'a4');
+        expect(
+          tester.widget<PracticeFeedbackCard>(find.byType(PracticeFeedbackCard)).feedback!.verdict,
+          verdict,
+        );
+        await tap(tester, origin);
+        await tap(tester, side == .red ? 'a4' : 'a5');
+        var card = tester.widget<PracticeFeedbackCard>(find.byType(PracticeFeedbackCard));
+        expect(card.feedback, isNull);
+        expect(card.isEvaluatingMove, isTrue);
+        expect(card.previousFeedback!.verdict, verdict);
+        await tester.tap(find.byIcon(CupertinoIcons.arrow_uturn_left));
+        await tester.pump();
+        card = tester.widget<PracticeFeedbackCard>(find.byType(PracticeFeedbackCard));
+        expect(card.isEvaluatingMove, isFalse);
+        expect(card.feedback!.verdict, verdict);
+        game
+            .containerOf(tester)
+            .read(xiangqiGameControllerProvider.notifier)
+            .startNewGame(
+              side: side,
+              difficulty: .level4,
+              timeIncrement: const TimeIncrement.infinite(),
+              practiceMode: true,
+            );
+        await tester.pump();
+        card = tester.widget<PracticeFeedbackCard>(find.byType(PracticeFeedbackCard));
+        expect(card.feedback, isNull);
+        expect(card.previousFeedback, isNull);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      }, variant: TargetPlatformVariant.only(TargetPlatform.linux));
+    }
+  }
 
   testWidgets('a finished computer game does not offer a drag that cannot be played', (
     tester,

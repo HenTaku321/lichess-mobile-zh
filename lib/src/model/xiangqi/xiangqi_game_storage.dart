@@ -65,12 +65,13 @@ final class const SavedXiangqiGame({
       if (positions.isEmpty || positions.length != moves.length + 1) return null;
       for (var i = 0; i < moves.length; i++) {
         if (!rules.isLegal(positions[i], moves[i]) ||
-            rules.play(positions[i], moves[i]) != positions[i + 1])
+            rules.play(positions[i], moves[i]) != positions[i + 1]) {
           return null;
+        }
       }
       final playerSide = XiangqiSide.values.byName(json['playerSide'] as String);
       final comments = <int, XiangqiPracticeComment>{};
-      if (json['practiceComments'] case final List entries) {
+      if (json['practiceComments'] case final List<dynamic> entries) {
         for (final entry in entries) {
           if (entry is! Map<String, dynamic>) continue;
           try {
@@ -81,8 +82,9 @@ final class const SavedXiangqiGame({
             if ((cp == null) == (mate == null)) continue;
             final best = entry['bestMove'];
             final move = best == null ? null : XiangqiMove.parseIccs(best as String);
-            if (best != null && (move == null || !rules.isLegal(positions[ply - 1], move)))
+            if (best != null && (move == null || !rules.isLegal(positions[ply - 1], move))) {
               continue;
+            }
             comments[ply] = XiangqiPracticeComment(
               verdict: MoveVerdict.values.byName(entry['verdict'] as String),
               bestMove: move,

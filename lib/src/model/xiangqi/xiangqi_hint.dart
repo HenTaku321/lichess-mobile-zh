@@ -42,7 +42,6 @@ sealed class const XiangqiHint._() with _$XiangqiHint {
     /// The engine's evaluation of the position the hint was asked for, or null when the search
     /// ended before it reached one.
     XiangqiEvaluation? evaluation,
-    XiangqiPosition? evaluatedPosition,
   }) = _XiangqiHint;
 }
 
@@ -105,6 +104,9 @@ sealed class const XiangqiEngineAnalysisState._() with _$XiangqiEngineAnalysisSt
 
     /// The latest score, from whichever search — a hint's or an evaluation's — is the current one.
     XiangqiEvaluation? evaluation,
+
+    /// The exact displayed position this evaluation belongs to.
+    XiangqiPosition? evaluatedPosition,
 
     /// Whether a search this provider started is still running.
     @Default(false) bool isBusy,

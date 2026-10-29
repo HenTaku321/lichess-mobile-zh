@@ -71,6 +71,7 @@ Future<Widget> makeTestProviderScopeApp(
   AuthUser? authUser,
   Map<String, Object>? defaultPreferences,
   Size surfaceSize = kTestSurfaceSize,
+  bool failOnOverflow = false,
 }) {
   return makeTestProviderScope(
     tester,
@@ -79,6 +80,7 @@ Future<Widget> makeTestProviderScopeApp(
     authUser: authUser,
     defaultPreferences: defaultPreferences,
     surfaceSize: surfaceSize,
+    failOnOverflow: failOnOverflow,
   );
 }
 
@@ -156,6 +158,7 @@ Future<Widget> makeTestProviderScope(
   Map<String, Object>? defaultPreferences,
   Size surfaceSize = kTestSurfaceSize,
   Key? key,
+  bool failOnOverflow = false,
 }) async {
   final binding = TestLichessBinding.ensureInitialized();
 
@@ -212,8 +215,8 @@ Future<Widget> makeTestProviderScope(
     }
   }
 
-  // TODO consider loading true fonts as well
-  FlutterError.onError = ignoreOverflowErrors;
+  // Legacy tests opt out by default; layout acceptance tests must not suppress overflows.
+  if (!failOnOverflow) FlutterError.onError = ignoreOverflowErrors;
 
   final Map<ProviderOrFamily, Override> overrideMap = {
     notificationDisplayProvider: notificationDisplayProvider.overrideWith((ref) {

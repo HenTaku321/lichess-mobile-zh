@@ -112,6 +112,31 @@ void main() {
   TestLichessBinding.ensureInitialized();
 
   group('XiangqiOverTheBoardScreen', () {
+    testWidgets('OTB only offers dragging for the side that may actually move', (tester) async {
+      await pumpOtbScreen(tester);
+      var board = tester.widget<XiangqiBoard>(find.byType(XiangqiBoard));
+      expect(board.canStartDrag!(board.position.pieceAt(squareAt('h9'))!), isFalse);
+      await tapSquare(tester, 'h2');
+      await tapSquare(tester, 'e2');
+      board = tester.widget<XiangqiBoard>(find.byType(XiangqiBoard));
+      expect(board.canStartDrag!(board.position.pieceAt(squareAt('e2'))!), isFalse);
+      expect(board.canStartDrag!(board.position.pieceAt(squareAt('h9'))!), isTrue);
+    });
+
+    testWidgets('OTB history is not draggable even though the live game remains playable', (
+      tester,
+    ) async {
+      await pumpOtbScreen(tester);
+      await tapSquare(tester, 'h2');
+      await tapSquare(tester, 'e2');
+      await tapSquare(tester, 'h9');
+      await tapSquare(tester, 'g7');
+      containerOf(tester).read(xiangqiGameControllerProvider.notifier).goTo(0);
+      await tester.pump();
+      final board = tester.widget<XiangqiBoard>(find.byType(XiangqiBoard));
+      expect(board.canStartDrag!(board.position.pieceAt(squareAt('a3'))!), isFalse);
+    });
+
     testWidgets('the game picker goes back to the chess board, and stays there', (tester) async {
       // The other half of the chess sheet's own row: the two boards are one way of playing offered
       // for two games, so whichever one the reader is setting up, the other is a tap away.

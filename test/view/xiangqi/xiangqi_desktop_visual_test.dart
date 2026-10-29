@@ -522,6 +522,7 @@ void main() {
                 await tester.pumpWidget(
                   await makeTestProviderScope(
                     tester,
+                    failOnOverflow: true,
                     surfaceSize: size,
                     child: DesktopSceneApp(
                       home: screen,

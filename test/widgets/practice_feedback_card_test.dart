@@ -22,6 +22,7 @@ void main() {
     await tester.pumpWidget(
       await makeTestProviderScopeApp(
         tester,
+        failOnOverflow: true,
         home: Scaffold(
           body: Center(
             child: ValueListenableBuilder(
@@ -50,6 +51,7 @@ void main() {
     await tester.pumpWidget(
       await makeTestProviderScopeApp(
         tester,
+        failOnOverflow: true,
         home: Scaffold(
           body: PracticeFeedbackCard(
             feedback: feedback,
@@ -71,6 +73,7 @@ void main() {
     await tester.pumpWidget(
       await makeTestProviderScopeApp(
         tester,
+        failOnOverflow: true,
         home: const Scaffold(
           body: Center(
             child: MediaQuery(
@@ -95,7 +98,7 @@ void main() {
     );
     expect(tester.takeException(), isNull);
     final card = tester.getRect(find.byType(PracticeFeedbackCard));
-    final suggestion = tester.getRect(find.byType(RichText).last);
+    final suggestion = tester.getRect(find.textContaining('A very long', findRichText: true));
     expect(card.contains(suggestion.bottomRight), isTrue);
   });
 }

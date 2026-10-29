@@ -9,9 +9,13 @@
 // socket client's own provider, and the token the controller reads is an in-memory storage holding
 // one session.
 
+import 'dart:convert';
+
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
+import 'package:lichess_mobile/src/model/settings/preferences_storage.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_controller.dart' show XiangqiGameEnd;
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_notation.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
@@ -54,6 +58,7 @@ Future<fx.FakeXiangqiChannelFactory> pumpGame(
   WidgetTester tester, {
   required String token,
   SoundService? sound,
+  bool pieceAnimation = false,
 }) async {
   final factory = fx.FakeXiangqiChannelFactory();
   final client = XiangqiSocketClient(channelFactory: factory, getToken: () async => token);
@@ -63,6 +68,13 @@ Future<fx.FakeXiangqiChannelFactory> pumpGame(
     await makeTestProviderScopeApp(
       tester,
       home: const XiangqiOnlineGameScreen(gameId: fx.xiangqiTestGameId),
+      defaultPreferences: pieceAnimation
+          ? {
+              PrefCategory.board.storageKey: jsonEncode(
+                BoardPrefs.defaults.copyWith(pieceAnimation: true).toJson(),
+              ),
+            }
+          : null,
       overrides: {
         if (sound != null) soundServiceProvider: soundServiceProvider.overrideWithValue(sound),
         // A real client over a fake transport, and not `overrideWithValue`: the client holds a

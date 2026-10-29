@@ -147,6 +147,7 @@ jobs:
           test/view/xiangqi/xiangqi_desktop_regression_test.dart
           test/view/xiangqi/xiangqi_desktop_pages_test.dart
           test/widgets/xiangqi_refresh_test.dart
+          test/view/message/xiangqi_conversation_screen_test.dart
 
       - name: Run unit tests
         run: flutter test

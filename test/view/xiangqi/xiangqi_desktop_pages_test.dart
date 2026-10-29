@@ -1,11 +1,14 @@
 import 'dart:convert';
 
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/network/http.dart';
 import 'package:lichess_mobile/src/network/xiangqi_http.dart';
+import 'package:lichess_mobile/src/network/xiangqi_session_store.dart';
 import 'package:lichess_mobile/src/network/xiangqi_socket.dart';
 import 'package:lichess_mobile/src/service/sound_service.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_chat_screen.dart';
@@ -19,6 +22,7 @@ import 'package:lichess_mobile/src/view/xiangqi/xiangqi_saved_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_tournaments_screen.dart';
 import 'package:lichess_mobile/src/widgets/history_navigation_button.dart';
 import 'package:lichess_mobile/src/widgets/move_list.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../binding.dart';
@@ -27,6 +31,7 @@ import '../../model/xiangqi/online/xiangqi_online_game_fixture.dart' as fx;
 import '../../network/fake_http_client_factory.dart';
 import '../../network/xiangqi_http_test.dart' as auth;
 import '../../test_provider_scope.dart';
+import 'xiangqi_chat_screen_test.dart' as chat;
 import 'xiangqi_desktop_regression_test.dart' show RecordingSound;
 import 'xiangqi_notifications_screen_test.dart' as notifications;
 import 'xiangqi_online_game_screen_test.dart' as online;
@@ -188,13 +193,83 @@ void main() {
       tester,
       token: fx.xiangqiTestToken(fx.xiangqiTestSpectatorId),
       sound: sound,
+      pieceAnimation: true,
     );
     await online.receive(tester, factory, fx.xiangqiSnapshotFrame());
     sound.calls.clear();
     await online.receive(tester, factory, fx.xiangqiMoveFrame(1));
+    expect(sound.calls, isEmpty, reason: 'this case must actually have delayed feedback pending');
     await online.receive(tester, factory, fx.xiangqiSnapshotFrame(plies: 1));
     await tester.pump(const Duration(seconds: 1));
     expect(sound.calls, isEmpty);
+  });
+
+  testDesktop('back-to-back move and snapshot frames cannot queue feedback after the snapshot', (
+    tester,
+  ) async {
+    final sound = RecordingSound();
+    final factory = await online.pumpGame(
+      tester,
+      token: fx.xiangqiTestToken(fx.xiangqiTestSpectatorId),
+      sound: sound,
+      pieceAnimation: true,
+    );
+    await online.receive(tester, factory, fx.xiangqiSnapshotFrame());
+    sound.calls.clear();
+    factory.channel.fromServer(fx.xiangqiMoveFrame(1));
+    factory.channel.fromServer(fx.xiangqiSnapshotFrame(plies: 1));
+    await tester.pump();
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(sound.calls, isEmpty);
+  });
+
+  testDesktop('database flip rotates its board without changing the reviewed position', (
+    tester,
+  ) async {
+    await pumpDesktopPage(
+      tester,
+      const XiangqiMasterGameScreen(slug: 'a-vs-b'),
+      MockClient((_) async => http.Response(jsonEncode(master.game()), 200)),
+    );
+    final before = tester.widget<XiangqiBoard>(find.byType(XiangqiBoard)).position;
+    expect(find.byIcon(CupertinoIcons.arrow_2_squarepath), findsOneWidget);
+    await tester.tap(find.byIcon(CupertinoIcons.arrow_2_squarepath));
+    await tester.pump();
+    final after = tester.widget<XiangqiBoard>(find.byType(XiangqiBoard));
+    expect(after.position, before);
+    expect(after.orientation, XiangqiSide.black);
+  });
+
+  testDesktop('review has a desktop refresh action without dropping the current board', (
+    tester,
+  ) async {
+    final factory = await review.pumpReview(tester);
+    await review.loadReview(tester, factory);
+    expect(toolbarRefresh(), findsOneWidget);
+  });
+
+  testDesktop('room refresh keeps the composer draft while waiting for fresh history', (
+    tester,
+  ) async {
+    await chat.pumpRoom(tester);
+    await tester.enterText(find.byType(TextField), 'Keep this draft');
+    expect(toolbarRefresh(), findsOneWidget);
+    await tester.tap(toolbarRefresh());
+    await tester.pump();
+    expect(tester.widget<TextField>(find.byType(TextField)).controller!.text, 'Keep this draft');
+  });
+
+  testDesktop('signing out of a public room drops the previous account composer draft', (
+    tester,
+  ) async {
+    await chat.pumpRoom(tester);
+    await tester.enterText(find.byType(TextField), 'Account A draft');
+    final container = ProviderScope.containerOf(tester.element(find.byType(XiangqiChatRoomScreen)));
+    await container.read(xiangqiSessionStoreProvider).write(null);
+    await tester.pump();
+    await tester.pump();
+    expect(tester.widget<TextField>(find.byType(TextField)).controller!.text, isEmpty);
   });
 
   testDesktop('review navigation does not play a move sound when returning to the root', (

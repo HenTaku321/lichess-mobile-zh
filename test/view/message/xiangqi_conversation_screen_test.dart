@@ -6,6 +6,7 @@ import 'package:lichess_mobile/src/network/xiangqi_http.dart';
 import 'package:lichess_mobile/src/network/xiangqi_session_store.dart';
 import 'package:lichess_mobile/src/network/xiangqi_socket.dart';
 import 'package:lichess_mobile/src/view/message/xiangqi_conversation_screen.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_refresh.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../binding.dart';
@@ -101,4 +102,16 @@ void main() {
     expect(find.byType(TextField), findsNothing);
     expect(find.text('Account A draft'), findsNothing);
   });
+
+  testWidgets('desktop PM refresh retains the composer draft and already loaded messages', (
+    tester,
+  ) async {
+    await pumpConversation(tester);
+    await tester.enterText(find.byType(TextField), 'Keep this PM draft');
+    expect(find.byType(DesktopRefreshButton), findsOneWidget);
+    await tester.tap(find.byType(DesktopRefreshButton));
+    await tester.pump();
+    expect(tester.widget<TextField>(find.byType(TextField)).controller!.text, 'Keep this PM draft');
+    expect(find.text('Hello'), findsOneWidget);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.linux));
 }

@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:lichess_mobile/src/model/analysis/analysis_preferences.dart';
 import 'package:lichess_mobile/src/model/common/chess.dart' show Variant;
+import 'package:lichess_mobile/src/model/engine/evaluation_preferences.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_analysis_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_move.dart';
@@ -17,6 +18,7 @@ import 'package:lichess_mobile/src/service/quick_actions.dart';
 import 'package:lichess_mobile/src/service/shared_pgn_service.dart';
 import 'package:lichess_mobile/src/service/sound_service.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_analysis_screen.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_engine_button.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_watch_screen.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
 import 'package:lichess_mobile/src/widgets/move_list.dart';
@@ -24,6 +26,7 @@ import 'package:lichess_mobile/src/widgets/xiangqi_game_layout.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../binding.dart';
+import '../../model/engine/fake_transport.dart';
 import '../../network/fake_http_client_factory.dart';
 import '../../service/fake_sound_service.dart';
 import '../../test_provider_scope.dart';
@@ -58,7 +61,14 @@ class RecordingFeedback(super.sound, super.ref) extends MoveFeedbackService {
   }
 }
 
-Future<({ProviderContainer container, RecordingSound sound, RecordingFeedback feedback})>
+Future<
+  ({
+    ProviderContainer container,
+    RecordingSound sound,
+    RecordingFeedback feedback,
+    FakeTransport transport,
+  })
+>
 pumpAnalysis(WidgetTester tester, {bool enabled = false}) async {
   final fake = analysis.fakeXiangqiEngine();
   final sound = RecordingSound();
@@ -86,7 +96,7 @@ pumpAnalysis(WidgetTester tester, {bool enabled = false}) async {
     await analysis.startSearch(tester, fake.transport);
     await analysis.answer(tester, fake.transport, 'info depth 12 score cp 40 pv h2e2');
   }
-  return (container: container, sound: sound, feedback: feedback);
+  return (container: container, sound: sound, feedback: feedback, transport: fake.transport);
 }
 
 void main() {
@@ -166,6 +176,48 @@ void main() {
     controller.goTo(0);
     await tester.pump();
     expect(harness.sound.calls, isEmpty);
+  });
+
+  testDesktop(
+    'an engine dying during analysis leaves a retryable error chip, not a running search',
+    (tester) async {
+      final harness = await pumpAnalysis(tester, enabled: true);
+      harness.transport.die();
+      await tester.pump();
+      await tester.pump();
+      expect(harness.container.read(xiangqiAnalysisControllerProvider).isEngineRunning, isFalse);
+      expect(find.text('!'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testDesktop('retrying the engine from its details also turns evaluation back on', (tester) async {
+    final fake = analysis.fakeXiangqiEngine();
+    var attempts = 0;
+    await tester.pumpWidget(
+      await makeTestProviderScopeApp(
+        tester,
+        home: const XiangqiAnalysisScreen(),
+        overrides: {
+          xiangqiEngineProvider: xiangqiEngineProvider.overrideWith((_) {
+            if (++attempts == 1) throw StateError('unavailable');
+            return fake.engine;
+          }),
+        },
+        defaultPreferences: analysis.evaluationPreferences(isEnabled: false),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.longPress(find.byType(XiangqiEngineButton));
+    await tester.pump();
+    expect(find.byIcon(Icons.refresh), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.refresh));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
+    final container = ProviderScope.containerOf(tester.element(find.byType(XiangqiAnalysisScreen)));
+    expect(container.read(engineEvaluationPreferencesProvider).isEnabled, isTrue);
+    expect(container.read(xiangqiAnalysisControllerProvider).isEngineRunning, isTrue);
   });
 
   testDesktop('desktop watch list has a mouse-visible refresh action', (tester) async {

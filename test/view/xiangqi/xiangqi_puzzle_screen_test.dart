@@ -66,9 +66,10 @@ class PuzzleServer({
   final List<http.Request> requests = [];
   bool failNextSearch = false;
 
-  MockClient get client => MockClient(_answer);
+  MockClient get client => MockClient(answer);
 
-  Future<http.Response> _answer(http.Request request) {
+  /// A reusable HTTP handler; a MockClient hands it an already-finalized request.
+  Future<http.Response> answer(http.Request request) {
     requests.add(request);
     switch (request.url.path) {
       case '/api/puzzle/search':

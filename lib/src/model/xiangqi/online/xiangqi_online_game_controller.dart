@@ -296,6 +296,12 @@ class XiangqiPendingPremove(final String gameId) extends Notifier<XiangqiQueuedP
   void clear() => state = null;
 }
 
+final class _XiangqiSnapshotRequest() {
+  final sent = Completer<void>();
+  // A value, not an unobserved error: background resyncs do not await a snapshot.
+  final received = Completer<String?>();
+}
+
 /// One game on xiangqi.com, played or watched.
 ///
 /// ## The wire, as this file understands it
@@ -369,8 +375,9 @@ class XiangqiOnlineGameController(final String gameId)
   /// The event names whose arrival is a whole snapshot rather than a patch.
   final Set<String> _snapshotEvents = {'game.get.success'};
 
-  /// Whether a `g_v2.get` is already on its way. Two of them would be two snapshots racing.
-  bool _subscribing = false;
+  /// Held until the snapshot, not just its separate ack, arrives.
+  _XiangqiSnapshotRequest? _snapshotRequest;
+  Future<void>? _refreshing;
 
   /// When the side to move got the move, for the `thinking_time` a move is sent with.
   DateTime? _turnStartedAt;
@@ -381,7 +388,8 @@ class XiangqiOnlineGameController(final String gameId)
   Future<XiangqiOnlineGameState> build() async {
     final generation = ++_buildGeneration;
     _built = false;
-    _subscribing = false;
+    _snapshotRequest = null;
+    _refreshing = null;
     _pendingMove = false;
     // Hold the per-game local state without rebuilding the network controller when it changes.
     ref.listen(xiangqiPendingPremoveProvider(gameId), (_, _) {});
@@ -392,7 +400,7 @@ class XiangqiOnlineGameController(final String gameId)
       _connections = null;
       unawaited(_status?.cancel());
       _moveConfirmation?.cancel();
-      _snapshotTimeout?.cancel();
+      _finishSnapshotRequest('Game load cancelled.');
       // Keep feedback through a retry rebuilding this notifier; close on final disposal.
       scheduleMicrotask(() {
         if (!ref.mounted && !_confirmedMoves.isClosed) unawaited(_confirmedMoves.close());
@@ -428,6 +436,10 @@ class XiangqiOnlineGameController(final String gameId)
     _connections = socket.connectedStream.listen(_onConnected);
     _status = socket.statusStream.listen((status) {
       if (status != XiangqiConnectionStatus.connected) {
+        if (status == XiangqiConnectionStatus.closed ||
+            status == XiangqiConnectionStatus.reconnecting) {
+          _finishSnapshotRequest(kXiangqiOnlineConnectionFailed);
+        }
         _set(_latest.copyWith(isConnected: false, selected: null));
       }
     });
@@ -443,7 +455,47 @@ class XiangqiOnlineGameController(final String gameId)
   ///
   /// The way back from anything: a lost connection, a frame that could not be read, a spectator who
   /// was never told the game ended. Cheap enough to call from a screen that has just regained focus.
-  Future<void> resync() => _subscribe();
+  Future<void> resync() {
+    if (!ref.mounted) return Future<void>.value();
+    return _socket.isConnected ? _subscribe() : _connect(_socket);
+  }
+
+  /// Mouse refresh waits for the complete snapshot while legacy resync still waits only for its ack.
+  Future<void> refresh() {
+    if (_refreshing case final pending?) return pending;
+    late final Future<void> future;
+    future = _refresh(_buildGeneration).whenComplete(() {
+      if (identical(_refreshing, future)) _refreshing = null;
+    });
+    _refreshing = future;
+    return future;
+  }
+
+  Future<void> _refresh(int generation) async {
+    if (!ref.mounted) return;
+    final socket = _socket;
+    final revision = _snapshotRevision;
+    try {
+      await socket.connect();
+    } on Object {
+      if (ref.mounted && generation == _buildGeneration) {
+        _set(_latest.copyWith(error: kXiangqiOnlineConnectionFailed, isConnected: false));
+      }
+      rethrow;
+    }
+    if (!ref.mounted || generation != _buildGeneration) return;
+    // A fast reconnect can already have supplied the snapshot before connect() resumes.
+    if (_snapshotRevision != revision) {
+      if (_latest.error case final error?) throw StateError(error);
+      if (_latest.isConnected) return;
+    }
+    unawaited(_subscribe());
+    final pending = _snapshotRequest;
+    if (pending != null) {
+      final error = await pending.received.future;
+      if (error != null && ref.mounted && generation == _buildGeneration) throw StateError(error);
+    }
+  }
 
   /// Plays [move] if it is this device's to play.
   ///
@@ -599,15 +651,19 @@ class XiangqiOnlineGameController(final String gameId)
 
   /// Opens the socket, if it is not open already, and subscribes once it is.
   Future<void> _connect(XiangqiSocketClient socket) async {
+    final generation = _buildGeneration;
+    final revision = _snapshotRevision;
     try {
       await socket.connect();
     } on Object catch (error, stackTrace) {
+      if (!ref.mounted || generation != _buildGeneration) return;
       _logger.warning('Could not open the xiangqi.com socket for game $gameId.', error, stackTrace);
       _set(_latest.copyWith(error: kXiangqiOnlineConnectionFailed));
       return;
     }
+    if (!ref.mounted || generation != _buildGeneration || revision != _snapshotRevision) return;
     // The handshake also fires [connectedStream], which subscribes for itself; one of the two wins
-    // and the other is dropped by [_subscribing]. The case this exists for is the socket having
+    // and the other joins [_snapshotRequest]. The case this exists for is the socket having
     // been opened by something else already, where no event will fire at all.
     if (socket.isConnected) {
       _set(_latest.copyWith(isConnected: false));
@@ -627,40 +683,60 @@ class XiangqiOnlineGameController(final String gameId)
 
   /// Asks the server for the game, under the one name this client ever subscribes with.
   Future<void> _subscribe() {
-    if (!ref.mounted || _subscribing) return Future<void>.value();
-    _set(_latest.copyWith(isConnected: false, selected: null));
+    if (!ref.mounted) return Future<void>.value();
+    if (_snapshotRequest case final pending?) return pending.sent.future;
+    final request = _XiangqiSnapshotRequest();
+    _snapshotRequest = request;
+    _set(_latest.copyWith(isConnected: false, selected: null, error: null));
     _snapshotTimeout?.cancel();
     _snapshotTimeout = Timer(const Duration(seconds: 20), () {
-      if (ref.mounted) {
+      if (ref.mounted && identical(_snapshotRequest, request)) {
         _set(_latest.copyWith(error: kXiangqiOnlineConnectionFailed, isConnected: false));
+        _finishSnapshotRequest(kXiangqiOnlineConnectionFailed);
       }
     });
-    return _subscribeTo(kXiangqiGetEvent);
+    unawaited(_subscribeTo(kXiangqiGetEvent, request));
+    return request.sent.future;
+  }
+
+  void _finishSnapshotRequest([String? error]) {
+    _snapshotTimeout?.cancel();
+    _snapshotTimeout = null;
+    final request = _snapshotRequest;
+    _snapshotRequest = null;
+    if (request != null && !request.received.isCompleted) request.received.complete(error);
   }
 
   /// Sends [event] and follows the ack's redirect, and any redirect *it* is answered with.
   ///
-  /// The walk is a loop rather than a recursive call, and that is not a style choice: the guard at
-  /// the top is what keeps one subscription in flight at a time, so a nested `_subscribeTo` would
-  /// be dropped by that guard and the redirect would never go out — the client would register the
-  /// name it is waiting for and then wait for it forever.
-  Future<void> _subscribeTo(String event) async {
-    if (_subscribing) return;
-    _subscribing = true;
+  /// A redirect stays inside the same request; each new snapshot request gets its own loop guard.
+  Future<void> _subscribeTo(String event, _XiangqiSnapshotRequest request) async {
     final generation = _buildGeneration;
+    final socket = _socket;
     final followed = <String>{event};
     try {
       var name = event;
       while (true) {
         final Object? ack;
         try {
-          ack = await _socket.emit(name, data: {'game_id': gameId});
+          ack = await socket.emit(name, data: {'game_id': gameId});
         } on Object catch (error, stackTrace) {
+          // A snapshot already settled this request, or a newer request/account superseded it.
+          if (!ref.mounted ||
+              generation != _buildGeneration ||
+              !identical(_snapshotRequest, request)) {
+            return;
+          }
           _logger.warning('xiangqi.com did not answer $name for game $gameId.', error, stackTrace);
           _set(_latest.copyWith(error: kXiangqiOnlineConnectionFailed, isConnected: false));
+          _finishSnapshotRequest(kXiangqiOnlineConnectionFailed);
           return;
         }
-        if (!ref.mounted || generation != _buildGeneration) return;
+        if (!ref.mounted ||
+            generation != _buildGeneration ||
+            !identical(_snapshotRequest, request)) {
+          return;
+        }
         // A finished game answers `g_v2.get` with a redirect rather than a failure: the snapshot is
         // not on `game.get.success` but on the event the ack names. Follow that name — it is the
         // server's to choose, and it has been seen spelling it `game.archived.get`. A name already
@@ -674,7 +750,7 @@ class XiangqiOnlineGameController(final String gameId)
         name = redirect;
       }
     } finally {
-      if (generation == _buildGeneration) _subscribing = false;
+      if (!request.sent.isCompleted) request.sent.complete();
     }
   }
 
@@ -687,6 +763,7 @@ class XiangqiOnlineGameController(final String gameId)
       _snapshotTimeout?.cancel();
       if (!_applySnapshot(data)) {
         _set(_latest.copyWith(error: kXiangqiOnlineUnreadableGame));
+        _finishSnapshotRequest(kXiangqiOnlineUnreadableGame);
       }
       return;
     }
@@ -775,6 +852,7 @@ class XiangqiOnlineGameController(final String gameId)
       ),
     );
     _turnStartedAt = clock.now();
+    _finishSnapshotRequest();
     return true;
   }
 
@@ -902,6 +980,7 @@ class XiangqiOnlineGameController(final String gameId)
     final message = map['message'];
     if (message is String && message.isNotEmpty) {
       _set(_latest.copyWith(error: message));
+      _finishSnapshotRequest(message);
       return;
     }
     if (!_applySnapshot(map)) unawaited(_subscribe());

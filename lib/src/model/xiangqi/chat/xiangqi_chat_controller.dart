@@ -4,6 +4,7 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:lichess_mobile/src/model/xiangqi/chat/xiangqi_chat.dart';
+import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
 import 'package:lichess_mobile/src/network/xiangqi_socket.dart';
 import 'package:logging/logging.dart';
 
@@ -101,6 +102,8 @@ class XiangqiChatController(final XiangqiChatRoomKey key) extends Notifier<Xiang
   StreamSubscription<void>? _connections;
   StreamSubscription<XiangqiConnectionStatus>? _status;
   Timer? _historyTimeout;
+  int _generation = 0;
+  int _historyRevision = 0;
 
   /// The page the last history request asked for, which is the page its answer is about.
   int _pendingPage = 1;
@@ -118,6 +121,14 @@ class XiangqiChatController(final XiangqiChatRoomKey key) extends Notifier<Xiang
 
   @override
   XiangqiChatState build() {
+    // History belongs to this account/room lifetime, not to the notifier object across rebuilds.
+    ref.watch(xiangqiAccountGenerationProvider);
+    final generation = ++_generation;
+    _historyRevision++;
+    _pendingPage = 1;
+    _page = 1;
+    _lastRequest = null;
+    _turn = Future<void>.value();
     ref.onDispose(() {
       _events?.cancel();
       _connections?.cancel();
@@ -136,15 +147,21 @@ class XiangqiChatController(final XiangqiChatRoomKey key) extends Notifier<Xiang
     final socket = ref.read(xiangqiSocketProvider).fork();
     _socket = socket;
 
-    _events = socket.stream.listen(_onEvent);
-    _connections = socket.connectedStream.listen((_) => unawaited(_onConnected()));
+    _events = socket.stream.listen((event) {
+      if (generation == _generation) _onEvent(event);
+    });
+    _connections = socket.connectedStream.listen((_) {
+      if (generation == _generation) unawaited(_onConnected());
+    });
     _status = socket.statusStream.listen((status) {
       if (!ref.mounted ||
+          generation != _generation ||
           status == XiangqiConnectionStatus.connected ||
           status == XiangqiConnectionStatus.connecting) {
         return;
       }
       _historyTimeout?.cancel();
+      _historyRevision++;
       state = state.copyWith(
         isConnected: false,
         isLoading: false,
@@ -155,7 +172,7 @@ class XiangqiChatController(final XiangqiChatRoomKey key) extends Notifier<Xiang
     unawaited(
       socket.connect().catchError((Object error, StackTrace stackTrace) {
         _logger.warning('The chat socket could not connect.', error, stackTrace);
-        if (ref.mounted) {
+        if (ref.mounted && generation == _generation) {
           state = state.copyWith(
             error: XiangqiChatError.offline,
             isLoading: false,
@@ -183,6 +200,8 @@ class XiangqiChatController(final XiangqiChatRoomKey key) extends Notifier<Xiang
   Future<void> _requestHistory({required int page}) async {
     final socket = _socket;
     if (socket == null || !socket.isConnected) return;
+    final generation = _generation;
+    final revision = ++_historyRevision;
     if (page == 1) {
       state = state.copyWith(isLoading: true, error: null);
     } else {
@@ -190,10 +209,15 @@ class XiangqiChatController(final XiangqiChatRoomKey key) extends Notifier<Xiang
     }
     _pendingPage = page;
     await _waitForTurn();
-    if (!ref.mounted || !socket.isConnected) return;
+    if (!ref.mounted ||
+        generation != _generation ||
+        revision != _historyRevision ||
+        !socket.isConnected) {
+      return;
+    }
     _historyTimeout?.cancel();
     _historyTimeout = Timer(const Duration(seconds: 20), () {
-      if (ref.mounted) {
+      if (ref.mounted && generation == _generation && revision == _historyRevision) {
         state = state.copyWith(
           isLoading: false,
           isLoadingMore: false,
@@ -219,11 +243,14 @@ class XiangqiChatController(final XiangqiChatRoomKey key) extends Notifier<Xiang
     if (state.isLoading || state.isLoadingMore) return;
     final socket = _socket;
     if (socket == null) return;
+    final generation = _generation;
     if (!socket.isConnected) {
       try {
         await socket.connect();
       } on Object {
-        if (ref.mounted) state = state.copyWith(isLoading: false, error: XiangqiChatError.offline);
+        if (ref.mounted && generation == _generation) {
+          state = state.copyWith(isLoading: false, error: XiangqiChatError.offline);
+        }
       }
     } else {
       await _requestHistory(page: 1);
@@ -238,8 +265,9 @@ class XiangqiChatController(final XiangqiChatRoomKey key) extends Notifier<Xiang
     final message = text.trim();
     final socket = _socket;
     if (message.isEmpty || socket == null || !socket.isConnected) return false;
+    final generation = _generation;
     await _waitForTurn();
-    if (!ref.mounted || !socket.isConnected) return false;
+    if (!ref.mounted || generation != _generation || !socket.isConnected) return false;
     socket.emitNoAck(
       'chat_v2.new.message',
       data: {'type': key.kind.wire, 'room': key.room, 'message': message},
@@ -253,8 +281,9 @@ class XiangqiChatController(final XiangqiChatRoomKey key) extends Notifier<Xiang
   /// and then both send: the second one waits for the first one's turn to end.
   Future<void> _waitForTurn() {
     final previous = _turn;
+    final generation = _generation;
     final turn = previous.then((_) async {
-      if (!ref.mounted) return;
+      if (!ref.mounted || generation != _generation) return;
       final last = _lastRequest;
       final now = DateTime.now();
       if (last != null) {
@@ -270,6 +299,7 @@ class XiangqiChatController(final XiangqiChatRoomKey key) extends Notifier<Xiang
           }
         }
       }
+      if (!ref.mounted || generation != _generation) return;
       _lastRequest = DateTime.now();
     });
     _turn = turn;
@@ -300,18 +330,46 @@ class XiangqiChatController(final XiangqiChatRoomKey key) extends Notifier<Xiang
     if (!ref.mounted) return;
     _historyTimeout?.cancel();
     final page = xiangqiChatMessagesFromJson(data);
-    // An older page goes in front of what is already read; the first page replaces it, which is
-    // also what makes a reconnect that re-asks for page one land on the same list rather than on a
-    // second copy of it.
-    final messages = _pendingPage == 1 ? page : page.followedBy(state.messages).toIList();
-    _page = _pendingPage;
+    final messages = _mergeHistory(page);
+    // Refreshing the newest page must not discard the reader's older pages or reopen their end.
+    final hasMore = _pendingPage == 1 && _page > 1 ? state.hasMore : _hasNextPage(data);
+    if (_pendingPage > _page) _page = _pendingPage;
     state = state.copyWith(
       messages: messages,
       isLoading: false,
       isLoadingMore: false,
-      hasMore: _hasNextPage(data),
+      hasMore: hasMore,
       error: null,
     );
+  }
+
+  IList<XiangqiChatMessage> _mergeHistory(IList<XiangqiChatMessage> page) {
+    if (page.isEmpty) return state.messages;
+    final byId = <int, XiangqiChatMessage>{
+      for (final message in page)
+        if (message.id != null) message.id!: message,
+    };
+    final retained = state.messages.where(
+      (message) => message.id == null || !byId.containsKey(message.id),
+    );
+    // Keep the page's authoritative ordering, including edited messages and overlapping pages.
+    // Echoes newer than its last numbered message, and unnumbered broadcasts, stay at the tail.
+    final newestId = byId.isEmpty ? null : byId.keys.reduce((a, b) => a > b ? a : b);
+    final candidates = switch (_pendingPage) {
+      1 when newestId != null =>
+        retained
+            .where((m) => m.id != null && m.id! <= newestId)
+            .followedBy(page)
+            .followedBy(retained.where((m) => m.id == null || m.id! > newestId)),
+      1 => retained.followedBy(page),
+      _ => page.followedBy(retained),
+    };
+    final seen = <int>{};
+    return [
+      for (final message in candidates)
+        if (message.id == null || seen.add(message.id!))
+          if (message.id == null) message else byId[message.id] ?? message,
+    ].lock;
   }
 
   void _onMessage(Object? data) {

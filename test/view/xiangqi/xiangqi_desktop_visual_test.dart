@@ -240,6 +240,24 @@ http.Response visualHttp(http.Request request, {required bool empty, required bo
     });
   }
   if (path.contains('/items/')) return visualJson({'items': <Object?>[]});
+  if (path.startsWith('/api/puzzle/puzzles/')) {
+    return visualJson({
+      'items': empty
+          ? <Object?>[]
+          : [
+              {
+                'puzzle_id': 'FixturePuzzle',
+                'theme': 1,
+                'p_rating': 1500,
+                'created_on': '2026-10-15',
+              },
+            ],
+      'total_pages': 1,
+    });
+  }
+  if (path.startsWith('/api/game-note/game-notes/')) {
+    return visualJson({'items': <Object?>[], 'total_pages': 0});
+  }
   if (path == '/api/users/countries') {
     return visualJson([
       {'id': 1, 'code': 'CN', 'name': 'China', 'value': 1},
@@ -445,9 +463,10 @@ void main() {
                 final httpRequests = <String>[];
                 final client = MockClient((request) async {
                   httpRequests.add('${request.method} ${request.url.path}');
-                  return request.url.path.startsWith('/api/puzzle') ||
+                  return (request.url.path.startsWith('/api/puzzle') &&
+                              !request.url.path.startsWith('/api/puzzle/puzzles/')) ||
                           request.url.path.startsWith('/api/quota')
-                      ? await http.Response.fromStream(await puzzle.client.send(request))
+                      ? await puzzle.answer(request)
                       : visualHttp(
                           request,
                           empty: scene.endsWith('-empty'),

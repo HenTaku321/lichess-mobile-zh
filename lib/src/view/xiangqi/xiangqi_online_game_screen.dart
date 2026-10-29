@@ -31,6 +31,7 @@ import 'package:lichess_mobile/src/widgets/xiangqi_avatar.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_game_layout.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_player_row.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_refresh.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_result_dialog.dart';
 import 'package:lichess_mobile/src/widgets/yes_no_dialog.dart';
 import 'package:material_ui/material_ui.dart';
@@ -81,6 +82,13 @@ class _XiangqiOnlineGameScreenState() extends ConsumerState<XiangqiOnlineGameScr
   bool _loadedBefore = false;
   XiangqiLowTimeWarning _clockWarning = XiangqiLowTimeWarning();
   bool _active = true;
+
+  Future<void> _refresh() async {
+    final provider = xiangqiOnlineGameControllerProvider(widget.gameId);
+    if (ref.read(provider) is AsyncError<XiangqiOnlineGameState>) ref.invalidate(provider);
+    await ref.read(provider.future);
+    if (mounted) await ref.read(provider.notifier).refresh();
+  }
 
   Future<void> _playLowTime(int generation) async {
     try {
@@ -234,25 +242,32 @@ class _XiangqiOnlineGameScreenState() extends ConsumerState<XiangqiOnlineGameScr
     });
 
     if (asyncState.value?.isLoaded == true) _loadedBefore = true;
-    return Scaffold(
-      appBar: AppBar(
-        // The game's own name, translated like every other — see the offline screens' titles.
-        title: AppBarTitleText(context.l10n.mobileXiangqi),
-      ),
-      body: SafeArea(
-        child: switch (asyncState) {
-          AsyncData(:final value) => _game(context, value, boardPrefs),
-          AsyncError(:final error) => _Failed(
-            message: error.toString(),
-            onRetry: () => ref.invalidate(xiangqiOnlineGameControllerProvider(widget.gameId)),
-          ),
-          _ => const Center(child: CircularProgressIndicator.adaptive()),
-        },
+    return XiangqiRefreshScope(
+      identity: (widget.gameId, ref.watch(xiangqiAccountGenerationProvider)),
+      onRefresh: _refresh,
+      builder: (context, refresh, busy) => Scaffold(
+        appBar: AppBar(
+          // The game's own name, translated like every other — see the offline screens' titles.
+          title: AppBarTitleText(context.l10n.mobileXiangqi),
+          actions: [DesktopRefreshButton(onRefresh: refresh, busy: busy)],
+        ),
+        body: SafeArea(
+          child: switch (asyncState) {
+            AsyncData(:final value) => _game(context, value, boardPrefs, refresh),
+            AsyncError(:final error) => _Failed(message: error.toString(), onRetry: refresh),
+            _ => const Center(child: CircularProgressIndicator.adaptive()),
+          },
+        ),
       ),
     );
   }
 
-  Widget _game(BuildContext context, XiangqiOnlineGameState state, BoardPrefs boardPrefs) {
+  Widget _game(
+    BuildContext context,
+    XiangqiOnlineGameState state,
+    BoardPrefs boardPrefs,
+    XiangqiRefresh refresh,
+  ) {
     // **The error is checked before the spinner, and that order is the whole of this method.** A
     // state that has failed to load is not a state that is still loading: the socket reports what
     // went wrong by setting [XiangqiOnlineGameState.error] and leaving `isLoaded` false, because
@@ -265,7 +280,7 @@ class _XiangqiOnlineGameScreenState() extends ConsumerState<XiangqiOnlineGameScr
         message: error,
         // Retrying is asking again, and the socket client is already reconnecting on its own with a
         // back-off behind it — this is the reader saying "now", not the app's only chance.
-        onRetry: () => ref.invalidate(xiangqiOnlineGameControllerProvider(widget.gameId)),
+        onRetry: refresh,
       );
     }
 
@@ -298,7 +313,7 @@ class _XiangqiOnlineGameScreenState() extends ConsumerState<XiangqiOnlineGameScr
       // the game has ended. See [XiangqiOnlineGameController.resync].
       onFocusRegained: () {
         if (!context.mounted) return;
-        unawaited(controller.resync());
+        unawaited(refresh());
       },
       child: XiangqiGameLayout(
         board: BrightnessHueFilter(

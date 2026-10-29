@@ -42,7 +42,13 @@ Future<({ProviderContainer container, fx.FakeXiangqiChannelFactory factory})> pu
       home: const XiangqiChatRoomScreen(roomKey: roomKey, title: '中文'),
       overrides: {
         xiangqiAuthStorageProvider: xiangqiAuthStorageProvider.overrideWithValue(
-          fx.FakeXiangqiAuthStorage(fx.xiangqiTestSession(fx.xiangqiTestToken('account-A'))),
+          fx.FakeXiangqiAuthStorage(
+            fx.xiangqiTestSession(
+              fx.xiangqiTestToken('account-A'),
+              userId: 'account-A',
+              isGuest: false,
+            ),
+          ),
         ),
         xiangqiSocketProvider: xiangqiSocketProvider.overrideWith((ref) {
           final sessions = ref.read(xiangqiSessionStoreProvider);
@@ -155,6 +161,53 @@ void main() {
     await tester.pump();
     expect(requests(factory.channel, 'g_v2.get'), hasLength(before + 1));
     await online.receive(tester, factory, fx.xiangqiSnapshotFrame());
+  });
+
+  testDesktop('online mouse refresh joins an initial snapshot request instead of duplicating it', (
+    tester,
+  ) async {
+    final factory = await online.pumpGame(
+      tester,
+      token: fx.xiangqiTestToken(fx.xiangqiTestViewerId),
+    );
+    final before = requests(factory.channel, 'g_v2.get').length;
+    await tester.tap(find.byType(DesktopRefreshButton));
+    await tester.pump();
+    await tester.pump();
+    expect(refreshButton(tester).busy, isTrue);
+    expect(requests(factory.channel, 'g_v2.get'), hasLength(before));
+    await online.receive(tester, factory, fx.xiangqiSnapshotFrame());
+    expect(refreshButton(tester).busy, isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
+  testDesktop('a late old acknowledgement cannot settle or fail the next online refresh', (
+    tester,
+  ) async {
+    final factory = await online.pumpGame(
+      tester,
+      token: fx.xiangqiTestToken(fx.xiangqiTestViewerId),
+    );
+    await online.receive(tester, factory, fx.xiangqiSnapshotFrame());
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(XiangqiOnlineGameScreen)),
+    );
+    final provider = xiangqiOnlineGameControllerProvider(fx.xiangqiTestGameId);
+    factory.channel.autoAck = false;
+    await tester.tap(find.byType(DesktopRefreshButton));
+    await tester.pump();
+    await online.receive(tester, factory, fx.xiangqiSnapshotFrame(plies: 2));
+    expect(refreshButton(tester).busy, isFalse);
+    factory.channel.autoAck = true;
+    await tester.tap(find.byType(DesktopRefreshButton));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 11));
+    expect(refreshButton(tester).busy, isTrue);
+    expect(container.read(provider).requireValue.error, isNull);
+    await online.receive(tester, factory, fx.xiangqiSnapshotFrame(plies: 4));
+    expect(refreshButton(tester).busy, isFalse);
+    expect(container.read(provider).requireValue.isConnected, isTrue);
+    expect(tester.takeException(), isNull);
   });
 
   testDesktop('a valid online snapshot survives its missing acknowledgement timeout', (
@@ -304,7 +357,7 @@ void main() {
     final oldChannel = factory.channel;
     final session = fx
         .xiangqiTestSession(fx.xiangqiTestToken('account-B'))
-        .copyWith(userId: 'account-B');
+        .copyWith(userId: 'account-B', isGuest: false);
     await container.read(xiangqiSessionStoreProvider).write(session);
     for (var i = 0; i < 8; i++) {
       await tester.pump();
@@ -322,6 +375,37 @@ void main() {
     );
     await history(tester, factory, [chat.message(id: 4, text: 'account B history')]);
     expect(container.read(provider).messages.map((m) => m.message), ['account B history']);
+    expect(tester.takeException(), isNull);
+  });
+
+  testDesktop('room refresh keeps broadcasts arriving after the requested history page', (
+    tester,
+  ) async {
+    final (:container, :factory) = await pumpRoom(tester);
+    final provider = xiangqiChatControllerProvider(roomKey);
+    await history(tester, factory, [chat.message(id: 3, text: 'third')]);
+    await tester.tap(find.byType(DesktopRefreshButton));
+    await tester.pump(kXiangqiChatRequestSpacing);
+    await tester.pump();
+    await online.receive(
+      tester,
+      factory,
+      fx.xiangqiEventFrame('chat.new.lobby.message.success', chat.message(id: 5, text: 'fifth')),
+    );
+    await online.receive(
+      tester,
+      factory,
+      fx.xiangqiEventFrame('chat.new.lobby.message.success', {
+        ...chat.message(id: 6, text: 'unnumbered live message'),
+        'id': null,
+      }),
+    );
+    await history(tester, factory, [
+      chat.message(id: 4, text: 'fourth'),
+      chat.message(id: 3, text: 'third'),
+    ]);
+    expect(container.read(provider).messages.map((m) => m.id), [3, 4, 5, null]);
+    expect(container.read(provider).messages.last.message, 'unnumbered live message');
     expect(tester.takeException(), isNull);
   });
 }

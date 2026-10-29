@@ -20,6 +20,7 @@ on:
       # feedback loop; this job is where a typo is supposed to be caught.
       - zh-local
       - fix/xiangqi-interaction-parity
+      - fix/xiangqi-desktop-parity
   pull_request:
     paths:
       - 'lib/**'
@@ -118,6 +119,7 @@ jobs:
         # run: dart format --output=none --set-exit-if-changed .
 
       - name: Analyze project source
+        id: analyze
         run: flutter analyze
 
       # - name: Run riverpod lint
@@ -136,6 +138,10 @@ jobs:
           test/network/xiangqi_hardening_test.dart
           test/widgets/history_navigation_button_test.dart
           test/widgets/xiangqi_board_test.dart
+
+      - name: Run xiangqi desktop regressions
+        if: ${{ !cancelled() && steps.analyze.outcome == 'success' }}
+        run: flutter test --no-pub --reporter expanded test/view/xiangqi/xiangqi_desktop_regression_test.dart
 
       - name: Run unit tests
         run: flutter test

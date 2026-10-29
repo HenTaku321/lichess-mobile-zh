@@ -8,6 +8,7 @@ import 'package:http/testing.dart';
 import 'package:lichess_mobile/src/model/message/xiangqi_inbox_repository.dart';
 import 'package:lichess_mobile/src/model/ui_events.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/network/socket.dart' show webSocketChannelFactoryProvider;
 import 'package:lichess_mobile/src/network/xiangqi_http.dart';
 import 'package:lichess_mobile/src/network/xiangqi_session_store.dart';
@@ -256,6 +257,28 @@ void main() {
     expect(game.state.moves, hasLength(4));
     expect(game.state.isMyTurn, isFalse, reason: 'replaying must not grant move permission');
     expect(game.channel.hasSentEvent('g_v2.move'), isFalse);
+  });
+
+  test('online snapshots replay from their explicit black-first initial FEN', () async {
+    final game = await harness.makeHarness(fx.xiangqiTestToken(fx.xiangqiTestViewerId));
+    final initialFen = kXiangqiInitialFen.replaceFirst(' w ', ' b ');
+    final snapshot = fx.xiangqiSnapshotPayload()
+      ..['initial_fen'] = initialFen
+      ..['move_history'] = ['h10g8 600/120 600/120 1'];
+    await game.send(fx.xiangqiEventFrame('game.get.success', snapshot));
+    expect(game.state.error, isNull);
+    expect(game.state.isLoaded, isTrue);
+    expect(game.state.positions.first.toFen(), initialFen);
+    expect(game.state.moves, hasLength(1));
+    expect(game.state.turn, XiangqiSide.red);
+  });
+
+  test('an explicitly malformed initial FEN is not silently replaced by the opening', () async {
+    final game = await harness.makeHarness(fx.xiangqiTestToken(fx.xiangqiTestViewerId));
+    final snapshot = fx.xiangqiSnapshotPayload()..['initial_fen'] = 'not a FEN';
+    await game.send(fx.xiangqiEventFrame('game.get.success', snapshot));
+    expect(game.state.isLoaded, isFalse);
+    expect(game.state.error, isNotNull);
   });
 
   test(

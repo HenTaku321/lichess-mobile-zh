@@ -337,9 +337,14 @@ class XiangqiChatController(final XiangqiChatRoomKey key) extends Notifier<Xiang
     _historyTimeout?.cancel();
     final page = xiangqiChatMessagesFromJson(data);
     final messages = _mergeHistory(page);
-    // Refreshing the newest page must not discard the reader's older pages or reopen their end.
-    final hasMore = _pendingPage == 1 && _page > 1 ? state.hasMore : _hasNextPage(data);
-    if (_pendingPage > _page) _page = _pendingPage;
+    // Preserve the older cursor only if the refreshed page has actually reached the known history.
+    // Otherwise newer messages span several pages: start at page two to fill the gap, while keeping
+    // every already-read message visible. An exhausted old page is not an exhausted new gap.
+    final knownIds = state.messages.map((message) => message.id).whereType<int>().toSet();
+    final overlaps = page.any((message) => message.id != null && knownIds.contains(message.id));
+    final keepOlderCursor = _pendingPage == 1 && _page > 1 && overlaps;
+    final hasMore = keepOlderCursor ? state.hasMore : _hasNextPage(data);
+    if (!keepOlderCursor) _page = _pendingPage;
     state = state.copyWith(
       messages: messages,
       isLoading: false,
@@ -352,29 +357,29 @@ class XiangqiChatController(final XiangqiChatRoomKey key) extends Notifier<Xiang
   IList<XiangqiChatMessage> _mergeHistory(IList<XiangqiChatMessage> page) {
     if (page.isEmpty) return state.messages;
     final byId = <int, XiangqiChatMessage>{
+      for (final message in state.messages)
+        if (message.id != null) message.id!: message,
       for (final message in page)
         if (message.id != null) message.id!: message,
     };
-    final retained = state.messages.where(
-      (message) => message.id == null || !byId.containsKey(message.id),
-    );
-    // Keep the page's authoritative ordering, including edited messages and overlapping pages.
-    // Echoes newer than its last numbered message, and unnumbered broadcasts, stay at the tail.
-    final newestId = byId.isEmpty ? null : byId.keys.reduce((a, b) => a > b ? a : b);
-    final candidates = switch (_pendingPage) {
-      1 when newestId != null =>
-        retained
-            .where((m) => m.id != null && m.id! <= newestId)
-            .followedBy(page)
-            .followedBy(retained.where((m) => m.id == null || m.id! > newestId)),
-      1 => retained.followedBy(page),
-      _ => page.followedBy(retained),
-    };
-    final seen = <int>{};
+    // A late page can belong between retained old history and the refreshed newest page, rather
+    // than before the whole list. Use server times with ids as a stable tie break. If timestamps
+    // cannot all be read, the numbered message sequence still gives a deterministic total order.
+    final haveTimes = byId.values.every((message) => message.timestamp != null);
+    final numbered = byId.values.toList()
+      ..sort((a, b) {
+        if (haveTimes) {
+          final timeOrder = a.timestamp!.compareTo(b.timestamp!);
+          if (timeOrder != 0) return timeOrder;
+        }
+        return a.id!.compareTo(b.id!);
+      });
     return [
-      for (final message in candidates)
-        if (message.id == null || seen.add(message.id!))
-          if (message.id == null) message else byId[message.id] ?? message,
+      ...numbered,
+      for (final message in state.messages)
+        if (message.id == null) message,
+      for (final message in page)
+        if (message.id == null) message,
     ].lock;
   }
 

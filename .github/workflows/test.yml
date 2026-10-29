@@ -135,13 +135,18 @@ jobs:
           test/view/xiangqi/xiangqi_review_screen_test.dart
           test/view/xiangqi/xiangqi_analysis_screen_test.dart
           test/model/xiangqi/review/xiangqi_review_test.dart
+          test/model/xiangqi/xiangqi_analysis_controller_test.dart
           test/network/xiangqi_hardening_test.dart
           test/widgets/history_navigation_button_test.dart
           test/widgets/xiangqi_board_test.dart
 
       - name: Run xiangqi desktop regressions
         if: ${{ !cancelled() && steps.analyze.outcome == 'success' }}
-        run: flutter test --no-pub --reporter expanded test/view/xiangqi/xiangqi_desktop_regression_test.dart
+        run: >-
+          flutter test --no-pub --reporter expanded
+          test/view/xiangqi/xiangqi_desktop_regression_test.dart
+          test/view/xiangqi/xiangqi_desktop_pages_test.dart
+          test/widgets/xiangqi_refresh_test.dart
 
       - name: Run unit tests
         run: flutter test

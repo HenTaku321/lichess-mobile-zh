@@ -64,4 +64,39 @@ void main() {
     expect(calls, afterRelease);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('a hold uses the independent repeat action and does not fire a trailing tap', (
+    tester,
+  ) async {
+    var taps = 0;
+    var repeats = 0;
+    await tester.pumpWidget(
+      await makeTestProviderScopeApp(
+        tester,
+        home: Scaffold(
+          body: Center(
+            child: HistoryNavigationButton(
+              forward: true,
+              onTap: () => taps++,
+              onRepeat: () => repeats++,
+            ),
+          ),
+        ),
+      ),
+    );
+    final button = find.byIcon(CupertinoIcons.chevron_forward);
+    await tester.tap(button);
+    expect(taps, 1);
+    expect(repeats, 0);
+    final gesture = await tester.startGesture(tester.getCenter(button));
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(repeats, greaterThan(1));
+    await gesture.up();
+    final afterRelease = repeats;
+    await tester.pump(const Duration(seconds: 1));
+    expect(taps, 1);
+    expect(repeats, afterRelease);
+    expect(tester.takeException(), isNull);
+  });
 }

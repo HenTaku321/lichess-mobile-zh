@@ -17,6 +17,7 @@ import 'package:lichess_mobile/src/model/xiangqi/xiangqi_notation.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/network/xiangqi_http.dart' show xiangqiAuthStorageProvider;
 import 'package:lichess_mobile/src/network/xiangqi_socket.dart';
+import 'package:lichess_mobile/src/service/sound_service.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_online_game_screen.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
 import 'package:lichess_mobile/src/widgets/clock.dart';
@@ -49,7 +50,11 @@ XiangqiOnlinePlayerRow playerRow(WidgetTester tester, XiangqiSide side) => teste
 
 /// Opens [fx.xiangqiTestGameId] as the account behind [token], over a socket whose other end is the
 /// fixture's, and hands the factory back so that a test can push frames from the server.
-Future<fx.FakeXiangqiChannelFactory> pumpGame(WidgetTester tester, {required String token}) async {
+Future<fx.FakeXiangqiChannelFactory> pumpGame(
+  WidgetTester tester, {
+  required String token,
+  SoundService? sound,
+}) async {
   final factory = fx.FakeXiangqiChannelFactory();
   final client = XiangqiSocketClient(channelFactory: factory, getToken: () async => token);
   addTearDown(client.dispose);
@@ -59,6 +64,7 @@ Future<fx.FakeXiangqiChannelFactory> pumpGame(WidgetTester tester, {required Str
       tester,
       home: const XiangqiOnlineGameScreen(gameId: fx.xiangqiTestGameId),
       overrides: {
+        if (sound != null) soundServiceProvider: soundServiceProvider.overrideWithValue(sound),
         // A real client over a fake transport, and not `overrideWithValue`: the client holds a
         // heartbeat timer, and the provider's teardown — which is what disposes it at the end of a
         // test — is the only thing that cancels the timer before the harness looks for pending ones.

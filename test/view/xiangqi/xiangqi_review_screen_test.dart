@@ -18,6 +18,7 @@ import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_rules.dart' as rules;
 import 'package:lichess_mobile/src/network/xiangqi_http.dart' show xiangqiAuthStorageProvider;
 import 'package:lichess_mobile/src/network/xiangqi_socket.dart';
+import 'package:lichess_mobile/src/service/sound_service.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_review_screen.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
@@ -80,7 +81,11 @@ Map<String, Object?> snapshotPayload() => {
 };
 
 /// Pumps the review screen over a fake socket, and hands the factory back.
-Future<fx.FakeXiangqiChannelFactory> pumpReview(WidgetTester tester, {bool signedIn = true}) async {
+Future<fx.FakeXiangqiChannelFactory> pumpReview(
+  WidgetTester tester, {
+  bool signedIn = true,
+  SoundService? sound,
+}) async {
   final factory = fx.FakeXiangqiChannelFactory();
   final client = XiangqiSocketClient(
     channelFactory: factory,
@@ -101,6 +106,7 @@ Future<fx.FakeXiangqiChannelFactory> pumpReview(WidgetTester tester, {bool signe
         home: XiangqiReviewScreen(gameId: _gameId),
       ),
       overrides: {
+        if (sound != null) soundServiceProvider: soundServiceProvider.overrideWithValue(sound),
         // A real client over a fake transport, and not `overrideWithValue`: the client holds a
         // heartbeat timer, and the provider's teardown is the only thing that cancels it before the
         // harness looks for pending ones.

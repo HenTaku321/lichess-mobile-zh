@@ -1,5 +1,4 @@
 import 'package:chessground/chessground.dart' show BrightnessHueFilter;
-import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/analysis/analysis_preferences.dart';
@@ -15,6 +14,7 @@ import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
+import 'package:lichess_mobile/src/widgets/history_navigation_button.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_analysis_layout.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
@@ -190,15 +190,13 @@ class _ReviewState() extends ConsumerState<_Review> {
         onSelectMove: _goTo,
         bottomBar: BottomBar(
           children: [
-            BottomBarButton(
-              label: context.l10n.mobileXiangqiReviewPrevious,
+            HistoryNavigationButton(
+              forward: false,
               onTap: cursor > 0 ? () => _goTo(cursor - 1) : null,
-              icon: CupertinoIcons.chevron_back,
             ),
-            BottomBarButton(
-              label: context.l10n.mobileXiangqiReviewNext,
+            HistoryNavigationButton(
+              forward: true,
               onTap: cursor < review.moves.length ? () => _goTo(cursor + 1) : null,
-              icon: CupertinoIcons.chevron_forward,
             ),
           ],
         ),

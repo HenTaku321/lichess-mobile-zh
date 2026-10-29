@@ -32,6 +32,7 @@ import 'package:lichess_mobile/src/widgets/adaptive_bottom_sheet.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_choice_picker.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
 import 'package:lichess_mobile/src/widgets/clock.dart';
+import 'package:lichess_mobile/src/widgets/history_navigation_button.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:lichess_mobile/src/widgets/non_linear_slider.dart';
 import 'package:lichess_mobile/src/widgets/settings.dart';
@@ -401,19 +402,17 @@ class const _OtbBottomBar({required final VoidCallback onFlipBoard}) extends Con
                   },
             icon: clock.active ? CupertinoIcons.pause : CupertinoIcons.play,
           ),
-        BottomBarButton(
-          label: context.l10n.mobilePreviousMove,
+        HistoryNavigationButton(
+          forward: false,
           onTap: gameState.viewCursor > 0
               ? ref.read(xiangqiGameControllerProvider.notifier).goBackward
               : null,
-          icon: CupertinoIcons.chevron_back,
         ),
-        BottomBarButton(
-          label: context.l10n.next,
+        HistoryNavigationButton(
+          forward: true,
           onTap: gameState.viewCursor < gameState.positions.length - 1
               ? ref.read(xiangqiGameControllerProvider.notifier).goForward
               : null,
-          icon: CupertinoIcons.chevron_forward,
         ),
         BottomBarButton(
           label: context.l10n.takeback,

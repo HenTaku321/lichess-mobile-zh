@@ -25,6 +25,7 @@ import 'package:lichess_mobile/src/view/xiangqi/xiangqi_chat_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_review_screen.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
 import 'package:lichess_mobile/src/widgets/clock.dart';
+import 'package:lichess_mobile/src/widgets/history_navigation_button.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_avatar.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
@@ -377,19 +378,22 @@ class _XiangqiOnlineGameScreenState() extends ConsumerState<XiangqiOnlineGameScr
         onSelectMove: (index) => _goTo(controller, state, index),
         userActionsBar: BottomBar(
           children: [
-            BottomBarButton(
-              label: l10n.mobilePreviousMove,
+            HistoryNavigationButton(
+              forward: false,
               onTap: state.viewCursor > 0
                   ? () => _goTo(controller, state, state.viewCursor - 1)
                   : null,
-              icon: CupertinoIcons.chevron_back,
             ),
-            BottomBarButton(
-              label: l10n.next,
+            HistoryNavigationButton(
+              forward: true,
               onTap: state.viewCursor < state.positions.length - 1
                   ? () => _goTo(controller, state, state.viewCursor + 1)
                   : null,
-              icon: CupertinoIcons.chevron_forward,
+              blink:
+                  state.isConnected &&
+                  !state.isFinished &&
+                  !state.isAtLivePosition &&
+                  state.isMyTurn,
             ),
             BottomBarButton(
               label: l10n.flipBoard,

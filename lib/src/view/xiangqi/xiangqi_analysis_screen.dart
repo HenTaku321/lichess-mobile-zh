@@ -22,6 +22,7 @@ import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_board_editor_screen.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
+import 'package:lichess_mobile/src/widgets/history_navigation_button.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_analysis_layout.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
@@ -304,15 +305,13 @@ class _BodyState() extends ConsumerState<_Body> {
                 },
                 icon: Icons.memory,
               ),
-              BottomBarButton(
-                label: context.l10n.mobilePreviousMove,
+              HistoryNavigationButton(
+                forward: false,
                 onTap: analysisState.canGoBack ? controller.goBack : null,
-                icon: CupertinoIcons.chevron_back,
               ),
-              BottomBarButton(
-                label: context.l10n.next,
+              HistoryNavigationButton(
+                forward: true,
                 onTap: analysisState.canGoForward ? controller.goForward : null,
-                icon: CupertinoIcons.chevron_forward,
               ),
             ],
           ),

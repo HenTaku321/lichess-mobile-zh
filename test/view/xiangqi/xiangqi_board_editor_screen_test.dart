@@ -340,7 +340,9 @@ void main() {
       expect(barButton(tester, 'analysis-board-button').onTap, isNotNull);
 
       await tester.tap(find.byKey(const Key('analysis-board-button')));
-      await tester.pumpAndSettle();
+      // Navigation can finish while the real engine-loading chip keeps spinning.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 350));
 
       // The position the editor built is the position the analysis board opened on, which is the
       // whole of what the two screens have to say to each other.

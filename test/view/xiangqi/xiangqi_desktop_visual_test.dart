@@ -159,7 +159,11 @@ http.Response visualHttp(http.Request request, {required bool empty, required bo
       'lessons': empty ? <Object?>[] : [lessons.lesson(title: longName)],
     });
   }
-  if (path.contains('/chapters')) return visualJson(empty ? <Object?>[] : [lessons.chapter()]);
+  if (path.contains('/chapters')) {
+    return visualJson({
+      'chapters': empty ? <Object?>[] : [lessons.chapter()],
+    });
+  }
   if (path.contains('/master-games/players') && path.endsWith('/stats')) {
     return visualJson({'wins': 12, 'losses': 3, 'draws': 2, 'country': 'CN'});
   }
@@ -337,10 +341,22 @@ void main() {
   setUpAll(() async {
     if (enabled) await loadVisualFonts();
   });
-  setUp(clearSavedXiangqiAnalysis);
+  setUp(() {
+    clearSavedXiangqiAnalysis();
+    // Real page focus callbacks still run; only the native Pigeon acknowledgement is simulated.
+    const channel = 'dev.flutter.pigeon.wakelock_plus_platform_interface.WakelockPlusApi.toggle';
+    final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMessageHandler(
+      channel,
+      (_) async => const StandardMessageCodec().encodeMessage(<Object?>[null]),
+    );
+    addTearDown(() => messenger.setMockMessageHandler(channel, null));
+  });
   tearDown(clearSavedXiangqiAnalysis);
 
-  final chapters = xiangqiChaptersFromJson([lessons.chapter()]);
+  final chapters = xiangqiChaptersFromJson({
+    'chapters': [lessons.chapter()],
+  });
   final scenes = <(String, Widget)>[
     ('analysis', const XiangqiAnalysisScreen()),
     ('analysis-ready', const XiangqiAnalysisScreen()),

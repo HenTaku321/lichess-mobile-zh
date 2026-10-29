@@ -6,6 +6,7 @@
 // whole line runs without waiting out four hundred milliseconds per answer; what is left is the
 // submission, which is a real request against a stubbed transport.
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -223,6 +224,58 @@ void main() {
     final state = stateOf(attempt.container);
     expect(state.hint, xiangqiTestLine.solution.first);
     expect(state.hintsUsed, 1);
+  });
+
+  test('concurrent hint clicks spend one allowance and show one hint', () async {
+    final requests = <http.Request>[];
+    final held = Completer<http.Response>();
+    final attempt = await makeAttempt(
+      client: MockClient((request) {
+        requests.add(request);
+        return held.future;
+      }),
+    );
+    final first = attempt.controller.hint();
+    final second = attempt.controller.hint();
+    await pumpEventQueue();
+    final count = requests.length;
+    held.complete(
+      await xiangqiJsonResponse(
+        jsonEncode({'feature': 'puzzle_hints', 'allowed': true, 'remaining': 4, 'reason': 'ok'}),
+        200,
+      ),
+    );
+    await Future.wait([first, second]);
+    expect(count, 1);
+    expect(stateOf(attempt.container).hintsUsed, 1);
+  });
+
+  test('a late hint cannot reveal the next position after an entire reply', () async {
+    final held = Completer<http.Response>();
+    final attempt = await makeAttempt(client: MockClient((request) => held.future));
+    final hint = attempt.controller.hint();
+    attempt.controller.onUserMove(stateOf(attempt.container).nextSolutionMove!);
+    await pumpEventQueue();
+    expect(stateOf(attempt.container).isSolverTurn, isTrue);
+    expect(stateOf(attempt.container).moves.length, 3);
+    held.complete(
+      await xiangqiJsonResponse(
+        jsonEncode({'feature': 'puzzle_hints', 'allowed': true, 'remaining': 4, 'reason': 'ok'}),
+        200,
+      ),
+    );
+    await hint;
+    expect(stateOf(attempt.container).hint, isNull);
+    expect(stateOf(attempt.container).hintsUsed, 0);
+  });
+
+  test('showing the same hint again does not spend another allowance', () async {
+    final requests = <http.Request>[];
+    final attempt = await makeAttempt(client: attemptClient(requests: requests));
+    await attempt.controller.hint();
+    await attempt.controller.hint();
+    expect(requests.length, 1);
+    expect(stateOf(attempt.container).hintsUsed, 1);
   });
 
   test('a hint the server refuses is not shown, and is not counted', () async {

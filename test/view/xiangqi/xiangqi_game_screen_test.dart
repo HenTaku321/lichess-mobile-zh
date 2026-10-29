@@ -97,6 +97,7 @@ Future<FakeTransport> pumpGameScreen(
   bool engineEvaluation = false,
   Locale? locale,
   String? initialFen,
+  XiangqiGameScreen? screen,
 }) async {
   final transport = FakeTransport(
     spec: const PikafishSpec(nnuePath: '/test/pikafish.nnue'),
@@ -105,7 +106,7 @@ Future<FakeTransport> pumpGameScreen(
   final engine = Engine(transport);
   addTearDown(engine.dispose);
 
-  final home = XiangqiGameScreen(initialFen: initialFen);
+  final home = screen ?? XiangqiGameScreen(initialFen: initialFen);
   final overrides = {
     xiangqiEngineProvider: xiangqiEngineProvider.overrideWith((Ref ref) => engine),
   };

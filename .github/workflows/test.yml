@@ -151,6 +151,15 @@ jobs:
           test/widgets/xiangqi_refresh_test.dart
           test/view/message/xiangqi_conversation_screen_test.dart
 
+      - name: Run xiangqi lifecycle regressions
+        if: ${{ !cancelled() && steps.analyze.outcome == 'success' }}
+        run: >-
+          flutter test --no-pub --reporter expanded
+          test/model/xiangqi/xiangqi_practice_lifecycle_test.dart
+          test/model/xiangqi/puzzle/xiangqi_puzzle_controller_test.dart
+          test/view/xiangqi/xiangqi_practice_screen_contract_test.dart
+          test/widgets/practice_feedback_card_test.dart
+
       - name: Fetch fixed desktop screenshot fonts
         if: ${{ !cancelled() && steps.analyze.outcome == 'success' }}
         run: bash scripts/fetch-desktop-test-fonts.sh out/visual-fonts

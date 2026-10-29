@@ -7,6 +7,7 @@ import 'package:material_ui/material_ui.dart';
 class const XiangqiDifficultyTile({
   required final XiangqiDifficulty difficulty,
   required final ValueChanged<XiangqiDifficulty> onChanged,
+  final ValueChanged<XiangqiDifficulty>? onChangeEnd,
   super.key,
 }) extends StatelessWidget {
   @override
@@ -32,7 +33,8 @@ class const XiangqiDifficultyTile({
             value: difficulty.level,
             values: XiangqiDifficulty.values.map((d) => d.level).toList(),
             onChange: (value) => onChanged(XiangqiDifficulty.values[value.toInt() - 1]),
-            onChangeEnd: (value) => onChanged(XiangqiDifficulty.values[value.toInt() - 1]),
+            onChangeEnd: (value) =>
+                (onChangeEnd ?? onChanged)(XiangqiDifficulty.values[value.toInt() - 1]),
           ),
         ],
       ),

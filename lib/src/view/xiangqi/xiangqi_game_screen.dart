@@ -816,6 +816,57 @@ class _XiangqiGameSettingsSheetState() extends ConsumerState<_XiangqiGameSetting
   // disk sixty times over one gesture. Read once, like the settings screen does.
   late double _brightness = ref.read(boardPreferencesProvider).brightness;
   late double _hue = ref.read(boardPreferencesProvider).hue;
+  XiangqiDifficulty? _difficultyPreview;
+  bool _changingDifficulty = false;
+
+  Future<void> _commitDifficulty(XiangqiDifficulty difficulty) async {
+    if (_changingDifficulty) return;
+    final controller = ref.read(xiangqiGameControllerProvider.notifier);
+    final game = ref.read(xiangqiGameControllerProvider);
+    if (difficulty == game.difficulty) {
+      setState(() => _difficultyPreview = null);
+      return;
+    }
+    final generation = controller.generation;
+    _changingDifficulty = true;
+    try {
+      final confirmed =
+          game.moves.isEmpty ||
+          (await showAdaptiveDialog<bool>(
+                context: context,
+                builder: (dialogContext) => YesNoDialog(
+                  title: Text(context.l10n.mobileNewGame),
+                  content: Text(context.l10n.mobileAreYouSure),
+                  onYes: () => Navigator.pop(dialogContext, true),
+                  onNo: () => Navigator.pop(dialogContext, false),
+                ),
+              ) ??
+              false);
+      if (!mounted || !confirmed || controller.generation != generation) return;
+      controller.startNewGame(
+        side: game.playerSide,
+        difficulty: difficulty,
+        opponent: game.opponent,
+        initialPosition: game.positions.first,
+        timeIncrement: game.timeIncrement,
+        practiceMode: game.practiceMode,
+      );
+      if (!game.timeIncrement.isInfinite) {
+        ref
+            .read(xiangqiClockProvider.notifier)
+            .resume(ref.read(xiangqiGameControllerProvider).turn);
+      }
+      unawaited(ref.read(xiangqiGameStorageProvider).delete());
+      unawaited(
+        ref
+            .read(offlineComputerGamePreferencesProvider.notifier)
+            .setLastXiangqiLevel(difficulty.level),
+      );
+    } finally {
+      _changingDifficulty = false;
+      if (mounted) setState(() => _difficultyPreview = null);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -834,17 +885,12 @@ class _XiangqiGameSettingsSheetState() extends ConsumerState<_XiangqiGameSetting
         ListSection(
           materialFilledCard: true,
           children: [
-            // A difficulty is not a setting that can be changed under a game in progress: what the
-            // level is, is how long the engine may think about the moves it is being asked for now,
-            // so choosing one starts the game over at it. The side is carried over, because choosing
-            // how hard to play is not choosing a side.
+            // Dragging only previews a level. Replacing a played game is one confirmed action,
+            // carrying over the side, initial position, time control and practice setting.
             XiangqiDifficultyTile(
-              difficulty: gameState.difficulty,
-              onChanged: (difficulty) {
-                ref
-                    .read(xiangqiGameControllerProvider.notifier)
-                    .startNewGame(side: gameState.playerSide, difficulty: difficulty);
-              },
+              difficulty: _difficultyPreview ?? gameState.difficulty,
+              onChanged: (difficulty) => setState(() => _difficultyPreview = difficulty),
+              onChangeEnd: (difficulty) => unawaited(_commitDifficulty(difficulty)),
             ),
             SwitchSettingTile(
               title: Text(context.l10n.flipBoard),

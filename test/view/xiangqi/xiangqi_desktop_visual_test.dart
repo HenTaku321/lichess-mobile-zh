@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
+import 'package:chessground/chessground.dart' show Chessboard;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -22,6 +23,7 @@ import 'package:lichess_mobile/src/model/settings/general_preferences.dart';
 import 'package:lichess_mobile/src/model/settings/preferences_storage.dart';
 import 'package:lichess_mobile/src/model/xiangqi/chat/xiangqi_chat.dart';
 import 'package:lichess_mobile/src/model/xiangqi/lesson/xiangqi_lesson.dart';
+import 'package:lichess_mobile/src/model/xiangqi/puzzle/xiangqi_puzzle_repository.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_analysis_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_move.dart';
@@ -31,6 +33,7 @@ import 'package:lichess_mobile/src/network/socket.dart' show webSocketChannelFac
 import 'package:lichess_mobile/src/network/xiangqi_http.dart';
 import 'package:lichess_mobile/src/network/xiangqi_socket.dart';
 import 'package:lichess_mobile/src/theme.dart';
+import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/view/analysis/analysis_screen.dart';
 import 'package:lichess_mobile/src/view/message/xiangqi_conversation_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_analysis_screen.dart';
@@ -439,17 +442,18 @@ void main() {
                 );
                 addTearDown(socket.dispose);
                 final puzzle = puzzles.PuzzleServer();
-                final client = MockClient(
-                  (request) async =>
-                      request.url.path.startsWith('/api/puzzle') ||
+                final httpRequests = <String>[];
+                final client = MockClient((request) async {
+                  httpRequests.add('${request.method} ${request.url.path}');
+                  return request.url.path.startsWith('/api/puzzle') ||
                           request.url.path.startsWith('/api/quota')
                       ? await http.Response.fromStream(await puzzle.client.send(request))
                       : visualHttp(
                           request,
                           empty: scene.endsWith('-empty'),
                           error: scene.endsWith('-error'),
-                        ),
-                );
+                        );
+                });
                 final key = GlobalKey();
                 await tester.pumpWidget(
                   await makeTestProviderScope(
@@ -516,6 +520,17 @@ void main() {
                   }
                 }
                 final exception = tester.takeException();
+                final container = ProviderScope.containerOf(
+                  tester.element(find.byType(DesktopSceneApp)),
+                );
+                final puzzleSearch = scene == 'puzzle'
+                    ? container.read(xiangqiPuzzleSearchProvider(xiangqiDefaultPuzzleSearch))
+                    : null;
+                final texts = tester
+                    .widgetList<Text>(find.byType(Text))
+                    .map((w) => w.data)
+                    .whereType<String>()
+                    .toList();
                 final boards = [
                   for (final element in find.byType(XiangqiBoard).evaluate())
                     tester.getRect(find.byElementPredicate((e) => identical(e, element))),
@@ -537,6 +552,9 @@ void main() {
                       'scale': scale,
                       'theme': mode.name,
                       'source': Platform.environment['GITHUB_SHA'],
+                      'requests': httpRequests,
+                      'texts': texts,
+                      'puzzleSearch': puzzleSearch?.toString(),
                       'boards': [
                         for (final rect in boards)
                           {
@@ -553,6 +571,33 @@ void main() {
                 });
                 expect(exception, isNull);
                 expect(find.byType(ErrorWidget), findsNothing);
+                if (!scene.endsWith('-error')) {
+                  expect(
+                    find.text(key.currentContext!.l10n.mobileSomethingWentWrong),
+                    findsNothing,
+                  );
+                }
+                if (const {
+                  'analysis',
+                  'analysis-ready',
+                  'analysis-menu',
+                  'online',
+                  'review',
+                  'editor',
+                  'computer',
+                  'otb-setup',
+                  'database-game',
+                  'lesson-player',
+                  'puzzle',
+                }.contains(scene)) {
+                  expect(
+                    boards,
+                    hasLength(1),
+                    reason:
+                        'a loaded $scene must render its real board; requests=$httpRequests puzzleSearch=$puzzleSearch',
+                  );
+                }
+                if (scene == 'lichess-analysis') expect(find.byType(Chessboard), findsOneWidget);
                 for (final board in boards) {
                   expect(
                     board.width,

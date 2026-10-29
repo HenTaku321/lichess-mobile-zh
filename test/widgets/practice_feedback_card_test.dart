@@ -71,11 +71,11 @@ void main() {
     await tester.pumpWidget(
       await makeTestProviderScopeApp(
         tester,
-        home: Scaffold(
+        home: const Scaffold(
           body: Center(
             child: MediaQuery(
-              data: const MediaQueryData(textScaler: TextScaler.linear(2)),
-              child: const SizedBox(
+              data: MediaQueryData(textScaler: TextScaler.linear(2)),
+              child: SizedBox(
                 width: 220,
                 child: PracticeFeedbackCard(
                   feedback: PracticeFeedbackData(

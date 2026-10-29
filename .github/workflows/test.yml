@@ -152,6 +152,7 @@ jobs:
           test/view/message/xiangqi_conversation_screen_test.dart
 
       - name: Run xiangqi lifecycle regressions
+        id: lifecycle
         if: ${{ !cancelled() && steps.analyze.outcome == 'success' }}
         run: >-
           flutter test --no-pub --reporter expanded
@@ -162,12 +163,12 @@ jobs:
           test/widgets/practice_feedback_card_test.dart
 
       - name: Fetch fixed desktop screenshot fonts
-        if: ${{ !cancelled() && steps.analyze.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.analyze.outcome == 'success' && steps.lifecycle.outcome == 'success' }}
         run: bash scripts/fetch-desktop-test-fonts.sh out/visual-fonts
 
       - name: Run desktop visual matrix
         id: desktop_visual
-        if: ${{ !cancelled() && steps.analyze.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.analyze.outcome == 'success' && steps.lifecycle.outcome == 'success' }}
         env:
           XIANGQI_DESKTOP_VISUALS: '1'
           XIANGQI_VISUAL_FONT_DIR: out/visual-fonts

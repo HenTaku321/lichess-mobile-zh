@@ -125,11 +125,13 @@ Future<void> pumpPuzzleScreen(
   WidgetTester tester, {
   required PuzzleServer server,
   Object? session = _defaultSession,
+  bool failOnOverflow = false,
 }) async {
   await tester.pumpWidget(
     await makeTestProviderScopeApp(
       tester,
       home: const XiangqiPuzzleScreen(),
+      failOnOverflow: failOnOverflow,
       overrides: {
         xiangqiAuthStorageProvider: xiangqiAuthStorageProvider.overrideWithValue(
           FakeXiangqiAuthStorage(

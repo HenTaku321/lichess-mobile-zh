@@ -11,7 +11,7 @@ void main() {
   TestLichessBinding.ensureInitialized();
 
   testWidgets('xiangqi starts with the same feedback tile as chess puzzles', (tester) async {
-    await puzzle.pumpPuzzleScreen(tester, server: puzzle.PuzzleServer());
+    await puzzle.pumpPuzzleScreen(tester, server: puzzle.PuzzleServer(), failOnOverflow: true);
 
     expect(find.byType(FeedbackTile), findsOneWidget);
     expect(find.text('Your turn'), findsOneWidget);
@@ -20,7 +20,7 @@ void main() {
 
   testWidgets('correct feedback remains after the automatic opponent reply', (tester) async {
     final server = puzzle.PuzzleServer();
-    await puzzle.pumpPuzzleScreen(tester, server: server);
+    await puzzle.pumpPuzzleScreen(tester, server: server, failOnOverflow: true);
     final move = xiangqiTestLine.solution.first;
     await puzzle.tapSquare(tester, move.from.name, orientation: XiangqiSide.black);
     await puzzle.tapSquare(tester, move.to.name, orientation: XiangqiSide.black);
@@ -38,7 +38,7 @@ void main() {
   });
 
   testWidgets('wrong feedback remains after reverting the wrong move', (tester) async {
-    await puzzle.pumpPuzzleScreen(tester, server: puzzle.PuzzleServer());
+    await puzzle.pumpPuzzleScreen(tester, server: puzzle.PuzzleServer(), failOnOverflow: true);
     final before = puzzle.board(tester).position;
     final wrong = rules
         .legalMoves(before)
@@ -59,7 +59,7 @@ void main() {
 
   testWidgets('a recorded solution uses the shared completion feedback', (tester) async {
     final server = puzzle.PuzzleServer();
-    await puzzle.pumpPuzzleScreen(tester, server: server);
+    await puzzle.pumpPuzzleScreen(tester, server: server, failOnOverflow: true);
     await puzzle.playTheLine(tester);
 
     expect(find.byType(FeedbackTile), findsOneWidget);

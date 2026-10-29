@@ -240,6 +240,24 @@ void main() {
     );
   });
 
+  test('snapshot resync keeps a replay cursor while refreshing the live position', () async {
+    final game = await harness.makeHarness(fx.xiangqiTestToken(fx.xiangqiTestViewerId));
+    await game.send(fx.xiangqiSnapshotFrame(plies: 2));
+    game.controller.goTo(1);
+    final displayed = game.state.position;
+    await game.controller.resync();
+    expect(game.state.isConnected, isFalse);
+    await game.send(fx.xiangqiSnapshotFrame(plies: 4));
+
+    expect(game.state.isConnected, isTrue);
+    expect(game.state.viewCursor, 1);
+    expect(game.state.position, displayed);
+    expect(game.state.gamePosition, fx.xiangqiTestPositions[4]);
+    expect(game.state.moves, hasLength(4));
+    expect(game.state.isMyTurn, isFalse, reason: 'replaying must not grant move permission');
+    expect(game.channel.hasSentEvent('g_v2.move'), isFalse);
+  });
+
   test('signout closes the account socket', () async {
     final storage = ht.FakeXiangqiAuthStorage(ht.signedInSession);
     final factory = fx.FakeXiangqiChannelFactory();

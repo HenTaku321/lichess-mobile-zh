@@ -9,6 +9,8 @@ bool get _mobile =>
         defaultTargetPlatform == TargetPlatform.iOS);
 
 bool get supportsFirebaseMessaging => _mobile;
+bool get supportsFirebaseCrashlytics =>
+    _mobile || (!kIsWeb && defaultTargetPlatform == TargetPlatform.macOS);
 bool get supportsQuickActions => _mobile;
 bool get supportsIncomingPgnShare => _mobile;
 bool get supportsHomeWidgets => _mobile;

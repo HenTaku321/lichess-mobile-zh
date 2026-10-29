@@ -14,6 +14,7 @@ import 'package:lichess_mobile/src/model/settings/preferences_storage.dart';
 import 'package:lichess_mobile/src/service/notification_service.dart';
 import 'package:lichess_mobile/src/utils/chessboard.dart';
 import 'package:lichess_mobile/src/utils/color_palette.dart';
+import 'package:lichess_mobile/src/utils/platform_capabilities.dart';
 import 'package:lichess_mobile/src/utils/screen.dart';
 import 'package:lichess_mobile/src/utils/string.dart';
 import 'package:logging/logging.dart';
@@ -55,11 +56,13 @@ Future<void> initializeApp() async {
     }
   } catch (e, st) {
     _logger.severe('Error during app initialization:', e, st);
-    LichessBinding.instance.firebaseCrashlytics.recordError(
-      e,
-      st,
-      reason: 'Error during app initialization',
-    );
+    if (supportsFirebaseCrashlytics) {
+      LichessBinding.instance.firebaseCrashlytics.recordError(
+        e,
+        st,
+        reason: 'Error during app initialization',
+      );
+    }
   } finally {
     await prefs.setBool('first_run', false);
   }

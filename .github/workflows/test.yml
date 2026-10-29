@@ -19,6 +19,7 @@ on:
       # with no Flutter installed, so a 12-minute iOS build is the only other
       # feedback loop; this job is where a typo is supposed to be caught.
       - zh-local
+      - fix/xiangqi-interaction-parity
   pull_request:
     paths:
       - 'lib/**'
@@ -112,6 +113,17 @@ jobs:
 
       # - name: Run riverpod lint
       #   run: dart run custom_lint
+
+      - name: Run xiangqi interaction regressions
+        run: >-
+          flutter test --no-pub --reporter expanded
+          test/view/xiangqi/xiangqi_history_parity_test.dart
+          test/view/xiangqi/xiangqi_online_game_screen_test.dart
+          test/view/xiangqi/xiangqi_over_the_board_screen_test.dart
+          test/view/xiangqi/xiangqi_review_screen_test.dart
+          test/view/xiangqi/xiangqi_analysis_screen_test.dart
+          test/model/xiangqi/review/xiangqi_review_test.dart
+          test/network/xiangqi_hardening_test.dart
 
       - name: Run unit tests
         run: flutter test

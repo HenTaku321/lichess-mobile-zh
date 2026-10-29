@@ -238,6 +238,7 @@ void main() {
       gameId: 'AbCdEf1234',
       initialPosition: XiangqiPosition.initial(),
       positions: IList([XiangqiPosition.initial(), XiangqiPosition.initial()]),
+      evaluations: const IListConst([XiangqiEvaluation(cp: 100), XiangqiEvaluation(cp: 100)]),
       moves: IList([move('h2e2')]),
       reviews: IList([
         xiangqiMoveReviewOf(

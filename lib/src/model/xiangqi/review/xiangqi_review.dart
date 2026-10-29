@@ -41,8 +41,11 @@ enum XiangqiMoveClassification() {
 @freezed
 sealed class const XiangqiMoveReview._() with _$XiangqiMoveReview {
   const factory({
-    /// Which ply this is, counted from zero. Red plays the even ones.
+    /// Which ply this is, counted from zero relative to the initial position.
     required int ply,
+
+    /// The side to move in the initial position; custom games need not start with red.
+    @Default(XiangqiSide.red) XiangqiSide firstSide,
 
     /// The move that was played.
     required XiangqiMove move,
@@ -67,7 +70,7 @@ sealed class const XiangqiMoveReview._() with _$XiangqiMoveReview {
   }) = _XiangqiMoveReview;
 
   /// Which side played this move.
-  XiangqiSide get side => ply.isEven ? XiangqiSide.red : XiangqiSide.black;
+  XiangqiSide get side => ply.isEven ? firstSide : firstSide.opposite;
 }
 
 /// A finished game, with every move of it marked up.
@@ -87,6 +90,9 @@ sealed class const XiangqiReview._() with _$XiangqiReview {
     /// Every position of the game: `positions[i]` is the position before `moves[i]` was played, so
     /// this is one longer than [moves] and `positions.last` is the final position.
     required IList<XiangqiPosition> positions,
+
+    /// One red-perspective evaluation per position, including the final position.
+    required IList<XiangqiEvaluation> evaluations,
 
     /// Every move of the game, in order.
     required IList<XiangqiMove> moves,
@@ -131,13 +137,15 @@ sealed class const XiangqiReview._() with _$XiangqiReview {
 /// `100 * (60 - min(10, |mate|))`, so a mate in one is 5900 and a mate in ten or more is 5000, and
 /// the sign is the mating side's. Everything else is the centipawn score clamped to ±5000, which is
 /// the same bound the mate scores start at — see [kXiangqiCompletelyWinningCp].
-int xiangqiReviewScore(XiangqiEvaluation evaluation) {
+int xiangqiReviewScore(XiangqiEvaluation evaluation, {XiangqiSide sideToMove = XiangqiSide.red}) {
   final mate = evaluation.mate;
   if (mate != null) {
     // `math.min` is generic over `num`, and a literal and an `int` do not pin it to `int` on their
     // own: the bound is written as an `int` for that reason and the product is taken as one.
     final reach = mate.abs() < 10 ? mate.abs() : 10;
-    return 100 * (60 - reach) * (mate > 0 ? 1 : -1);
+    // Integer negation cannot preserve -0. At mate zero the side to move has already lost.
+    final redWins = mate == 0 ? sideToMove == XiangqiSide.black : mate > 0;
+    return 100 * (60 - reach) * (redWins ? 1 : -1);
   }
   final cp = evaluation.cp ?? 0;
   if (cp > kXiangqiCompletelyWinningCp) return kXiangqiCompletelyWinningCp;
@@ -206,17 +214,19 @@ XiangqiMoveReview xiangqiMoveReviewOf({
   required XiangqiMove move,
   required XiangqiEvaluation before,
   required XiangqiEvaluation after,
+  XiangqiSide firstSide = XiangqiSide.red,
   XiangqiMove? bestMove,
   int depth = 0,
 }) {
-  final side = ply.isEven ? XiangqiSide.red : XiangqiSide.black;
+  final side = ply.isEven ? firstSide : firstSide.opposite;
   final sign = side == XiangqiSide.red ? 1 : -1;
-  final beforeRate = xiangqiWinRate(xiangqiReviewScore(before) * sign);
-  final afterRate = xiangqiWinRate(xiangqiReviewScore(after) * sign);
+  final beforeRate = xiangqiWinRate(xiangqiReviewScore(before, sideToMove: side) * sign);
+  final afterRate = xiangqiWinRate(xiangqiReviewScore(after, sideToMove: side.opposite) * sign);
   final accuracy = xiangqiMoveAccuracy(before: beforeRate, after: afterRate);
 
   return XiangqiMoveReview(
     ply: ply,
+    firstSide: firstSide,
     move: move,
     evaluation: before,
     classification: xiangqiMoveClassificationOf(accuracy),
@@ -236,6 +246,7 @@ IList<XiangqiMoveReview> xiangqiMoveReviewsFromAnalysis({
   required IList<XiangqiEvaluation> evaluations,
   required IList<XiangqiMove?> bestMoves,
   required IList<int> depths,
+  XiangqiSide firstSide = XiangqiSide.red,
 }) {
   if (evaluations.length != moves.length + 1) {
     _logger.warning(
@@ -248,6 +259,7 @@ IList<XiangqiMoveReview> xiangqiMoveReviewsFromAnalysis({
     for (var ply = 0; ply < moves.length; ply++)
       xiangqiMoveReviewOf(
         ply: ply,
+        firstSide: firstSide,
         move: moves[ply],
         before: evaluations[ply],
         after: evaluations[ply + 1],

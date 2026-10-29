@@ -98,14 +98,15 @@ final xiangqiReviewProvider = FutureProvider.autoDispose.family<XiangqiReview, S
         throw const XiangqiReviewException(XiangqiReviewFailure.failed);
       }
 
-      final analysis = await _analysisOf(socket, gameId, moves);
+      final analysis = await _analysisOf(socket, gameId, moves, initial.turn);
 
       return XiangqiReview(
         gameId: gameId,
         initialPosition: initial,
         positions: positions,
+        evaluations: analysis.evaluations,
         moves: moves,
-        reviews: analysis,
+        reviews: analysis.reviews,
         red: xiangqiLivePlayerFromJson(snapshot['rplayer']),
         black: xiangqiLivePlayerFromJson(snapshot['bplayer']),
         endReason: _int(snapshot['end_reason']),
@@ -173,10 +174,11 @@ Future<Map<String, dynamic>> _snapshotOf(XiangqiSocketClient socket, String game
 /// One emit, one frame, the whole game: the server answers `game.review.success` with an entry per
 /// position and nothing else — there is no progress frame and no second call. See
 /// `xiangqi-com-re/docs/review.md`.
-Future<IList<XiangqiMoveReview>> _analysisOf(
+Future<({IList<XiangqiMoveReview> reviews, IList<XiangqiEvaluation> evaluations})> _analysisOf(
   XiangqiSocketClient socket,
   String gameId,
   IList<XiangqiMove> moves,
+  XiangqiSide firstSide,
 ) async {
   final frame = await _requestFrame(
     socket,
@@ -191,7 +193,9 @@ Future<IList<XiangqiMoveReview>> _analysisOf(
   );
   final data = _asMap(_unwrap(frame.data));
   final entries = data?['analysis'];
-  if (entries is! List) throw const XiangqiReviewException(XiangqiReviewFailure.failed);
+  if (entries is! List || entries.length != moves.length + 1) {
+    throw const XiangqiReviewException(XiangqiReviewFailure.failed);
+  }
 
   final evaluations = <XiangqiEvaluation>[];
   final bestMoves = <XiangqiMove?>[];
@@ -204,12 +208,16 @@ Future<IList<XiangqiMoveReview>> _analysisOf(
     final score = _asMap(entry['s']);
     if (score == null) throw const XiangqiReviewException(XiangqiReviewFailure.failed);
     // The server's score is in the **side to move's** point of view, and the side to move at
-    // position `ply` is the side that played that ply: red on the even ones. Everything above this
+    // position `ply` follows the initial FEN's turn, not a hard-coded red-first assumption.
+    // Everything above this
     // file reads an evaluation as red's, so the flip happens here, once — the same rule
     // `xiangqiEvaluationFromEngine` follows for the engine's own scores.
-    final sideToMove = ply.isEven ? XiangqiSide.red : XiangqiSide.black;
+    final sideToMove = ply.isEven ? firstSide : firstSide.opposite;
     final cp = _int(score['cp']);
     final mate = _int(score['mate']);
+    if (cp == null && mate == null) {
+      throw const XiangqiReviewException(XiangqiReviewFailure.failed);
+    }
     evaluations.add(
       XiangqiEvaluation(
         cp: cp == null ? null : (sideToMove == XiangqiSide.red ? cp : -cp),
@@ -220,11 +228,15 @@ Future<IList<XiangqiMoveReview>> _analysisOf(
     depths.add(_int(entry['d']) ?? 0);
   }
 
-  return xiangqiMoveReviewsFromAnalysis(
-    moves: moves,
+  return (
+    reviews: xiangqiMoveReviewsFromAnalysis(
+      moves: moves,
+      evaluations: evaluations.lock,
+      bestMoves: bestMoves.lock,
+      depths: depths.lock,
+      firstSide: firstSide,
+    ),
     evaluations: evaluations.lock,
-    bestMoves: bestMoves.lock,
-    depths: depths.lock,
   );
 }
 

@@ -1,4 +1,5 @@
 import 'package:chessground/chessground.dart' show BrightnessHueFilter;
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/analysis/analysis_preferences.dart';
@@ -41,9 +42,8 @@ import 'package:material_ui/material_ui.dart';
 ///
 /// ## Where the board is
 ///
-/// The board is always drawn from red's side and never flips. A review is not a game: there is
-/// nobody to face, nothing is being played, and a board that turned itself around between two moves
-/// of the same game would be a board that made the reader lose their place.
+/// The board starts with red at the bottom and never flips automatically between moves. The reader
+/// can flip it explicitly, with the player rows and evaluation gauge following the same orientation.
 class const XiangqiReviewScreen({required final String gameId, super.key}) extends ConsumerWidget {
   static Route<void> buildRoute(String gameId) =>
       buildScreenRoute(screen: XiangqiReviewScreen(gameId: gameId));
@@ -97,6 +97,7 @@ class _ReviewState() extends ConsumerState<_Review> {
   /// move and `moves.length` is after the last one.
   int _cursor = 0;
   bool _animate = false;
+  bool _isFlipped = false;
 
   @override
   void initState() {
@@ -137,9 +138,17 @@ class _ReviewState() extends ConsumerState<_Review> {
     // The verdict on the move that led to the position on the board, which is the move at
     // `cursor - 1`: the entry at `cursor` is the reading of the position *before* that move.
     final current = cursor == 0 ? null : review.reviews[cursor - 1];
-    final evaluation = cursor == 0
-        ? review.reviews.first.evaluation
-        : review.reviews[cursor - 1].evaluation;
+    final position = review.positions[cursor];
+    final evaluation = review.evaluations[cursor];
+    // Mate zero identifies the losing side through the position's turn, not through integer sign.
+    final terminalWinner = evaluation.mate == 0 ? position.turn.opposite : null;
+    final orientation = _isFlipped ? XiangqiSide.black : XiangqiSide.red;
+    final topSide = orientation.opposite;
+    final redWinProbability = terminalWinner == null
+        ? evaluation.redWinProbability
+        : terminalWinner == XiangqiSide.red
+        ? 1.0
+        : 0.0;
 
     return SafeArea(
       child: XiangqiAnalysisLayout(
@@ -149,8 +158,8 @@ class _ReviewState() extends ConsumerState<_Review> {
           hue: boardPrefs.hue,
           child: XiangqiBoard(
             settings: XiangqiBoardSettings.fromPreferences(boardPrefs),
-            position: review.positions[cursor],
-            orientation: XiangqiSide.red,
+            position: position,
+            orientation: orientation,
             selected: null,
             moves: const IListConst([]),
             // A review is read, not played: no tap, no drag, and no legal-move dots, because there
@@ -168,20 +177,21 @@ class _ReviewState() extends ConsumerState<_Review> {
           ),
         ),
         evalGauge: XiangqiEvalGauge(
-          redWinProbability: evaluation.redWinProbability,
-          orientation: XiangqiSide.red,
+          redWinProbability: redWinProbability,
+          orientation: orientation,
           evaluation: evaluation,
+          outcome: terminalWinner == null ? null : (winner: terminalWinner),
         ),
         boardHeader: _PlayerRow(
-          side: XiangqiSide.black,
-          player: review.black,
-          accuracy: review.accuracyOf(XiangqiSide.black),
+          side: topSide,
+          player: topSide == XiangqiSide.black ? review.black : review.red,
+          accuracy: review.accuracyOf(topSide),
           style: style,
         ),
         boardFooter: _PlayerRow(
-          side: XiangqiSide.red,
-          player: review.red,
-          accuracy: review.accuracyOf(XiangqiSide.red),
+          side: orientation,
+          player: orientation == XiangqiSide.red ? review.red : review.black,
+          accuracy: review.accuracyOf(orientation),
           style: style,
         ),
         panelHeader: _Verdict(review: review, cursor: cursor, current: current),
@@ -190,6 +200,11 @@ class _ReviewState() extends ConsumerState<_Review> {
         onSelectMove: _goTo,
         bottomBar: BottomBar(
           children: [
+            BottomBarButton(
+              label: context.l10n.flipBoard,
+              onTap: () => setState(() => _isFlipped = !_isFlipped),
+              icon: CupertinoIcons.arrow_2_squarepath,
+            ),
             HistoryNavigationButton(
               forward: false,
               onTap: cursor > 0 ? () => _goTo(cursor - 1) : null,

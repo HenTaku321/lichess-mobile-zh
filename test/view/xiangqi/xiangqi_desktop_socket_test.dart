@@ -118,8 +118,10 @@ void main() {
     );
     final provider = xiangqiOnlineGameControllerProvider(fx.xiangqiTestGameId);
     container.read(provider.notifier).goTo(2);
-    await tester.tap(online.barButton(CupertinoIcons.arrow_2_squarepath));
-    await tester.pump();
+    await tester.tap(online.barButton(Icons.menu));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.text('Flip board'));
+    await tester.pump(const Duration(milliseconds: 300));
     final position = online.board(tester).position;
     final orientation = online.board(tester).orientation;
     final before = requests(factory.channel, 'g_v2.get').length;

@@ -151,9 +151,10 @@ void main() {
       expect(board(tester).position.toFen(), fx.xiangqiTestPositions.first.toFen());
       expect(find.byType(XiangqiOnlinePlayerRow), findsNWidgets(2));
 
-      // The two buttons anybody gets, and not the third: a spectator has no seat to resign.
-      expect(barButton(CupertinoIcons.arrow_2_squarepath), findsOneWidget);
-      expect(barButton(CupertinoIcons.xmark), findsOneWidget);
+      // The menu owns flip/close; a spectator has no seat to resign.
+      expect(barButton(Icons.menu), findsOneWidget);
+      expect(barButton(CupertinoIcons.arrow_2_squarepath), findsNothing);
+      expect(barButton(CupertinoIcons.xmark), findsNothing);
       expect(barButton(CupertinoIcons.flag), findsNothing);
 
       // And the board is theirs to look at rather than to play on: neither a tap nor a drag is
@@ -261,11 +262,11 @@ void main() {
       expect(dialog.state.resignedBy, XiangqiSide.black);
       expect(dialog.state.winner, XiangqiSide.red);
 
-      // The board keeps the final position, and the resign button goes inert rather than away: there
-      // is still a game on the screen, it is just not one that can be resigned any more.
+      // As on chess, a finished game replaces resign with the way to show its result again.
       expect(board(tester).position.toFen(), fx.xiangqiTestPositions.last.toFen());
-      expect(barButton(CupertinoIcons.flag), findsOneWidget);
-      expect(tester.widget<BottomBarButton>(barButton(CupertinoIcons.flag)).onTap, isNull);
+      expect(barButton(CupertinoIcons.flag), findsNothing);
+      expect(barButton(Icons.info_outline), findsOneWidget);
+      expect(tester.widget<BottomBarButton>(barButton(Icons.info_outline)).onTap, isNotNull);
     });
 
     testWidgets('a socket that will not open says so, rather than spinning forever', (

@@ -24,6 +24,7 @@ import 'package:lichess_mobile/src/utils/navigation.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_chat_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_review_screen.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
+import 'package:lichess_mobile/src/widgets/adaptive_action_sheet.dart';
 import 'package:lichess_mobile/src/widgets/clock.dart';
 import 'package:lichess_mobile/src/widgets/history_navigation_button.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
@@ -400,6 +401,32 @@ class _XiangqiOnlineGameScreenState() extends ConsumerState<XiangqiOnlineGameScr
         onSelectMove: (index) => _goTo(controller, state, index),
         userActionsBar: BottomBar(
           children: [
+            BottomBarButton(label: l10n.menu, onTap: _showGameMenu, icon: Icons.menu),
+            if (state.isFinished)
+              BottomBarButton(
+                label: l10n.mobileShowResult,
+                onTap: () => _showResult(state),
+                icon: Icons.info_outline,
+              )
+            else if (!isSpectator)
+              BottomBarButton(
+                label: l10n.resign,
+                onTap: state.isConnected ? () => _confirmResign(context, controller) : null,
+                icon: CupertinoIcons.flag,
+              ),
+            // The game's own chat, which is the same room the site shows beside the board: the
+            // `game` kind of a chat whose `room` is this game's id. A spectator reads it too — it
+            // is the same conversation either way.
+            BottomBarButton(
+              label: l10n.mobileXiangqiChat,
+              onTap: () => Navigator.of(context, rootNavigator: true).push(
+                XiangqiChatRoomScreen.buildRoute(
+                  roomKey: (kind: XiangqiChatKind.game, room: widget.gameId),
+                  title: l10n.mobileXiangqiChatGame,
+                ),
+              ),
+              icon: CupertinoIcons.chat_bubble_2,
+            ),
             HistoryNavigationButton(
               forward: false,
               onTap: state.viewCursor > 0
@@ -420,54 +447,69 @@ class _XiangqiOnlineGameScreenState() extends ConsumerState<XiangqiOnlineGameScr
                   state.mySide != null &&
                   state.turn == state.mySide,
             ),
-            BottomBarButton(
-              label: l10n.flipBoard,
-              onTap: () => setState(() => _isFlipped = !_isFlipped),
-              icon: CupertinoIcons.arrow_2_squarepath,
-            ),
-            // The game's own chat, which is the same room the site shows beside the board: the
-            // `game` kind of a chat whose `room` is this game's id. A spectator reads it too — it
-            // is the same conversation either way.
-            BottomBarButton(
-              label: l10n.mobileXiangqiChat,
-              onTap: () => Navigator.of(context, rootNavigator: true).push(
-                XiangqiChatRoomScreen.buildRoute(
-                  roomKey: (kind: XiangqiChatKind.game, room: widget.gameId),
-                  title: l10n.mobileXiangqiChatGame,
-                ),
-              ),
-              icon: CupertinoIcons.chat_bubble_2,
-            ),
-            // A spectator has nobody to resign as, and a finished game has nothing to resign, so
-            // the button is not there at all rather than there and inert.
-            if (!isSpectator)
-              BottomBarButton(
-                label: l10n.resign,
-                onTap: state.isFinished || !state.isConnected
-                    ? null
-                    : () => _confirmResign(context, controller),
-                icon: CupertinoIcons.flag,
-              ),
-            // A game that is over can be gone through move by move. Offered to a spectator as well
-            // as to a player: what a review is, is the game read back, and that is the same
-            // question for the two of them.
-            if (state.isFinished)
-              BottomBarButton(
-                label: l10n.mobileXiangqiReview,
-                onTap: () => Navigator.of(
-                  context,
-                  rootNavigator: true,
-                ).push(XiangqiReviewScreen.buildRoute(widget.gameId)),
-                icon: CupertinoIcons.chart_bar_alt_fill,
-              ),
-            BottomBarButton(
-              label: l10n.close,
-              onTap: () => Navigator.of(context).maybePop(),
-              icon: CupertinoIcons.xmark,
-            ),
           ],
         ),
       ),
+    );
+  }
+
+  void _showResult(XiangqiOnlineGameState state) {
+    if (!mounted || !state.isFinished) return;
+    _resultTimer?.cancel();
+    _resultShown = true;
+    showAdaptiveDialog<void>(
+      context: context,
+      builder: (_) => XiangqiOnlineResultDialog(state: state),
+    );
+  }
+
+  /// Uses the same action sheet as chess. Capabilities come from the current game, while actions
+  /// from a menu opened under an old account must not act on the replacement session.
+  void _showGameMenu() {
+    final provider = xiangqiOnlineGameControllerProvider(widget.gameId);
+    final state = ref.read(provider).value;
+    if (state == null || !state.isLoaded) return;
+    final generation = ref.read(xiangqiAccountGenerationProvider);
+    void perform(VoidCallback action) {
+      if (!mounted || generation != ref.read(xiangqiAccountGenerationProvider)) return;
+      action();
+    }
+
+    showAdaptiveActionSheet<void>(
+      context: context,
+      actions: [
+        BottomSheetAction(
+          makeLabel: (context) => Text(context.l10n.flipBoard),
+          onPressed: () => perform(() => setState(() => _isFlipped = !_isFlipped)),
+        ),
+        if (state.isFinished) ...[
+          BottomSheetAction(
+            makeLabel: (context) => Text(context.l10n.mobileShowResult),
+            onPressed: () => perform(() => _showResult(state)),
+          ),
+          BottomSheetAction(
+            makeLabel: (context) => Text(context.l10n.mobileXiangqiReview),
+            onPressed: () => perform(
+              () => Navigator.of(
+                context,
+                rootNavigator: true,
+              ).push(XiangqiReviewScreen.buildRoute(widget.gameId)),
+            ),
+          ),
+        ] else if (state.mySide != null && state.isConnected)
+          BottomSheetAction(
+            makeLabel: (context) => Text(context.l10n.resign),
+            onPressed: () => perform(() {
+              final latest = ref.read(provider).value;
+              if (latest == null || latest.isFinished || !latest.isConnected) return;
+              _confirmResign(context, ref.read(provider.notifier));
+            }),
+          ),
+        BottomSheetAction(
+          makeLabel: (context) => Text(context.l10n.close),
+          onPressed: () => perform(() => Navigator.of(context).maybePop()),
+        ),
+      ],
     );
   }
 

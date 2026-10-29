@@ -13,6 +13,7 @@ import 'package:lichess_mobile/src/network/xiangqi_socket.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_chat_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_online_game_screen.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_refresh.dart';
+import 'package:material_ui/material_ui.dart' show Icons;
 
 import '../../binding.dart';
 import '../../model/xiangqi/online/xiangqi_online_game_fixture.dart' as fx;

@@ -335,6 +335,11 @@ class XiangqiPendingPremove(final String gameId) extends Notifier<XiangqiQueuedP
 /// spectator has no reliable game-over frame and the archived snapshot is what says what happened.
 class XiangqiOnlineGameController(final String gameId)
     extends AsyncNotifier<XiangqiOnlineGameState> {
+  int _snapshotRevision = 0;
+
+  /// A snapshot explicitly supersedes pending incremental-move presentation, even if unchanged.
+  int get snapshotRevision => _snapshotRevision;
+
   StreamSubscription<XiangqiSocketEvent>? _events;
   StreamSubscription<void>? _connections;
   StreamSubscription<XiangqiConnectionStatus>? _status;
@@ -482,10 +487,10 @@ class XiangqiOnlineGameController(final String gameId)
   }
 
   /// Puts the board back on an earlier position in the recorded game.
-  void goTo(int index) {
+  void goTo(int index, {bool fastSeek = false}) {
     cancelPremove();
     final clamped = index.clamp(0, _latest.positions.length - 1);
-    _animateUpdate = (clamped - _latest.viewCursor).abs() == 1;
+    _animateUpdate = !fastSeek && (clamped - _latest.viewCursor).abs() == 1;
     _set(_latest.copyWith(cursor: clamped, selected: null));
   }
 
@@ -711,6 +716,7 @@ class XiangqiOnlineGameController(final String gameId)
   /// half a game is worse than none — the board would show a position that never happened and the
   /// clock would run on it as if it had.
   bool _applySnapshot(Object? data) {
+    _snapshotRevision++;
     cancelPremove();
     _submittedDragMove = null;
     final map = _asMap(data);

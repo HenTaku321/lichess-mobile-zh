@@ -100,6 +100,18 @@ class _ReviewState() extends ConsumerState<_Review> {
   bool _isFlipped = false;
 
   @override
+  void didUpdateWidget(_Review oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.review == widget.review) return;
+    final keep =
+        _cursor < widget.review.positions.length &&
+        _cursor < oldWidget.review.positions.length &&
+        widget.review.positions[_cursor] == oldWidget.review.positions[_cursor];
+    if (!keep) _cursor = widget.review.moves.length;
+    _animate = false;
+  }
+
+  @override
   void initState() {
     super.initState();
     // The review opens on the **last** position, which is the one a player who just finished the
@@ -107,15 +119,12 @@ class _ReviewState() extends ConsumerState<_Review> {
     _cursor = widget.review.moves.length;
   }
 
-  void _goTo(int target) {
+  void _goTo(int target, {bool fastSeek = false}) {
     final clamped = target.clamp(0, widget.review.moves.length);
     if (clamped == _cursor) return;
-    _animate = (clamped - _cursor).abs() == 1;
-    if (_animate && widget.review.moves.isNotEmpty) {
-      final index = (clamped > _cursor ? clamped - 1 : _cursor - 1).clamp(
-        0,
-        widget.review.moves.length - 1,
-      );
+    _animate = !fastSeek && (clamped - _cursor).abs() == 1;
+    if (clamped > 0) {
+      final index = clamped - 1;
       final before = widget.review.positions[index];
       final move = widget.review.moves[index];
       final sound = ref.read(soundServiceProvider);
@@ -208,10 +217,12 @@ class _ReviewState() extends ConsumerState<_Review> {
             HistoryNavigationButton(
               forward: false,
               onTap: cursor > 0 ? () => _goTo(cursor - 1) : null,
+              onRepeat: () => _goTo(cursor - 1, fastSeek: true),
             ),
             HistoryNavigationButton(
               forward: true,
               onTap: cursor < review.moves.length ? () => _goTo(cursor + 1) : null,
+              onRepeat: () => _goTo(cursor + 1, fastSeek: true),
             ),
           ],
         ),

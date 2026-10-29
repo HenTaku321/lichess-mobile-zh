@@ -12,6 +12,7 @@ import 'package:lichess_mobile/src/widgets/feedback.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
 import 'package:lichess_mobile/src/widgets/rich_link_text.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_refresh.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -33,49 +34,58 @@ class const XiangqiChatScreen({super.key}) extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final rooms = ref.watch(xiangqiChatRoomsProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: AppBarTitleText('${context.l10n.mobileXiangqi} · ${context.l10n.mobileXiangqiChat}'),
-      ),
-      body: rooms.when(
-        data: (rooms) => RefreshIndicator.adaptive(
-          onRefresh: () => ref.refresh(xiangqiChatRoomsProvider.future),
-          child: ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            children: [
-              ListSection(
-                hasLeading: true,
-                header: Text(context.l10n.mobileXiangqiChatRooms),
-                children: [for (final room in rooms) _RoomRow(room: room)],
-              ),
-              ListSection(
-                hasLeading: true,
-                header: Text(context.l10n.mobileXiangqiChatClubs),
+    final identity = ref.watch(xiangqiAccountGenerationProvider);
+    return XiangqiRefreshScope(
+      identity: identity,
+      onRefresh: () => ref.refresh(xiangqiChatRoomsProvider.future),
+      builder: (context, refresh, busy) => XiangqiRetainedData(
+        identity: identity,
+        value: rooms,
+        builder: (context, rooms) => Scaffold(
+          appBar: AppBar(
+            title: AppBarTitleText(
+              '${context.l10n.mobileXiangqi} · ${context.l10n.mobileXiangqiChat}',
+            ),
+            actions: [DesktopRefreshButton(onRefresh: refresh, busy: busy)],
+          ),
+          body: rooms.when(
+            data: (rooms) => RefreshIndicator.adaptive(
+              onRefresh: refresh,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
                 children: [
-                  ListTile(
-                    leading: const Icon(Icons.groups_outlined),
-                    title: Text(context.l10n.mobileXiangqiChatNoClubs),
-                    subtitle: Text(context.l10n.mobileXiangqiChatClubsSubtitle),
+                  ListSection(
+                    hasLeading: true,
+                    header: Text(context.l10n.mobileXiangqiChatRooms),
+                    children: [for (final room in rooms) _RoomRow(room: room)],
+                  ),
+                  ListSection(
+                    hasLeading: true,
+                    header: Text(context.l10n.mobileXiangqiChatClubs),
+                    children: [
+                      ListTile(
+                        leading: const Icon(Icons.groups_outlined),
+                        title: Text(context.l10n.mobileXiangqiChatNoClubs),
+                        subtitle: Text(context.l10n.mobileXiangqiChatClubsSubtitle),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
-          ),
-        ),
-        loading: () => const Center(child: CircularProgressIndicator.adaptive()),
-        error: (error, stackTrace) => Center(
-          child: Padding(
-            padding: Styles.bodySectionPadding,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(context.l10n.mobileSomethingWentWrong, textAlign: TextAlign.center),
-                const SizedBox(height: 16.0),
-                FilledButton(
-                  onPressed: () => ref.invalidate(xiangqiChatRoomsProvider),
-                  child: Text(context.l10n.retry),
+            ),
+            loading: () => const Center(child: CircularProgressIndicator.adaptive()),
+            error: (error, stackTrace) => Center(
+              child: Padding(
+                padding: Styles.bodySectionPadding,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(context.l10n.mobileSomethingWentWrong, textAlign: TextAlign.center),
+                    const SizedBox(height: 16.0),
+                    FilledButton(onPressed: refresh, child: Text(context.l10n.retry)),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ),

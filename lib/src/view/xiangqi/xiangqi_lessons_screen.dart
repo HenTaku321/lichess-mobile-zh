@@ -3,6 +3,7 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/xiangqi/lesson/xiangqi_lesson.dart';
 import 'package:lichess_mobile/src/model/xiangqi/lesson/xiangqi_lesson_repository.dart';
+import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_locale.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
@@ -10,6 +11,7 @@ import 'package:lichess_mobile/src/utils/navigation.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_lesson_player_screen.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_refresh.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_refreshable_empty.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -33,41 +35,48 @@ class const XiangqiLessonsScreen({super.key}) extends ConsumerWidget {
     final locale = xiangqiLocaleOf(Localizations.localeOf(context));
     final topics = ref.watch(xiangqiTopicsProvider(locale));
 
-    return Scaffold(
-      appBar: AppBar(
-        title: AppBarTitleText(
-          '${context.l10n.mobileXiangqi} · ${context.l10n.mobileXiangqiLessons}',
-        ),
-      ),
-      body: topics.when(
-        data: (topics) => RefreshIndicator.adaptive(
-          onRefresh: () => ref.refresh(xiangqiTopicsProvider(locale).future),
-          child: ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            children: [
-              for (final level in _levelsOf(topics))
-                ListSection(
-                  hasLeading: true,
-                  header: Text(level.title),
-                  children: [for (final topic in level.topics) _TopicRow(topic: topic)],
-                ),
-            ],
+    final identity = (locale, ref.watch(xiangqiAccountGenerationProvider));
+    return XiangqiRefreshScope(
+      identity: identity,
+      onRefresh: () => ref.refresh(xiangqiTopicsProvider(locale).future),
+      builder: (context, refresh, busy) => XiangqiRetainedData(
+        identity: identity,
+        value: topics,
+        builder: (context, topics) => Scaffold(
+          appBar: AppBar(
+            title: AppBarTitleText(
+              '${context.l10n.mobileXiangqi} · ${context.l10n.mobileXiangqiLessons}',
+            ),
+            actions: [DesktopRefreshButton(onRefresh: refresh, busy: busy)],
           ),
-        ),
-        loading: () => const Center(child: CircularProgressIndicator.adaptive()),
-        error: (error, stackTrace) => Center(
-          child: Padding(
-            padding: Styles.bodySectionPadding,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(context.l10n.mobileSomethingWentWrong, textAlign: TextAlign.center),
-                const SizedBox(height: 16.0),
-                FilledButton(
-                  onPressed: () => ref.invalidate(xiangqiTopicsProvider(locale)),
-                  child: Text(context.l10n.retry),
+          body: topics.when(
+            data: (topics) => RefreshIndicator.adaptive(
+              onRefresh: refresh,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  for (final level in _levelsOf(topics))
+                    ListSection(
+                      hasLeading: true,
+                      header: Text(level.title),
+                      children: [for (final topic in level.topics) _TopicRow(topic: topic)],
+                    ),
+                ],
+              ),
+            ),
+            loading: () => const Center(child: CircularProgressIndicator.adaptive()),
+            error: (error, stackTrace) => Center(
+              child: Padding(
+                padding: Styles.bodySectionPadding,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(context.l10n.mobileSomethingWentWrong, textAlign: TextAlign.center),
+                    const SizedBox(height: 16.0),
+                    FilledButton(onPressed: refresh, child: Text(context.l10n.retry)),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ),
@@ -129,46 +138,53 @@ class const XiangqiTopicScreen({required final String topicId, super.key}) exten
     final locale = xiangqiLocaleOf(Localizations.localeOf(context));
     final detail = ref.watch(xiangqiTopicProvider((topicId, locale)));
 
-    return Scaffold(
-      appBar: AppBar(
-        title: AppBarTitleText(detail.value?.topic.title ?? context.l10n.mobileXiangqiLessons),
-      ),
-      body: detail.when(
-        data: (detail) => RefreshIndicator.adaptive(
-          onRefresh: () => ref.refresh(xiangqiTopicProvider((topicId, locale)).future),
-          child: ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            children: [
-              if (detail.topic.description != null)
-                Padding(
-                  padding: Styles.bodySectionPadding,
-                  child: Text(
-                    detail.topic.description!,
-                    style: TextTheme.of(context).bodyMedium
-                        ?.copyWith(color: textShade(context, 0.7)),
-                  ),
-                ),
-              ListSection(
-                hasLeading: true,
-                children: [for (final lesson in detail.lessons) _LessonRow(lesson: lesson)],
-              ),
-            ],
+    final identity = (topicId, locale, ref.watch(xiangqiAccountGenerationProvider));
+    return XiangqiRefreshScope(
+      identity: identity,
+      onRefresh: () => ref.refresh(xiangqiTopicProvider((topicId, locale)).future),
+      builder: (context, refresh, busy) => XiangqiRetainedData(
+        identity: identity,
+        value: detail,
+        builder: (context, detail) => Scaffold(
+          appBar: AppBar(
+            title: AppBarTitleText(detail.value?.topic.title ?? context.l10n.mobileXiangqiLessons),
+            actions: [DesktopRefreshButton(onRefresh: refresh, busy: busy)],
           ),
-        ),
-        loading: () => const Center(child: CircularProgressIndicator.adaptive()),
-        error: (error, stackTrace) => Center(
-          child: Padding(
-            padding: Styles.bodySectionPadding,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(context.l10n.mobileSomethingWentWrong, textAlign: TextAlign.center),
-                const SizedBox(height: 16.0),
-                FilledButton(
-                  onPressed: () => ref.invalidate(xiangqiTopicProvider((topicId, locale))),
-                  child: Text(context.l10n.retry),
+          body: detail.when(
+            data: (detail) => RefreshIndicator.adaptive(
+              onRefresh: refresh,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  if (detail.topic.description != null)
+                    Padding(
+                      padding: Styles.bodySectionPadding,
+                      child: Text(
+                        detail.topic.description!,
+                        style: TextTheme.of(context).bodyMedium
+                            ?.copyWith(color: textShade(context, 0.7)),
+                      ),
+                    ),
+                  ListSection(
+                    hasLeading: true,
+                    children: [for (final lesson in detail.lessons) _LessonRow(lesson: lesson)],
+                  ),
+                ],
+              ),
+            ),
+            loading: () => const Center(child: CircularProgressIndicator.adaptive()),
+            error: (error, stackTrace) => Center(
+              child: Padding(
+                padding: Styles.bodySectionPadding,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(context.l10n.mobileSomethingWentWrong, textAlign: TextAlign.center),
+                    const SizedBox(height: 16.0),
+                    FilledButton(onPressed: refresh, child: Text(context.l10n.retry)),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ),
@@ -230,53 +246,62 @@ class const XiangqiLessonScreen({
     final locale = xiangqiLocaleOf(Localizations.localeOf(context));
     final chapters = ref.watch(xiangqiChaptersProvider((lessonId, locale)));
 
-    return Scaffold(
-      appBar: AppBar(title: AppBarTitleText(lessonTitle)),
-      body: chapters.when(
-        data: (chapters) => chapters.isEmpty
-            ? XiangqiRefreshableEmpty(
-                onRefresh: () => ref.refresh(xiangqiChaptersProvider((lessonId, locale)).future),
-                child: Padding(
-                  padding: Styles.bodySectionPadding,
-                  child: Text(context.l10n.mobileXiangqiLessonNoChapters),
-                ),
-              )
-            : RefreshIndicator.adaptive(
-                onRefresh: () => ref.refresh(xiangqiChaptersProvider((lessonId, locale)).future),
-                child: ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  children: [
-                    ListSection(
-                      hasLeading: true,
-                      header: Text(context.l10n.mobileXiangqiLessonChapters),
+    final identity = (lessonId, locale, ref.watch(xiangqiAccountGenerationProvider));
+    return XiangqiRefreshScope(
+      identity: identity,
+      onRefresh: () => ref.refresh(xiangqiChaptersProvider((lessonId, locale)).future),
+      builder: (context, refresh, busy) => XiangqiRetainedData(
+        identity: identity,
+        value: chapters,
+        builder: (context, chapters) => Scaffold(
+          appBar: AppBar(
+            title: AppBarTitleText(lessonTitle),
+            actions: [DesktopRefreshButton(onRefresh: refresh, busy: busy)],
+          ),
+          body: chapters.when(
+            data: (chapters) => chapters.isEmpty
+                ? XiangqiRefreshableEmpty(
+                    onRefresh: refresh,
+                    child: Padding(
+                      padding: Styles.bodySectionPadding,
+                      child: Text(context.l10n.mobileXiangqiLessonNoChapters),
+                    ),
+                  )
+                : RefreshIndicator.adaptive(
+                    onRefresh: refresh,
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
                       children: [
-                        for (final (index, chapter) in chapters.indexed)
-                          _ChapterRow(
-                            chapter: chapter,
-                            lessonTitle: lessonTitle,
-                            chapters: chapters,
-                            index: index,
-                            lessonId: lessonId,
-                          ),
+                        ListSection(
+                          hasLeading: true,
+                          header: Text(context.l10n.mobileXiangqiLessonChapters),
+                          children: [
+                            for (final (index, chapter) in chapters.indexed)
+                              _ChapterRow(
+                                chapter: chapter,
+                                lessonTitle: lessonTitle,
+                                chapters: chapters,
+                                index: index,
+                                lessonId: lessonId,
+                              ),
+                          ],
+                        ),
                       ],
                     ),
+                  ),
+            loading: () => const Center(child: CircularProgressIndicator.adaptive()),
+            error: (error, stackTrace) => Center(
+              child: Padding(
+                padding: Styles.bodySectionPadding,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(context.l10n.mobileSomethingWentWrong, textAlign: TextAlign.center),
+                    const SizedBox(height: 16.0),
+                    FilledButton(onPressed: refresh, child: Text(context.l10n.retry)),
                   ],
                 ),
               ),
-        loading: () => const Center(child: CircularProgressIndicator.adaptive()),
-        error: (error, stackTrace) => Center(
-          child: Padding(
-            padding: Styles.bodySectionPadding,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(context.l10n.mobileSomethingWentWrong, textAlign: TextAlign.center),
-                const SizedBox(height: 16.0),
-                FilledButton(
-                  onPressed: () => ref.invalidate(xiangqiChaptersProvider((lessonId, locale))),
-                  child: Text(context.l10n.retry),
-                ),
-              ],
             ),
           ),
         ),

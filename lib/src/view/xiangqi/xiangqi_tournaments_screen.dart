@@ -1,5 +1,6 @@
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/tournament/xiangqi_tournament.dart';
 import 'package:lichess_mobile/src/model/xiangqi/tournament/xiangqi_tournament_repository.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_country_names.dart';
@@ -8,6 +9,7 @@ import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_refresh.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// xiangqi.com's tournaments, split the way the server splits them.
@@ -33,43 +35,50 @@ class const XiangqiTournamentsScreen({super.key}) extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tournaments = ref.watch(xiangqiTournamentsProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: AppBarTitleText(
-          '${context.l10n.mobileXiangqi} · ${context.l10n.mobileXiangqiTournaments}',
-        ),
-      ),
-      body: tournaments.when(
-        data: (tournaments) => RefreshIndicator.adaptive(
-          onRefresh: () => ref.refresh(xiangqiTournamentsProvider.future),
-          child: ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            children: [
-              _Section(
-                title: context.l10n.mobileXiangqiTournamentsActive,
-                tournaments: tournaments.active,
-              ),
-              _Section(
-                title: context.l10n.mobileXiangqiTournamentsPrevious,
-                tournaments: tournaments.previous,
-              ),
-            ],
+    final identity = ref.watch(xiangqiAccountGenerationProvider);
+    return XiangqiRefreshScope(
+      identity: identity,
+      onRefresh: () => ref.refresh(xiangqiTournamentsProvider.future),
+      builder: (context, refresh, busy) => XiangqiRetainedData(
+        identity: identity,
+        value: tournaments,
+        builder: (context, tournaments) => Scaffold(
+          appBar: AppBar(
+            title: AppBarTitleText(
+              '${context.l10n.mobileXiangqi} · ${context.l10n.mobileXiangqiTournaments}',
+            ),
+            actions: [DesktopRefreshButton(onRefresh: refresh, busy: busy)],
           ),
-        ),
-        loading: () => const Center(child: CircularProgressIndicator.adaptive()),
-        error: (error, stackTrace) => Center(
-          child: Padding(
-            padding: Styles.bodySectionPadding,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(context.l10n.mobileSomethingWentWrong, textAlign: TextAlign.center),
-                const SizedBox(height: 16.0),
-                FilledButton(
-                  onPressed: () => ref.invalidate(xiangqiTournamentsProvider),
-                  child: Text(context.l10n.retry),
+          body: tournaments.when(
+            data: (tournaments) => RefreshIndicator.adaptive(
+              onRefresh: refresh,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  _Section(
+                    title: context.l10n.mobileXiangqiTournamentsActive,
+                    tournaments: tournaments.active,
+                  ),
+                  _Section(
+                    title: context.l10n.mobileXiangqiTournamentsPrevious,
+                    tournaments: tournaments.previous,
+                  ),
+                ],
+              ),
+            ),
+            loading: () => const Center(child: CircularProgressIndicator.adaptive()),
+            error: (error, stackTrace) => Center(
+              child: Padding(
+                padding: Styles.bodySectionPadding,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(context.l10n.mobileSomethingWentWrong, textAlign: TextAlign.center),
+                    const SizedBox(height: 16.0),
+                    FilledButton(onPressed: refresh, child: Text(context.l10n.retry)),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ),
@@ -151,91 +160,149 @@ class _XiangqiTournamentScreenState() extends ConsumerState<XiangqiTournamentScr
     final leaders = ref.watch(xiangqiTournamentLeadersProvider((widget.id, 1)));
     final participants = ref.watch(xiangqiTournamentParticipantsProvider(widget.id));
 
-    return Scaffold(
-      appBar: AppBar(title: AppBarTitleText(widget.name)),
-      body: RefreshIndicator.adaptive(
-        onRefresh: () async {
-          await Future.wait([
-            ref.refresh(xiangqiTournamentProvider(widget.id).future),
-            ref.refresh(xiangqiTournamentLeadersProvider((widget.id, 1)).future),
-            ref.refresh(xiangqiTournamentParticipantsProvider(widget.id).future),
-          ]);
-        },
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          children: [
-            if (tournament.value != null)
-              ListSection(
-                hasLeading: true,
-                children: [
-                  ListTile(
-                    dense: true,
-                    title: Text(
-                      [
-                        if (tournament.value!.startsAt != null)
-                          context.l10n.mobileXiangqiTournamentsStartsAt(
-                            _date(tournament.value!.startsAt!),
+    final identity = (widget.id, ref.watch(xiangqiAccountGenerationProvider));
+    return XiangqiRefreshScope(
+      identity: identity,
+      onRefresh: () => Future.wait<Object?>([
+        ref.refresh(xiangqiTournamentProvider(widget.id).future),
+        ref.refresh(xiangqiTournamentLeadersProvider((widget.id, 1)).future),
+        ref.refresh(xiangqiTournamentParticipantsProvider(widget.id).future),
+      ]),
+      builder: (context, refresh, busy) => XiangqiRetainedData(
+        identity: identity,
+        value: tournament,
+        builder: (context, tournament) => XiangqiRetainedData(
+          identity: identity,
+          value: leaders,
+          builder: (context, leaders) => XiangqiRetainedData(
+            identity: identity,
+            value: participants,
+            builder: (context, participants) => Scaffold(
+              appBar: AppBar(
+                title: AppBarTitleText(widget.name),
+                actions: [DesktopRefreshButton(onRefresh: refresh, busy: busy)],
+              ),
+              body: RefreshIndicator.adaptive(
+                onRefresh: refresh,
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  children: [
+                    if (tournament.isLoading) ListSection.loading(itemsNumber: 2, hasLeading: true),
+                    if (tournament.hasError)
+                      ListSection(
+                        hasLeading: true,
+                        children: [
+                          XiangqiRetryTile(
+                            onRetry: busy
+                                ? null
+                                : () => refresh(
+                                    request: () =>
+                                        ref.refresh(xiangqiTournamentProvider(widget.id).future),
+                                  ),
                           ),
-                        _timeControl(tournament.value!),
-                        if (tournament.value!.isRated) context.l10n.rated,
-                      ].join(' · '),
-                    ),
-                  ),
-                  ListTile(
-                    dense: true,
-                    title: Text(
-                      context.l10n.mobileXiangqiTournamentsParticipants(
-                        '${tournament.value!.participants}',
+                        ],
+                      ),
+                    if (tournament.value != null)
+                      ListSection(
+                        hasLeading: true,
+                        children: [
+                          ListTile(
+                            dense: true,
+                            title: Text(
+                              [
+                                if (tournament.value!.startsAt != null)
+                                  context.l10n.mobileXiangqiTournamentsStartsAt(
+                                    _date(tournament.value!.startsAt!),
+                                  ),
+                                _timeControl(tournament.value!),
+                                if (tournament.value!.isRated) context.l10n.rated,
+                              ].join(' · '),
+                            ),
+                          ),
+                          ListTile(
+                            dense: true,
+                            title: Text(
+                              context.l10n.mobileXiangqiTournamentsParticipants(
+                                '${tournament.value!.participants}',
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    // The standings first, and the sign-ups under them: a tournament that has been played has
+                    // a table worth reading, and one that has not has nothing but the list of who is coming.
+                    leaders.when(
+                      data: (leaders) => ListSection(
+                        hasLeading: true,
+                        header: Text(context.l10n.mobileXiangqiTournamentsStandings),
+                        children: [
+                          if (leaders.items.isEmpty)
+                            ListTile(
+                              dense: true,
+                              title: Text(context.l10n.mobileXiangqiTournamentsStandingsEmpty),
+                            )
+                          else
+                            for (final entry in leaders.items) _StandingRow(entry: entry),
+                        ],
+                      ),
+                      loading: () =>
+                          ListSection.loading(itemsNumber: 3, header: true, hasLeading: true),
+                      error: (error, stackTrace) => ListSection(
+                        hasLeading: true,
+                        header: Text(context.l10n.mobileXiangqiTournamentsStandings),
+                        children: [
+                          ListTile(
+                            dense: true,
+                            title: Text(context.l10n.mobileSomethingWentWrong),
+                            trailing: IconButton(
+                              tooltip: context.l10n.retry,
+                              icon: const Icon(Icons.refresh),
+                              onPressed: busy
+                                  ? null
+                                  : () => refresh(
+                                      request: () => ref.refresh(
+                                        xiangqiTournamentLeadersProvider((widget.id, 1)).future,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                ],
-              ),
-            // The standings first, and the sign-ups under them: a tournament that has been played has
-            // a table worth reading, and one that has not has nothing but the list of who is coming.
-            leaders.when(
-              data: (leaders) => ListSection(
-                hasLeading: true,
-                header: Text(context.l10n.mobileXiangqiTournamentsStandings),
-                children: [
-                  if (leaders.items.isEmpty)
-                    ListTile(
-                      dense: true,
-                      title: Text(context.l10n.mobileXiangqiTournamentsStandingsEmpty),
-                    )
-                  else
-                    for (final entry in leaders.items) _StandingRow(entry: entry),
-                ],
-              ),
-              loading: () => ListSection.loading(itemsNumber: 3, header: true, hasLeading: true),
-              error: (error, stackTrace) => ListSection(
-                hasLeading: true,
-                header: Text(context.l10n.mobileXiangqiTournamentsStandings),
-                children: [
-                  ListTile(
-                    dense: true,
-                    title: Text(context.l10n.mobileSomethingWentWrong),
-                    trailing: IconButton(
-                      tooltip: context.l10n.retry,
-                      icon: const Icon(Icons.refresh),
-                      onPressed: () =>
-                          ref.invalidate(xiangqiTournamentLeadersProvider((widget.id, 1))),
-                    ),
-                  ),
-                ],
+                    if (participants.isLoading)
+                      ListSection.loading(itemsNumber: 2, hasLeading: true),
+                    if (participants.hasError)
+                      ListSection(
+                        hasLeading: true,
+                        children: [
+                          XiangqiRetryTile(
+                            onRetry: busy
+                                ? null
+                                : () => refresh(
+                                    request: () => ref.refresh(
+                                      xiangqiTournamentParticipantsProvider(widget.id).future,
+                                    ),
+                                  ),
+                          ),
+                        ],
+                      ),
+                    if (participants.value != null && participants.value!.isNotEmpty)
+                      ListSection(
+                        hasLeading: true,
+                        header: Text(
+                          context.l10n.mobileXiangqiTournamentsParticipants(
+                            '${participants.value!.length}',
+                          ),
+                        ),
+                        children: [
+                          for (final entry in participants.value!) _StandingRow(entry: entry),
+                        ],
+                      ),
+                  ],
+                ),
               ),
             ),
-            if (participants.value != null && participants.value!.isNotEmpty)
-              ListSection(
-                hasLeading: true,
-                header: Text(
-                  context.l10n.mobileXiangqiTournamentsParticipants(
-                    '${participants.value!.length}',
-                  ),
-                ),
-                children: [for (final entry in participants.value!) _StandingRow(entry: entry)],
-              ),
-          ],
+          ),
         ),
       ),
     );

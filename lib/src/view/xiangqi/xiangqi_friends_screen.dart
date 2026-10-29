@@ -15,6 +15,7 @@ import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
 import 'package:lichess_mobile/src/widgets/platform_search_bar.dart';
 import 'package:lichess_mobile/src/widgets/user.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_refresh.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// The account's friends on xiangqi.com, and the requests waiting to be answered.
@@ -75,82 +76,108 @@ class _XiangqiFriendsScreenState() extends ConsumerState<XiangqiFriendsScreen> {
     final friends = ref.watch(xiangqiFriendsProvider((username, _search.isEmpty ? null : _search)));
     final requests = ref.watch(xiangqiFriendRequestsProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: AppBarTitleText('${context.l10n.mobileXiangqi} · ${context.l10n.friends}'),
-      ),
-      body: RefreshIndicator.adaptive(
-        onRefresh: () async {
-          await Future.wait([
-            ref.refresh(
-              xiangqiFriendsProvider((username, _search.isEmpty ? null : _search)).future,
+    final generation = ref.watch(xiangqiAccountGenerationProvider);
+    return XiangqiRefreshScope(
+      identity: (username, _search, generation),
+      onRefresh: () => Future.wait<Object?>([
+        ref.refresh(xiangqiFriendsProvider((username, _search.isEmpty ? null : _search)).future),
+        ref.refresh(xiangqiFriendRequestsProvider.future),
+      ]),
+      builder: (context, refresh, busy) => XiangqiRetainedData(
+        identity: (username, generation),
+        value: requests,
+        builder: (context, requests) => XiangqiRetainedData(
+          identity: (username, _search, generation),
+          value: friends,
+          builder: (context, friends) => Scaffold(
+            appBar: AppBar(
+              title: AppBarTitleText('${context.l10n.mobileXiangqi} · ${context.l10n.friends}'),
+              actions: [DesktopRefreshButton(onRefresh: refresh, busy: busy)],
             ),
-            ref.refresh(xiangqiFriendRequestsProvider.future),
-          ]);
-        },
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              child: PlatformSearchBar(
-                controller: _searchController,
-                hintText: context.l10n.search,
-                onChanged: (value) => setState(() => _search = value),
+            body: RefreshIndicator.adaptive(
+              onRefresh: refresh,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                    child: PlatformSearchBar(
+                      controller: _searchController,
+                      hintText: context.l10n.search,
+                      onChanged: (value) => setState(() => _search = value),
+                    ),
+                  ),
+                  ListSection(
+                    hasLeading: true,
+                    header: Text(context.l10n.mobileXiangqiFriendRequests),
+                    children: switch (requests) {
+                      AsyncData(:final value) when value.isEmpty => [
+                        ListTile(
+                          dense: true,
+                          title: Text(context.l10n.mobileXiangqiFriendRequestsEmpty),
+                        ),
+                      ],
+                      AsyncData(:final value) => [
+                        for (final request in value)
+                          _RequestRow(request: request, username: username),
+                      ],
+                      AsyncError() => [
+                        ListTile(
+                          dense: true,
+                          title: Text(context.l10n.mobileSomethingWentWrong),
+                          trailing: IconButton(
+                            tooltip: context.l10n.retry,
+                            icon: const Icon(Icons.refresh),
+                            onPressed: busy
+                                ? null
+                                : () => refresh(
+                                    request: () =>
+                                        ref.refresh(xiangqiFriendRequestsProvider.future),
+                                  ),
+                          ),
+                        ),
+                      ],
+                      _ => [const ListTile(dense: true, title: Text('…'))],
+                    },
+                  ),
+                  ListSection(
+                    hasLeading: true,
+                    header: Text(context.l10n.friends),
+                    children: switch (friends) {
+                      AsyncData(:final value) when value.friends.isEmpty => [
+                        ListTile(dense: true, title: Text(context.l10n.mobileXiangqiFriendsEmpty)),
+                      ],
+                      AsyncData(:final value) => [
+                        for (final friend in value.friends)
+                          _FriendRow(friend: friend, username: username),
+                      ],
+                      AsyncError() => [
+                        ListTile(
+                          dense: true,
+                          title: Text(context.l10n.mobileSomethingWentWrong),
+                          trailing: IconButton(
+                            tooltip: context.l10n.retry,
+                            icon: const Icon(Icons.refresh),
+                            onPressed: busy
+                                ? null
+                                : () => refresh(
+                                    request: () => ref.refresh(
+                                      xiangqiFriendsProvider((
+                                        username,
+                                        _search.isEmpty ? null : _search,
+                                      )).future,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ],
+                      _ => [const ListTile(dense: true, title: Text('…'))],
+                    },
+                  ),
+                ],
               ),
             ),
-            ListSection(
-              hasLeading: true,
-              header: Text(context.l10n.mobileXiangqiFriendRequests),
-              children: switch (requests) {
-                AsyncData(:final value) when value.isEmpty => [
-                  ListTile(dense: true, title: Text(context.l10n.mobileXiangqiFriendRequestsEmpty)),
-                ],
-                AsyncData(:final value) => [
-                  for (final request in value) _RequestRow(request: request, username: username),
-                ],
-                AsyncError() => [
-                  ListTile(
-                    dense: true,
-                    title: Text(context.l10n.mobileSomethingWentWrong),
-                    trailing: IconButton(
-                      tooltip: context.l10n.retry,
-                      icon: const Icon(Icons.refresh),
-                      onPressed: () => ref.invalidate(xiangqiFriendRequestsProvider),
-                    ),
-                  ),
-                ],
-                _ => [const ListTile(dense: true, title: Text('…'))],
-              },
-            ),
-            ListSection(
-              hasLeading: true,
-              header: Text(context.l10n.friends),
-              children: switch (friends) {
-                AsyncData(:final value) when value.friends.isEmpty => [
-                  ListTile(dense: true, title: Text(context.l10n.mobileXiangqiFriendsEmpty)),
-                ],
-                AsyncData(:final value) => [
-                  for (final friend in value.friends)
-                    _FriendRow(friend: friend, username: username),
-                ],
-                AsyncError() => [
-                  ListTile(
-                    dense: true,
-                    title: Text(context.l10n.mobileSomethingWentWrong),
-                    trailing: IconButton(
-                      tooltip: context.l10n.retry,
-                      icon: const Icon(Icons.refresh),
-                      onPressed: () => ref.invalidate(
-                        xiangqiFriendsProvider((username, _search.isEmpty ? null : _search)),
-                      ),
-                    ),
-                  ),
-                ],
-                _ => [const ListTile(dense: true, title: Text('…'))],
-              },
-            ),
-          ],
+          ),
         ),
       ),
     );

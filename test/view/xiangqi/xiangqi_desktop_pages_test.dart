@@ -136,7 +136,7 @@ void main() {
     );
     await tester.enterText(find.byType(TextField), 'Opening');
     await settleDesktop(tester);
-    await tester.tap(find.byIcon(CupertinoIcons.chevron_forward));
+    await tester.tap(find.byIcon(Icons.chevron_right));
     await settleDesktop(tester);
     expect(requests.last.queryParameters['q'], 'Opening');
     expect(requests.last.queryParameters['page'], '2');

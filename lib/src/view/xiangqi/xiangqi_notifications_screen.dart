@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/social/xiangqi_social.dart';
 import 'package:lichess_mobile/src/model/xiangqi/social/xiangqi_social_repository.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
@@ -7,6 +8,7 @@ import 'package:lichess_mobile/src/utils/navigation.dart';
 import 'package:lichess_mobile/src/widgets/feedback.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_refresh.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_refreshable_empty.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -39,63 +41,75 @@ class _XiangqiNotificationsScreenState() extends ConsumerState<XiangqiNotificati
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(xiangqiAccountGenerationProvider, (_, _) {
+      if (mounted) setState(() => _marking = false);
+    });
     final notifications = ref.watch(xiangqiNotificationsProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: AppBarTitleText('${context.l10n.mobileXiangqi} · ${context.l10n.notifications}'),
-        actions: [
-          IconButton(
-            tooltip: context.l10n.mobileXiangqiNotificationsMarkAllRead,
-            icon: const Icon(Icons.done_all),
-            // Nothing to mark when there is nothing unread, and nothing to mark while a mark is
-            // already on its way.
-            onPressed: _marking || (notifications.value?.unreadCount ?? 0) == 0
-                ? null
-                : _markAllRead,
+    final identity = ref.watch(xiangqiAccountGenerationProvider);
+    return XiangqiRefreshScope(
+      identity: identity,
+      onRefresh: () =>
+          _marking ? Future<void>.value() : ref.refresh(xiangqiNotificationsProvider.future),
+      builder: (context, refresh, busy) => XiangqiRetainedData(
+        identity: identity,
+        value: notifications,
+        builder: (context, notifications) => Scaffold(
+          appBar: AppBar(
+            title: AppBarTitleText('${context.l10n.mobileXiangqi} · ${context.l10n.notifications}'),
+            actions: [
+              DesktopRefreshButton(onRefresh: refresh, busy: busy || _marking),
+              IconButton(
+                tooltip: context.l10n.mobileXiangqiNotificationsMarkAllRead,
+                icon: const Icon(Icons.done_all),
+                // Nothing to mark when there is nothing unread, and nothing to mark while a mark is
+                // already on its way.
+                onPressed: busy || _marking || (notifications.value?.unreadCount ?? 0) == 0
+                    ? null
+                    : _markAllRead,
+              ),
+            ],
           ),
-        ],
-      ),
-      body: notifications.when(
-        data: (notifications) => notifications.items.isEmpty
-            ? XiangqiRefreshableEmpty(
-                onRefresh: () => ref.refresh(xiangqiNotificationsProvider.future),
-                child: const Padding(padding: Styles.bodySectionPadding, child: _Empty()),
-              )
-            : RefreshIndicator.adaptive(
-                onRefresh: () => ref.refresh(xiangqiNotificationsProvider.future),
-                child: ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  children: [
-                    ListSection(
-                      hasLeading: true,
+          body: notifications.when(
+            data: (notifications) => notifications.items.isEmpty
+                ? XiangqiRefreshableEmpty(
+                    onRefresh: refresh,
+                    child: const Padding(padding: Styles.bodySectionPadding, child: _Empty()),
+                  )
+                : RefreshIndicator.adaptive(
+                    onRefresh: refresh,
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
                       children: [
-                        for (final notification in notifications.items)
-                          _NotificationRow(notification: notification),
+                        ListSection(
+                          hasLeading: true,
+                          children: [
+                            for (final notification in notifications.items)
+                              _NotificationRow(notification: notification),
+                          ],
+                        ),
                       ],
                     ),
+                  ),
+            loading: () => const Center(child: CircularProgressIndicator.adaptive()),
+            error: (error, stackTrace) => Center(
+              child: Padding(
+                padding: Styles.bodySectionPadding,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(switch (error) {
+                      XiangqiSocialException(reason: .noSession) =>
+                        context.l10n.mobileXiangqiSignIn,
+                      XiangqiSocialException(reason: .offline) =>
+                        context.l10n.mobileXiangqiReviewOffline,
+                      _ => context.l10n.mobileSomethingWentWrong,
+                    }, textAlign: TextAlign.center),
+                    const SizedBox(height: 16.0),
+                    FilledButton(onPressed: refresh, child: Text(context.l10n.retry)),
                   ],
                 ),
               ),
-        loading: () => const Center(child: CircularProgressIndicator.adaptive()),
-        error: (error, stackTrace) => Center(
-          child: Padding(
-            padding: Styles.bodySectionPadding,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(switch (error) {
-                  XiangqiSocialException(reason: .noSession) => context.l10n.mobileXiangqiSignIn,
-                  XiangqiSocialException(reason: .offline) =>
-                    context.l10n.mobileXiangqiReviewOffline,
-                  _ => context.l10n.mobileSomethingWentWrong,
-                }, textAlign: TextAlign.center),
-                const SizedBox(height: 16.0),
-                FilledButton(
-                  onPressed: () => ref.invalidate(xiangqiNotificationsProvider),
-                  child: Text(context.l10n.retry),
-                ),
-              ],
             ),
           ),
         ),
@@ -106,16 +120,19 @@ class _XiangqiNotificationsScreenState() extends ConsumerState<XiangqiNotificati
   /// Marks every notification read, and redraws the list once the server has said so.
   Future<void> _markAllRead() async {
     if (_marking) return;
+    final generation = ref.read(xiangqiAccountGenerationProvider);
     setState(() => _marking = true);
     try {
       await markAllXiangqiNotificationsRead(ref);
-      if (!mounted) return;
+      if (!mounted || generation != ref.read(xiangqiAccountGenerationProvider)) return;
       ref.invalidate(xiangqiNotificationsProvider);
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || generation != ref.read(xiangqiAccountGenerationProvider)) return;
       showSnackBar(context, context.l10n.mobileSomethingWentWrong, type: SnackBarType.error);
     } finally {
-      if (mounted) setState(() => _marking = false);
+      if (mounted && generation == ref.read(xiangqiAccountGenerationProvider)) {
+        setState(() => _marking = false);
+      }
     }
   }
 }

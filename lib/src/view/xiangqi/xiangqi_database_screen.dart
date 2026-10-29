@@ -6,6 +6,7 @@ import 'package:lichess_mobile/src/model/analysis/analysis_preferences.dart';
 import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
 import 'package:lichess_mobile/src/model/xiangqi/database/xiangqi_master_game.dart';
 import 'package:lichess_mobile/src/model/xiangqi/database/xiangqi_master_game_repository.dart';
+import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_country_names.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_locale.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_notation.dart';
@@ -15,11 +16,13 @@ import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
+import 'package:lichess_mobile/src/widgets/history_navigation_button.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
 import 'package:lichess_mobile/src/widgets/platform_search_bar.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_analysis_layout.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_refresh.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// The master-games database: famous players, and the games of theirs it holds.
@@ -64,63 +67,71 @@ class _XiangqiDatabaseScreenState() extends ConsumerState<XiangqiDatabaseScreen>
       )),
     );
 
-    return Scaffold(
-      appBar: AppBar(
-        title: AppBarTitleText(
-          '${context.l10n.mobileXiangqi} · ${context.l10n.mobileXiangqiDatabase}',
-        ),
+    final identity = (_search, _page, locale, ref.watch(xiangqiAccountGenerationProvider));
+    return XiangqiRefreshScope(
+      identity: identity,
+      onRefresh: () => ref.refresh(
+        xiangqiMasterPlayersProvider((
+          search: _search.isEmpty ? null : _search,
+          page: _page,
+          locale: locale,
+        )).future,
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: PlatformSearchBar(
-              controller: _searchController,
-              hintText: context.l10n.search,
-              onChanged: (value) => setState(() {
-                _search = value;
-                _page = 1;
-              }),
+      builder: (context, refresh, busy) => XiangqiRetainedData(
+        identity: identity,
+        value: players,
+        builder: (context, players) => Scaffold(
+          appBar: AppBar(
+            title: AppBarTitleText(
+              '${context.l10n.mobileXiangqi} · ${context.l10n.mobileXiangqiDatabase}',
             ),
+            actions: [DesktopRefreshButton(onRefresh: refresh, busy: busy)],
           ),
-          Expanded(
-            child: players.when(
-              data: (players) => players.items.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: Styles.bodySectionPadding,
-                        child: Text(context.l10n.mobileXiangqiDatabasePlayersEmpty),
-                      ),
-                    )
-                  : ListView(
-                      children: [
-                        ListSection(
-                          hasLeading: true,
-                          header: Text(context.l10n.mobileXiangqiDatabasePlayers),
-                          children: [
-                            for (final player in players.items) _PlayerRow(player: player),
-                          ],
-                        ),
-                        _Pager(
-                          page: players.totalPages == 0 ? 1 : _page,
-                          hasNext: players.hasNextPage,
-                          onChanged: (page) => setState(() => _page = page),
-                        ),
-                      ],
-                    ),
-              loading: () => const Center(child: CircularProgressIndicator.adaptive()),
-              error: (error, stackTrace) => _Failed(
-                onRetry: () => ref.invalidate(
-                  xiangqiMasterPlayersProvider((
-                    search: _search.isEmpty ? null : _search,
-                    page: _page,
-                    locale: locale,
-                  )),
+          body: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                child: PlatformSearchBar(
+                  controller: _searchController,
+                  hintText: context.l10n.search,
+                  onChanged: (value) => setState(() {
+                    _search = value;
+                    _page = 1;
+                  }),
                 ),
               ),
-            ),
+              Expanded(
+                child: players.when(
+                  data: (players) => players.items.isEmpty
+                      ? Center(
+                          child: Padding(
+                            padding: Styles.bodySectionPadding,
+                            child: Text(context.l10n.mobileXiangqiDatabasePlayersEmpty),
+                          ),
+                        )
+                      : ListView(
+                          children: [
+                            ListSection(
+                              hasLeading: true,
+                              header: Text(context.l10n.mobileXiangqiDatabasePlayers),
+                              children: [
+                                for (final player in players.items) _PlayerRow(player: player),
+                              ],
+                            ),
+                            _Pager(
+                              page: players.totalPages == 0 ? 1 : _page,
+                              hasNext: players.hasNextPage,
+                              onChanged: (page) => setState(() => _page = page),
+                            ),
+                          ],
+                        ),
+                  loading: () => const Center(child: CircularProgressIndicator.adaptive()),
+                  error: (error, stackTrace) => _Failed(onRetry: refresh),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -176,65 +187,122 @@ class _XiangqiMasterPlayerScreenState() extends ConsumerState<XiangqiMasterPlaye
       xiangqiMasterGamesProvider((playerId: widget.playerId, page: _page, locale: locale)),
     );
 
-    return Scaffold(
-      appBar: AppBar(title: AppBarTitleText(widget.playerName)),
-      body: ListView(
-        children: [
-          if (stats.value != null)
-            ListSection(
-              hasLeading: true,
+    final identity = (widget.playerId, _page, locale, ref.watch(xiangqiAccountGenerationProvider));
+    return XiangqiRefreshScope(
+      identity: identity,
+      onRefresh: () => Future.wait<Object?>([
+        ref.refresh(xiangqiMasterStatsProvider((id: widget.playerId, locale: locale)).future),
+        ref.refresh(
+          xiangqiMasterGamesProvider((playerId: widget.playerId, page: _page, locale: locale))
+              .future,
+        ),
+      ]),
+      builder: (context, refresh, busy) => XiangqiRetainedData(
+        identity: (widget.playerId, locale, ref.watch(xiangqiAccountGenerationProvider)),
+        value: stats,
+        builder: (context, stats) => XiangqiRetainedData(
+          identity: identity,
+          value: games,
+          builder: (context, games) => Scaffold(
+            appBar: AppBar(
+              title: AppBarTitleText(widget.playerName),
+              actions: [DesktopRefreshButton(onRefresh: refresh, busy: busy)],
+            ),
+            body: ListView(
               children: [
-                ListTile(
-                  dense: true,
-                  title: Text(
-                    [
-                      if (stats.value!.title != null) stats.value!.title!,
-                      if (stats.value!.country != null)
-                        xiangqiLocalizedCountryName(
-                              Localizations.localeOf(context),
-                              code: stats.value!.country,
-                            ) ??
-                            stats.value!.country!,
-                    ].join(' · '),
+                if (stats.isLoading) ListSection.loading(itemsNumber: 2, hasLeading: true),
+                if (stats.hasError)
+                  ListSection(
+                    hasLeading: true,
+                    children: [
+                      XiangqiRetryTile(
+                        onRetry: busy
+                            ? null
+                            : () => refresh(
+                                request: () => ref.refresh(
+                                  xiangqiMasterStatsProvider((id: widget.playerId, locale: locale))
+                                      .future,
+                                ),
+                              ),
+                      ),
+                    ],
+                  ),
+                if (stats.value != null)
+                  ListSection(
+                    hasLeading: true,
+                    children: [
+                      ListTile(
+                        dense: true,
+                        title: Text(
+                          [
+                            if (stats.value!.title != null) stats.value!.title!,
+                            if (stats.value!.country != null)
+                              xiangqiLocalizedCountryName(
+                                    Localizations.localeOf(context),
+                                    code: stats.value!.country,
+                                  ) ??
+                                  stats.value!.country!,
+                          ].join(' · '),
+                        ),
+                      ),
+                      ListTile(
+                        dense: true,
+                        title: Text(
+                          [
+                            context.l10n.nbWins(stats.value!.wins),
+                            context.l10n.nbLosses(stats.value!.losses),
+                            context.l10n.nbDraws(stats.value!.draws),
+                          ].join(' · '),
+                        ),
+                      ),
+                    ],
+                  ),
+                games.when(
+                  data: (games) => ListSection(
+                    hasLeading: true,
+                    header: Text(context.l10n.mobileXiangqiDatabaseGames),
+                    children: [
+                      if (games.items.isEmpty)
+                        ListTile(
+                          dense: true,
+                          title: Text(context.l10n.mobileXiangqiDatabaseGamesEmpty),
+                        )
+                      else
+                        for (final game in games.items) _GameRow(game: game),
+                    ],
+                  ),
+                  loading: () =>
+                      ListSection.loading(itemsNumber: 4, header: true, hasLeading: true),
+                  error: (error, stackTrace) => ListSection(
+                    hasLeading: true,
+                    header: Text(context.l10n.mobileXiangqiDatabaseGames),
+                    children: [
+                      XiangqiRetryTile(
+                        onRetry: busy
+                            ? null
+                            : () => refresh(
+                                request: () => ref.refresh(
+                                  xiangqiMasterGamesProvider((
+                                    playerId: widget.playerId,
+                                    page: _page,
+                                    locale: locale,
+                                  )).future,
+                                ),
+                              ),
+                      ),
+                    ],
                   ),
                 ),
-                ListTile(
-                  dense: true,
-                  title: Text(
-                    [
-                      context.l10n.nbWins(stats.value!.wins),
-                      context.l10n.nbLosses(stats.value!.losses),
-                      context.l10n.nbDraws(stats.value!.draws),
-                    ].join(' · '),
+                if (games.value != null)
+                  _Pager(
+                    page: _page,
+                    hasNext: games.value!.hasNextPage,
+                    onChanged: (page) => setState(() => _page = page),
                   ),
-                ),
               ],
-            ),
-          games.when(
-            data: (games) => ListSection(
-              hasLeading: true,
-              header: Text(context.l10n.mobileXiangqiDatabaseGames),
-              children: [
-                if (games.items.isEmpty)
-                  ListTile(dense: true, title: Text(context.l10n.mobileXiangqiDatabaseGamesEmpty))
-                else
-                  for (final game in games.items) _GameRow(game: game),
-              ],
-            ),
-            loading: () => ListSection.loading(itemsNumber: 4, header: true, hasLeading: true),
-            error: (error, stackTrace) => ListSection(
-              hasLeading: true,
-              header: Text(context.l10n.mobileXiangqiDatabaseGames),
-              children: [ListTile(dense: true, title: Text(context.l10n.mobileSomethingWentWrong))],
             ),
           ),
-          if (games.value != null)
-            _Pager(
-              page: _page,
-              hasNext: games.value!.hasNextPage,
-              onChanged: (page) => setState(() => _page = page),
-            ),
-        ],
+        ),
       ),
     );
   }
@@ -284,13 +352,23 @@ class const XiangqiMasterGameScreen({required final String slug, super.key})
     final locale = xiangqiLocaleOf(Localizations.localeOf(context));
     final game = ref.watch(xiangqiMasterGameProvider((slug: slug, locale: locale)));
 
-    return Scaffold(
-      appBar: AppBar(title: AppBarTitleText(context.l10n.mobileXiangqiDatabase)),
-      body: game.when(
-        data: (game) => _Game(game: game),
-        loading: () => const Center(child: CircularProgressIndicator.adaptive()),
-        error: (error, stackTrace) => _Failed(
-          onRetry: () => ref.invalidate(xiangqiMasterGameProvider((slug: slug, locale: locale))),
+    final identity = (slug, locale, ref.watch(xiangqiAccountGenerationProvider));
+    return XiangqiRefreshScope(
+      identity: identity,
+      onRefresh: () => ref.refresh(xiangqiMasterGameProvider((slug: slug, locale: locale)).future),
+      builder: (context, refresh, busy) => XiangqiRetainedData(
+        identity: identity,
+        value: game,
+        builder: (context, game) => Scaffold(
+          appBar: AppBar(
+            title: AppBarTitleText(context.l10n.mobileXiangqiDatabase),
+            actions: [DesktopRefreshButton(onRefresh: refresh, busy: busy)],
+          ),
+          body: game.when(
+            data: (game) => _Game(game: game, onRefresh: refresh),
+            loading: () => const Center(child: CircularProgressIndicator.adaptive()),
+            error: (error, stackTrace) => _Failed(onRetry: refresh),
+          ),
         ),
       ),
     );
@@ -298,7 +376,8 @@ class const XiangqiMasterGameScreen({required final String slug, super.key})
 }
 
 /// The board, with a cursor on it.
-class const _Game({required final XiangqiMasterGame game}) extends ConsumerStatefulWidget {
+class const _Game({required final XiangqiMasterGame game, required final XiangqiRefresh onRefresh})
+    extends ConsumerStatefulWidget {
   @override
   ConsumerState<_Game> createState() => _GameState();
 }
@@ -308,13 +387,25 @@ class _GameState() extends ConsumerState<_Game> {
   int _cursor = 0;
   bool _animate = false;
 
-  void _goTo(int target) {
+  @override
+  void didUpdateWidget(_Game oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.game == widget.game) return;
+    final keep =
+        _cursor < widget.game.positions.length &&
+        _cursor < oldWidget.game.positions.length &&
+        widget.game.positions[_cursor] == oldWidget.game.positions[_cursor];
+    if (!keep) _cursor = 0;
+    _animate = false;
+  }
+
+  void _goTo(int target, {bool fastSeek = false}) {
     final game = widget.game;
     final next = target.clamp(0, game.moves.length);
     if (next == _cursor) return;
-    _animate = (next - _cursor).abs() == 1;
-    if (_animate && game.moves.isNotEmpty) {
-      final i = (next > _cursor ? next - 1 : _cursor - 1).clamp(0, game.moves.length - 1);
+    _animate = !fastSeek && (next - _cursor).abs() == 1;
+    if (next > 0) {
+      final i = next - 1;
       final capture = game.positions[i].pieceAt(game.moves[i].to) != null;
       ref.read(soundServiceProvider).play(capture ? Sound.capture : Sound.move);
     }
@@ -328,7 +419,14 @@ class _GameState() extends ConsumerState<_Game> {
       return Center(
         child: Padding(
           padding: Styles.bodySectionPadding,
-          child: Text(context.l10n.mobileSomethingWentWrong, textAlign: TextAlign.center),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(context.l10n.mobileSomethingWentWrong, textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              FilledButton(onPressed: widget.onRefresh, child: Text(context.l10n.retry)),
+            ],
+          ),
         ),
       );
     }
@@ -340,6 +438,7 @@ class _GameState() extends ConsumerState<_Game> {
     return SafeArea(
       child: XiangqiAnalysisLayout(
         smallBoard: ref.watch(analysisPreferencesProvider).smallBoard,
+        inlineNotation: ref.watch(analysisPreferencesProvider).inlineNotation,
         boardBuilder: (context, size, radius) => BrightnessHueFilter(
           brightness: boardPrefs.brightness,
           hue: boardPrefs.hue,
@@ -379,15 +478,15 @@ class _GameState() extends ConsumerState<_Game> {
         onSelectMove: _goTo,
         bottomBar: BottomBar(
           children: [
-            BottomBarButton(
-              label: context.l10n.mobileXiangqiReviewPrevious,
+            HistoryNavigationButton(
+              forward: false,
               onTap: cursor > 0 ? () => _goTo(cursor - 1) : null,
-              icon: CupertinoIcons.chevron_back,
+              onRepeat: () => _goTo(cursor - 1, fastSeek: true),
             ),
-            BottomBarButton(
-              label: context.l10n.mobileXiangqiReviewNext,
+            HistoryNavigationButton(
+              forward: true,
               onTap: cursor < game.moves.length ? () => _goTo(cursor + 1) : null,
-              icon: CupertinoIcons.chevron_forward,
+              onRepeat: () => _goTo(cursor + 1, fastSeek: true),
             ),
           ],
         ),

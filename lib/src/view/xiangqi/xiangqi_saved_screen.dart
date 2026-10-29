@@ -10,6 +10,7 @@ import 'package:lichess_mobile/src/view/xiangqi/xiangqi_review_screen.dart';
 import 'package:lichess_mobile/src/widgets/feedback.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_refresh.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_refreshable_empty.dart';
 import 'package:lichess_mobile/src/widgets/yes_no_dialog.dart';
 import 'package:material_ui/material_ui.dart';
@@ -42,92 +43,152 @@ class const XiangqiSavedScreen({super.key}) extends ConsumerWidget {
     final session = ref.watch(xiangqiAuthControllerProvider);
     final username = session != null && !session.isGuest ? session.name : null;
 
+    final generation = ref.watch(xiangqiAccountGenerationProvider);
     return DefaultTabController(
       length: XiangqiSavedKind.values.length,
-      child: Scaffold(
-        appBar: AppBar(
-          title: AppBarTitleText(
-            '${context.l10n.mobileXiangqi} · ${context.l10n.mobileXiangqiSaved}',
-          ),
-          bottom: TabBar(
-            tabs: [
-              for (final kind in XiangqiSavedKind.values) Tab(text: _kindLabel(context, kind)),
-            ],
-          ),
-        ),
-        body: ref.watch(xiangqiSessionReadyProvider).isLoading
-            ? const Center(child: CircularProgressIndicator.adaptive())
-            : username == null
-            ? Center(
-                child: Padding(
-                  padding: Styles.bodySectionPadding,
-                  child: Text(context.l10n.mobileXiangqiSignIn, textAlign: TextAlign.center),
+      child: Builder(
+        builder: (context) {
+          final tabs = DefaultTabController.of(context);
+          return ListenableBuilder(
+            listenable: tabs,
+            builder: (context, _) {
+              final kind = XiangqiSavedKind.values[tabs.index];
+              return XiangqiRefreshScope(
+                identity: (username, kind, generation),
+                onRefresh: () => username == null
+                    ? Future<void>.value()
+                    : _refreshSavedKind(ref, username, kind),
+                builder: (context, refresh, busy) => Scaffold(
+                  appBar: AppBar(
+                    title: AppBarTitleText(
+                      '${context.l10n.mobileXiangqi} · ${context.l10n.mobileXiangqiSaved}',
+                    ),
+                    bottom: TabBar(
+                      tabs: [
+                        for (final kind in XiangqiSavedKind.values)
+                          Tab(text: _kindLabel(context, kind)),
+                      ],
+                    ),
+                    actions: [
+                      DesktopRefreshButton(
+                        onRefresh: refresh,
+                        busy: busy,
+                        enabled:
+                            username != null && !ref.watch(xiangqiSessionReadyProvider).isLoading,
+                      ),
+                    ],
+                  ),
+                  body: ref.watch(xiangqiSessionReadyProvider).isLoading
+                      ? const Center(child: CircularProgressIndicator.adaptive())
+                      : username == null
+                      ? Center(
+                          child: Padding(
+                            padding: Styles.bodySectionPadding,
+                            child: Text(
+                              context.l10n.mobileXiangqiSignIn,
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        )
+                      : TabBarView(
+                          children: [
+                            for (final kind in XiangqiSavedKind.values)
+                              _KindTab(
+                                username: username,
+                                kind: kind,
+                                onRefresh: refresh,
+                                busy: busy,
+                              ),
+                          ],
+                        ),
                 ),
-              )
-            : TabBarView(
-                children: [
-                  for (final kind in XiangqiSavedKind.values)
-                    _KindTab(username: username, kind: kind),
-                ],
-              ),
+              );
+            },
+          );
+        },
       ),
     );
   }
 }
 
+Future<void> _refreshSavedKind(WidgetRef ref, String username, XiangqiSavedKind kind) async {
+  final subscriptions = [
+    ref.listenManual(xiangqiSavedFoldersProvider((username, kind, null)), (_, _) {}),
+    switch (kind) {
+      XiangqiSavedKind.puzzle => ref.listenManual(xiangqiSavedPuzzlesProvider(username), (_, _) {}),
+      XiangqiSavedKind.note => ref.listenManual(xiangqiSavedNotesProvider(username), (_, _) {}),
+    },
+  ];
+  try {
+    await Future.wait<Object?>([
+      ref.refresh(xiangqiSavedFoldersProvider((username, kind, null)).future),
+      switch (kind) {
+        XiangqiSavedKind.puzzle => ref.refresh(xiangqiSavedPuzzlesProvider(username).future),
+        XiangqiSavedKind.note => ref.refresh(xiangqiSavedNotesProvider(username).future),
+      },
+    ]);
+  } finally {
+    for (final subscription in subscriptions) {
+      subscription.close();
+    }
+  }
+}
+
 /// One kind of content: its folders, and what is at the root of its tree.
-class const _KindTab({required final String username, required final XiangqiSavedKind kind})
-    extends ConsumerWidget {
+class const _KindTab({
+  required final String username,
+  required final XiangqiSavedKind kind,
+  required final XiangqiRefresh onRefresh,
+  required final bool busy,
+}) extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final folders = ref.watch(xiangqiSavedFoldersProvider((username, kind, null)));
 
-    return RefreshIndicator.adaptive(
-      onRefresh: () => Future.wait<Object?>([
-        // The folders and the content are two questions, and a pull asks both: a folder made on
-        // another device is as much a reason to pull as a puzzle made on one.
-        ref.refresh(xiangqiSavedFoldersProvider((username, kind, null)).future),
-        switch (kind) {
-          XiangqiSavedKind.puzzle => ref.refresh(xiangqiSavedPuzzlesProvider(username).future),
-          XiangqiSavedKind.note => ref.refresh(xiangqiSavedNotesProvider(username).future),
-        },
-      ]),
-      child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        children: [
-          ListSection(
-            hasLeading: true,
-            header: Text(context.l10n.mobileXiangqiSavedNewFolder),
-            children: [_CreateFolderRow(username: username, kind: kind)],
-          ),
-          switch (folders) {
-            AsyncData(:final value) when value.folders.isNotEmpty => ListSection(
+    return XiangqiRetainedData(
+      identity: (username, kind, ref.watch(xiangqiAccountGenerationProvider)),
+      value: folders,
+      builder: (context, folders) => RefreshIndicator.adaptive(
+        onRefresh: () => onRefresh(request: () => _refreshSavedKind(ref, username, kind)),
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            ListSection(
               hasLeading: true,
-              children: [
-                for (final folder in value.folders)
-                  _FolderRow(folder: folder, username: username, kind: kind),
-              ],
+              header: Text(context.l10n.mobileXiangqiSavedNewFolder),
+              children: [_CreateFolderRow(username: username, kind: kind)],
             ),
-            AsyncData() => const SizedBox.shrink(),
-            AsyncError() => ListSection(
-              hasLeading: true,
-              children: [
-                _RetryRow(
-                  onRetry: () =>
-                      ref.invalidate(xiangqiSavedFoldersProvider((username, kind, null))),
-                ),
-              ],
-            ),
-            _ => const ListSection(
-              hasLeading: true,
-              children: [ListTile(dense: true, title: Text('…'))],
-            ),
-          },
-          if (kind == XiangqiSavedKind.puzzle)
-            _Puzzles(username: username)
-          else
-            _Notes(username: username),
-        ],
+            switch (folders) {
+              AsyncData(:final value) when value.folders.isNotEmpty => ListSection(
+                hasLeading: true,
+                children: [
+                  for (final folder in value.folders)
+                    _FolderRow(folder: folder, username: username, kind: kind),
+                ],
+              ),
+              AsyncData() => const SizedBox.shrink(),
+              AsyncError() => ListSection(
+                hasLeading: true,
+                children: [
+                  _RetryRow(
+                    onRetry: () => onRefresh(
+                      request: () =>
+                          ref.refresh(xiangqiSavedFoldersProvider((username, kind, null)).future),
+                    ),
+                  ),
+                ],
+              ),
+              _ => const ListSection(
+                hasLeading: true,
+                children: [ListTile(dense: true, title: Text('…'))],
+              ),
+            },
+            if (kind == XiangqiSavedKind.puzzle)
+              _Puzzles(username: username, onRefresh: onRefresh, busy: busy)
+            else
+              _Notes(username: username, onRefresh: onRefresh, busy: busy),
+          ],
+        ),
       ),
     );
   }
@@ -249,56 +310,62 @@ class const XiangqiSavedFolderScreen({
     }
     final folders = ref.watch(xiangqiSavedFoldersProvider((username, kind, folder.id)));
 
-    return Scaffold(
-      appBar: AppBar(title: AppBarTitleText(folder.name)),
-      body: folders.when(
-        data: (folders) => folders.folders.isEmpty
-            ? XiangqiRefreshableEmpty(
-                onRefresh: () =>
-                    ref.refresh(xiangqiSavedFoldersProvider((username, kind, folder.id)).future),
-                child: Padding(
-                  padding: Styles.bodySectionPadding,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _CreateFolderRow(username: username, kind: kind, parentId: folder.id),
-                      Text(context.l10n.mobileXiangqiSavedEmpty),
-                    ],
-                  ),
-                ),
-              )
-            : RefreshIndicator.adaptive(
-                onRefresh: () =>
-                    ref.refresh(xiangqiSavedFoldersProvider((username, kind, folder.id)).future),
-                child: ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  children: [
-                    _CreateFolderRow(username: username, kind: kind, parentId: folder.id),
-                    ListSection(
-                      hasLeading: true,
+    final identity = (username, kind, folder.id, ref.watch(xiangqiAccountGenerationProvider));
+    return XiangqiRefreshScope(
+      identity: identity,
+      onRefresh: () => ref.refresh(xiangqiSavedFoldersProvider((username, kind, folder.id)).future),
+      builder: (context, refresh, busy) => XiangqiRetainedData(
+        identity: identity,
+        value: folders,
+        builder: (context, folders) => Scaffold(
+          appBar: AppBar(
+            title: AppBarTitleText(folder.name),
+            actions: [DesktopRefreshButton(onRefresh: refresh, busy: busy)],
+          ),
+          body: folders.when(
+            data: (folders) => folders.folders.isEmpty
+                ? XiangqiRefreshableEmpty(
+                    onRefresh: refresh,
+                    child: Padding(
+                      padding: Styles.bodySectionPadding,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _CreateFolderRow(username: username, kind: kind, parentId: folder.id),
+                          Text(context.l10n.mobileXiangqiSavedEmpty),
+                        ],
+                      ),
+                    ),
+                  )
+                : RefreshIndicator.adaptive(
+                    onRefresh: refresh,
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
                       children: [
-                        for (final child in folders.folders)
-                          _FolderRow(folder: child, username: username, kind: kind),
+                        _CreateFolderRow(username: username, kind: kind, parentId: folder.id),
+                        ListSection(
+                          hasLeading: true,
+                          children: [
+                            for (final child in folders.folders)
+                              _FolderRow(folder: child, username: username, kind: kind),
+                          ],
+                        ),
                       ],
                     ),
+                  ),
+            loading: () => const Center(child: CircularProgressIndicator.adaptive()),
+            error: (error, stackTrace) => Center(
+              child: Padding(
+                padding: Styles.bodySectionPadding,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(context.l10n.mobileSomethingWentWrong, textAlign: TextAlign.center),
+                    const SizedBox(height: 16.0),
+                    FilledButton(onPressed: refresh, child: Text(context.l10n.retry)),
                   ],
                 ),
               ),
-        loading: () => const Center(child: CircularProgressIndicator.adaptive()),
-        error: (error, stackTrace) => Center(
-          child: Padding(
-            padding: Styles.bodySectionPadding,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(context.l10n.mobileSomethingWentWrong, textAlign: TextAlign.center),
-                const SizedBox(height: 16.0),
-                FilledButton(
-                  onPressed: () =>
-                      ref.invalidate(xiangqiSavedFoldersProvider((username, kind, folder.id))),
-                  child: Text(context.l10n.retry),
-                ),
-              ],
             ),
           ),
         ),
@@ -308,93 +375,119 @@ class const XiangqiSavedFolderScreen({
 }
 
 /// The puzzles this account has created.
-class const _Puzzles({required final String username}) extends ConsumerWidget {
+class const _Puzzles({
+  required final String username,
+  required final XiangqiRefresh onRefresh,
+  required final bool busy,
+}) extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return ref
-        .watch(xiangqiSavedPuzzlesProvider(username))
-        .when(
-          data: (puzzles) => ListSection(
-            hasLeading: true,
-            header: Text(context.l10n.mobileXiangqiSavedPuzzles),
-            children: [
-              if (puzzles.puzzles.isEmpty)
-                ListTile(dense: true, title: Text(context.l10n.mobileXiangqiSavedEmpty))
-              else
-                for (final puzzle in puzzles.puzzles)
-                  ListTile(
-                    dense: true,
-                    title: Text(puzzle.id, maxLines: 1, overflow: TextOverflow.ellipsis),
-                    subtitle: Text(
-                      [
-                        if (puzzle.rating != null) '${puzzle.rating}',
-                        if (puzzle.createdOn != null) puzzle.createdOn!,
-                      ].join(' · '),
-                    ),
+    final puzzles = ref.watch(xiangqiSavedPuzzlesProvider(username));
+    return XiangqiRetainedData(
+      identity: (username, ref.watch(xiangqiAccountGenerationProvider)),
+      value: puzzles,
+      builder: (context, puzzles) => puzzles.when(
+        data: (puzzles) => ListSection(
+          hasLeading: true,
+          header: Text(context.l10n.mobileXiangqiSavedPuzzles),
+          children: [
+            if (puzzles.puzzles.isEmpty)
+              ListTile(dense: true, title: Text(context.l10n.mobileXiangqiSavedEmpty))
+            else
+              for (final puzzle in puzzles.puzzles)
+                ListTile(
+                  dense: true,
+                  title: Text(puzzle.id, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  subtitle: Text(
+                    [
+                      if (puzzle.rating != null) '${puzzle.rating}',
+                      if (puzzle.createdOn != null) puzzle.createdOn!,
+                    ].join(' · '),
                   ),
-            ],
-          ),
-          loading: () => ListSection.loading(itemsNumber: 3, header: true, hasLeading: true),
-          error: (error, stackTrace) => ListSection(
-            hasLeading: true,
-            header: Text(context.l10n.mobileXiangqiSavedPuzzles),
-            children: [
-              _RetryRow(onRetry: () => ref.invalidate(xiangqiSavedPuzzlesProvider(username))),
-            ],
-          ),
-        );
+                ),
+          ],
+        ),
+        loading: () => ListSection.loading(itemsNumber: 3, header: true, hasLeading: true),
+        error: (error, stackTrace) => ListSection(
+          hasLeading: true,
+          header: Text(context.l10n.mobileXiangqiSavedPuzzles),
+          children: [
+            _RetryRow(
+              onRetry: busy
+                  ? null
+                  : () => onRefresh(
+                      request: () => ref.refresh(xiangqiSavedPuzzlesProvider(username).future),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
 /// The notes this account has saved.
-class const _Notes({required final String username}) extends ConsumerWidget {
+class const _Notes({
+  required final String username,
+  required final XiangqiRefresh onRefresh,
+  required final bool busy,
+}) extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return ref
-        .watch(xiangqiSavedNotesProvider(username))
-        .when(
-          data: (notes) => ListSection(
-            hasLeading: true,
-            header: Text(context.l10n.mobileXiangqiSavedNotes),
-            children: [
-              if (notes.notes.isEmpty)
-                ListTile(dense: true, title: Text(context.l10n.mobileXiangqiSavedEmpty))
-              else
-                for (final note in notes.notes)
-                  ListTile(
-                    dense: true,
-                    title: Text(
-                      note.title ?? note.id ?? '',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    subtitle: note.description == null
-                        ? null
-                        : Text(note.description!, maxLines: 2, overflow: TextOverflow.ellipsis),
-                    // A note is a game gone through, so the way into one is the review screen — the
-                    // same screen a finished game opens onto.
-                    onTap: note.id == null
-                        ? null
-                        : () => Navigator.of(
-                            context,
-                            rootNavigator: true,
-                          ).push(XiangqiReviewScreen.buildRoute(note.id!)),
+    final notes = ref.watch(xiangqiSavedNotesProvider(username));
+    return XiangqiRetainedData(
+      identity: (username, ref.watch(xiangqiAccountGenerationProvider)),
+      value: notes,
+      builder: (context, notes) => notes.when(
+        data: (notes) => ListSection(
+          hasLeading: true,
+          header: Text(context.l10n.mobileXiangqiSavedNotes),
+          children: [
+            if (notes.notes.isEmpty)
+              ListTile(dense: true, title: Text(context.l10n.mobileXiangqiSavedEmpty))
+            else
+              for (final note in notes.notes)
+                ListTile(
+                  dense: true,
+                  title: Text(
+                    note.title ?? note.id ?? '',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-            ],
-          ),
-          loading: () => ListSection.loading(itemsNumber: 3, header: true, hasLeading: true),
-          error: (error, stackTrace) => ListSection(
-            hasLeading: true,
-            header: Text(context.l10n.mobileXiangqiSavedNotes),
-            children: [
-              _RetryRow(onRetry: () => ref.invalidate(xiangqiSavedNotesProvider(username))),
-            ],
-          ),
-        );
+                  subtitle: note.description == null
+                      ? null
+                      : Text(note.description!, maxLines: 2, overflow: TextOverflow.ellipsis),
+                  // A note is a game gone through, so the way into one is the review screen — the
+                  // same screen a finished game opens onto.
+                  onTap: note.id == null
+                      ? null
+                      : () => Navigator.of(
+                          context,
+                          rootNavigator: true,
+                        ).push(XiangqiReviewScreen.buildRoute(note.id!)),
+                ),
+          ],
+        ),
+        loading: () => ListSection.loading(itemsNumber: 3, header: true, hasLeading: true),
+        error: (error, stackTrace) => ListSection(
+          hasLeading: true,
+          header: Text(context.l10n.mobileXiangqiSavedNotes),
+          children: [
+            _RetryRow(
+              onRetry: busy
+                  ? null
+                  : () => onRefresh(
+                      request: () => ref.refresh(xiangqiSavedNotesProvider(username).future),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
-class const _RetryRow({required final VoidCallback onRetry}) extends StatelessWidget {
+class const _RetryRow({required final VoidCallback? onRetry}) extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListTile(
     dense: true,

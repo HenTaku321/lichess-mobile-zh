@@ -170,9 +170,16 @@ class _XiangqiOnlineGameScreenState() extends ConsumerState<XiangqiOnlineGameScr
       if (update == null || !(ModalRoute.of(context)?.isCurrent ?? true)) return;
       final isCapture = update.before.pieceAt(update.move.to) != null;
       final isCheck = rules.isCheck(update.after);
+      final snapshotRevision = ref.read(provider.notifier).snapshotRevision;
       void playFeedback() {
         if (!mounted || !_active || !(ModalRoute.of(context)?.isCurrent ?? true)) return;
-        if (ref.read(provider).value?.isAtLivePosition != true) return;
+        final current = ref.read(provider).value;
+        if (ref.read(provider.notifier).snapshotRevision != snapshotRevision ||
+            current?.isAtLivePosition != true ||
+            current?.isConnected != true ||
+            current?.gamePosition != update.after) {
+          return;
+        }
         final service = ref.read(moveFeedbackServiceProvider);
         if (isCapture) {
           service.captureFeedback(null, check: isCheck);
@@ -383,12 +390,14 @@ class _XiangqiOnlineGameScreenState() extends ConsumerState<XiangqiOnlineGameScr
               onTap: state.viewCursor > 0
                   ? () => _goTo(controller, state, state.viewCursor - 1)
                   : null,
+              onRepeat: () => _goTo(controller, state, state.viewCursor - 1, fastSeek: true),
             ),
             HistoryNavigationButton(
               forward: true,
               onTap: state.viewCursor < state.positions.length - 1
                   ? () => _goTo(controller, state, state.viewCursor + 1)
                   : null,
+              onRepeat: () => _goTo(controller, state, state.viewCursor + 1, fastSeek: true),
               blink:
                   state.isConnected &&
                   !state.isFinished &&
@@ -447,20 +456,23 @@ class _XiangqiOnlineGameScreenState() extends ConsumerState<XiangqiOnlineGameScr
     );
   }
 
-  void _goTo(XiangqiOnlineGameController controller, XiangqiOnlineGameState state, int target) {
+  void _goTo(
+    XiangqiOnlineGameController controller,
+    XiangqiOnlineGameState state,
+    int target, {
+    bool fastSeek = false,
+  }) {
     for (final timer in _feedbackTimers) {
       timer.cancel();
     }
     _feedbackTimers.clear();
-    if ((target - state.viewCursor).abs() == 1 && state.moves.isNotEmpty) {
-      final index = (target > state.viewCursor ? target - 1 : state.viewCursor - 1).clamp(
-        0,
-        state.moves.length - 1,
-      );
+    final next = target.clamp(0, state.moves.length);
+    if (next != state.viewCursor && next > 0) {
+      final index = next - 1;
       final capture = state.positions[index].pieceAt(state.moves[index].to) != null;
       ref.read(soundServiceProvider).play(capture ? Sound.capture : Sound.move);
     }
-    controller.goTo(target);
+    controller.goTo(next, fastSeek: fastSeek);
   }
 
   /// Asks before resigning, and says nothing if the answer is no.

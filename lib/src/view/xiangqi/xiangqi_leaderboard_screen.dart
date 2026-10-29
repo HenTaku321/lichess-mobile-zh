@@ -1,5 +1,6 @@
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/profile/xiangqi_profile.dart';
 import 'package:lichess_mobile/src/model/xiangqi/profile/xiangqi_profile_repository.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_country_names.dart';
@@ -11,6 +12,7 @@ import 'package:lichess_mobile/src/widgets/feedback.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
 import 'package:lichess_mobile/src/widgets/platform_search_bar.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_refresh.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_refreshable_empty.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -52,73 +54,77 @@ class _XiangqiLeaderboardScreenState() extends ConsumerState<XiangqiLeaderboardS
     // The tabs are a plain `TabBar` over a `DefaultTabController`: the screen keeps the mode in its
     // own state and the controller is only what the bar needs to draw itself, so there is nothing
     // for a controller of the screen's own to do that its state does not already do.
-    return DefaultTabController(
-      length: XiangqiRatingType.values.length,
-      child: Scaffold(
-        appBar: AppBar(
-          title: AppBarTitleText('${context.l10n.mobileXiangqi} · ${context.l10n.leaderboard}'),
-          actions: [
-            IconButton(
-              tooltip: context.l10n.mobileXiangqiLeaderboardCountry,
-              icon: const Icon(Icons.flag_outlined),
-              onPressed: _pickingCountry ? null : () => _pickCountry(context),
+    final identity = (_mode, _country, _page, ref.watch(xiangqiAccountGenerationProvider));
+    return XiangqiRefreshScope(
+      identity: identity,
+      onRefresh: () => ref.refresh(xiangqiLeaderboardProvider((_mode, _country, _page)).future),
+      builder: (context, refresh, busy) => XiangqiRetainedData(
+        identity: identity,
+        value: board,
+        builder: (context, board) => DefaultTabController(
+          length: XiangqiRatingType.values.length,
+          child: Scaffold(
+            appBar: AppBar(
+              title: AppBarTitleText('${context.l10n.mobileXiangqi} · ${context.l10n.leaderboard}'),
+              actions: [
+                DesktopRefreshButton(onRefresh: refresh, busy: busy),
+                IconButton(
+                  tooltip: context.l10n.mobileXiangqiLeaderboardCountry,
+                  icon: const Icon(Icons.flag_outlined),
+                  onPressed: _pickingCountry ? null : () => _pickCountry(context),
+                ),
+              ],
+              bottom: TabBar(
+                isScrollable: true,
+                tabAlignment: TabAlignment.start,
+                onTap: (index) => setState(() {
+                  _mode = XiangqiRatingType.values[index];
+                  _page = 1;
+                }),
+                tabs: [
+                  for (final mode in XiangqiRatingType.values) Tab(text: _modeLabel(context, mode)),
+                ],
+              ),
             ),
-          ],
-          bottom: TabBar(
-            isScrollable: true,
-            tabAlignment: TabAlignment.start,
-            onTap: (index) => setState(() {
-              _mode = XiangqiRatingType.values[index];
-              _page = 1;
-            }),
-            tabs: [
-              for (final mode in XiangqiRatingType.values) Tab(text: _modeLabel(context, mode)),
-            ],
-          ),
-        ),
-        body: board.when(
-          data: (board) => board.entries.isEmpty
-              ? XiangqiRefreshableEmpty(
-                  onRefresh: () =>
-                      ref.refresh(xiangqiLeaderboardProvider((_mode, _country, _page)).future),
-                  child: const Padding(padding: Styles.bodySectionPadding, child: _Empty()),
-                )
-              : RefreshIndicator.adaptive(
-                  onRefresh: () =>
-                      ref.refresh(xiangqiLeaderboardProvider((_mode, _country, _page)).future),
-                  child: ListView(
-                    physics: const AlwaysScrollableScrollPhysics(),
+            body: board.when(
+              data: (board) => board.entries.isEmpty
+                  ? XiangqiRefreshableEmpty(
+                      onRefresh: refresh,
+                      child: const Padding(padding: Styles.bodySectionPadding, child: _Empty()),
+                    )
+                  : RefreshIndicator.adaptive(
+                      onRefresh: refresh,
+                      child: ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        children: [
+                          ListSection(
+                            header: Text(
+                              context.l10n.mobileXiangqiLeaderboardPlayers('${board.totalPlayers}'),
+                            ),
+                            hasLeading: true,
+                            children: [for (final entry in board.entries) _LeaderRow(entry: entry)],
+                          ),
+                          _Pager(
+                            page: board.currentPage,
+                            hasNext: board.hasNextPage,
+                            onChanged: (page) => setState(() => _page = page),
+                          ),
+                        ],
+                      ),
+                    ),
+              loading: () => const Center(child: CircularProgressIndicator.adaptive()),
+              error: (error, stackTrace) => Center(
+                child: Padding(
+                  padding: Styles.bodySectionPadding,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      ListSection(
-                        header: Text(
-                          context.l10n.mobileXiangqiLeaderboardPlayers('${board.totalPlayers}'),
-                        ),
-                        hasLeading: true,
-                        children: [for (final entry in board.entries) _LeaderRow(entry: entry)],
-                      ),
-                      _Pager(
-                        page: board.currentPage,
-                        hasNext: board.hasNextPage,
-                        onChanged: (page) => setState(() => _page = page),
-                      ),
+                      Text(context.l10n.mobileSomethingWentWrong, textAlign: TextAlign.center),
+                      const SizedBox(height: 16.0),
+                      FilledButton(onPressed: refresh, child: Text(context.l10n.retry)),
                     ],
                   ),
                 ),
-          loading: () => const Center(child: CircularProgressIndicator.adaptive()),
-          error: (error, stackTrace) => Center(
-            child: Padding(
-              padding: Styles.bodySectionPadding,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(context.l10n.mobileSomethingWentWrong, textAlign: TextAlign.center),
-                  const SizedBox(height: 16.0),
-                  FilledButton(
-                    onPressed: () =>
-                        ref.invalidate(xiangqiLeaderboardProvider((_mode, _country, _page))),
-                    child: Text(context.l10n.retry),
-                  ),
-                ],
               ),
             ),
           ),

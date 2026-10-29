@@ -23,6 +23,7 @@ import 'package:lichess_mobile/src/widgets/feedback.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_avatar.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_refresh.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// A xiangqi.com account, as this app shows it.
@@ -60,67 +61,98 @@ class const XiangqiProfileScreen({required final String username, super.key})
     // saved content.
     final canDeleteAccount = isMe && session != null && !session.isGuest;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: AppBarTitleText(username),
-        actions: [
-          if (canEditProfile)
-            IconButton(
-              tooltip: context.l10n.editProfile,
-              icon: const Icon(Icons.edit_outlined),
-              onPressed: () async {
-                final updated = await Navigator.of(
-                  context,
-                  rootNavigator: true,
-                ).push<String?>(XiangqiProfileEditScreen.buildRoute(username));
-                if (!context.mounted || updated == null) return;
-                if (updated != username) {
-                  Navigator.of(
-                    context,
-                    rootNavigator: true,
-                  ).pushReplacement(XiangqiProfileScreen.buildRoute(updated));
-                } else {
-                  ref.invalidate(xiangqiUserProvider(username));
-                }
-              },
-            ),
-          if (isMe)
-            IconButton(
-              tooltip: context.l10n.logOut,
-              icon: const Icon(Icons.logout),
-              onPressed: () => ref.read(xiangqiAuthControllerProvider.notifier).signOut(),
-            ),
-        ],
-      ),
-      body: profile.when(
-        data: (profile) => ListView(
-          children: [
-            _Header(profile: profile),
-            _Ratings(profile: profile),
-            for (final speed in XiangqiRatingType.values)
-              _SpeedRecord(username: username, speed: speed),
-            _RecentGames(username: username),
-            // Deleting the account is the one thing on this screen that cannot be undone, so it is
-            // the last thing on it and it is behind a dialog that asks for the password. Offered
-            // only on the account's own profile, for the same reason signing out is: it is an action
-            // on the session this device holds.
-            if (canDeleteAccount) _DeleteAccount(username: username),
-          ],
-        ),
-        loading: () => const Center(child: CircularProgressIndicator.adaptive()),
-        error: (error, stackTrace) => Center(
-          child: Padding(
-            padding: Styles.bodySectionPadding,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(context.l10n.mobileSomethingWentWrong, textAlign: TextAlign.center),
-                const SizedBox(height: 16.0),
-                FilledButton(
-                  onPressed: () => ref.invalidate(xiangqiUserProvider(username)),
-                  child: Text(context.l10n.retry),
+    final identity = (username, ref.watch(xiangqiAccountGenerationProvider));
+    return XiangqiRefreshScope(
+      identity: identity,
+      onRefresh: () async {
+        final subscriptions = [
+          ref.listenManual(xiangqiUserProvider(username), (_, _) {}),
+          for (final speed in XiangqiRatingType.values.where((speed) => speed.isGame))
+            ref.listenManual(xiangqiGameStatsProvider((username, speed)), (_, _) {}),
+          ref.listenManual(xiangqiPuzzleStatsProvider(username), (_, _) {}),
+          ref.listenManual(xiangqiGameHistoryProvider((username, 1)), (_, _) {}),
+        ];
+        try {
+          await Future.wait<Object?>([
+            ref.refresh(xiangqiUserProvider(username).future),
+            for (final speed in XiangqiRatingType.values.where((speed) => speed.isGame))
+              ref.refresh(xiangqiGameStatsProvider((username, speed)).future),
+            ref.refresh(xiangqiPuzzleStatsProvider(username).future),
+            ref.refresh(xiangqiGameHistoryProvider((username, 1)).future),
+          ]);
+        } finally {
+          for (final subscription in subscriptions) {
+            subscription.close();
+          }
+        }
+      },
+      builder: (context, refresh, busy) => XiangqiRetainedData(
+        identity: identity,
+        value: profile,
+        builder: (context, profile) => Scaffold(
+          appBar: AppBar(
+            title: AppBarTitleText(username),
+            actions: [
+              DesktopRefreshButton(onRefresh: refresh, busy: busy),
+              if (canEditProfile)
+                IconButton(
+                  tooltip: context.l10n.editProfile,
+                  icon: const Icon(Icons.edit_outlined),
+                  onPressed: () async {
+                    final updated = await Navigator.of(
+                      context,
+                      rootNavigator: true,
+                    ).push<String?>(XiangqiProfileEditScreen.buildRoute(username));
+                    if (!context.mounted || updated == null) return;
+                    if (updated != username) {
+                      Navigator.of(
+                        context,
+                        rootNavigator: true,
+                      ).pushReplacement(XiangqiProfileScreen.buildRoute(updated));
+                    } else {
+                      ref.invalidate(xiangqiUserProvider(username));
+                    }
+                  },
                 ),
-              ],
+              if (isMe)
+                IconButton(
+                  tooltip: context.l10n.logOut,
+                  icon: const Icon(Icons.logout),
+                  onPressed: () => ref.read(xiangqiAuthControllerProvider.notifier).signOut(),
+                ),
+            ],
+          ),
+          body: profile.when(
+            data: (profile) => RefreshIndicator.adaptive(
+              onRefresh: refresh,
+              child: ListView(
+                children: [
+                  _Header(profile: profile),
+                  _Ratings(profile: profile),
+                  for (final speed in XiangqiRatingType.values)
+                    _SpeedRecord(username: username, speed: speed, onRefresh: refresh, busy: busy),
+                  _RecentGames(username: username, onRefresh: refresh, busy: busy),
+                  // Deleting the account is the one thing on this screen that cannot be undone, so it is
+                  // the last thing on it and it is behind a dialog that asks for the password. Offered
+                  // only on the account's own profile, for the same reason signing out is: it is an action
+                  // on the session this device holds.
+                  if (canDeleteAccount) _DeleteAccount(username: username),
+                ],
+              ),
+            ),
+            loading: () => const Center(child: CircularProgressIndicator.adaptive()),
+            error: (error, stackTrace) => Center(
+              child: Padding(
+                padding: Styles.bodySectionPadding,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(context.l10n.mobileSomethingWentWrong, textAlign: TextAlign.center),
+                    const SizedBox(height: 16.0),
+                    FilledButton(onPressed: refresh, child: Text(context.l10n.retry)),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
@@ -215,8 +247,12 @@ class const _Ratings({required final XiangqiUserProfile profile}) extends Statel
 /// The puzzle record is read from a different endpoint with a different shape, so the two are two
 /// widgets rather than one with a branch: what they share is the section and the heading, and what
 /// they do not share is everything they say.
-class const _SpeedRecord({required final String username, required final XiangqiRatingType speed})
-    extends ConsumerWidget {
+class const _SpeedRecord({
+  required final String username,
+  required final XiangqiRatingType speed,
+  required final XiangqiRefresh onRefresh,
+  required final bool busy,
+}) extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final record = speed.isGame
@@ -227,14 +263,34 @@ class const _SpeedRecord({required final String username, required final Xiangqi
               .watch(xiangqiPuzzleStatsProvider(username))
               .whenData((stats) => _puzzleLines(context, stats));
 
-    return ListSection(
-      hasLeading: true,
-      header: Text(_speedLabel(context, speed)),
-      children: [
-        for (final line in record.value ?? const <String>[])
-          ListTile(dense: true, title: Text(line)),
-        if (record.isLoading) const ListTile(dense: true, title: Text('…')),
-      ],
+    return XiangqiRetainedData(
+      identity: (username, speed, ref.watch(xiangqiAccountGenerationProvider)),
+      value: record,
+      builder: (context, record) => ListSection(
+        hasLeading: true,
+        header: Text(_speedLabel(context, speed)),
+        children: [
+          for (final line in record.value ?? const <String>[])
+            ListTile(dense: true, title: Text(line)),
+          if (record.isLoading) const ListTile(dense: true, title: Text('…')),
+          if (record.hasError)
+            ListTile(
+              dense: true,
+              title: Text(context.l10n.mobileSomethingWentWrong),
+              trailing: IconButton(
+                tooltip: context.l10n.retry,
+                icon: const Icon(Icons.refresh),
+                onPressed: busy
+                    ? null
+                    : () => onRefresh(
+                        request: () => speed.isGame
+                            ? ref.refresh(xiangqiGameStatsProvider((username, speed)).future)
+                            : ref.refresh(xiangqiPuzzleStatsProvider(username).future),
+                      ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
@@ -264,28 +320,51 @@ class const _SpeedRecord({required final String username, required final Xiangqi
 /// only ever grew would be a list nobody could get to the end of. A game that is over opens its
 /// review; one still being played is a row with no way in, since watching it is the watch list's
 /// business and not a profile's.
-class const _RecentGames({required final String username}) extends ConsumerWidget {
+class const _RecentGames({
+  required final String username,
+  required final XiangqiRefresh onRefresh,
+  required final bool busy,
+}) extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final history = ref.watch(xiangqiGameHistoryProvider((username, 1)));
-    return history.when(
-      data: (history) => ListSection(
-        hasLeading: true,
-        header: Text(context.l10n.games),
-        children: [
-          if (history.games.isEmpty)
-            ListTile(dense: true, title: Text(context.l10n.mobileXiangqiNoGames))
-          else
-            for (final game in history.games) _GameRow(game: game),
-        ],
-      ),
-      loading: () => ListSection.loading(itemsNumber: 3, header: true, hasLeading: true),
-      // A history that did not arrive is not a reason to fail the whole screen: everything above it
-      // is already drawn, and this is the last section of it.
-      error: (error, stackTrace) => ListSection(
-        hasLeading: true,
-        header: Text(context.l10n.games),
-        children: [ListTile(dense: true, title: Text(context.l10n.mobileSomethingWentWrong))],
+    return XiangqiRetainedData(
+      identity: (username, ref.watch(xiangqiAccountGenerationProvider)),
+      value: history,
+      builder: (context, history) => history.when(
+        data: (history) => ListSection(
+          hasLeading: true,
+          header: Text(context.l10n.games),
+          children: [
+            if (history.games.isEmpty)
+              ListTile(dense: true, title: Text(context.l10n.mobileXiangqiNoGames))
+            else
+              for (final game in history.games) _GameRow(game: game),
+          ],
+        ),
+        loading: () => ListSection.loading(itemsNumber: 3, header: true, hasLeading: true),
+        // A history that did not arrive is not a reason to fail the whole screen: everything above it
+        // is already drawn, and this is the last section of it.
+        error: (error, stackTrace) => ListSection(
+          hasLeading: true,
+          header: Text(context.l10n.games),
+          children: [
+            ListTile(
+              dense: true,
+              title: Text(context.l10n.mobileSomethingWentWrong),
+              trailing: IconButton(
+                tooltip: context.l10n.retry,
+                icon: const Icon(Icons.refresh),
+                onPressed: busy
+                    ? null
+                    : () => onRefresh(
+                        request: () =>
+                            ref.refresh(xiangqiGameHistoryProvider((username, 1)).future),
+                      ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

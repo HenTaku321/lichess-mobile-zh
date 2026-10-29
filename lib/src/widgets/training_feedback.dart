@@ -3,7 +3,11 @@ import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// The solver's latest decision, independent of the opponent's automatic reply.
-enum TrainingFeedbackPhase { prompt, correct, incorrect }
+enum TrainingFeedbackPhase() {
+  prompt,
+  correct,
+  incorrect,
+}
 
 /// Shared move feedback for chess and xiangqi, with only the starting piece and prompt supplied
 /// by the caller. Copy, icons and typography must not drift between the two training screens.

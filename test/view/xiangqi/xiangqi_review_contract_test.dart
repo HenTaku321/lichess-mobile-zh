@@ -2,6 +2,7 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_com_protocol.dart';
+import 'package:lichess_mobile/src/model/xiangqi/review/xiangqi_review.dart';
 import 'package:lichess_mobile/src/model/xiangqi/review/xiangqi_review_repository.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_rules.dart' as rules;
@@ -156,6 +157,27 @@ void main() {
     await tester.tap(find.byIcon(CupertinoIcons.chevron_back));
     await tester.pump();
     expect(_gauge(tester).evaluation?.cp, -1200);
+  });
+
+  testWidgets('mate zero on black turn is a red win, not a blunder by the mating move', (
+    tester,
+  ) async {
+    const initialFen = '4k4/3R1R3/4p4/4R4/9/9/9/9/9/3K5 w - - 0 1';
+    final container = await _loadReview(
+      tester,
+      initialFen: initialFen,
+      moves: const ['e7e8'],
+      scores: const [
+        {'mate': 1},
+        {'mate': 0},
+      ],
+    );
+    expect(rules.isCheckmate(review.board(tester).position), isTrue);
+    final data = container.read(xiangqiReviewProvider(_gameId)).requireValue;
+    expect(data.reviews.single.accuracy, 100);
+    expect(data.reviews.single.classification, XiangqiMoveClassification.best);
+    expect(_gauge(tester).redWinProbability, 1);
+    expect(_gauge(tester).evaluation?.mate, 0);
   });
 
   testWidgets('review flip rotates the board, gauge and both player rows together', (tester) async {

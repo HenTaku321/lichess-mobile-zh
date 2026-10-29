@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -92,16 +91,13 @@ pumpAnalysis(WidgetTester tester, {bool enabled = false}) async {
 
 void main() {
   TestLichessBinding.ensureInitialized();
-  setUp(() {
-    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
-    clearSavedXiangqiAnalysis();
-  });
-  tearDown(() {
-    debugDefaultTargetPlatformOverride = null;
-    clearSavedXiangqiAnalysis();
-  });
+  setUp(clearSavedXiangqiAnalysis);
+  tearDown(clearSavedXiangqiAnalysis);
 
-  testWidgets('desktop analysis has a menu and Lichess chip instead of a separate memory icon', (
+  void testDesktop(String name, WidgetTesterCallback callback) =>
+      testWidgets(name, callback, variant: TargetPlatformVariant.only(TargetPlatform.linux));
+
+  testDesktop('desktop analysis has a menu and Lichess chip instead of a separate memory icon', (
     tester,
   ) async {
     await pumpAnalysis(tester);
@@ -124,7 +120,7 @@ void main() {
     expect(find.text('Clear local data'), findsOneWidget);
   });
 
-  testWidgets('analysis display preferences independently control gauge, arrows and notation', (
+  testDesktop('analysis display preferences independently control gauge, arrows and notation', (
     tester,
   ) async {
     final harness = await pumpAnalysis(tester, enabled: true);
@@ -141,7 +137,7 @@ void main() {
     expect(tester.widget<MoveList>(find.byType(MoveList)).type, MoveListType.inline);
   });
 
-  testWidgets('playing a shorter replacement analysis branch is still a new played move', (
+  testDesktop('playing a shorter replacement analysis branch is still a new played move', (
     tester,
   ) async {
     final harness = await pumpAnalysis(tester);
@@ -159,7 +155,7 @@ void main() {
     expect(harness.container.read(xiangqiAnalysisControllerProvider).moves, hasLength(1));
   });
 
-  testWidgets('returning analysis to its initial position does not invent a move sound', (
+  testDesktop('returning analysis to its initial position does not invent a move sound', (
     tester,
   ) async {
     final harness = await pumpAnalysis(tester);
@@ -172,12 +168,12 @@ void main() {
     expect(harness.sound.calls, isEmpty);
   });
 
-  testWidgets('desktop watch list has a mouse-visible refresh action', (tester) async {
+  testDesktop('desktop watch list has a mouse-visible refresh action', (tester) async {
     await watch.pumpWatchScreen(tester, [watch.entry()]);
     expect(find.byIcon(Icons.refresh), findsOneWidget);
   });
 
-  testWidgets('a failed manual watch refresh retains the loaded games and stops busy state', (
+  testDesktop('a failed manual watch refresh retains the loaded games and stops busy state', (
     tester,
   ) async {
     var calls = 0;
@@ -214,7 +210,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Linux service startup does not touch mobile-only native channels or Firebase', (
+  testDesktop('Linux service startup does not touch mobile-only native channels or Firebase', (
     tester,
   ) async {
     await testBinding.firebaseMessaging.setAutoInitEnabled(false);

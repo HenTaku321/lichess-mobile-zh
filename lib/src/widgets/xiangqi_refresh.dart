@@ -39,9 +39,15 @@ class _XiangqiRefreshScopeState() extends State<XiangqiRefreshScope> {
           },
         )
         .whenComplete(() {
-          if (mounted) setState(() => _inFlight = null);
+          if (mounted) {
+            setState(() {
+              _inFlight = null;
+            });
+          }
         });
-    setState(() => _inFlight = future);
+    setState(() {
+      _inFlight = future;
+    });
     return future;
   }
 

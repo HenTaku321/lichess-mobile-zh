@@ -11,6 +11,7 @@ import 'package:lichess_mobile/src/model/xiangqi/xiangqi_move.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_rules.dart' as rules;
 
+import '../../test_container.dart';
 import '../engine/fake_transport.dart';
 
 /// The move written [iccs], which is also how Pikafish writes one.
@@ -56,10 +57,9 @@ Future<AnalysisHarness> makeHarness() async {
   final engine = Engine(transport);
   addTearDown(engine.dispose);
 
-  final container = ProviderContainer(
-    overrides: [xiangqiEngineProvider.overrideWith((Ref ref) => engine)],
+  final container = await makeContainer(
+    overrides: {xiangqiEngineProvider: xiangqiEngineProvider.overrideWith((Ref ref) => engine)},
   );
-  addTearDown(container.dispose);
 
   // The analysis is autoDispose and a bare `read` is not a watcher, so without something holding it
   // it would be thrown away between two lines of a test.

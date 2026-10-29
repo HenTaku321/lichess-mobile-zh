@@ -113,6 +113,8 @@ class XiangqiChatController(final XiangqiChatRoomKey key) extends Notifier<Xiang
 
   /// The queue every request waits in, so that two of them cannot both decide the coast is clear.
   Future<void> _turn = Future<void>.value();
+  Timer? _spacingTimer;
+  Completer<void>? _spacingWaiter;
 
   @override
   XiangqiChatState build() {
@@ -121,6 +123,11 @@ class XiangqiChatController(final XiangqiChatRoomKey key) extends Notifier<Xiang
       _connections?.cancel();
       _status?.cancel();
       _historyTimeout?.cancel();
+      _spacingTimer?.cancel();
+      _spacingTimer = null;
+      final waiter = _spacingWaiter;
+      _spacingWaiter = null;
+      if (waiter != null && !waiter.isCompleted) waiter.complete();
       final socket = _socket;
       _socket = null;
       if (socket != null) unawaited(socket.dispose());
@@ -252,7 +259,14 @@ class XiangqiChatController(final XiangqiChatRoomKey key) extends Notifier<Xiang
       if (last != null) {
         final earliest = last.add(kXiangqiChatRequestSpacing);
         if (earliest.isAfter(now)) {
-          await Future<void>.delayed(earliest.difference(now));
+          final waiter = Completer<void>();
+          _spacingWaiter = waiter;
+          _spacingTimer = Timer(earliest.difference(now), waiter.complete);
+          await waiter.future;
+          if (identical(_spacingWaiter, waiter)) {
+            _spacingTimer = null;
+            _spacingWaiter = null;
+          }
         }
       }
       _lastRequest = DateTime.now();

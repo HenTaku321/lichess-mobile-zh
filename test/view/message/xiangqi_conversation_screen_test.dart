@@ -6,6 +6,7 @@ import 'package:lichess_mobile/src/network/xiangqi_http.dart';
 import 'package:lichess_mobile/src/network/xiangqi_session_store.dart';
 import 'package:lichess_mobile/src/network/xiangqi_socket.dart';
 import 'package:lichess_mobile/src/view/message/xiangqi_conversation_screen.dart';
+import 'package:lichess_mobile/src/widgets/rich_link_text.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_refresh.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -108,10 +109,14 @@ void main() {
   ) async {
     await pumpConversation(tester);
     await tester.enterText(find.byType(TextField), 'Keep this PM draft');
+    final loadedMessage = find.byWidgetPredicate(
+      (widget) => widget is RichLinkText && widget.text == 'Hello',
+    );
+    expect(loadedMessage, findsOneWidget);
     expect(find.byType(DesktopRefreshButton), findsOneWidget);
     await tester.tap(find.byType(DesktopRefreshButton));
     await tester.pump();
     expect(tester.widget<TextField>(find.byType(TextField)).controller!.text, 'Keep this PM draft');
-    expect(find.text('Hello'), findsOneWidget);
+    expect(loadedMessage, findsOneWidget);
   }, variant: TargetPlatformVariant.only(TargetPlatform.linux));
 }

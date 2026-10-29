@@ -1,15 +1,14 @@
-import 'dart:math' as math;
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:lichess_mobile/src/model/common/eval.dart';
 import 'package:lichess_mobile/src/model/engine/engine_utils.dart';
 import 'package:lichess_mobile/src/model/engine/evaluation_preferences.dart';
 import 'package:lichess_mobile/src/model/engine/position_evaluator.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
-import 'package:lichess_mobile/src/widgets/buttons.dart';
+import 'package:lichess_mobile/src/view/engine/engine_button_display.dart';
 import 'package:lichess_mobile/src/widgets/popover.dart';
 import 'package:material_ui/material_ui.dart';
+
+export 'package:lichess_mobile/src/view/engine/engine_button_display.dart' show MicroChipPainter;
 
 /// A button to toggle engine evaluation and show engine depth.
 class const EngineButton({
@@ -17,134 +16,41 @@ class const EngineButton({
   final VoidCallback? onTap,
   final ClientEval? savedEval,
   final VoidCallback? goDeeper,
-}) extends ConsumerStatefulWidget {
+}) extends ConsumerWidget {
   @override
-  ConsumerState<EngineButton> createState() => _EngineButtonState();
-}
-
-class _EngineButtonState() extends ConsumerState<EngineButton> {
-  late Color fromChipColor;
-  Color? toChipColor;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final prefs = ref.watch(engineEvaluationPreferencesProvider);
     final (:engine, :engineSpec, eval: localEval, :isComputing, currentWork: _) = ref.watch(
-      engineEvaluationProvider(widget.filters),
+      engineEvaluationProvider(filters),
     );
-    final eval = pickBestClientEval(localEval: localEval, savedEval: widget.savedEval);
-
-    final newChipColor = prefs.isEnabled
-        ? isComputing
-              ? ColorScheme.of(context).primary
-              : ColorScheme.of(context).primary.withValues(alpha: 0.65)
-        : IconTheme.of(context).color ?? TextTheme.of(context).bodyMedium!.color!;
-
-    fromChipColor = toChipColor ?? newChipColor;
-    toChipColor = newChipColor;
-
-    final textColor = prefs.isEnabled
-        ? ColorScheme.of(context).primary
-        : IconTheme.of(context).color ?? TextTheme.of(context).bodyMedium!.color!;
-
-    final loadingIndicator = SpinKitFadingFour(color: textColor.withValues(alpha: 0.7), size: 10);
-
-    const microChipSize = 28.0;
-    final iconTextStyle = TextStyle(
-      color: textColor,
-      fontFeatures: const [FontFeature.tabularFigures()],
-      fontWeight: FontWeight.w600,
-      fontSize: 11,
-    );
-
-    return Stack(
-      clipBehavior: Clip.none,
-      alignment: Alignment.center,
-      children: [
-        SemanticIconButton(
-          semanticsLabel: context.l10n.toggleLocalEvaluation,
-          onPressed: widget.onTap,
-          onLongPress: () {
-            showPopover(
-              context: context,
-              bodyBuilder: (_) {
-                return _EnginePopup(
-                  goDeeper: widget.goDeeper,
-                  filters: widget.filters,
-                  savedEval: widget.savedEval,
-                );
-              },
-              direction: PopoverDirection.top,
-              width: 250,
-              backgroundColor:
-                  DialogTheme.of(context).backgroundColor ??
-                  ColorScheme.of(context).surfaceContainerHigh,
-              transitionDuration: Duration.zero,
-              popoverTransitionBuilder: (_, child) => child,
-            );
-          },
-          icon: Badge(
-            offset: const Offset(4, -7),
-            backgroundColor: ColorScheme.of(context).tertiaryContainer,
-            textColor: ColorScheme.of(context).onTertiaryContainer,
-            label: prefs.isEnabled && eval is CloudEval ? const Text('CLOUD') : null,
-            textStyle: const TextStyle(fontSize: 8),
-            isLabelVisible: prefs.isEnabled && eval is CloudEval,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                TweenAnimationBuilder<Color?>(
-                  curve: Curves.easeInOut,
-                  tween: ColorTween(begin: fromChipColor, end: toChipColor),
-                  duration: const Duration(milliseconds: 300),
-                  builder: (BuildContext context, Color? color, Widget? _) {
-                    return CustomPaint(
-                      size: const Size(microChipSize, microChipSize),
-                      painter: MicroChipPainter(color ?? toChipColor!),
-                    );
-                  },
-                ),
-                SizedBox(
-                  width: microChipSize,
-                  height: microChipSize,
-                  child: RepaintBoundary(
-                    child: Center(
-                      child: prefs.isEnabled
-                          ? eval is CloudEval
-                                ? Text('${math.min(99, eval.depth)}', style: iconTextStyle)
-                                : switch (engine) {
-                                    // No engine has been asked for yet.
-                                    null => Text('-', style: iconTextStyle),
-                                    AsyncError() => Text('!', style: iconTextStyle),
-                                    AsyncValue(isLoading: true) => loadingIndicator,
-                                    _ =>
-                                      eval?.depth != null
-                                          ? Text(
-                                              '${math.min(99, eval!.depth)}',
-                                              style: iconTextStyle,
-                                            )
-                                          : loadingIndicator,
-                                  }
-                          : const SizedBox.shrink(),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        Positioned(
-          bottom: -6,
-          child: Text(
-            engineShortLabel(engine?.value, spec: engineSpec) ?? prefs.enginePref.shortLabel,
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              color: textColor.withValues(alpha: 0.8),
-            ),
-          ),
-        ),
-      ],
+    final eval = pickBestClientEval(localEval: localEval, savedEval: savedEval);
+    final status = eval is CloudEval
+        ? EngineButtonStatus.ready
+        : switch (engine) {
+            null => EngineButtonStatus.idle,
+            AsyncError() => EngineButtonStatus.error,
+            AsyncValue(isLoading: true) => EngineButtonStatus.loading,
+            _ => EngineButtonStatus.ready,
+          };
+    return EngineButtonDisplay(
+      enabled: prefs.isEnabled,
+      computing: isComputing,
+      status: status,
+      depth: eval?.depth,
+      cloud: eval is CloudEval,
+      engineLabel: engineShortLabel(engine?.value, spec: engineSpec) ?? prefs.enginePref.shortLabel,
+      onTap: onTap,
+      onLongPress: () => showPopover(
+        context: context,
+        bodyBuilder: (_) =>
+            _EnginePopup(goDeeper: goDeeper, filters: filters, savedEval: savedEval),
+        direction: PopoverDirection.top,
+        width: 250,
+        backgroundColor:
+            DialogTheme.of(context).backgroundColor ?? ColorScheme.of(context).surfaceContainerHigh,
+        transitionDuration: Duration.zero,
+        popoverTransitionBuilder: (_, child) => child,
+      ),
     );
   }
 }
@@ -189,127 +95,6 @@ class const EngineToggleButton({
       },
     );
   }
-}
-
-class const MicroChipPainter(final Color color) extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    const pinLength = 3.5;
-    const pinRadius = Radius.circular(1);
-    const innerRimWidth = 1.0;
-    const outerRimWidth = 1.5;
-
-    final fillPaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-
-    final outerStrokePaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = outerRimWidth;
-
-    final innerStrokePaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = innerRimWidth;
-
-    final innerSquareSize = size.width - pinLength - innerRimWidth - outerRimWidth;
-
-    final innerSquarePath = Path()
-      ..addRRect(
-        RRect.fromLTRBR(
-          pinLength + innerRimWidth + outerRimWidth,
-          pinLength + innerRimWidth + outerRimWidth,
-          innerSquareSize,
-          innerSquareSize,
-          const Radius.circular(2),
-        ),
-      );
-
-    final outerRimPath = Path()
-      ..addRRect(
-        RRect.fromLTRBR(
-          pinLength,
-          pinLength,
-          size.width - pinLength,
-          size.height - pinLength,
-          const Radius.circular(4),
-        ),
-      );
-
-    final pinsPath = Path();
-    final chipSide = size.width - pinLength * 2;
-    final pinsMargin = (chipSide - chipSide * 0.6) / 2;
-    final pinWidth = chipSide / 10;
-    final pinSpacing = (chipSide - (pinsMargin * 2) - 3 * pinWidth) / 2;
-    // draw left pins
-    for (var i = 0; i < 3; i++) {
-      pinsPath.addRRect(
-        RRect.fromRectAndCorners(
-          Rect.fromLTWH(
-            0,
-            pinLength + pinsMargin + i * (pinWidth + pinSpacing),
-            pinLength,
-            pinWidth,
-          ),
-          topLeft: pinRadius,
-          bottomLeft: pinRadius,
-        ),
-      );
-    }
-    // draw right pins
-    for (var i = 0; i < 3; i++) {
-      pinsPath.addRRect(
-        RRect.fromRectAndCorners(
-          Rect.fromLTWH(
-            size.width - pinLength,
-            pinLength + pinsMargin + i * (pinWidth + pinSpacing),
-            pinLength,
-            pinWidth,
-          ),
-          topRight: pinRadius,
-          bottomRight: pinRadius,
-        ),
-      );
-    }
-    // draw top pins
-    for (var i = 0; i < 3; i++) {
-      pinsPath.addRRect(
-        RRect.fromRectAndCorners(
-          Rect.fromLTWH(
-            pinLength + pinsMargin + i * (pinWidth + pinSpacing),
-            0,
-            pinWidth,
-            pinLength,
-          ),
-          topLeft: pinRadius,
-          topRight: pinRadius,
-        ),
-      );
-    }
-    // draw bottom pins
-    for (var i = 0; i < 3; i++) {
-      pinsPath.addRRect(
-        RRect.fromRectAndCorners(
-          Rect.fromLTWH(
-            pinLength + pinsMargin + i * (pinWidth + pinSpacing),
-            size.height - pinLength,
-            pinWidth,
-            pinLength,
-          ),
-          bottomLeft: pinRadius,
-          bottomRight: pinRadius,
-        ),
-      );
-    }
-
-    canvas.drawPath(outerRimPath, outerStrokePaint);
-    canvas.drawPath(pinsPath, fillPaint);
-    canvas.drawPath(innerSquarePath, innerStrokePaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant MicroChipPainter oldDelegate) => color != oldDelegate.color;
 }
 
 class const _EnginePopup({

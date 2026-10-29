@@ -34,6 +34,7 @@ class const XiangqiAnalysisLayout({
   final void Function(int)? onSelectMove,
   final Widget? bottomBar,
   final bool smallBoard = false,
+  final bool inlineNotation = false,
   super.key,
 }) extends ConsumerWidget {
   @override
@@ -47,7 +48,7 @@ class const XiangqiAnalysisLayout({
         : [
             MoveList(
               wrapInCard: false,
-              type: MoveListType.stacked,
+              type: inlineNotation ? MoveListType.inline : MoveListType.stacked,
               slicedMoves: moves.asMap().entries.slices(2),
               currentMoveIndex: currentMoveIndex,
               pieceNotation: PieceNotation.letter,

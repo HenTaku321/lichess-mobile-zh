@@ -34,6 +34,7 @@ import 'package:lichess_mobile/src/tab_navigation.dart';
 import 'package:lichess_mobile/src/tab_scaffold.dart';
 import 'package:lichess_mobile/src/theme.dart';
 import 'package:lichess_mobile/src/ui_event_coordinator.dart';
+import 'package:lichess_mobile/src/utils/platform_capabilities.dart';
 import 'package:lichess_mobile/src/utils/screen.dart';
 import 'package:lichess_mobile/src/utils/scroll_behavior.dart';
 import 'package:lichess_mobile/src/widgets/window_title_bar.dart';
@@ -157,7 +158,9 @@ class _AppState() extends ConsumerState<Application> {
     if (Platform.isIOS) {
       HomeWidget.setAppGroupId(_kIosAppGroupId);
     }
-    HomeWidget.saveWidgetData<String>('lichessHost', kLichessHost);
+    if (supportsHomeWidgets) {
+      HomeWidget.saveWidgetData<String>('lichessHost', kLichessHost);
+    }
 
     if (Platform.isIOS) {
       ref.listenManual(kidModeProvider, (prev, state) {

@@ -15,6 +15,7 @@ import 'package:lichess_mobile/src/model/xiangqi/xiangqi_move.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/view/more/more_tab_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_analysis_screen.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_engine_button.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
 import 'package:lichess_mobile/src/widgets/move_list.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
@@ -90,7 +91,9 @@ Future<FakeTransport> pumpAnalysisScreen(
       surfaceSize: surfaceSize,
     ),
   );
-  await tester.pumpAndSettle();
+  // The real shared chip spins until the engine answers; bounded pumps must not hide that state.
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 350));
   return transport;
 }
 
@@ -161,7 +164,8 @@ void main() {
       expect(board(tester).position, XiangqiPosition.initial());
       expect(barButton(tester, CupertinoIcons.chevron_back).onTap, isNull);
       expect(barButton(tester, CupertinoIcons.chevron_forward).onTap, isNull);
-      expect(find.byIcon(Icons.restart_alt), findsOneWidget);
+      expect(find.byIcon(Icons.menu), findsOneWidget);
+      expect(find.byIcon(Icons.restart_alt), findsNothing);
     });
 
     testWidgets('the engine is started on it, and says how deep it has got', (tester) async {
@@ -402,14 +406,15 @@ void main() {
 
       expect(find.byType(XiangqiEvalGauge), findsOneWidget);
 
-      await tester.tap(find.byIcon(Icons.memory));
+      await tester.tap(find.byType(XiangqiEngineButton));
       await tester.pumpAndSettle();
 
       expect(find.byType(XiangqiEvalGauge), findsNothing);
       expect(transport.takeCommands(), contains('stop'));
 
-      await tester.tap(find.byIcon(Icons.memory));
-      await tester.pumpAndSettle();
+      await tester.tap(find.byType(XiangqiEngineButton));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 350));
 
       expect(find.byType(XiangqiEvalGauge), findsOneWidget);
       expect(transport.takeCommands(), isNotEmpty, reason: 'the engine is started again');
@@ -430,14 +435,21 @@ void main() {
       );
     });
 
-    testWidgets('reset puts the board back and throws the line away', (tester) async {
+    testWidgets('confirmed clear local data puts the board back and throws the line away', (
+      tester,
+    ) async {
       await pumpAnalysisScreen(tester, engineEvaluation: false);
       await tapSquare(tester, 'h2');
       await tapSquare(tester, 'e2');
       expect(find.byType(StackedMoveItem), findsOneWidget);
       expect(find.text('炮二平五'), findsOneWidget);
 
-      await tester.tap(find.byIcon(Icons.restart_alt));
+      await tester.tap(find.byIcon(Icons.menu));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Clear local data'));
+      await tester.pumpAndSettle();
+      expect(find.text('炮二平五'), findsOneWidget, reason: 'the action must be confirmed first');
+      await tester.tap(find.text('OK'));
       await tester.pump();
 
       expect(find.byType(StackedMoveItem), findsNothing);

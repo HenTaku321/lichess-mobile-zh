@@ -7,12 +7,15 @@ import 'package:lichess_mobile/src/widgets/buttons.dart';
 class const HistoryNavigationButton({
   required final bool forward,
   required final VoidCallback? onTap,
+
+  /// A separate fast-seek action; defaults to [onTap] for existing callers.
+  final VoidCallback? onRepeat,
   final bool blink = false,
   super.key,
 }) extends StatelessWidget {
   @override
   Widget build(BuildContext context) => RepeatButton(
-    onLongPress: onTap,
+    onLongPress: onTap == null ? null : onRepeat ?? onTap,
     child: BottomBarButton(
       icon: forward ? CupertinoIcons.chevron_forward : CupertinoIcons.chevron_back,
       label: forward ? context.l10n.next : context.l10n.mobilePreviousMove,

@@ -3,9 +3,9 @@ import 'dart:async';
 import 'package:chessground/chessground.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/analysis/analysis_preferences.dart';
-import 'package:lichess_mobile/src/model/common/chess.dart' show Variant;
 import 'package:lichess_mobile/src/model/engine/evaluation_preferences.dart';
 import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_analysis_controller.dart';
@@ -13,15 +13,16 @@ import 'package:lichess_mobile/src/model/xiangqi/xiangqi_export.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_move.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_notation.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
-import 'package:lichess_mobile/src/model/xiangqi/xiangqi_rules.dart' as rules;
-import 'package:lichess_mobile/src/service/move_feedback.dart';
-import 'package:lichess_mobile/src/service/sound_service.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/focus_detector.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_analysis_settings_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_board_editor_screen.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_engine_button.dart';
+import 'package:lichess_mobile/src/widgets/adaptive_action_sheet.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
+import 'package:lichess_mobile/src/widgets/feedback.dart';
 import 'package:lichess_mobile/src/widgets/history_navigation_button.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_analysis_layout.dart';
@@ -80,35 +81,6 @@ class const XiangqiAnalysisScreen({
       // one of this screen's making.
       appBar: AppBar(
         title: AppBarTitleText('${context.l10n.mobileXiangqi} · ${context.l10n.analysis}'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit_outlined),
-            tooltip: context.l10n.boardEditor,
-            // What is on the board, handed over as a FEN, which is the one thing an editor and an
-            // analysis board both speak. This is the way in that opens on the position being looked
-            // at; the More tab's row opens the same editor on the starting position, and the chess
-            // analysis board reaches its own editor through its menu.
-            //
-            // Read rather than watched: the app bar is the screen's and the position is the
-            // controller's, which the body watches, and this only has to be right at the moment the
-            // button is pressed. It is a position and nothing else, so the board opens red at the
-            // bottom whatever way up this screen's own board is drawn — which way up a board is drawn
-            // is the screen's business and is not a fact about the position.
-            onPressed: () => Navigator.of(context).push(
-              XiangqiBoardEditorScreen.buildRoute(
-                initialFen: ref.read(xiangqiAnalysisControllerProvider).position.toFen(),
-              ),
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.restart_alt),
-            tooltip: context.l10n.reset,
-            // Reset puts the board back to the starting position and throws the line away, which is
-            // why it sits up here and not in the bar with taking a move back: it is not a step
-            // through the line, it is the end of it.
-            onPressed: () => ref.read(xiangqiAnalysisControllerProvider.notifier).reset(),
-          ),
-        ],
       ),
       body: _Body(initialFen: initialFen),
     );
@@ -168,49 +140,24 @@ class _BodyState() extends ConsumerState<_Body> {
   @override
   Widget build(BuildContext context) {
     final analysisState = ref.watch(xiangqiAnalysisControllerProvider);
+    final analysisPrefs = ref.watch(analysisPreferencesProvider);
     final boardPrefs = ref.watch(boardPreferencesProvider);
     final evalEnabled = ref.watch(engineEvaluationPreferencesProvider.select((p) => p.isEnabled));
     final numEvalLines = ref.watch(
       engineEvaluationPreferencesProvider.select((p) => p.numEvalLines),
     );
-    final shownLines = analysisState.lines.take(numEvalLines).toList();
+    final shownLines = analysisState.lines.take(numEvalLines > 0 ? numEvalLines : 1).toList();
     final arrows = IList<XiangqiBoardArrow>([
-      for (var index = 0; index < shownLines.length; index++)
-        if (shownLines[index].moves.isNotEmpty)
-          XiangqiBoardArrow(
-            move: shownLines[index].moves.first,
-            color: _analysisArrowColors[index % _analysisArrowColors.length],
-            opacity: index == 0 ? 0.9 : 0.62,
-          ),
+      if (evalEnabled && analysisPrefs.showBestMoveArrow)
+        for (var index = 0; index < shownLines.length; index++)
+          if (shownLines[index].moves.isNotEmpty)
+            XiangqiBoardArrow(
+              move: shownLines[index].moves.first,
+              color: _analysisArrowColors[index % _analysisArrowColors.length],
+              opacity: index == 0 ? 0.9 : 0.62,
+            ),
     ]);
     final controller = ref.read(xiangqiAnalysisControllerProvider.notifier);
-
-    ref.listen(xiangqiAnalysisControllerProvider, (previous, next) {
-      if (previous == null ||
-          previous.cursor == next.cursor && previous.moves.length == next.moves.length) {
-        return;
-      }
-      final moveIndex = next.cursor > 0 ? next.cursor - 1 : 0;
-      if (moveIndex >= next.moves.length || moveIndex >= next.positions.length) return;
-      final before = next.positions[moveIndex];
-      final move = next.moves[moveIndex];
-      final isCapture = before.pieceAt(move.to) != null;
-      if (previous.moves.length < next.moves.length) {
-        final feedback = ref.read(moveFeedbackServiceProvider);
-        if (isCapture) {
-          feedback.captureFeedback(null, check: rules.isCheck(next.position));
-        } else {
-          feedback.moveFeedback(check: rules.isCheck(next.position));
-        }
-      } else {
-        final sound = ref.read(soundServiceProvider);
-        if (isCapture) {
-          sound.playCaptureSound(Variant.standard);
-        } else {
-          sound.play(Sound.move);
-        }
-      }
-    });
 
     ref.listen(engineEvaluationPreferencesProvider.select((p) => p.isEnabled), (_, _) {
       _syncEngine();
@@ -236,7 +183,8 @@ class _BodyState() extends ConsumerState<_Body> {
       },
       child: SafeArea(
         child: XiangqiAnalysisLayout(
-          smallBoard: ref.watch(analysisPreferencesProvider).smallBoard,
+          smallBoard: analysisPrefs.smallBoard,
+          inlineNotation: analysisPrefs.inlineNotation,
           boardBuilder: (context, size, radius) => BrightnessHueFilter(
             brightness: boardPrefs.brightness,
             hue: boardPrefs.hue,
@@ -249,7 +197,9 @@ class _BodyState() extends ConsumerState<_Body> {
               onTapSquare: controller.tapSquare,
               onDragMove: controller.movePiece,
               onCancelInteraction: controller.clearSelection,
-              animationDuration: boardPrefs.pieceAnimationDuration,
+              animationDuration: controller.shouldAnimateUpdate
+                  ? boardPrefs.pieceAnimationDuration
+                  : Duration.zero,
               showCoordinates: boardPrefs.coordinates,
               showLastMove: boardPrefs.boardHighlights,
               showBorder: boardPrefs.showBorder,
@@ -266,10 +216,10 @@ class _BodyState() extends ConsumerState<_Body> {
           boardHeader: _AnalysisDepth(depth: analysisState.depth),
           // Under it: what the engine says, in as many lines as the player has asked to be shown.
           engineLinesHeight: numEvalLines * _kEngineLineHeight,
-          engineLines: !evalEnabled
+          engineLines: !evalEnabled || !analysisPrefs.showEngineLines || numEvalLines == 0
               ? null
               : _EngineLines(state: analysisState, count: numEvalLines, onPlay: controller.play),
-          evalGauge: evalEnabled
+          evalGauge: evalEnabled && analysisPrefs.showEvaluationGauge
               ? XiangqiEvalGauge(
                   // A bar with nothing to report yet is drawn level rather than left out: the
                   // engine is about to answer, and a bar that came and went would flicker.
@@ -289,35 +239,82 @@ class _BodyState() extends ConsumerState<_Body> {
           onSelectMove: controller.goTo,
           bottomBar: BottomBar(
             children: [
+              BottomBarButton(label: context.l10n.menu, icon: Icons.menu, onTap: _showMenu),
               BottomBarButton(
                 label: context.l10n.flipBoard,
                 onTap: () => setState(() => _isFlipped = !_isFlipped),
                 icon: CupertinoIcons.arrow_2_squarepath,
               ),
-              BottomBarButton(
-                label: context.l10n.mobileEngineEvaluation,
-                // The setting the whole screen hangs off, offered where the player is looking at the
-                // board rather than only in the settings screen: an analysis board with no engine is
-                // a move list, and the switch that makes it one belongs next to it.
-                highlighted: evalEnabled,
-                onTap: () {
-                  unawaited(ref.read(engineEvaluationPreferencesProvider.notifier).toggle());
-                },
-                icon: Icons.memory,
-              ),
+              const XiangqiEngineButton(),
               HistoryNavigationButton(
                 forward: false,
                 onTap: analysisState.canGoBack ? controller.goBack : null,
+                onRepeat: () => controller.goBack(fastSeek: true),
               ),
               HistoryNavigationButton(
                 forward: true,
                 onTap: analysisState.canGoForward ? controller.goForward : null,
+                onRepeat: () => controller.goForward(fastSeek: true),
               ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  void _showMenu() {
+    showAdaptiveActionSheet<void>(
+      context: context,
+      actions: [
+        BottomSheetAction(
+          makeLabel: (context) => Text(context.l10n.settingsSettings),
+          onPressed: () => Navigator.of(context).push(XiangqiAnalysisSettingsScreen.buildRoute()),
+        ),
+        BottomSheetAction(
+          makeLabel: (context) => Text(context.l10n.clearLocalData),
+          onPressed: () => showConfirmDialog<void>(
+            context,
+            title: Text(context.l10n.clearLocalData),
+            onConfirm: () {
+              if (!mounted) return;
+              clearSavedXiangqiAnalysis();
+              ref.read(xiangqiAnalysisControllerProvider.notifier).reset();
+            },
+          ),
+        ),
+        BottomSheetAction(
+          makeLabel: (context) => Text(context.l10n.boardEditor),
+          onPressed: () => Navigator.of(context).push(
+            XiangqiBoardEditorScreen.buildRoute(
+              initialFen: ref.read(xiangqiAnalysisControllerProvider).position.toFen(),
+            ),
+          ),
+        ),
+        BottomSheetAction(
+          makeLabel: (context) => Text('${context.l10n.copyToClipboard} · FEN'),
+          onPressed: () =>
+              _copy(xiangqiFenExport(ref.read(xiangqiAnalysisControllerProvider).position)),
+        ),
+        BottomSheetAction(
+          makeLabel: (context) =>
+              Text('${context.l10n.copyToClipboard} · ${context.l10n.movesPlayed}'),
+          onPressed: () {
+            final state = ref.read(xiangqiAnalysisControllerProvider);
+            unawaited(_copy(xiangqiLineExport(state.positions.first, state.moves)));
+          },
+        ),
+      ],
+    );
+  }
+
+  Future<void> _copy(String value) async {
+    try {
+      await Clipboard.setData(ClipboardData(text: value));
+      if (mounted) showSnackBar(context, context.l10n.success);
+    } on Object catch (error) {
+      if (mounted) showSnackBar(context, error.toString(), type: SnackBarType.error);
+    }
   }
 }
 

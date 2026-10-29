@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/tab_navigation.dart';
+import 'package:lichess_mobile/src/utils/platform_capabilities.dart';
 import 'package:lichess_mobile/src/view/more/import_pgn_screen.dart';
 import 'package:logging/logging.dart';
 
@@ -29,6 +30,7 @@ class SharedPgnService(final Ref ref) {
   StreamSubscription<dynamic>? _subscription;
 
   Future<void> start() async {
+    if (!supportsIncomingPgnShare) return;
     // Handle the PGN the app was cold-started with (if any) after the first
     // frame so the navigator is ready.
     WidgetsBinding.instance.addPostFrameCallback((_) async {

@@ -18,6 +18,8 @@ import 'package:lichess_mobile/src/model/xiangqi/xiangqi_hint.dart'
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_move.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_rules.dart' as rules;
+import 'package:lichess_mobile/src/service/move_feedback.dart';
+import 'package:lichess_mobile/src/service/sound_service.dart';
 import 'package:logging/logging.dart';
 
 part 'xiangqi_analysis_controller.freezed.dart';
@@ -161,6 +163,16 @@ final xiangqiAnalysisControllerProvider =
     );
 
 class XiangqiAnalysisController() extends Notifier<XiangqiAnalysisState> {
+  String? _engineError;
+
+  /// The last search failure. Changes together with [XiangqiAnalysisState.isEngineRunning].
+  String? get engineError => _engineError;
+
+  bool _shouldAnimateUpdate = false;
+
+  /// Only deliberate single steps and newly played moves animate, never reset or fast seek.
+  bool get shouldAnimateUpdate => _shouldAnimateUpdate;
+
   /// The search running on the engine, while one is.
   Search? _search;
 
@@ -190,6 +202,8 @@ class XiangqiAnalysisController() extends Notifier<XiangqiAnalysisState> {
 
   @override
   XiangqiAnalysisState build() {
+    _engineError = null;
+    _shouldAnimateUpdate = false;
     // Hold the engine open for as long as this analysis is watched, exactly as the game controller
     // and the hint do: a bare read of the engine's future is not a watcher, so it could be torn down
     // between two searches. A failure is only noted here; it is reported to the player by the search
@@ -242,6 +256,10 @@ class XiangqiAnalysisController() extends Notifier<XiangqiAnalysisState> {
   /// whichever method changed it.
   void startEngine() {
     if (state.isEngineRunning) return;
+    if (_engineError != null && ref.read(xiangqiEngineProvider).hasError) {
+      ref.invalidate(xiangqiEngineProvider);
+    }
+    _engineError = null;
     state = _latest = state.copyWith(isEngineRunning: true);
     _restart();
   }
@@ -265,12 +283,20 @@ class XiangqiAnalysisController() extends Notifier<XiangqiAnalysisState> {
     if (!rules.isLegal(before, move)) throw rules.XiangqiIllegalMoveException(move);
     final positions = state.positions.sublist(0, state.cursor + 1).add(rules.play(before, move));
     final moves = state.moves.sublist(0, state.cursor).add(move);
+    _shouldAnimateUpdate = true;
     state = _latest = state.copyWith(
       positions: positions,
       moves: moves,
       cursor: positions.length - 1,
       selected: null,
     );
+    final feedback = ref.read(moveFeedbackServiceProvider);
+    final check = rules.isCheck(state.position);
+    if (before.pieceAt(move.to) != null) {
+      feedback.captureFeedback(null, check: check);
+    } else {
+      feedback.moveFeedback(check: check);
+    }
     _restart();
   }
 
@@ -280,6 +306,7 @@ class XiangqiAnalysisController() extends Notifier<XiangqiAnalysisState> {
   void retract() {
     if (state.cursor == 0) return;
     final cursor = state.cursor - 1;
+    _shouldAnimateUpdate = true;
     state = _latest = state.copyWith(
       positions: state.positions.sublist(0, cursor + 1),
       moves: state.moves.sublist(0, cursor),
@@ -290,18 +317,28 @@ class XiangqiAnalysisController() extends Notifier<XiangqiAnalysisState> {
   }
 
   /// Puts the board on the position [cursor] moves into the line, clamped to the line's ends.
-  void goTo(int cursor) {
+  void goTo(int cursor, {bool fastSeek = false}) {
     final target = cursor.clamp(0, state.moves.length);
     if (target == state.cursor) return;
+    _shouldAnimateUpdate = !fastSeek && (target - state.cursor).abs() == 1;
     state = _latest = state.copyWith(cursor: target, selected: null);
+    // Replay feedback belongs to the move that produced the target, not the one being undone.
+    // The root has no previous move and therefore no sound. Feedback is immediate, never queued.
+    if (target > 0) {
+      final move = state.moves[target - 1];
+      final before = state.positions[target - 1];
+      ref
+          .read(soundServiceProvider)
+          .play(before.pieceAt(move.to) != null ? Sound.capture : Sound.move);
+    }
     _restart();
   }
 
   /// Steps one move forward along the line, if there is one.
-  void goForward() => goTo(state.cursor + 1);
+  void goForward({bool fastSeek = false}) => goTo(state.cursor + 1, fastSeek: fastSeek);
 
   /// Steps one move back along the line, if there is one.
-  void goBack() => goTo(state.cursor - 1);
+  void goBack({bool fastSeek = false}) => goTo(state.cursor - 1, fastSeek: fastSeek);
 
   /// Picks up the piece on [square], or plays the piece already picked up onto it.
   ///
@@ -339,6 +376,7 @@ class XiangqiAnalysisController() extends Notifier<XiangqiAnalysisState> {
   void reset() => _setStart(XiangqiPosition.initial());
 
   void _setStart(XiangqiPosition position) {
+    _shouldAnimateUpdate = false;
     state = _latest = state.copyWith(
       positions: IList([position]),
       moves: const IListConst([]),
@@ -404,6 +442,7 @@ class XiangqiAnalysisController() extends Notifier<XiangqiAnalysisState> {
       _logger.warning('The xiangqi analysis could not be started', error, stackTrace);
       _generation++;
       _search = null;
+      _engineError = _kEngineFailedMessage;
       state = _latest = state.copyWith(isEngineRunning: false, lines: const IListConst([]));
       ref.read(uiEventBusProvider).emit(const ShowErrorEvent(_kEngineFailedMessage));
     }

@@ -9,6 +9,7 @@ import 'package:lichess_mobile/src/view/xiangqi/xiangqi_online_game_screen.dart'
 import 'package:lichess_mobile/src/widgets/misc.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_avatar.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_refresh.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_refreshable_empty.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -36,28 +37,35 @@ class const XiangqiWatchScreen({super.key}) extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Scaffold(
-      appBar: AppBar(
-        title: AppBarTitleText('${context.l10n.mobileXiangqi} · ${context.l10n.mobileWatchGames}'),
+    return XiangqiRefreshScope(
+      onRefresh: () => ref.refresh(xiangqiLiveGamesProvider.future),
+      builder: (context, refresh, busy) => Scaffold(
+        appBar: AppBar(
+          title: AppBarTitleText(
+            '${context.l10n.mobileXiangqi} · ${context.l10n.mobileWatchGames}',
+          ),
+          actions: [DesktopRefreshButton(onRefresh: refresh, busy: busy)],
+        ),
+        body: _Body(onRefresh: refresh),
       ),
-      body: const _Body(),
     );
   }
 }
 
-class const _Body() extends ConsumerWidget {
+class const _Body({required final Future<void> Function() onRefresh}) extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final games = ref.watch(xiangqiLiveGamesProvider);
 
     return games.when(
+      skipError: true,
       data: (games) => games.isEmpty
           ? XiangqiRefreshableEmpty(
-              onRefresh: () => ref.refresh(xiangqiLiveGamesProvider.future),
+              onRefresh: onRefresh,
               child: const Padding(padding: Styles.bodySectionPadding, child: _NoGames()),
             )
           : RefreshIndicator.adaptive(
-              onRefresh: () => ref.refresh(xiangqiLiveGamesProvider.future),
+              onRefresh: onRefresh,
               child: ListView.builder(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -74,10 +82,7 @@ class const _Body() extends ConsumerWidget {
             children: [
               Text(context.l10n.mobileSomethingWentWrong, textAlign: TextAlign.center),
               const SizedBox(height: 16.0),
-              FilledButton(
-                onPressed: () => ref.invalidate(xiangqiLiveGamesProvider),
-                child: Text(context.l10n.retry),
-              ),
+              FilledButton(onPressed: onRefresh, child: Text(context.l10n.retry)),
             ],
           ),
         ),

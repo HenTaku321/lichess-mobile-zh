@@ -722,7 +722,17 @@ class XiangqiOnlineGameController(final String gameId)
     final red = _player(map['rplayer']);
     final black = _player(map['bplayer']);
     final moves = _movesOf(map['move_history']);
-    final positions = moves == null ? null : _replay(moves);
+    final rawInitialFen = map['initial_fen'];
+    if (rawInitialFen != null && rawInitialFen is! String) return false;
+    final XiangqiPosition initial;
+    try {
+      initial = rawInitialFen == null
+          ? XiangqiPosition.initial()
+          : XiangqiPosition.fromFen(rawInitialFen as String);
+    } on FormatException {
+      return false;
+    }
+    final positions = moves == null ? null : _replay(initial, moves);
     if (moves == null || positions == null) return false;
     final clocks = _clocksOf(map['timers']);
     final replayCursor = _latest.viewCursor;
@@ -953,8 +963,8 @@ class XiangqiOnlineGameController(final String gameId)
   /// server could spell differently from this repo, and the moves are the game. It is the check as
   /// well as the construction — a `move_history` that does not replay is a history this client does
   /// not understand, which is worth knowing before it is put on a board.
-  IList<XiangqiPosition>? _replay(IList<XiangqiMove> moves) {
-    final positions = <XiangqiPosition>[XiangqiPosition.initial()];
+  IList<XiangqiPosition>? _replay(XiangqiPosition initial, IList<XiangqiMove> moves) {
+    final positions = <XiangqiPosition>[initial];
     var position = positions.first;
     for (final move in moves) {
       try {

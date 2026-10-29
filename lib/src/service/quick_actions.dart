@@ -10,6 +10,7 @@ import 'package:lichess_mobile/src/model/lobby/game_seek.dart';
 import 'package:lichess_mobile/src/model/puzzle/puzzle_angle.dart';
 import 'package:lichess_mobile/src/model/puzzle/puzzle_theme.dart';
 import 'package:lichess_mobile/src/tab_navigation.dart';
+import 'package:lichess_mobile/src/utils/platform_capabilities.dart';
 import 'package:lichess_mobile/src/view/game/game_screen.dart';
 import 'package:lichess_mobile/src/view/game/game_screen_providers.dart';
 import 'package:lichess_mobile/src/view/offline_computer/offline_computer_game_screen.dart';
@@ -35,6 +36,7 @@ class QuickActionService(final Ref ref) {
   TargetPlatform get platform => defaultTargetPlatform;
 
   void start() {
+    if (!supportsQuickActions) return;
     final recentSeeks = ref.read(recentGameSeekProvider).seeks;
     quickActions.initialize((String shortcutType) {
       final context = ref.read(currentNavigatorKeyProvider).currentContext;
@@ -61,6 +63,7 @@ class QuickActionService(final Ref ref) {
   }
 
   void setQuickActions(IList<GameSeek> recentSeeks) {
+    if (!supportsQuickActions) return;
     quickActions.setShortcutItems(<ShortcutItem>[
       ShortcutItem(
         type: 'play_puzzles',

@@ -14,6 +14,7 @@ import 'package:lichess_mobile/src/model/notifications/notifications.dart';
 import 'package:lichess_mobile/src/network/connectivity.dart';
 import 'package:lichess_mobile/src/network/http.dart';
 import 'package:lichess_mobile/src/utils/badge_service.dart';
+import 'package:lichess_mobile/src/utils/platform_capabilities.dart';
 import 'package:logging/logging.dart';
 
 final _logger = Logger('NotificationService');
@@ -94,6 +95,7 @@ class NotificationService(final Ref _ref) {
   /// This method should be called once the app is ready to receive notifications,
   /// and after [LichessBinding.initializeNotifications] has been called.
   Future<void> start() async {
+    if (!supportsFirebaseMessaging) return;
     // Firebase auto-init is disabled at build time (`FirebaseMessagingAutoInitEnabled` in
     // Info.plist, `firebase_messaging_auto_init_enabled` in AndroidManifest.xml) so that nothing
     // is registered with Firebase before the app actually starts its notification service.
@@ -346,6 +348,7 @@ class NotificationService(final Ref _ref) {
   ///
   /// Returns true if the device was successfully registered, false otherwise.
   Future<bool> registerDevice() async {
+    if (!supportsFirebaseMessaging) return false;
     // For apple platforms, make sure the APNS token is available before making any FCM plugin API calls
     if (defaultTargetPlatform == TargetPlatform.iOS) {
       final apnsToken = await LichessBinding.instance.firebaseMessaging.getAPNSToken();
@@ -364,6 +367,7 @@ class NotificationService(final Ref _ref) {
 
   /// Unregister the device from push notifications.
   Future<void> unregister() async {
+    if (!supportsFirebaseMessaging) return;
     _logger.info('will unregister');
     final authUser = _ref.read(authControllerProvider);
     if (authUser == null) {

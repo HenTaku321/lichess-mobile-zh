@@ -109,6 +109,7 @@ sealed class const XiangqiPuzzleAttemptState._() with _$XiangqiPuzzleAttemptStat
     /// Cleared as soon as any move is played: a hint is about one position, and it stops saying
     /// anything the moment the board leaves it.
     XiangqiMove? hint,
+    @Default(false) bool isHintPending,
 
     /// The move the solver just got wrong, or null when the last move was not one.
     ///
@@ -158,7 +159,7 @@ sealed class const XiangqiPuzzleAttemptState._() with _$XiangqiPuzzleAttemptStat
   bool get isPlayable => phase == XiangqiPuzzlePhase.solving && puzzle.solution != null;
 
   /// Whether a hint can be asked for from here.
-  bool get canHint => isPlayable && isSolverTurn;
+  bool get canHint => isPlayable && isSolverTurn && !isHintPending;
 }
 
 /// What one attempt at a puzzle is held under: the puzzle, and which attempt at it this is.
@@ -184,11 +185,20 @@ final xiangqiPuzzleControllerProvider = NotifierProvider.autoDispose
 /// One attempt at one puzzle: the moves the solver makes, and what the server says about them.
 class XiangqiPuzzleController(final XiangqiPuzzleAttemptKey key)
     extends Notifier<XiangqiPuzzleAttemptState> {
+  int _hintGeneration = 0;
+  Future<XiangqiQuotaUsage?>? _pendingHint;
+
+  void _cancelHint() {
+    _hintGeneration++;
+    _pendingHint = null;
+  }
+
   /// The puzzle being solved.
   XiangqiPuzzle get puzzle => key.puzzle;
 
   @override
   XiangqiPuzzleAttemptState build() {
+    ref.onDispose(_cancelHint);
     // The blunder is played here, before the solver ever sees the board, because it is the
     // opponent's move and not one of the moves being asked for. It is legal by construction: the
     // puzzle reader refuses a puzzle whose blunder cannot be played in its own position, so this
@@ -221,6 +231,7 @@ class XiangqiPuzzleController(final XiangqiPuzzleAttemptKey key)
     if (expected == null) return;
 
     if (move != expected) {
+      _cancelHint();
       final positionsBefore = state.positions;
       final movesBefore = state.moves;
       state = state.copyWith(
@@ -229,6 +240,7 @@ class XiangqiPuzzleController(final XiangqiPuzzleAttemptKey key)
         mistakes: state.mistakes + 1,
         wrongMove: move,
         hint: null,
+        isHintPending: false,
       );
       unawaited(_revertWrongMove(move, positionsBefore, movesBefore));
       return;
@@ -247,17 +259,60 @@ class XiangqiPuzzleController(final XiangqiPuzzleAttemptKey key)
   /// Returns what the server said, or null when nothing was asked: a hint is only asked for on the
   /// solver's turn of a puzzle that has an answer, and a caller that asks at any other moment is
   /// told nothing rather than charged for it.
-  Future<XiangqiQuotaUsage?> hint() async {
-    if (!state.canHint) return null;
-    final usage = await ref.read(xiangqiQuotaRepositoryProvider).consume(kXiangqiQuotaPuzzleHints);
-    if (!ref.mounted || !usage.allowed) return usage;
+  Future<XiangqiQuotaUsage?> hint() {
+    final pending = _pendingHint;
+    if (pending != null) return pending;
+    if (!state.canHint || state.hint != null) return Future.value(null);
+    final generation = ++_hintGeneration;
+    final position = state.position;
+    final ply = state.moves.length;
+    final account = ref.read(xiangqiAccountGenerationProvider);
+    final result = Completer<XiangqiQuotaUsage?>();
+    _pendingHint = result.future;
+    state = state.copyWith(isHintPending: true);
+    unawaited(
+      _consumeHint(
+        position,
+        ply,
+        account,
+        generation,
+      ).then<void>(result.complete, onError: result.completeError),
+    );
+    return result.future;
+  }
 
-    // Re-read after the await: the solver may have moved while the request was in flight, in which
-    // case the hint it was asked for is about a position that is no longer on the board.
-    final move = state.canHint ? state.nextSolutionMove : null;
-    if (move == null) return usage;
-    state = state.copyWith(hint: move, hintsUsed: state.hintsUsed + 1);
-    return usage;
+  Future<XiangqiQuotaUsage?> _consumeHint(
+    XiangqiPosition position,
+    int ply,
+    int account,
+    int generation,
+  ) async {
+    bool current() =>
+        ref.mounted &&
+        generation == _hintGeneration &&
+        account == ref.read(xiangqiAccountGenerationProvider) &&
+        state.moves.length == ply &&
+        state.position == position;
+    try {
+      final usage = await ref
+          .read(xiangqiQuotaRepositoryProvider)
+          .consume(kXiangqiQuotaPuzzleHints);
+      if (!current()) return null;
+      if (!usage.allowed) return usage;
+      final move = state.nextSolutionMove;
+      if (move != null && state.isPlayable && state.isSolverTurn) {
+        state = state.copyWith(hint: move, hintsUsed: state.hintsUsed + 1);
+      }
+      return usage;
+    } on Object {
+      if (!current()) return null;
+      rethrow;
+    } finally {
+      if (ref.mounted && generation == _hintGeneration) {
+        _pendingHint = null;
+        state = state.copyWith(isHintPending: false);
+      }
+    }
   }
 
   /// Sends the attempt again, after [XiangqiPuzzlePhase.unrecorded].
@@ -307,12 +362,14 @@ class XiangqiPuzzleController(final XiangqiPuzzleAttemptKey key)
 
   /// Plays [move] on the board and appends it to the attempt.
   void _play(XiangqiMove move) {
+    _cancelHint();
     state = state.copyWith(
       positions: state.positions.add(rules.play(state.position, move)),
       moves: state.moves.add(move),
       // A hint is about the position it was asked for, and the wrong-move mark is about the last
       // move; both stop meaning anything once the board moves on.
       hint: null,
+      isHintPending: false,
       wrongMove: null,
     );
   }

@@ -98,7 +98,12 @@ void main() {
     );
     expect(tester.takeException(), isNull);
     final card = tester.getRect(find.byType(PracticeFeedbackCard));
-    final suggestion = tester.getRect(find.textContaining('A very long', findRichText: true));
+    final suggestion = tester.getRect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Text && (widget.textSpan?.toPlainText().contains('A very long') ?? false),
+      ),
+    );
     expect(card.contains(suggestion.bottomRight), isTrue);
   });
 }

@@ -988,6 +988,15 @@ sealed class const OfflineComputerGameState._() with _$OfflineComputerGameState 
           ? game.steps[game.steps.length - 2].computerAnalysis?.practiceComment
           : null);
 
+  /// The last surviving player verdict, only used faded while evaluating a new move.
+  PracticeComment? get previousPracticeComment {
+    for (final step in game.steps.reversed) {
+      final comment = step.computerAnalysis?.practiceComment;
+      if (comment != null) return comment;
+    }
+    return null;
+  }
+
   /// The hint moves for the current position.
   IList<Move>? get hintMoves => currentAnalysis?.hintMoves;
 

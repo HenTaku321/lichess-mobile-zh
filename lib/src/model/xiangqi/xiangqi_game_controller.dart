@@ -177,8 +177,8 @@ sealed class const XiangqiGameState._() with _$XiangqiGameState {
     /// Whether the current player move is still being evaluated in practice mode.
     @Default(false) bool isEvaluatingMove,
 
-    /// The last xiangqi practice verdict, if any.
-    XiangqiPracticeComment? practiceComment,
+    /// Player-move verdicts keyed by the index of the position after that move.
+    @Default(IMapConst({})) IMap<int, XiangqiPracticeComment> practiceComments,
 
     /// The practice suggestion currently drawn on the board, if any.
     XiangqiMove? showingSuggestedMove,
@@ -221,6 +221,25 @@ sealed class const XiangqiGameState._() with _$XiangqiGameState {
   /// whoever is to move may move. This is the one question the rest of the game asks before a touch
   /// does anything, and before the engine is given a turn at all.
   bool get isPlayerTurn => opponent == .human || turn == playerSide;
+
+  /// Input and drag affordances use the same policy; history and finished boards are read-only.
+  bool get canMovePieces =>
+      !isFinished && !isEngineThinking && !isEvaluatingMove && isAtLivePosition && isPlayerTurn;
+
+  bool canMovePiece(XiangqiPiece piece) => canMovePieces && piece.side == turn;
+
+  /// The live player's verdict, including after the computer has answered it.
+  XiangqiPracticeComment? get practiceComment =>
+      practiceComments[positions.length - 1] ?? practiceComments[positions.length - 2];
+
+  /// The last surviving verdict, only used faded while the next move is evaluated.
+  XiangqiPracticeComment? get previousPracticeComment {
+    for (var ply = positions.length - 1; ply > 0; ply--) {
+      final comment = practiceComments[ply];
+      if (comment != null) return comment;
+    }
+    return null;
+  }
 
   XiangqiMove? get lastMove => viewCursor == 0 ? null : moves[viewCursor - 1];
 
@@ -308,10 +327,19 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
   /// resignation. A search cannot be un-asked, so the answer to a question the game has moved on
   /// from still arrives, and this is what tells it apart from the answer to the current one.
   int _epoch = 0;
+  int get generation => _epoch;
 
   /// The search the engine is running for this game, so that it can be stopped once its answer stops
   /// mattering.
   Search? _search;
+  Search? _practiceMoveSearch;
+
+  void _stopSearches() {
+    _search?.stop();
+    _practiceMoveSearch?.stop();
+    _search = null;
+    _practiceMoveSearch = null;
+  }
 
   @override
   XiangqiGameState build() {
@@ -328,7 +356,7 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
 
     ref.onDispose(() {
       _epoch++;
-      _search?.stop();
+      _stopSearches();
     });
 
     return XiangqiGameState(
@@ -358,8 +386,7 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
     bool practiceMode = false,
   }) {
     _epoch++;
-    _search?.stop();
-    _search = null;
+    _stopSearches();
     final effectiveTimeIncrement = timeIncrement ?? ref.read(xiangqiClockProvider).timeIncrement;
     state = XiangqiGameState(
       playerSide: side,
@@ -387,10 +414,11 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
     Duration? blackTimeLeft,
   }) {
     _epoch++;
-    _search?.stop();
-    _search = null;
+    _stopSearches();
     state = game.copyWith(
       isEngineThinking: false,
+      isEvaluatingMove: false,
+      showingSuggestedMove: null,
       selected: null,
       cursor: game.positions.length - 1,
     );
@@ -411,24 +439,14 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
   bool get lastMoveViaDrag => _lastMoveViaDrag;
 
   void movePiece(XiangqiSquare from, XiangqiSquare to) {
-    if (state.isFinished ||
-        state.isEngineThinking ||
-        !state.isAtLivePosition ||
-        !state.isPlayerTurn) {
-      return;
-    }
+    if (!state.canMovePieces) return;
     final move = XiangqiMove(from, to);
     if (!isLegal(state.gamePosition, move)) return;
     _play(move, viaDragAndDrop: true);
   }
 
   void tapSquare(XiangqiSquare square) {
-    if (state.isFinished ||
-        state.isEngineThinking ||
-        !state.isAtLivePosition ||
-        !state.isPlayerTurn) {
-      return;
-    }
+    if (!state.canMovePieces) return;
 
     final selected = state.selected;
     if (selected != null && state.selectedMoves.any((move) => move.to == square)) {
@@ -446,14 +464,19 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
     if (!state.canUndo || index == null) return;
 
     _epoch++;
-    _search?.stop();
-    _search = null;
+    _stopSearches();
     // The engine has nothing to say about a position that was already played and answered, so the
     // search it may have been running is left behind rather than carried over.
     state = state.copyWith(
       positions: state.positions.sublist(0, index + 1),
       moves: state.moves.sublist(0, index),
       isEngineThinking: false,
+      isEvaluatingMove: false,
+      showingSuggestedMove: null,
+      practiceComments: IMap({
+        for (final entry in state.practiceComments.entries)
+          if (entry.key <= index) entry.key: entry.value,
+      }),
       selected: null,
       cursor: index,
     );
@@ -483,9 +506,14 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
   void resign() {
     if (state.isFinished) return;
     _epoch++;
-    _search?.stop();
-    _search = null;
-    state = state.copyWith(resignedBy: state.playerSide, isEngineThinking: false, selected: null);
+    _stopSearches();
+    state = state.copyWith(
+      resignedBy: state.playerSide,
+      isEngineThinking: false,
+      isEvaluatingMove: false,
+      showingSuggestedMove: null,
+      selected: null,
+    );
   }
 
   /// The clock has run out for [side], and the game is over.
@@ -497,9 +525,14 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
   void onFlag(XiangqiSide side) {
     if (state.isFinished) return;
     _epoch++;
-    _search?.stop();
-    _search = null;
-    state = state.copyWith(flaggedSide: side, isEngineThinking: false, selected: null);
+    _stopSearches();
+    state = state.copyWith(
+      flaggedSide: side,
+      isEngineThinking: false,
+      isEvaluatingMove: false,
+      showingSuggestedMove: null,
+      selected: null,
+    );
   }
 
   bool _isPlayerPiece(XiangqiSquare square) {
@@ -522,12 +555,11 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
       positions: state.positions.add(nextPosition),
       moves: state.moves.add(move),
       selected: null,
-      practiceComment: null,
       showingSuggestedMove: null,
       cursor: wasAtLive ? state.positions.length : state.viewCursor,
     );
 
-    if (state.practiceMode && wasPlayerMove) {
+    if (state.practiceMode && wasPlayerMove && !state.isFinished) {
       unawaited(_evaluatePracticeMove(positionBefore, move));
     } else if (!state.isFinished && !state.isPlayerTurn) {
       unawaited(_playEngineMove());
@@ -536,11 +568,13 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
 
   Future<void> _evaluatePracticeMove(XiangqiPosition before, XiangqiMove move) async {
     final epoch = _epoch;
+    final positionAfter = state.gamePosition;
+    final ply = state.moves.length;
     state = state.copyWith(isEvaluatingMove: true);
     try {
-      final pre = await _practiceSearch(before);
+      final pre = await _practiceSearch(before, epoch);
       if (epoch != _epoch || !ref.mounted) return;
-      final after = await _practiceSearch(state.gamePosition);
+      final after = await _practiceSearch(positionAfter, epoch);
       if (epoch != _epoch || !ref.mounted) return;
 
       final preEval = pre.evaluation;
@@ -562,19 +596,24 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
       );
       state = state.copyWith(
         isEvaluatingMove: false,
-        practiceComment: XiangqiPracticeComment(
-          verdict: verdict,
-          bestMove: pre.bestMove,
-          evaluation: afterEval,
-          suggestionNotation: pre.bestMove == null
-              ? null
-              : xiangqiMoveNotation(before, pre.bestMove!),
-          evalAfter: ExternalEval(cp: afterEval.cp, mate: afterEval.mate).evalString,
+        practiceComments: state.practiceComments.add(
+          ply,
+          XiangqiPracticeComment(
+            verdict: verdict,
+            bestMove: pre.bestMove,
+            evaluation: afterEval,
+            suggestionNotation: pre.bestMove == null
+                ? null
+                : xiangqiMoveNotation(before, pre.bestMove!),
+            evalAfter: ExternalEval(cp: afterEval.cp, mate: afterEval.mate).evalString,
+          ),
         ),
         showingSuggestedMove: null,
       );
     } catch (error, stackTrace) {
-      _logger.warning('Xiangqi practice move evaluation failed', error, stackTrace);
+      if (epoch == _epoch && ref.mounted) {
+        _logger.warning('Xiangqi practice move evaluation failed', error, stackTrace);
+      }
     } finally {
       if (epoch == _epoch && ref.mounted) {
         state = state.copyWith(isEvaluatingMove: false);
@@ -585,8 +624,10 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
 
   Future<({XiangqiMove? bestMove, XiangqiEvaluation? evaluation})> _practiceSearch(
     XiangqiPosition position,
+    int epoch,
   ) async {
     final engine = await ref.read(xiangqiEngineProvider.future);
+    if (epoch != _epoch || !ref.mounted) return (bestMove: null, evaluation: null);
     final search = engine.search(
       SearchRequest(
         initialPosition: Chess.initial,
@@ -597,17 +638,27 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
         game: this,
       ),
     );
+    _practiceMoveSearch = search;
     XiangqiEvaluation? evaluation;
     final subscription = search.infos.listen((info) {
+      if (epoch != _epoch || !ref.mounted || !identical(_practiceMoveSearch, search)) return;
+      if (info.cp == null && info.mate == null) return;
       evaluation = xiangqiEvaluationFromEngine(
         cp: info.cp,
         mate: info.mate,
         sideToMove: position.turn,
       );
     });
-    final best = await search.bestMove;
-    await subscription.cancel();
-    return (bestMove: best == null ? null : XiangqiMove.parseIccs(best), evaluation: evaluation);
+    try {
+      final best = await search.bestMove;
+      if (epoch != _epoch || !ref.mounted) return (bestMove: null, evaluation: null);
+      final move = best == null ? null : XiangqiMove.parseIccs(best);
+      if (move == null || !isLegal(position, move)) return (bestMove: null, evaluation: null);
+      return (bestMove: move, evaluation: evaluation);
+    } finally {
+      await subscription.cancel();
+      if (identical(_practiceMoveSearch, search)) _practiceMoveSearch = null;
+    }
   }
 
   Future<void> _playEngineMove() async {
@@ -636,7 +687,7 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
       _search = search;
 
       final best = await search.bestMove;
-      _search = null;
+      if (identical(_search, search)) _search = null;
       // Null means the search was superseded or the engine died; either way this answer is not one.
       if (best == null || epoch != _epoch || !ref.mounted) return;
 
@@ -650,8 +701,10 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
       }
       _play(move);
     } catch (error, stackTrace) {
-      _logger.warning('Failed to play the engine move', error, stackTrace);
-      _reportFailure();
+      if (epoch == _epoch && ref.mounted) {
+        _logger.warning('Failed to play the engine move', error, stackTrace);
+        _reportFailure();
+      }
     } finally {
       // Only the current game may touch the state: a search left over from a game that has been
       // replaced or taken back has no business clearing the flag of the one that replaced it.

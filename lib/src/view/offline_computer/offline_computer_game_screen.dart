@@ -225,8 +225,8 @@ class _BodyState() extends ConsumerState<_Body> {
                     key: _boardKey,
                     topTable: _Player(side: isBoardFlipped ? orientation : orientation.opposite),
                     bottomTable: _Player(side: isBoardFlipped ? orientation.opposite : orientation),
-                    topTableFlex: 1,
-                    bottomTableFlex: gameState.game.practiceMode ? 2 : 1,
+                    topTableFlex: gameState.game.practiceMode && isBoardFlipped ? 2 : 1,
+                    bottomTableFlex: gameState.game.practiceMode && !isBoardFlipped ? 2 : 1,
                     orientation: variantBoardOrientation(
                       variant: gameState.game.meta.variant,
                       youAre: orientation,
@@ -441,8 +441,6 @@ class const _Player({required final Side side}) extends ConsumerWidget {
         ? gameState.currentMaterialDiff(side)
         : null;
 
-    final isShortScreen = isShortVerticalScreen(context);
-
     if (isEngine) {
       return Row(
         children: [
@@ -478,74 +476,52 @@ class const _Player({required final Side side}) extends ConsumerWidget {
       );
     }
 
-    final practiceStatusLabel = !game.practiceMode
-        ? null
-        : gameState.isEvaluatingMove
-        ? context.l10n.evaluatingYourMove
-        : gameState.isEngineThinking
-        ? context.l10n.computerThinking
-        : !gameState.finished && gameState.turn == game.playerSide
-        ? context.l10n.yourTurn
-        : null;
-
-    return Column(
-      crossAxisAlignment: .stretch,
-      mainAxisAlignment: .center,
-      mainAxisSize: .min,
+    final playerRow = Row(
+      mainAxisSize: .max,
+      mainAxisAlignment: .start,
       children: [
-        if (game.practiceMode) ...[
-          Padding(
-            padding: isShortScreen
-                ? const EdgeInsets.only(bottom: 4.0)
-                : const EdgeInsets.only(bottom: 8),
-            child: Text(
-              practiceStatusLabel ?? '',
-              style: TextStyle(
-                fontSize: isShortScreen ? 11 : null,
-                fontStyle: FontStyle.italic,
-                color: textShade(context, 0.8),
-                height: isShortScreen ? 1.0 : null,
-              ),
-            ),
-          ),
-          PracticeFeedbackCard(
-            feedback: gameState.practiceComment == null
-                ? null
-                : PracticeFeedbackData(
-                    verdict: gameState.practiceComment!.verdict,
-                    suggestion: gameState.practiceComment!.moveSuggestion?.san,
-                    evalAfter: gameState.practiceComment!.evalAfter,
-                    isBookMove: gameState.practiceComment!.isBookMove,
-                  ),
-            isEvaluatingMove: gameState.isEvaluatingMove,
-            isPlayerTurn: gameState.turn == gameState.game.playerSide,
-            isFinished: gameState.finished,
-            currentEval: gameState.currentAnalysis?.evalString,
-            showSuggestion:
-                gameState.showingSuggestedMove == gameState.practiceComment?.moveSuggestion?.move,
-            onToggleSuggestion: switch (gameState.practiceComment?.moveSuggestion?.move) {
-              final NormalMove move =>
-                () => ref
-                    .read(offlineComputerGameControllerProvider.notifier)
-                    .toggleSuggestedMove(move),
-              _ => null,
-            },
-          ),
-          SizedBox(height: isShortScreen ? 4.0 : 8.0),
-        ],
-        Row(
-          mainAxisSize: .max,
-          mainAxisAlignment: .start,
-          children: [
-            MaterialDifferenceDisplay(
-              materialDiff: materialDiff,
-              materialDifferenceFormat: boardPreferences.materialDifferenceFormat,
-            ),
-            const Spacer(),
-            _PlayerClock(side: side, clockKey: const ValueKey('playerClock')),
-          ],
+        MaterialDifferenceDisplay(
+          materialDiff: materialDiff,
+          materialDifferenceFormat: boardPreferences.materialDifferenceFormat,
         ),
+        const Spacer(),
+        _PlayerClock(side: side, clockKey: const ValueKey('playerClock')),
       ],
+    );
+    if (!game.practiceMode) return playerRow;
+    final comment = gameState.practiceComment;
+    final previous = gameState.previousPracticeComment;
+    return PracticeFeedbackPanel(
+      playerRow: playerRow,
+      feedback: comment == null
+          ? null
+          : PracticeFeedbackData(
+              verdict: comment.verdict,
+              suggestion: comment.moveSuggestion?.san,
+              evalAfter: comment.evalAfter,
+              isBookMove: comment.isBookMove,
+            ),
+      previousFeedback: previous == null
+          ? null
+          : PracticeFeedbackData(
+              verdict: previous.verdict,
+              suggestion: previous.moveSuggestion?.san,
+              evalAfter: previous.evalAfter,
+              isBookMove: previous.isBookMove,
+            ),
+      isEvaluatingMove: gameState.isEvaluatingMove,
+      isEngineThinking: gameState.isEngineThinking,
+      isPlayerTurn: gameState.turn == game.playerSide,
+      isFinished: gameState.finished,
+      currentEval: gameState.currentAnalysis?.evalString,
+      showSuggestion:
+          comment?.moveSuggestion != null &&
+          gameState.showingSuggestedMove == comment!.moveSuggestion!.move,
+      onToggleSuggestion: switch (comment?.moveSuggestion?.move) {
+        final NormalMove move =>
+          () => ref.read(offlineComputerGameControllerProvider.notifier).toggleSuggestedMove(move),
+        _ => null,
+      },
     );
   }
 }

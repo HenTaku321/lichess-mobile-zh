@@ -296,7 +296,7 @@ class _BodyState() extends ConsumerState<_Body> {
                           boardPrefs,
                           annotations: false,
                         ),
-                        canStartDrag: (_) => true,
+                        canStartDrag: gameState.canMovePiece,
                         style: XiangqiBoardStyle.fromChessboardColorScheme(
                           boardPrefs.boardTheme.colors,
                         ),

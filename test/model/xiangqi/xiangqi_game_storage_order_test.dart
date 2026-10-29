@@ -38,7 +38,7 @@ harness() async {
     messenger.setMockMethodCallHandler(channel, null);
     await directory.delete(recursive: true);
   });
-  return (storage: const XiangqiGameStorage(), directory: directory, blocked: blocked);
+  return (storage: XiangqiGameStorage(), directory: directory, blocked: blocked);
 }
 
 void main() {

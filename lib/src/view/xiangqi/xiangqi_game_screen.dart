@@ -6,6 +6,7 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/account/account_preferences.dart';
 import 'package:lichess_mobile/src/model/auth/auth_controller.dart';
+import 'package:lichess_mobile/src/model/common/eval.dart';
 import 'package:lichess_mobile/src/model/common/time_increment.dart';
 import 'package:lichess_mobile/src/model/engine/evaluation_preferences.dart';
 import 'package:lichess_mobile/src/model/offline_computer/offline_computer_game_preferences.dart';
@@ -192,6 +193,8 @@ class _BodyState() extends ConsumerState<_Body> {
   /// does; this is what keeps a rebuild from asking for the same position twice and dropping the
   /// search that is already running on it.
   XiangqiPosition? _evaluatedPosition;
+  int? _evaluatedGeneration;
+  int? _hintGeneration;
   final Set<Timer> _moveFeedbackTimers = {};
   Timer? _gameResultTimer;
   XiangqiLowTimeWarning _clockWarning = XiangqiLowTimeWarning();
@@ -256,7 +259,9 @@ class _BodyState() extends ConsumerState<_Body> {
         ref.read(xiangqiClockProvider.notifier).setupClock(timeIncrement);
         unawaited(ref.read(xiangqiGameStorageProvider).delete());
         if (!timeIncrement.isInfinite) {
-          ref.read(xiangqiClockProvider.notifier).resume(setupSide);
+          ref
+              .read(xiangqiClockProvider.notifier)
+              .resume(ref.read(xiangqiGameControllerProvider).turn);
         }
         ref.read(pendingXiangqiComputerSetupProvider.notifier).clear();
         _syncEvaluation(ref.read(xiangqiGameControllerProvider));
@@ -275,8 +280,9 @@ class _BodyState() extends ConsumerState<_Body> {
   }
 
   Future<void> _restoreOrStart() async {
+    final original = ref.read(xiangqiGameControllerProvider);
     final saved = await ref.read(xiangqiGameStorageProvider).fetchGame();
-    if (!mounted) return;
+    if (!mounted || !identical(original, ref.read(xiangqiGameControllerProvider))) return;
     if (saved != null && saved.state.moves.isNotEmpty && !saved.state.isFinished) {
       ref
           .read(xiangqiGameControllerProvider.notifier)
@@ -319,6 +325,10 @@ class _BodyState() extends ConsumerState<_Body> {
     final clock = ref.watch(xiangqiClockProvider);
     final clockTenths =
         ref.watch(clockTenthsProvider).value ?? defaultAccountPreferences.clockTenths;
+
+    ref.listen(engineEvaluationPreferencesProvider.select((p) => p.isEnabled), (_, _) {
+      _syncEvaluation(ref.read(xiangqiGameControllerProvider));
+    });
 
     ref.listen(xiangqiClockProvider.select((c) => c.flagSide), (previous, flagged) {
       if (previous == null && flagged != null) {
@@ -417,15 +427,20 @@ class _BodyState() extends ConsumerState<_Body> {
           );
         });
       }
-      if (!newState.practiceMode) _syncEvaluation(newState);
+      _syncEvaluation(newState);
       unawaited(_saveGame(newState));
     });
 
     final controller = ref.read(xiangqiGameControllerProvider.notifier);
     final orientation = isBoardFlipped ? gameState.playerSide.opposite : gameState.playerSide;
     final authUser = ref.watch(authControllerProvider);
-    final playerName = authUser?.user.name ?? orientation.label(context.l10n);
-    final hintMove = _hintPosition == gameState.position ? analysisState.hint?.move : null;
+    final playerName = authUser?.user.name ?? gameState.playerSide.label(context.l10n);
+    final hintMove = _hintPosition == gameState.position && _hintGeneration == controller.generation
+        ? analysisState.hint?.move
+        : null;
+    final positionEvaluation = analysisState.evaluatedPosition == gameState.position
+        ? analysisState.evaluation
+        : null;
     final hideBestMove = ref.watch(
       offlineComputerGamePreferencesProvider.select((p) => p.hideBestMove),
     );
@@ -434,8 +449,8 @@ class _BodyState() extends ConsumerState<_Body> {
       if (!hideBestMove && gameState.showingSuggestedMove != null)
         XiangqiBoardArrow(
           move: gameState.showingSuggestedMove!,
-          color: Colors.orange,
-          opacity: 0.65,
+          color: gameState.practiceComment?.verdict.color ?? Colors.blue,
+          opacity: 0.8,
         ),
     ]);
     // The same preference the chess game against the computer reads, because it is the same thing:
@@ -443,6 +458,46 @@ class _BodyState() extends ConsumerState<_Body> {
     final blindfoldMode = ref.watch(
       offlineComputerGamePreferencesProvider.select((p) => p.blindfoldMode),
     );
+
+    Widget playerTable(XiangqiSide side) {
+      final isHuman = side == gameState.playerSide;
+      final row = XiangqiPlayerRow(
+        side: side,
+        isToMove: !gameState.isFinished && gameState.turn == side,
+        clock: gameState.timeIncrement.isInfinite
+            ? null
+            : Clock(
+                timeLeft: clock.timeLeft(side) ?? Duration.zero,
+                active: clock.activeClock == side,
+                emergencyThreshold: xiangqiEmergencyThreshold(clock.timeIncrement.time),
+                clockTenths: clockTenths,
+              ),
+        style: XiangqiBoardStyle.fromChessboardColorScheme(boardPrefs.boardTheme.colors),
+        name: isHuman ? playerName : 'Pikafish',
+        isBot: !isHuman && gameState.opponent == .engine,
+        thinking: !isHuman && gameState.isEngineThinking,
+        status: isHuman && !gameState.practiceMode ? _statusText(context, gameState) : '',
+      );
+      if (!isHuman || !gameState.practiceMode) return row;
+      final comment = gameState.practiceComment;
+      return PracticeFeedbackPanel(
+        playerRow: row,
+        feedback: _practiceFeedbackData(comment),
+        previousFeedback: _practiceFeedbackData(gameState.previousPracticeComment),
+        isEvaluatingMove: gameState.isEvaluatingMove,
+        isEngineThinking: gameState.isEngineThinking,
+        isPlayerTurn: gameState.isPlayerTurn,
+        isFinished: gameState.isFinished,
+        currentEval: positionEvaluation == null
+            ? null
+            : ExternalEval(cp: positionEvaluation.cp, mate: positionEvaluation.mate).evalString,
+        showSuggestion:
+            comment?.bestMove != null && gameState.showingSuggestedMove == comment!.bestMove,
+        onToggleSuggestion: comment?.bestMove == null
+            ? null
+            : () => controller.toggleSuggestedMove(comment!.bestMove),
+      );
+    }
 
     // The engine is the app's own shared one, and leaving the screen does not mean the player wants
     // it searching: losing focus stops the evaluation, exactly as the chess screen's own detector
@@ -510,10 +565,7 @@ class _BodyState() extends ConsumerState<_Body> {
                     magnifyDraggedPiece: boardPrefs.magnifyDraggedPiece,
                     dragTargetKind: boardPrefs.dragTargetKind,
                     settings: XiangqiBoardSettings.fromPreferences(boardPrefs),
-                    canStartDrag: (piece) =>
-                        gameState.isPlayerTurn &&
-                        (gameState.opponent == XiangqiOpponent.human ||
-                            piece.side == gameState.playerSide),
+                    canStartDrag: gameState.canMovePiece,
                     // The board is a citizen of the app's own theming, not a board of its own: it
                     // wears the colours of whichever chessboard theme the player has picked. See
                     // [XiangqiBoardStyle.fromChessboardColorScheme] for the mapping, and what it
@@ -523,82 +575,22 @@ class _BodyState() extends ConsumerState<_Body> {
                     ),
                   ),
                 ),
-                topTable: XiangqiPlayerRow(
-                  side: orientation.opposite,
-                  isToMove: !gameState.isFinished && gameState.turn == orientation.opposite,
-                  clock: gameState.timeIncrement.isInfinite
-                      ? null
-                      : Clock(
-                          timeLeft: clock.timeLeft(orientation.opposite) ?? Duration.zero,
-                          active: clock.activeClock == orientation.opposite,
-                          emergencyThreshold: xiangqiEmergencyThreshold(clock.timeIncrement.time),
-                          clockTenths: clockTenths,
-                        ),
-                  style: XiangqiBoardStyle.fromChessboardColorScheme(boardPrefs.boardTheme.colors),
-                  // The engine's own name, which is a proper name and the same in every language:
-                  // it is the program that is playing, not a description of it. How hard it is
-                  // playing is a setting, and the sheet is where a setting is read.
-                  name: orientation.opposite == gameState.playerSide ? playerName : 'Pikafish',
-                  isBot:
-                      orientation.opposite != gameState.playerSide && gameState.opponent == .engine,
-                  thinking:
-                      orientation.opposite != gameState.playerSide && gameState.isEngineThinking,
-                  status: '',
-                ),
-                bottomTable: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    XiangqiPlayerRow(
-                      side: orientation,
-                      isToMove: gameState.turn == orientation && !gameState.isFinished,
-                      clock: gameState.timeIncrement.isInfinite
-                          ? null
-                          : Clock(
-                              timeLeft: clock.timeLeft(orientation) ?? Duration.zero,
-                              active: clock.activeClock == orientation,
-                              emergencyThreshold: xiangqiEmergencyThreshold(
-                                clock.timeIncrement.time,
-                              ),
-                              clockTenths: clockTenths,
-                            ),
-                      style: XiangqiBoardStyle.fromChessboardColorScheme(
-                        boardPrefs.boardTheme.colors,
-                      ),
-                      name: orientation == gameState.playerSide ? playerName : 'Pikafish',
-                      isBot: orientation != gameState.playerSide && gameState.opponent == .engine,
-                      thinking: orientation != gameState.playerSide && gameState.isEngineThinking,
-                      status: _statusText(context, gameState),
-                    ),
-                    if (gameState.practiceMode)
-                      PracticeFeedbackCard(
-                        feedback: gameState.practiceComment == null
-                            ? null
-                            : PracticeFeedbackData(
-                                verdict: gameState.practiceComment!.verdict,
-                                suggestion: gameState.practiceComment!.suggestionNotation,
-                                evalAfter: gameState.practiceComment!.evalAfter,
-                              ),
-                        isEvaluatingMove: gameState.isEvaluatingMove,
-                        isPlayerTurn: gameState.isPlayerTurn,
-                        isFinished: gameState.isFinished,
-                        showSuggestion:
-                            gameState.showingSuggestedMove == gameState.practiceComment?.bestMove,
-                        onToggleSuggestion: gameState.practiceComment?.bestMove == null
-                            ? null
-                            : () => controller.toggleSuggestedMove(
-                                gameState.practiceComment!.bestMove,
-                              ),
-                      ),
-                  ],
-                ),
+                topTable: playerTable(orientation.opposite),
+                bottomTable: playerTable(orientation),
+                topTableFlex: gameState.practiceMode && orientation.opposite == gameState.playerSide
+                    ? 2
+                    : 1,
+                bottomTableFlex: gameState.practiceMode && orientation == gameState.playerSide
+                    ? 2
+                    : 1,
                 evalGauge: evalEnabled
                     ? XiangqiEvalGauge(
                         // A bar with nothing to report yet is drawn level rather than left out:
                         // the engine is about to answer, and a bar that came and went on every
                         // move would flicker.
-                        redWinProbability: analysisState.evaluation?.redWinProbability ?? 0.5,
+                        redWinProbability: positionEvaluation?.redWinProbability ?? 0.5,
                         orientation: orientation,
-                        evaluation: analysisState.evaluation,
+                        evaluation: positionEvaluation,
                         outcome: gameState.isFinished && gameState.isAtLivePosition
                             ? (winner: gameState.winner)
                             : null,
@@ -665,20 +657,25 @@ class _BodyState() extends ConsumerState<_Body> {
   void _syncEvaluation(XiangqiGameState gameState) {
     final shouldEvaluate =
         ref.read(engineEvaluationPreferencesProvider).isEnabled &&
+        _active &&
         !gameState.isEngineThinking &&
+        !gameState.isEvaluatingMove &&
         gameState.isPlayerTurn &&
         !gameState.isFinished;
 
     if (!shouldEvaluate) {
       _evaluatedPosition = null;
+      _evaluatedGeneration = null;
       if (ref.read(xiangqiEngineAnalysisProvider).isBusy) {
         ref.read(xiangqiEngineAnalysisProvider.notifier).stopEvaluation();
       }
       return;
     }
 
-    if (_evaluatedPosition == gameState.position) return;
+    final generation = ref.read(xiangqiGameControllerProvider.notifier).generation;
+    if (_evaluatedPosition == gameState.position && _evaluatedGeneration == generation) return;
     _evaluatedPosition = gameState.position;
+    _evaluatedGeneration = generation;
     ref.read(xiangqiEngineAnalysisProvider.notifier).startEvaluation(gameState.position);
   }
 
@@ -691,6 +688,7 @@ class _BodyState() extends ConsumerState<_Body> {
   bool _canGetHint(XiangqiGameState gameState, XiangqiEngineAnalysisState analysisState) {
     return !gameState.isFinished &&
         !gameState.isEngineThinking &&
+        !gameState.isEvaluatingMove &&
         gameState.isAtLivePosition &&
         gameState.isPlayerTurn &&
         !analysisState.isBusy;
@@ -698,6 +696,7 @@ class _BodyState() extends ConsumerState<_Body> {
 
   void _requestHint(XiangqiGameState gameState) {
     _hintPosition = gameState.position;
+    _hintGeneration = ref.read(xiangqiGameControllerProvider.notifier).generation;
     unawaited(ref.read(xiangqiEngineAnalysisProvider.notifier).requestHint(gameState.position));
   }
 
@@ -716,6 +715,14 @@ class _BodyState() extends ConsumerState<_Body> {
     );
   }
 }
+
+PracticeFeedbackData? _practiceFeedbackData(XiangqiPracticeComment? comment) => comment == null
+    ? null
+    : PracticeFeedbackData(
+        verdict: comment.verdict,
+        suggestion: comment.suggestionNotation,
+        evalAfter: comment.evalAfter,
+      );
 
 /// What the player's own row says.
 ///
@@ -1208,7 +1215,9 @@ class _NewGameSheetState() extends ConsumerState<_NewGameSheet> {
                   );
               ref.read(offlineComputerGamePreferencesProvider.notifier).setLastGameWasXiangqi(true);
               if (!effectiveIncrement.isInfinite) {
-                ref.read(xiangqiClockProvider.notifier).resume(_initialPosition?.turn ?? _side);
+                ref
+                    .read(xiangqiClockProvider.notifier)
+                    .resume(ref.read(xiangqiGameControllerProvider).turn);
               }
               unawaited(ref.read(xiangqiGameStorageProvider).delete());
               Navigator.pop(context);

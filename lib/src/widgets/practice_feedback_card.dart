@@ -41,6 +41,7 @@ final class const PracticeFeedbackData({
 /// behaviour identical without pretending the two games use the same move type.
 class const PracticeFeedbackCard({
   required final PracticeFeedbackData? feedback,
+  final PracticeFeedbackData? previousFeedback,
   required final bool isEvaluatingMove,
   required final bool isPlayerTurn,
   final bool isFinished = false,
@@ -48,27 +49,11 @@ class const PracticeFeedbackCard({
   final bool showSuggestion = false,
   final VoidCallback? onToggleSuggestion,
   super.key,
-}) extends ConsumerStatefulWidget {
+}) extends ConsumerWidget {
   @override
-  ConsumerState<PracticeFeedbackCard> createState() => _PracticeFeedbackCardState();
-}
-
-class _PracticeFeedbackCardState() extends ConsumerState<PracticeFeedbackCard> {
-  // Last non-null comment, kept so it can be shown faded while the next evaluation runs.
-  PracticeFeedbackData? _previousFeedback;
-
-  @override
-  void didUpdateWidget(PracticeFeedbackCard oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.feedback != null && widget.feedback == null) {
-      _previousFeedback = oldWidget.feedback;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final prefs = ref.watch(offlineComputerGamePreferencesProvider);
-    final feedback = widget.feedback ?? (widget.isEvaluatingMove ? _previousFeedback : null);
+    final visibleFeedback = feedback ?? (isEvaluatingMove ? previousFeedback : null);
     final isShortScreen = isShortVerticalScreen(context);
     final evalTextStyle = TextStyle(
       fontWeight: FontWeight.w600,
@@ -81,11 +66,11 @@ class _PracticeFeedbackCardState() extends ConsumerState<PracticeFeedbackCard> {
     Color? backgroundColor;
     Color? iconColor;
 
-    if (widget.isFinished) {
+    if (isFinished) {
       content = Text(context.l10n.gameOver, style: const TextStyle(fontStyle: .italic));
-    } else if (feedback != null) {
-      final verdict = feedback.verdict;
-      final icon = feedback.isBookMove ? Icons.menu_book : verdict.icon;
+    } else if (visibleFeedback != null) {
+      final verdict = visibleFeedback.verdict;
+      final icon = visibleFeedback.isBookMove ? Icons.menu_book : verdict.icon;
       iconColor = verdict.color;
       backgroundColor = verdict.color.withValues(alpha: 0.1);
 
@@ -98,15 +83,15 @@ class _PracticeFeedbackCardState() extends ConsumerState<PracticeFeedbackCard> {
       };
 
       Widget? suggestionWidget;
-      if (feedback.suggestion case final suggestion? when !prefs.hideBestMove) {
+      if (visibleFeedback.suggestion case final suggestion? when !prefs.hideBestMove) {
         final labelText = verdict == MoveVerdict.goodMove
             ? context.l10n.anotherWasX('')
             : context.l10n.bestWasX('');
-        final label = labelText.replaceAll(' ', '').isEmpty
-            ? ''
-            : labelText.substring(0, labelText.length - 1);
-        suggestionWidget = GestureDetector(
-          onTap: widget.onToggleSuggestion,
+        final label = labelText.trimRight();
+        suggestionWidget = InkWell(
+          onTap: onToggleSuggestion,
+          canRequestFocus: onToggleSuggestion != null,
+          borderRadius: BorderRadius.circular(4),
           child: Text.rich(
             TextSpan(
               children: [
@@ -116,7 +101,7 @@ class _PracticeFeedbackCardState() extends ConsumerState<PracticeFeedbackCard> {
                   text: suggestion,
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
-                    color: widget.showSuggestion ? iconColor : null,
+                    color: showSuggestion ? iconColor : null,
                     decoration: TextDecoration.underline,
                     decorationStyle: TextDecorationStyle.dotted,
                   ),
@@ -128,33 +113,46 @@ class _PracticeFeedbackCardState() extends ConsumerState<PracticeFeedbackCard> {
         );
       }
 
-      content = Row(
-        children: [
-          Icon(icon, color: iconColor, size: 20),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  verdictText,
-                  style: TextStyle(fontWeight: FontWeight.w600, color: iconColor),
+      final eval = prefs.hideEvaluation ? null : currentEval ?? visibleFeedback.evalAfter;
+      content = LayoutBuilder(
+        builder: (context, constraints) {
+          final stackEvaluation =
+              constraints.maxWidth < 320 || MediaQuery.textScalerOf(context).scale(14) > 18;
+          return Row(
+            children: [
+              Icon(icon, color: iconColor, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      verdictText,
+                      style: TextStyle(fontWeight: FontWeight.w600, color: iconColor),
+                    ),
+                    ?suggestionWidget,
+                    if (stackEvaluation && eval != null) ...[
+                      const SizedBox(height: 4),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Text(eval, style: evalTextStyle),
+                      ),
+                    ],
+                  ],
                 ),
-                ?suggestionWidget,
-              ],
-            ),
-          ),
-          if (widget.currentEval ?? feedback.evalAfter case final eval? when !prefs.hideEvaluation)
-            Text(eval, style: evalTextStyle),
-        ],
+              ),
+              if (!stackEvaluation && eval != null) Text(eval, style: evalTextStyle),
+            ],
+          );
+        },
       );
-    } else if (widget.isPlayerTurn) {
+    } else if (isPlayerTurn) {
       content = Row(
         children: [
           const Spacer(),
-          if (!prefs.hideEvaluation && widget.currentEval != null)
-            Text(widget.currentEval!, style: evalTextStyle),
+          if (!prefs.hideEvaluation && currentEval != null)
+            Text(currentEval!, style: evalTextStyle),
         ],
       );
     } else {
@@ -162,18 +160,81 @@ class _PracticeFeedbackCardState() extends ConsumerState<PracticeFeedbackCard> {
     }
 
     return AnimatedOpacity(
-      opacity: widget.isEvaluatingMove && widget.feedback == null ? 0.5 : 1.0,
+      opacity: isEvaluatingMove && feedback == null ? 0.5 : 1.0,
       duration: const Duration(milliseconds: 300),
       child: Container(
-        height: cardHeight,
+        constraints: BoxConstraints(minHeight: cardHeight),
         margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: backgroundColor ?? Theme.of(context).colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(8),
         ),
-        child: Align(alignment: Alignment.centerLeft, child: content),
+        child: Material(
+          type: MaterialType.transparency,
+          child: Align(alignment: Alignment.centerLeft, heightFactor: 1, child: content),
+        ),
       ),
+    );
+  }
+}
+
+/// The practice status and feedback belong to the human seat, regardless of board orientation.
+class const PracticeFeedbackPanel({
+  required final Widget playerRow,
+  required final PracticeFeedbackData? feedback,
+  final PracticeFeedbackData? previousFeedback,
+  required final bool isEvaluatingMove,
+  required final bool isPlayerTurn,
+  final bool isEngineThinking = false,
+  final bool isFinished = false,
+  final String? currentEval,
+  final bool showSuggestion = false,
+  final VoidCallback? onToggleSuggestion,
+  super.key,
+}) extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final short = isShortVerticalScreen(context);
+    final status = isFinished
+        ? ''
+        : isEvaluatingMove
+        ? context.l10n.evaluatingYourMove
+        : isEngineThinking
+        ? context.l10n.computerThinking
+        : isPlayerTurn
+        ? context.l10n.yourTurn
+        : '';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: EdgeInsets.only(bottom: short ? 4 : 8),
+          child: Text(
+            status,
+            style: TextStyle(
+              fontSize: short ? 11 : null,
+              fontStyle: FontStyle.italic,
+              color: textShade(context, 0.8),
+              height: short ? 1 : null,
+            ),
+          ),
+        ),
+        PracticeFeedbackCard(
+          feedback: feedback,
+          previousFeedback: previousFeedback,
+          isEvaluatingMove: isEvaluatingMove,
+          isPlayerTurn: isPlayerTurn,
+          isFinished: isFinished,
+          currentEval: currentEval,
+          showSuggestion: showSuggestion,
+          onToggleSuggestion: onToggleSuggestion,
+        ),
+        SizedBox(height: short ? 4 : 8),
+        playerRow,
+      ],
     );
   }
 }

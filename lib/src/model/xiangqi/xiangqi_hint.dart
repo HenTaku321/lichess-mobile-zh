@@ -42,6 +42,7 @@ sealed class const XiangqiHint._() with _$XiangqiHint {
     /// The engine's evaluation of the position the hint was asked for, or null when the search
     /// ended before it reached one.
     XiangqiEvaluation? evaluation,
+    XiangqiPosition? evaluatedPosition,
   }) = _XiangqiHint;
 }
 
@@ -178,7 +179,7 @@ class XiangqiEngineAnalysis() extends Notifier<XiangqiEngineAnalysisState> {
   /// player is told, rather than being shown a move the board would refuse.
   Future<void> requestHint(XiangqiPosition position) async {
     final generation = _restart();
-    state = state.copyWith(hint: null, evaluation: null, isBusy: true);
+    state = state.copyWith(hint: null, evaluation: null, evaluatedPosition: position, isBusy: true);
 
     try {
       final search = await _startSearch(position, generation);
@@ -234,7 +235,7 @@ class XiangqiEngineAnalysis() extends Notifier<XiangqiEngineAnalysisState> {
   /// to run on asks again when it ends.
   void startEvaluation(XiangqiPosition position) {
     final generation = _restart();
-    state = state.copyWith(evaluation: null, isBusy: true);
+    state = state.copyWith(hint: null, evaluation: null, evaluatedPosition: position, isBusy: true);
     unawaited(_evaluate(position, generation));
   }
 

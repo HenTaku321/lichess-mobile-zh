@@ -393,7 +393,8 @@ class _XiangqiOnlineGameScreenState() extends ConsumerState<XiangqiOnlineGameScr
                   state.isConnected &&
                   !state.isFinished &&
                   !state.isAtLivePosition &&
-                  state.isMyTurn,
+                  state.mySide != null &&
+                  state.turn == state.mySide,
             ),
             BottomBarButton(
               label: l10n.flipBoard,

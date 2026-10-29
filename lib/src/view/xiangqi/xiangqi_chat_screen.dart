@@ -149,6 +149,7 @@ class _XiangqiChatRoomScreenState() extends ConsumerState<XiangqiChatRoomScreen>
 
   Future<void> _send() async {
     if (_sending) return;
+    final generation = ref.read(xiangqiAccountGenerationProvider);
     final text = _input.text.trim();
     if (text.isEmpty) return;
     setState(() {
@@ -160,18 +161,20 @@ class _XiangqiChatRoomScreenState() extends ConsumerState<XiangqiChatRoomScreen>
       final submitted = await ref
           .read(xiangqiChatControllerProvider(widget.roomKey).notifier)
           .send(text);
-      if (!mounted) return;
+      if (!mounted || generation != ref.read(xiangqiAccountGenerationProvider)) return;
       if (!submitted) {
         _restoreDraft(text);
         showSnackBar(context, context.l10n.mobileXiangqiChatOffline, type: SnackBarType.error);
       }
     } on Object {
-      if (mounted) {
+      if (mounted && generation == ref.read(xiangqiAccountGenerationProvider)) {
         _restoreDraft(text);
         showSnackBar(context, context.l10n.mobileSomethingWentWrong, type: SnackBarType.error);
       }
     } finally {
-      if (mounted) setState(() => _sending = false);
+      if (mounted && generation == ref.read(xiangqiAccountGenerationProvider)) {
+        setState(() => _sending = false);
+      }
     }
   }
 
@@ -182,6 +185,14 @@ class _XiangqiChatRoomScreenState() extends ConsumerState<XiangqiChatRoomScreen>
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(xiangqiAccountGenerationProvider, (_, _) {
+      if (!mounted) return;
+      setState(() {
+        _sending = false;
+        _submittedText = null;
+        _input.clear();
+      });
+    });
     ref.listen(xiangqiChatControllerProvider(widget.roomKey).select((s) => s.error), (
       before,
       after,
@@ -198,28 +209,40 @@ class _XiangqiChatRoomScreenState() extends ConsumerState<XiangqiChatRoomScreen>
     final controller = ref.read(xiangqiChatControllerProvider(widget.roomKey).notifier);
     final myId = int.tryParse(ref.watch(xiangqiAuthControllerProvider)?.userId ?? '');
 
-    return Scaffold(
-      appBar: AppBar(title: AppBarTitleText(widget.title)),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: _Messages(
-                state: state,
-                myId: myId,
-                onLoadMore: controller.loadMore,
-                onRetry: controller.retry,
-              ),
-            ),
-            if (state.messages.isNotEmpty && state.error != null)
-              TextButton(onPressed: controller.retry, child: Text(context.l10n.retry)),
-            _Composer(
-              controller: _input,
-              enabled: state.isConnected && !_sending,
-              onSend: _send,
-              hint: context.l10n.mobileXiangqiChatSend,
+    return XiangqiRefreshScope(
+      identity: (widget.roomKey, ref.watch(xiangqiAccountGenerationProvider)),
+      onRefresh: () => _sending ? Future<void>.value() : controller.retry(),
+      builder: (context, refresh, busy) => Scaffold(
+        appBar: AppBar(
+          title: AppBarTitleText(widget.title),
+          actions: [
+            DesktopRefreshButton(
+              onRefresh: refresh,
+              busy: busy || state.isLoading || state.isLoadingMore || _sending,
             ),
           ],
+        ),
+        body: SafeArea(
+          child: Column(
+            children: [
+              Expanded(
+                child: _Messages(
+                  state: state,
+                  myId: myId,
+                  onLoadMore: controller.loadMore,
+                  onRetry: refresh,
+                ),
+              ),
+              if (state.messages.isNotEmpty && state.error != null)
+                TextButton(onPressed: refresh, child: Text(context.l10n.retry)),
+              _Composer(
+                controller: _input,
+                enabled: state.isConnected && !_sending,
+                onSend: _send,
+                hint: context.l10n.mobileXiangqiChatSend,
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -33,6 +33,7 @@ import 'package:lichess_mobile/src/widgets/feedback.dart';
 import 'package:lichess_mobile/src/widgets/platform.dart';
 import 'package:lichess_mobile/src/widgets/rich_link_text.dart';
 import 'package:lichess_mobile/src/widgets/user.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_refresh.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -41,7 +42,7 @@ class const XiangqiConversationScreen({
   required final int peerId,
   required final LightUser peer,
   super.key,
-}) extends StatelessWidget {
+}) extends ConsumerWidget {
   static Route<dynamic> buildRoute({
     required String chatId,
     required int peerId,
@@ -53,89 +54,101 @@ class const XiangqiConversationScreen({
   }
 
   @override
-  Widget build(BuildContext context) {
-    return PlatformScaffold(
-      appBar: PlatformAppBar(
-        titleSpacing: 0,
-        title: ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: UserAvatar(peer, radius: 16),
-          title: UserFullNameWidget(user: peer, showFlair: false),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final conversation = (chatId: chatId, peerId: peerId, peer: peer);
+    return XiangqiRefreshScope(
+      identity: (conversation, ref.watch(xiangqiAccountGenerationProvider)),
+      onRefresh: () => ref.refresh(xiangqiConversationControllerProvider(conversation).future),
+      builder: (context, refresh, busy) => PlatformScaffold(
+        appBar: PlatformAppBar(
+          titleSpacing: 0,
+          actions: [DesktopRefreshButton(onRefresh: refresh, busy: busy)],
+          title: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: UserAvatar(peer, radius: 16),
+            title: UserFullNameWidget(user: peer, showFlair: false),
+          ),
         ),
+        body: _Body(conversation: conversation, onRefresh: refresh, busy: busy),
       ),
-      body: _Body(conversation: (chatId: chatId, peerId: peerId, peer: peer)),
     );
   }
 }
 
-class const _Body({required final XiangqiConversationKey conversation}) extends ConsumerWidget {
+class const _Body({
+  required final XiangqiConversationKey conversation,
+  required final XiangqiRefresh onRefresh,
+  required final bool busy,
+}) extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final stateAsync = ref.watch(xiangqiConversationControllerProvider(conversation));
 
-    switch (stateAsync) {
-      case AsyncData(:final value):
-        final items = _buildItems(value.convo.messages, conversation.peerId);
-        return Column(
-          children: [
-            Expanded(
-              child: GestureDetector(
-                onTap: () => FocusScope.of(context).unfocus(),
-                child: ListView.builder(
-                  // The bottom padding the input row already provides.
-                  padding: MediaQuery.paddingOf(context).copyWith(bottom: 0),
-                  // Newest at the bottom: the server hands the page over newest-first and the list
-                  // is drawn the way a chat reads.
-                  reverse: true,
-                  itemCount: items.length,
-                  itemBuilder: (context, index) {
-                    final item = items[index];
-                    return switch (item) {
-                      _DateItem(:final date) => _DateBubble(date: date),
-                      _MessageItem(
-                        :final message,
-                        :final isMe,
-                        :final groupLength,
-                        :final groupIndex,
-                      ) =>
-                        _MessageBubble(
-                          message: message,
-                          isMe: isMe,
-                          groupLength: groupLength,
-                          groupIndex: groupIndex,
-                        ),
-                    };
-                  },
+    return XiangqiRetainedData(
+      identity: (conversation, ref.watch(xiangqiAccountGenerationProvider)),
+      value: stateAsync,
+      builder: (context, stateAsync) {
+        switch (stateAsync) {
+          case AsyncData(:final value):
+            final items = _buildItems(value.convo.messages, conversation.peerId);
+            return Column(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => FocusScope.of(context).unfocus(),
+                    child: ListView.builder(
+                      // The bottom padding the input row already provides.
+                      padding: MediaQuery.paddingOf(context).copyWith(bottom: 0),
+                      // Newest at the bottom: the server hands the page over newest-first and the list
+                      // is drawn the way a chat reads.
+                      reverse: true,
+                      itemCount: items.length,
+                      itemBuilder: (context, index) {
+                        final item = items[index];
+                        return switch (item) {
+                          _DateItem(:final date) => _DateBubble(date: date),
+                          _MessageItem(
+                            :final message,
+                            :final isMe,
+                            :final groupLength,
+                            :final groupIndex,
+                          ) =>
+                            _MessageBubble(
+                              message: message,
+                              isMe: isMe,
+                              groupLength: groupLength,
+                              groupIndex: groupIndex,
+                            ),
+                        };
+                      },
+                    ),
+                  ),
                 ),
+                _MessageInput(
+                  key: ValueKey(ref.watch(xiangqiAccountGenerationProvider)),
+                  conversation: conversation,
+                ),
+              ],
+            );
+          case AsyncError(:final error, :final stackTrace):
+            debugPrint(
+              'Error loading xiangqi conversation ${conversation.chatId}: $error\n$stackTrace',
+            );
+            return Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(context.l10n.mobileSomethingWentWrong),
+                  const SizedBox(height: 16),
+                  FilledButton(onPressed: busy ? null : onRefresh, child: Text(context.l10n.retry)),
+                ],
               ),
-            ),
-            _MessageInput(
-              key: ValueKey(ref.watch(xiangqiAccountGenerationProvider)),
-              conversation: conversation,
-            ),
-          ],
-        );
-      case AsyncError(:final error, :final stackTrace):
-        debugPrint(
-          'Error loading xiangqi conversation ${conversation.chatId}: $error\n$stackTrace',
-        );
-        return Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(context.l10n.mobileSomethingWentWrong),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: () =>
-                    ref.invalidate(xiangqiConversationControllerProvider(conversation)),
-                child: Text(context.l10n.retry),
-              ),
-            ],
-          ),
-        );
-      case _:
-        return const Center(child: CircularProgressIndicator.adaptive());
-    }
+            );
+          case _:
+            return const Center(child: CircularProgressIndicator.adaptive());
+        }
+      },
+    );
   }
 
   /// The messages, with a day separator before each day's run of them.

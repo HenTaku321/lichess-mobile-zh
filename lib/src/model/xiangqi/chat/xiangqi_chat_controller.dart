@@ -209,6 +209,7 @@ class XiangqiChatController(final XiangqiChatRoomKey key) extends Notifier<Xiang
   }
 
   Future<void> retry() async {
+    if (state.isLoading || state.isLoadingMore) return;
     final socket = _socket;
     if (socket == null) return;
     if (!socket.isConnected) {

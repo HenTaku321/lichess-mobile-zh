@@ -386,6 +386,7 @@ class _GameState() extends ConsumerState<_Game> {
   /// Which position is on the board: 0 is before the first move.
   int _cursor = 0;
   bool _animate = false;
+  bool _isFlipped = false;
 
   @override
   void didUpdateWidget(_Game oldWidget) {
@@ -445,7 +446,7 @@ class _GameState() extends ConsumerState<_Game> {
           child: XiangqiBoard(
             settings: XiangqiBoardSettings.fromPreferences(boardPrefs),
             position: game.positions[cursor],
-            orientation: XiangqiSide.red,
+            orientation: _isFlipped ? XiangqiSide.black : XiangqiSide.red,
             selected: null,
             moves: const IListConst([]),
             // A game out of a book is read, not played: no tap, no drag, no legal-move dots.
@@ -462,22 +463,27 @@ class _GameState() extends ConsumerState<_Game> {
           ),
         ),
         boardHeader: _PlayerLine(
-          name: game.blackPlayer,
-          title: game.blackTitle,
-          country: game.blackCountry,
-          isWinner: game.winner == XiangqiSide.black,
+          name: _isFlipped ? game.redPlayer : game.blackPlayer,
+          title: _isFlipped ? game.redTitle : game.blackTitle,
+          country: _isFlipped ? game.redCountry : game.blackCountry,
+          isWinner: game.winner == (_isFlipped ? XiangqiSide.red : XiangqiSide.black),
         ),
         boardFooter: _PlayerLine(
-          name: game.redPlayer,
-          title: game.redTitle,
-          country: game.redCountry,
-          isWinner: game.winner == XiangqiSide.red,
+          name: _isFlipped ? game.blackPlayer : game.redPlayer,
+          title: _isFlipped ? game.blackTitle : game.redTitle,
+          country: _isFlipped ? game.blackCountry : game.redCountry,
+          isWinner: game.winner == (_isFlipped ? XiangqiSide.black : XiangqiSide.red),
         ),
         moves: xiangqiGameNotation(game.positions, game.moves),
         currentMoveIndex: cursor,
         onSelectMove: _goTo,
         bottomBar: BottomBar(
           children: [
+            BottomBarButton(
+              label: context.l10n.flipBoard,
+              icon: CupertinoIcons.arrow_2_squarepath,
+              onTap: () => setState(() => _isFlipped = !_isFlipped),
+            ),
             HistoryNavigationButton(
               forward: false,
               onTap: cursor > 0 ? () => _goTo(cursor - 1) : null,

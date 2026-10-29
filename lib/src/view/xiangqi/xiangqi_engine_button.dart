@@ -30,6 +30,21 @@ class _XiangqiEngineButtonState() extends ConsumerState<XiangqiEngineButton> {
     }
   }
 
+  Future<void> _retry() async {
+    if (_toggling) return;
+    setState(() => _toggling = true);
+    try {
+      if (!ref.read(engineEvaluationPreferencesProvider).isEnabled) {
+        await ref.read(engineEvaluationPreferencesProvider.notifier).toggle();
+      }
+      if (mounted) ref.read(xiangqiAnalysisControllerProvider.notifier).startEngine();
+    } on Object catch (error) {
+      if (mounted) showSnackBar(context, error.toString(), type: SnackBarType.error);
+    } finally {
+      if (mounted) setState(() => _toggling = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(xiangqiAnalysisControllerProvider);
@@ -49,7 +64,7 @@ class _XiangqiEngineButtonState() extends ConsumerState<XiangqiEngineButton> {
       onTap: _toggling ? null : _toggle,
       onLongPress: () => showPopover(
         context: context,
-        bodyBuilder: (_) => const _EngineDetails(),
+        bodyBuilder: (_) => _EngineDetails(onRetry: _retry),
         direction: PopoverDirection.top,
         width: 250,
         backgroundColor:
@@ -62,7 +77,7 @@ class _XiangqiEngineButtonState() extends ConsumerState<XiangqiEngineButton> {
 }
 
 /// Only real engine identity, depth and a retryable error; no invented cloud/throughput settings.
-class const _EngineDetails() extends ConsumerWidget {
+class const _EngineDetails({required final VoidCallback onRetry}) extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(xiangqiAnalysisControllerProvider);
@@ -84,10 +99,7 @@ class const _EngineDetails() extends ConsumerWidget {
           ? IconButton(
               tooltip: context.l10n.retry,
               icon: const Icon(Icons.refresh),
-              onPressed: () {
-                ref.invalidate(xiangqiEngineProvider);
-                ref.read(xiangqiAnalysisControllerProvider.notifier).startEngine();
-              },
+              onPressed: onRetry,
             )
           : null,
     );

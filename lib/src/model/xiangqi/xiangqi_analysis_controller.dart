@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:lichess_mobile/src/model/common/chess.dart';
 import 'package:lichess_mobile/src/model/engine/engine.dart';
+import 'package:lichess_mobile/src/model/engine/engine_providers.dart';
 import 'package:lichess_mobile/src/model/ui_events.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_controller.dart'
     show xiangqiEngineProvider;
@@ -256,7 +257,11 @@ class XiangqiAnalysisController() extends Notifier<XiangqiAnalysisState> {
   /// whichever method changed it.
   void startEngine() {
     if (state.isEngineRunning) return;
-    if (_engineError != null && ref.read(xiangqiEngineProvider).hasError) {
+    final cached = ref.read(xiangqiEngineProvider);
+    if (cached.value?.isDead == true) {
+      ref.invalidate(engineProvider(cached.requireValue.spec));
+    }
+    if (cached.hasError || cached.value?.isDead == true) {
       ref.invalidate(xiangqiEngineProvider);
     }
     _engineError = null;
@@ -433,19 +438,33 @@ class XiangqiAnalysisController() extends Notifier<XiangqiAnalysisState> {
         ),
       );
       _search = search;
-      _infos = search.infos.listen((info) {
-        if (generation != _generation) return;
-        _onInfo(info, position);
-      });
+      _infos = search.infos.listen(
+        (info) {
+          if (generation != _generation) return;
+          _onInfo(info, position);
+        },
+        onDone: () {
+          if (engine.isDead) {
+            _fail(
+              generation,
+              StateError('The xiangqi engine exited during analysis.'),
+              StackTrace.current,
+            );
+          }
+        },
+      );
     } on Object catch (error, stackTrace) {
-      if (generation != _generation || !ref.mounted) return;
-      _logger.warning('The xiangqi analysis could not be started', error, stackTrace);
-      _generation++;
-      _search = null;
-      _engineError = _kEngineFailedMessage;
-      state = _latest = state.copyWith(isEngineRunning: false, lines: const IListConst([]));
-      ref.read(uiEventBusProvider).emit(const ShowErrorEvent(_kEngineFailedMessage));
+      _fail(generation, error, stackTrace);
     }
+  }
+
+  void _fail(int generation, Object error, StackTrace stackTrace) {
+    if (generation != _generation || !ref.mounted) return;
+    _logger.warning('The xiangqi analysis failed', error, stackTrace);
+    _cancel();
+    _engineError = _kEngineFailedMessage;
+    state = _latest = state.copyWith(isEngineRunning: false, lines: const IListConst([]));
+    ref.read(uiEventBusProvider).emit(const ShowErrorEvent(_kEngineFailedMessage));
   }
 
   /// Files one `info` line into the state, under the multipv index it belongs to.

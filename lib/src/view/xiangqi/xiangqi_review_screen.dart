@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/analysis/analysis_preferences.dart';
 import 'package:lichess_mobile/src/model/common/chess.dart' show Variant;
 import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
+import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_live_game.dart';
 import 'package:lichess_mobile/src/model/xiangqi/review/xiangqi_review.dart';
 import 'package:lichess_mobile/src/model/xiangqi/review/xiangqi_review_repository.dart';
@@ -21,6 +22,7 @@ import 'package:lichess_mobile/src/widgets/xiangqi_analysis_layout.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_game_layout.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_player_row.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_refresh.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// A finished game on xiangqi.com, with every move of it marked up.
@@ -50,38 +52,45 @@ class const XiangqiReviewScreen({required final String gameId, super.key}) exten
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Scaffold(
-      appBar: AppBar(
-        title: AppBarTitleText(
-          '${context.l10n.mobileXiangqi} · ${context.l10n.mobileXiangqiReview}',
+    return XiangqiRefreshScope(
+      identity: (gameId, ref.watch(xiangqiAccountGenerationProvider)),
+      onRefresh: () => ref.refresh(xiangqiReviewProvider(gameId).future),
+      builder: (context, refresh, busy) => Scaffold(
+        appBar: AppBar(
+          title: AppBarTitleText(
+            '${context.l10n.mobileXiangqi} · ${context.l10n.mobileXiangqiReview}',
+          ),
+          actions: [DesktopRefreshButton(onRefresh: refresh, busy: busy)],
         ),
+        body: _Body(gameId: gameId, onRefresh: refresh),
       ),
-      body: _Body(gameId: gameId),
     );
   }
 }
 
-class const _Body({required final String gameId}) extends ConsumerWidget {
+class const _Body({required final String gameId, required final XiangqiRefresh onRefresh})
+    extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final review = ref.watch(xiangqiReviewProvider(gameId));
 
-    return review.when(
-      data: (review) => _Review(review: review),
-      loading: () => const Center(child: CircularProgressIndicator.adaptive()),
-      error: (error, stackTrace) => switch (error) {
-        // No session branch: a review needs none. The socket opens a guest one of its own when the
-        // device has never signed in, and a guest was measured being handed a whole archived game's
-        // analysis — see [xiangqiReviewProvider].
-        XiangqiReviewException(reason: .offline) => _Failed(
-          message: context.l10n.mobileXiangqiReviewOffline,
-          onRetry: () => ref.invalidate(xiangqiReviewProvider(gameId)),
-        ),
-        _ => _Failed(
-          message: context.l10n.mobileXiangqiReviewFailed,
-          onRetry: () => ref.invalidate(xiangqiReviewProvider(gameId)),
-        ),
-      },
+    return XiangqiRetainedData(
+      identity: (gameId, ref.watch(xiangqiAccountGenerationProvider)),
+      value: review,
+      builder: (context, review) => review.when(
+        data: (review) => _Review(review: review),
+        loading: () => const Center(child: CircularProgressIndicator.adaptive()),
+        error: (error, stackTrace) => switch (error) {
+          // No session branch: a review needs none. The socket opens a guest one of its own when the
+          // device has never signed in, and a guest was measured being handed a whole archived game's
+          // analysis — see [xiangqiReviewProvider].
+          XiangqiReviewException(reason: .offline) => _Failed(
+            message: context.l10n.mobileXiangqiReviewOffline,
+            onRetry: onRefresh,
+          ),
+          _ => _Failed(message: context.l10n.mobileXiangqiReviewFailed, onRetry: onRefresh),
+        },
+      ),
     );
   }
 }

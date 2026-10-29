@@ -252,7 +252,12 @@ void main() {
   testDesktop('room refresh keeps the composer draft while waiting for fresh history', (
     tester,
   ) async {
-    await chat.pumpRoom(tester);
+    final channel = await chat.pumpRoom(tester);
+    channel.event('chat.lobby.messages.success', {
+      'data': {'items': <Object?>[], 'has_next_page': false},
+    });
+    await tester.pump();
+    await tester.pump();
     await tester.enterText(find.byType(TextField), 'Keep this draft');
     expect(toolbarRefresh(), findsOneWidget);
     await tester.tap(toolbarRefresh());

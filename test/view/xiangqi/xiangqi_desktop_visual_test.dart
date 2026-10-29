@@ -1,10 +1,12 @@
 // Deterministic Linux screenshots, opt-in on Actions with real Roboto and pinned CJK fonts.
 // No production account, native engine, live HTTP or real socket is involved.
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:chessground/chessground.dart' show Chessboard;
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,6 +16,7 @@ import 'package:http/testing.dart';
 import 'package:l10n_esperanto/l10n_esperanto.dart';
 import 'package:lichess_mobile/l10n/l10n.dart';
 import 'package:lichess_mobile/src/model/analysis/analysis_controller.dart';
+import 'package:lichess_mobile/src/model/analysis/analysis_preferences.dart';
 import 'package:lichess_mobile/src/model/common/chess.dart' show Variant;
 import 'package:lichess_mobile/src/model/common/time_increment.dart';
 import 'package:lichess_mobile/src/model/engine/evaluation_preferences.dart';
@@ -59,6 +62,7 @@ import 'package:lichess_mobile/src/view/xiangqi/xiangqi_tournaments_screen.dart'
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_watch_screen.dart';
 import 'package:lichess_mobile/src/widgets/window_title_bar.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_refresh.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../binding.dart';
@@ -381,6 +385,9 @@ void main() {
   final scenes = <(String, Widget)>[
     ('analysis', const XiangqiAnalysisScreen()),
     ('analysis-ready', const XiangqiAnalysisScreen()),
+    ('analysis-engine-error', const XiangqiAnalysisScreen()),
+    ('analysis-inline-small', const XiangqiAnalysisScreen()),
+    ('analysis-flip-hover', const XiangqiAnalysisScreen()),
     ('analysis-menu', const XiangqiAnalysisScreen()),
     ('analysis-settings', const XiangqiAnalysisSettingsScreen()),
     (
@@ -388,6 +395,7 @@ void main() {
       const AnalysisScreen(options: AnalysisOptions.standalone(variant: Variant.standard)),
     ),
     ('online', const XiangqiOnlineGameScreen(gameId: fx.xiangqiTestGameId)),
+    ('online-refresh', const XiangqiOnlineGameScreen(gameId: fx.xiangqiTestGameId)),
     ('review', const XiangqiReviewScreen(gameId: reviewId)),
     ('editor', const XiangqiBoardEditorScreen()),
     (
@@ -401,6 +409,7 @@ void main() {
     ('otb-setup', const XiangqiOverTheBoardScreen()),
     ('database', const XiangqiDatabaseScreen()),
     ('database-game', const XiangqiMasterGameScreen(slug: 'a-vs-b')),
+    ('database-game-refresh', const XiangqiMasterGameScreen(slug: 'a-vs-b')),
     ('master-player', const XiangqiMasterPlayerScreen(playerId: 1, playerName: longName)),
     ('lessons', const XiangqiLessonsScreen()),
     ('topic', const XiangqiTopicScreen(topicId: 'AbCdEf')),
@@ -419,6 +428,7 @@ void main() {
     ('tournament', const XiangqiTournamentScreen(id: 'AbCdEf', name: longName)),
     ('leaderboard', const XiangqiLeaderboardScreen()),
     ('profile', const XiangqiProfileScreen(username: 'Tester')),
+    ('profile-partial-error', const XiangqiProfileScreen(username: 'Tester')),
     ('profile-edit', const XiangqiProfileEditScreen(username: 'Tester')),
     ('signup', const XiangqiSignUpScreen()),
     ('friends', const XiangqiFriendsScreen()),
@@ -430,6 +440,10 @@ void main() {
       const XiangqiChatRoomScreen(roomKey: (kind: XiangqiChatKind.lobby, room: '中文'), title: '中文'),
     ),
     (
+      'room-refresh',
+      const XiangqiChatRoomScreen(roomKey: (kind: XiangqiChatKind.lobby, room: '中文'), title: '中文'),
+    ),
+    (
       'pm',
       XiangqiConversationScreen(
         chatId: pm.xiangqiFirstChatId,
@@ -437,7 +451,16 @@ void main() {
         peer: xiangqiLightUser('${pm.xiangqiFirstPeerId}', pm.xiangqiFirstPeerName),
       ),
     ),
+    (
+      'pm-refresh',
+      XiangqiConversationScreen(
+        chatId: pm.xiangqiFirstChatId,
+        peerId: pm.xiangqiFirstPeerId,
+        peer: xiangqiLightUser('${pm.xiangqiFirstPeerId}', pm.xiangqiFirstPeerName),
+      ),
+    ),
     ('watch', const XiangqiWatchScreen()),
+    ('watch-refresh', const XiangqiWatchScreen()),
     ('watch-empty', const XiangqiWatchScreen()),
     ('watch-error', const XiangqiWatchScreen()),
     ('database-error', const XiangqiDatabaseScreen()),
@@ -461,8 +484,30 @@ void main() {
                 addTearDown(socket.dispose);
                 final puzzle = puzzles.PuzzleServer();
                 final httpRequests = <String>[];
+                final heldResponse = Completer<http.Response>();
+                http.Request? heldRequest;
+                var holdHttp = false;
+                addTearDown(() {
+                  if (!heldResponse.isCompleted) {
+                    heldResponse.complete(
+                      heldRequest == null
+                          ? visualJson({})
+                          : visualHttp(heldRequest!, empty: false, error: false),
+                    );
+                  }
+                });
                 final client = MockClient((request) async {
                   httpRequests.add('${request.method} ${request.url.path}');
+                  if (holdHttp &&
+                      (request.url.path == '/api/v2/games/active' ||
+                          request.url.path.contains('/master-games/games/'))) {
+                    heldRequest = request;
+                    return await heldResponse.future;
+                  }
+                  if (scene == 'profile-partial-error' &&
+                      request.url.path.contains('/multiplayer_stats/')) {
+                    return visualJson({'error': 'fixture unavailable'}, 503);
+                  }
                   return (request.url.path.startsWith('/api/puzzle') &&
                               !request.url.path.startsWith('/api/puzzle/puzzles/')) ||
                           request.url.path.startsWith('/api/quota')
@@ -470,7 +515,7 @@ void main() {
                       : visualHttp(
                           request,
                           empty: scene.endsWith('-empty'),
-                          error: scene.endsWith('-error'),
+                          error: scene.endsWith('-error') && scene != 'profile-partial-error',
                         );
                 });
                 final key = GlobalKey();
@@ -487,6 +532,12 @@ void main() {
                     ),
                     defaultPreferences: {
                       ...analysis.evaluationPreferences(isEnabled: false),
+                      if (scene == 'analysis-inline-small')
+                        PrefCategory.analysis.storageKey: jsonEncode(
+                          AnalysisPrefs.defaults
+                              .copyWith(smallBoard: true, inlineNotation: true)
+                              .toJson(),
+                        ),
                       PrefCategory.general.storageKey: jsonEncode(
                         GeneralPrefs.defaults
                             .copyWith(locale: locale, themeMode: mode, systemColors: false)
@@ -533,10 +584,58 @@ void main() {
                       fake.transport,
                       'info depth 14 score cp 37 pv h0g2 b9c7 e3e4',
                     );
+                  } else if (scene == 'analysis-engine-error') {
+                    await container.read(engineEvaluationPreferencesProvider.notifier).toggle();
+                    await analysis.startSearch(tester, fake.transport);
+                    fake.transport.die();
+                    await tester.pump();
+                    await tester.pump();
+                    expect(find.text('!'), findsOneWidget);
                   } else if (scene == 'analysis-menu') {
                     await tester.tap(find.byIcon(Icons.menu));
                     await tester.pump(const Duration(milliseconds: 350));
                   }
+                }
+                if (scene.endsWith('-refresh')) {
+                  if (scene == 'pm-refresh' || scene == 'room-refresh') {
+                    await tester.enterText(find.byType(TextField).last, longName);
+                    await tester.pump();
+                  }
+                  holdHttp = scene == 'watch-refresh' || scene == 'database-game-refresh';
+                  await tester.tap(find.byType(DesktopRefreshButton));
+                  await tester.pump(const Duration(milliseconds: 1600));
+                  await tester.pump();
+                  expect(
+                    tester.widget<DesktopRefreshButton>(find.byType(DesktopRefreshButton)).busy,
+                    isTrue,
+                  );
+                  if (scene == 'pm-refresh' || scene == 'room-refresh') {
+                    expect(
+                      tester.widget<EditableText>(find.byType(EditableText)).controller.text,
+                      longName,
+                    );
+                  }
+                }
+                final mouse = scene == 'analysis-flip-hover'
+                    ? await tester.createGesture(kind: ui.PointerDeviceKind.mouse)
+                    : null;
+                if (mouse != null) {
+                  await mouse.addPointer(location: Offset.zero);
+                  await mouse.moveTo(
+                    tester.getCenter(find.byIcon(CupertinoIcons.arrow_2_squarepath)),
+                  );
+                  await tester.pump(const Duration(seconds: 1));
+                  expect(
+                    find.text(key.currentContext!.l10n.flipBoard, findRichText: true),
+                    findsAtLeastNWidgets(1),
+                  );
+                }
+                if (scene == 'profile-partial-error') {
+                  expect(find.text(longName), findsAtLeastNWidgets(1));
+                  expect(
+                    find.text(key.currentContext!.l10n.mobileSomethingWentWrong),
+                    findsAtLeastNWidgets(1),
+                  );
                 }
                 final exception = tester.takeException();
                 final container = ProviderScope.containerOf(
@@ -573,6 +672,10 @@ void main() {
                       'source': Platform.environment['GITHUB_SHA'],
                       'requests': httpRequests,
                       'texts': texts,
+                      'drafts': tester
+                          .widgetList<EditableText>(find.byType(EditableText))
+                          .map((w) => w.controller.text)
+                          .toList(),
                       'puzzleSearch': puzzleSearch?.toString(),
                       'boards': [
                         for (final rect in boards)
@@ -599,13 +702,18 @@ void main() {
                 if (const {
                   'analysis',
                   'analysis-ready',
+                  'analysis-engine-error',
+                  'analysis-inline-small',
+                  'analysis-flip-hover',
                   'analysis-menu',
                   'online',
+                  'online-refresh',
                   'review',
                   'editor',
                   'computer',
                   'otb-setup',
                   'database-game',
+                  'database-game-refresh',
                   'lesson-player',
                   'puzzle',
                 }.contains(scene)) {
@@ -626,6 +734,16 @@ void main() {
                   expect(board.left, greaterThanOrEqualTo(-1));
                   expect(board.right, lessThanOrEqualTo(size.width + 1));
                   expect(board.bottom, lessThanOrEqualTo(size.height + 1));
+                }
+                if (heldRequest != null && !heldResponse.isCompleted) {
+                  heldResponse.complete(visualHttp(heldRequest!, empty: false, error: false));
+                }
+                answerVisualSockets(factory, offsets, scene);
+                await tester.pump();
+                await tester.pump();
+                if (mouse != null) {
+                  await mouse.removePointer();
+                  await tester.pump(const Duration(seconds: 1));
                 }
               },
               variant: TargetPlatformVariant.only(TargetPlatform.linux),

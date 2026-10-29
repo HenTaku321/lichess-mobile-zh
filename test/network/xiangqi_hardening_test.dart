@@ -229,9 +229,12 @@ void main() {
 
   test('each resync follows its own archived redirect', () async {
     final game = await harness.makeHarness(fx.xiangqiTestToken(fx.xiangqiTestViewerId));
+    await game.send(fx.xiangqiSnapshotFrame());
     game.channel.ackOverrides['g_v2.get'] = fx.xiangqiRedirectAck;
     await game.controller.resync();
+    await game.send(fx.xiangqiArchivedSnapshotFrame());
     await game.controller.resync();
+    await game.send(fx.xiangqiArchivedSnapshotFrame());
     expect(
       game.channel.sent
           .whereType<String>()

@@ -416,4 +416,48 @@ void main() {
     expect(container.read(provider).messages.last.message, 'unnumbered live message');
     expect(tester.takeException(), isNull);
   });
+
+  testDesktop('a refreshed room page without overlap fills the gap before the retained history', (
+    tester,
+  ) async {
+    final (:container, :factory) = await pumpRoom(tester);
+    final provider = xiangqiChatControllerProvider(roomKey);
+    final controller = container.read(provider.notifier);
+    await history(tester, factory, [
+      chat.message(id: 4, text: 'fourth'),
+      chat.message(id: 3, text: 'third'),
+    ], hasNext: true);
+    unawaited(controller.loadMore());
+    await tester.pump(kXiangqiChatRequestSpacing);
+    await tester.pump();
+    await history(tester, factory, [
+      chat.message(id: 2, text: 'second'),
+      chat.message(id: 1, text: 'first'),
+    ]);
+    expect(container.read(provider).hasMore, isFalse);
+
+    await tester.tap(find.byType(DesktopRefreshButton));
+    await tester.pump(kXiangqiChatRequestSpacing);
+    await tester.pump();
+    await history(tester, factory, [
+      chat.message(id: 8, text: 'eighth'),
+      chat.message(id: 7, text: 'seventh'),
+    ], hasNext: true);
+    expect(container.read(provider).messages.map((m) => m.id), [1, 2, 3, 4, 7, 8]);
+    expect(
+      container.read(provider).hasMore,
+      isTrue,
+      reason: 'the new page has not reached the old history yet',
+    );
+    unawaited(controller.loadMore());
+    await tester.pump(kXiangqiChatRequestSpacing);
+    await tester.pump();
+    expect(requests(factory.channel, 'chat_v2.messages').last['page'], 2);
+    await history(tester, factory, [
+      chat.message(id: 6, text: 'sixth'),
+      chat.message(id: 5, text: 'fifth'),
+    ], hasNext: true);
+    expect(container.read(provider).messages.map((m) => m.id), [1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(tester.takeException(), isNull);
+  });
 }

@@ -95,6 +95,14 @@ void main() {
   void testDesktop(String name, WidgetTesterCallback callback) =>
       testWidgets(name, callback, variant: TargetPlatformVariant.only(TargetPlatform.linux));
 
+  testDesktop('restoring a saved room account opens only one transport', (tester) async {
+    final (:factory, :container) = await pumpRoom(tester);
+    expect(factory.channels, hasLength(1));
+    await history(tester, factory, [chat.message(id: 1, text: 'restored room')]);
+    expect(container.read(xiangqiChatControllerProvider(roomKey)).isConnected, isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
   testDesktop('online mouse refresh waits for the matching snapshot and keeps replay and flip', (
     tester,
   ) async {

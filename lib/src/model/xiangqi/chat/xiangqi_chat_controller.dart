@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:lichess_mobile/src/model/xiangqi/chat/xiangqi_chat.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
+import 'package:lichess_mobile/src/network/xiangqi_session_store.dart';
 import 'package:lichess_mobile/src/network/xiangqi_socket.dart';
 import 'package:logging/logging.dart';
 
@@ -121,9 +122,13 @@ class XiangqiChatController(final XiangqiChatRoomKey key) extends Notifier<Xiang
 
   @override
   XiangqiChatState build() {
+    final generation = ++_generation;
+    // A cold restore changes accountGeneration too. Do not open a socket under the unknown account
+    // and immediately tear it down when the saved session is restored.
+    if (ref.watch(xiangqiSessionReadyProvider).isLoading)
+      return const XiangqiChatState(isLoading: true);
     // History belongs to this account/room lifetime, not to the notifier object across rebuilds.
     ref.watch(xiangqiAccountGenerationProvider);
-    final generation = ++_generation;
     _historyRevision++;
     _pendingPage = 1;
     _page = 1;

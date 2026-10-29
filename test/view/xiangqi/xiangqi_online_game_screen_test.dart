@@ -59,6 +59,7 @@ Future<fx.FakeXiangqiChannelFactory> pumpGame(
   required String token,
   SoundService? sound,
   bool pieceAnimation = false,
+  bool failOnOverflow = false,
 }) async {
   final factory = fx.FakeXiangqiChannelFactory();
   final client = XiangqiSocketClient(channelFactory: factory, getToken: () async => token);
@@ -68,6 +69,7 @@ Future<fx.FakeXiangqiChannelFactory> pumpGame(
     await makeTestProviderScopeApp(
       tester,
       home: const XiangqiOnlineGameScreen(gameId: fx.xiangqiTestGameId),
+      failOnOverflow: failOnOverflow,
       defaultPreferences: pieceAnimation
           ? {
               PrefCategory.board.storageKey: jsonEncode(

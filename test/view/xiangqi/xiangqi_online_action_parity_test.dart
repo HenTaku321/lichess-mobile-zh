@@ -24,6 +24,7 @@ void main() {
       final factory = await online.pumpGame(
         tester,
         token: fx.xiangqiTestToken(spectator ? fx.xiangqiTestSpectatorId : fx.xiangqiTestViewerId),
+        failOnOverflow: true,
       );
       await online.receive(tester, factory, fx.xiangqiSnapshotFrame(plies: 4));
 
@@ -44,6 +45,7 @@ void main() {
     final factory = await online.pumpGame(
       tester,
       token: fx.xiangqiTestToken(fx.xiangqiTestViewerId),
+      failOnOverflow: true,
     );
     await online.receive(tester, factory, fx.xiangqiSnapshotFrame(plies: 4));
     final container = ProviderScope.containerOf(

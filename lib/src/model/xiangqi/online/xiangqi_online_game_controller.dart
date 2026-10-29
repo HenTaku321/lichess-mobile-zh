@@ -725,6 +725,15 @@ class XiangqiOnlineGameController(final String gameId)
     final positions = moves == null ? null : _replay(moves);
     if (moves == null || positions == null) return false;
     final clocks = _clocksOf(map['timers']);
+    final replayCursor = _latest.viewCursor;
+    // Reconnection and foreground resync refresh the live end, not the reader's place in history.
+    // Keep the cursor only while the same position still exists there; a divergent or shortened
+    // history must instead display the authoritative live position.
+    final keepReplayCursor =
+        _latest.isLoaded &&
+        !_latest.isAtLivePosition &&
+        replayCursor < positions.length &&
+        positions[replayCursor] == _latest.position;
 
     // A snapshot may be silent about how a game ended — the archived one is not obliged to repeat
     // it — and a game that has ended does not come back to life because a later frame failed to
@@ -734,6 +743,7 @@ class XiangqiOnlineGameController(final String gameId)
       XiangqiOnlineGameState(
         positions: positions,
         moves: moves,
+        cursor: keepReplayCursor ? replayCursor : -1,
         red: red,
         black: black,
         isRated: _asBool(map['is_rated']) ?? false,

@@ -258,6 +258,30 @@ void main() {
     expect(game.channel.hasSentEvent('g_v2.move'), isFalse);
   });
 
+  test(
+    'a shortened resync follows the authoritative live end when the old cursor is gone',
+    () async {
+      final game = await harness.makeHarness(fx.xiangqiTestToken(fx.xiangqiTestViewerId));
+      await game.send(fx.xiangqiSnapshotFrame(plies: 4));
+      game.controller.goTo(3);
+      await game.controller.resync();
+      await game.send(fx.xiangqiSnapshotFrame(plies: 2));
+      expect(game.state.viewCursor, 2);
+      expect(game.state.isAtLivePosition, isTrue);
+      expect(game.state.position, fx.xiangqiTestPositions[2]);
+    },
+  );
+
+  test('resync advances the live board when the user was not replaying', () async {
+    final game = await harness.makeHarness(fx.xiangqiTestToken(fx.xiangqiTestViewerId));
+    await game.send(fx.xiangqiSnapshotFrame(plies: 2));
+    await game.controller.resync();
+    await game.send(fx.xiangqiSnapshotFrame(plies: 4));
+    expect(game.state.viewCursor, 4);
+    expect(game.state.isAtLivePosition, isTrue);
+    expect(game.state.position, fx.xiangqiTestPositions[4]);
+  });
+
   test('signout closes the account socket', () async {
     final storage = ht.FakeXiangqiAuthStorage(ht.signedInSession);
     final factory = fx.FakeXiangqiChannelFactory();

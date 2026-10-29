@@ -71,6 +71,15 @@ jobs:
       - name: Code generation
         run: dart run build_runner build
 
+      # Model codegen stays on Actions too; only generated schema code is exported, never binaries.
+      - name: Export generated review model
+        if: github.ref == 'refs/heads/fix/xiangqi-interaction-parity'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: xiangqi-review-model-${{ github.sha }}
+          path: lib/src/model/xiangqi/review/xiangqi_review.freezed.dart
+          retention-days: 3
+
       # gen-arb.mjs imports `colors`, `xml2js` and `js-yaml`; upstream never runs
       # these scripts in CI, so nothing else installs them. `npm ci` (not install)
       # so a lockfile that drifts from package.json fails here rather than
@@ -118,6 +127,7 @@ jobs:
         run: >-
           flutter test --no-pub --reporter expanded
           test/view/xiangqi/xiangqi_history_parity_test.dart
+          test/view/xiangqi/xiangqi_review_contract_test.dart
           test/view/xiangqi/xiangqi_online_game_screen_test.dart
           test/view/xiangqi/xiangqi_over_the_board_screen_test.dart
           test/view/xiangqi/xiangqi_review_screen_test.dart

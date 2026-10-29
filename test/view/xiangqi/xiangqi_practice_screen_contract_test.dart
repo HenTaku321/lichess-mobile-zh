@@ -47,6 +47,8 @@ Future<void> searchStarted(
   final commands = <String>[];
   var started = false;
   for (var i = 0; i < 30; i++) {
+    // Riverpod/stream cancellation may finish on the real event queue, not fake frame time.
+    await tester.runAsync(() => pumpEventQueue(times: 2));
     await tester.pump(const Duration(milliseconds: 1));
     final fresh = transport.takeCommands();
     commands.addAll(fresh);
@@ -73,23 +75,20 @@ Future<void> searchStarted(
 Future<void> reply(WidgetTester tester, FakeTransport transport, String move) async {
   await searchStarted(tester, transport);
   transport.emit('bestmove $move');
+  await tester.runAsync(() => pumpEventQueue(times: 2));
   await tester.pump(const Duration(milliseconds: 1));
   await tester.pump();
   await tester.pump();
-  final state = game.containerOf(tester).read(xiangqiGameControllerProvider);
-  debugPrint(
-    'UI scoring trace: $move; grading=${state.isEvaluatingMove}; '
-    'thinking=${state.isEngineThinking}; comment=${state.practiceComment != null}; '
-    'commands=${transport.commands}',
-  );
 }
 
 Future<void> score(WidgetTester tester, FakeTransport transport, int cp, String move) async {
   await searchStarted(tester, transport, scoring: true);
   transport.emit('info depth 9 score cp $cp pv $move');
   await tester.pump(const Duration(milliseconds: 1));
+  await tester.runAsync(() => pumpEventQueue(times: 2));
   await tester.pump();
   transport.emit('bestmove $move');
+  await tester.runAsync(() => pumpEventQueue(times: 2));
   await tester.pump(const Duration(milliseconds: 1));
   await tester.pump();
   await tester.pump();

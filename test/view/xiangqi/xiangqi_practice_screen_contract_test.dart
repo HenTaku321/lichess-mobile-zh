@@ -9,8 +9,10 @@ import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_game_screen.dart';
 import 'package:lichess_mobile/src/widgets/practice_feedback_card.dart';
 import 'package:lichess_mobile/src/widgets/settings.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_difficulty_tile.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_player_row.dart';
+import 'package:lichess_mobile/src/widgets/yes_no_dialog.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../binding.dart';
@@ -59,6 +61,46 @@ void main() {
   });
 
   final human = find.byWidgetPredicate((widget) => widget is XiangqiPlayerRow && !widget.isBot);
+
+  testWidgets('difficulty dragging never discards a live game before confirmation', (tester) async {
+    final transport = await game.pumpGameScreen(tester, screen: practiceScreen);
+    await tap(tester, 'h2');
+    await tap(tester, 'e2');
+    await score(tester, transport, 20, 'b2e2');
+    await score(tester, transport, -30, 'h9g7');
+    await game.answer(tester, transport, 'h9g7');
+    final container = game.containerOf(tester);
+    final controller = container.read(xiangqiGameControllerProvider.notifier);
+    final before = container.read(xiangqiGameControllerProvider);
+    final generation = controller.generation;
+    await tester.tap(find.byIcon(Icons.settings));
+    await tester.pumpAndSettle();
+    final slider = find.descendant(
+      of: find.byType(XiangqiDifficultyTile),
+      matching: find.byType(Slider),
+    );
+    final rect = tester.getRect(slider);
+    final gesture = await tester.startGesture(rect.center);
+    await gesture.moveTo(rect.centerRight - const Offset(16, 0));
+    await tester.pump();
+    final preview = container.read(xiangqiGameControllerProvider);
+    final previewGeneration = controller.generation;
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(preview.moves, before.moves);
+    expect(previewGeneration, generation);
+    final dialog = find.byType(YesNoDialog);
+    expect(dialog, findsOneWidget);
+    expect(find.descendant(of: dialog, matching: find.text('New game')), findsOneWidget);
+    expect(container.read(xiangqiGameControllerProvider).moves, before.moves);
+    await tester.tap(find.descendant(of: dialog, matching: find.text('Yes')));
+    await tester.pump();
+    final next = container.read(xiangqiGameControllerProvider);
+    expect(next.moves, isEmpty);
+    expect(next.practiceMode, isTrue);
+    expect(next.timeIncrement, before.timeIncrement);
+    expect(controller.generation, generation + 1);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.linux));
 
   for (final size in const [Size(480, 480), Size(1280, 720), Size(1920, 1080)]) {
     for (final side in XiangqiSide.values) {

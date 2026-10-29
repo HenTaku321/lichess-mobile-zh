@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lichess_mobile/src/model/common/time_increment.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_clock.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_storage.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
@@ -78,6 +79,29 @@ void main() {
     harness.controller.resign();
     expect(harness.state.isEvaluatingMove, isFalse);
     expect(harness.state.end, XiangqiGameEnd.resign);
+  });
+
+  test('a new game retains its time control but resets the old clocks', () async {
+    final harness = await game.makeHarness();
+    harness.controller.startNewGame(
+      side: .red,
+      difficulty: .level4,
+      timeIncrement: const TimeIncrement(300, 3),
+    );
+    harness.container
+        .read(xiangqiClockProvider.notifier)
+        .setupClock(
+          const TimeIncrement(300, 3),
+          redTimeLeft: const Duration(seconds: 20),
+          blackTimeLeft: const Duration(seconds: 30),
+        );
+    harness.controller.startNewGame(side: .red, difficulty: .level6);
+    final clock = harness.container.read(xiangqiClockProvider);
+    expect(clock.timeIncrement, const TimeIncrement(300, 3));
+    expect(clock.redTimeLeft, const Duration(seconds: 300));
+    expect(clock.blackTimeLeft, const Duration(seconds: 300));
+    expect(clock.activeClock, isNull);
+    expect(clock.flagSide, isNull);
   });
 
   test('restoring a pending move clears scoring state and asks for one reply', () async {

@@ -7,6 +7,8 @@ import 'package:lichess_mobile/src/model/xiangqi/xiangqi_rules.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../model/xiangqi/online/xiangqi_online_game_fixture.dart' as fx;
+
 /// Paints [board] in a room of [size] and hands back where the board ended up, which is what a
 /// touch has to be aimed at.
 Future<Rect> pumpBoard(
@@ -216,6 +218,16 @@ void main() {
     test('has nothing moving when there is no move at all', () {
       expect(xiangqiPieceAnimation(before, after, null).translating, isEmpty);
       expect(xiangqiPieceAnimation(before, after, null).fading, isEmpty);
+    });
+
+    test('one matching last move must not animate a multi-move snapshot', () {
+      final animation = xiangqiPieceAnimation(
+        fx.xiangqiTestPositions.first,
+        fx.xiangqiTestPositions.last,
+        fx.xiangqiTestMoves.last,
+      );
+      expect(animation.translating, isEmpty);
+      expect(animation.fading, isEmpty);
     });
   });
 
@@ -494,6 +506,58 @@ void main() {
       await pumpBoard(tester, XiangqiBoard(position: before, lastMove: move));
       expect(painterOf(tester).translating, isEmpty);
       await tester.pumpAndSettle();
+    });
+
+    testWidgets('single-step backward history animates the move being taken off the board', (
+      tester,
+    ) async {
+      final before = XiangqiPosition.initial();
+      final move = XiangqiMove.parseIccs('e3e4')!;
+      final after = play(before, move);
+      await pumpBoard(tester, XiangqiBoard(position: after, lastMove: move));
+      await pumpBoard(tester, XiangqiBoard(position: before));
+      expect(painterOf(tester).translating.toList(), [
+        (from: move.to, to: move.from, piece: before.pieceAt(move.from)!),
+      ]);
+      await tester.pumpAndSettle();
+      expect(painterOf(tester).translating, isEmpty);
+    });
+
+    testWidgets('backward capture history restores the captured piece through the animation', (
+      tester,
+    ) async {
+      final before = XiangqiPosition.fromFen('3ak4/9/9/9/9/9/9/R3r4/9/3AK4 w - - 0 1');
+      final move = XiangqiMove.parseIccs('a2e2')!;
+      final after = play(before, move);
+      await pumpBoard(tester, XiangqiBoard(position: after, lastMove: move));
+      await pumpBoard(tester, XiangqiBoard(position: before));
+      expect(painterOf(tester).translating.toList(), [
+        (from: move.to, to: move.from, piece: before.pieceAt(move.from)!),
+      ]);
+      expect(painterOf(tester).fading.toList(), [
+        (square: move.to, piece: before.pieceAt(move.to)!),
+      ]);
+      expect(painterOf(tester).drawnPieceSquares, isNot(contains(move.to)));
+      await tester.pumpAndSettle();
+      expect(painterOf(tester).drawnPieceSquares, containsAll([move.from, move.to]));
+    });
+
+    testWidgets('multi-step history jumps do not animate just the last matching piece', (
+      tester,
+    ) async {
+      await pumpBoard(tester, XiangqiBoard(position: fx.xiangqiTestPositions.first));
+      await pumpBoard(
+        tester,
+        XiangqiBoard(position: fx.xiangqiTestPositions.last, lastMove: fx.xiangqiTestMoves.last),
+      );
+      expect(painterOf(tester).translating, isEmpty);
+      expect(painterOf(tester).fading, isEmpty);
+      await pumpBoard(
+        tester,
+        XiangqiBoard(position: fx.xiangqiTestPositions[3], lastMove: fx.xiangqiTestMoves[2]),
+      );
+      expect(painterOf(tester).translating, isEmpty);
+      expect(painterOf(tester).fading, isEmpty);
     });
 
     testWidgets('draws nothing travelling when the board is turned around', (tester) async {

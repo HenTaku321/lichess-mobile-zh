@@ -254,6 +254,7 @@ class XiangqiChatController(final XiangqiChatRoomKey key) extends Notifier<Xiang
   Future<void> _waitForTurn() {
     final previous = _turn;
     final turn = previous.then((_) async {
+      if (!ref.mounted) return;
       final last = _lastRequest;
       final now = DateTime.now();
       if (last != null) {

@@ -149,6 +149,28 @@ jobs:
           test/widgets/xiangqi_refresh_test.dart
           test/view/message/xiangqi_conversation_screen_test.dart
 
+      - name: Fetch fixed desktop screenshot fonts
+        if: ${{ !cancelled() && steps.analyze.outcome == 'success' }}
+        run: bash scripts/fetch-desktop-test-fonts.sh out/visual-fonts
+
+      - name: Run desktop visual matrix
+        id: desktop_visual
+        if: ${{ !cancelled() && steps.analyze.outcome == 'success' }}
+        env:
+          XIANGQI_DESKTOP_VISUALS: '1'
+          XIANGQI_VISUAL_FONT_DIR: out/visual-fonts
+          XIANGQI_SCREENSHOT_DIR: out/desktop-screenshots
+        run: flutter test --no-pub --reporter expanded test/view/xiangqi/xiangqi_desktop_visual_test.dart
+
+      - name: Export desktop screenshots and geometry
+        if: ${{ !cancelled() && steps.desktop_visual.outcome != 'skipped' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: xiangqi-desktop-visuals-${{ github.sha }}
+          path: out/desktop-screenshots
+          retention-days: 7
+          if-no-files-found: error
+
       - name: Run unit tests
         run: flutter test
 

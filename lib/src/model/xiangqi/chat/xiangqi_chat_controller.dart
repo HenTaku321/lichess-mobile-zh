@@ -125,8 +125,9 @@ class XiangqiChatController(final XiangqiChatRoomKey key) extends Notifier<Xiang
     final generation = ++_generation;
     // A cold restore changes accountGeneration too. Do not open a socket under the unknown account
     // and immediately tear it down when the saved session is restored.
-    if (ref.watch(xiangqiSessionReadyProvider).isLoading)
+    if (ref.watch(xiangqiSessionReadyProvider).isLoading) {
       return const XiangqiChatState(isLoading: true);
+    }
     // History belongs to this account/room lifetime, not to the notifier object across rebuilds.
     ref.watch(xiangqiAccountGenerationProvider);
     _historyRevision++;

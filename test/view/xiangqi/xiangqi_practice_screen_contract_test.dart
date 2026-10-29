@@ -39,12 +39,39 @@ Future<void> tap(WidgetTester tester, String square) async {
   await tester.pump();
 }
 
-Future<void> score(WidgetTester tester, FakeTransport transport, int cp, String move) async {
-  await game.startSearch(tester, transport);
+Future<void> searchStarted(
+  WidgetTester tester,
+  FakeTransport transport, {
+  bool scoring = false,
+}) async {
+  final commands = <String>[];
+  var started = false;
+  for (var i = 0; i < 30; i++) {
+    await tester.pump(const Duration(milliseconds: 1));
+    final fresh = transport.takeCommands();
+    commands.addAll(fresh);
+    // Reply only after isready was sent; the engine drops an early readyok.
+    for (final command in fresh) {
+      if (command == 'isready') transport.emit('readyok');
+    }
+    if (fresh.any((command) => scoring ? command == 'go depth 9' : command.startsWith('go '))) {
+      started = true;
+      break;
+    }
+  }
+  expect(started, isTrue, reason: 'search never started; scoring=$scoring; commands=$commands');
+}
+
+Future<void> reply(WidgetTester tester, FakeTransport transport, String move) async {
+  await searchStarted(tester, transport);
+  transport.emit('bestmove $move');
   await tester.pump(const Duration(milliseconds: 1));
-  final searches = transport.takeCommands().where((command) => command.startsWith('go ')).toList();
-  expect(searches, isNotEmpty, reason: 'the scoring search must actually be started');
-  expect(searches.last, 'go depth 9');
+  await tester.pump();
+  await tester.pump();
+}
+
+Future<void> score(WidgetTester tester, FakeTransport transport, int cp, String move) async {
+  await searchStarted(tester, transport, scoring: true);
   transport.emit('info depth 9 score cp $cp pv $move');
   await tester.pump(const Duration(milliseconds: 1));
   await tester.pump();
@@ -74,7 +101,7 @@ void main() {
     await tap(tester, 'e2');
     await score(tester, transport, 20, 'b2e2');
     await score(tester, transport, -30, 'h9g7');
-    await game.answer(tester, transport, 'h9g7');
+    await reply(tester, transport, 'h9g7');
     final container = game.containerOf(tester);
     final controller = container.read(xiangqiGameControllerProvider.notifier);
     final before = container.read(xiangqiGameControllerProvider);
@@ -122,15 +149,15 @@ void main() {
             initialPracticeMode: true,
           ),
         );
-        if (side == .black) await game.answer(tester, transport, 'h2e2');
+        if (side == .black) await reply(tester, transport, 'h2e2');
         await tap(tester, side == .red ? 'h2' : 'h9');
         await tap(tester, side == .red ? 'e2' : 'g7');
         final moved = game.containerOf(tester).read(xiangqiGameControllerProvider);
         expect(moved.moves.length, side == .red ? 1 : 2);
         expect(moved.isEvaluatingMove, isTrue);
         await score(tester, transport, 20, side == .red ? 'b2e2' : 'b9c7');
-        final reply = side == .red ? 'h9g7' : 'h0g2';
-        await score(tester, transport, -30, reply);
+        final engineMove = side == .red ? 'h9g7' : 'h0g2';
+        await score(tester, transport, -30, engineMove);
         expect(
           game.containerOf(tester).read(xiangqiGameControllerProvider).practiceComment,
           isNotNull,
@@ -139,7 +166,11 @@ void main() {
             .widget<PracticeFeedbackCard>(find.byType(PracticeFeedbackCard))
             .feedback!
             .verdict;
-        await game.answer(tester, transport, reply);
+        await reply(tester, transport, engineMove);
+        expect(
+          game.containerOf(tester).read(xiangqiGameControllerProvider).moves.length,
+          side == .red ? 2 : 3,
+        );
         expect(
           tester.widget<PracticeFeedbackCard>(find.byType(PracticeFeedbackCard)).feedback!.verdict,
           verdict,

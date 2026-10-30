@@ -430,6 +430,10 @@ class _BodyState() extends ConsumerState<_Body> {
                 Navigator.pop(dialogContext);
                 _showNewGameSheet(context, ref);
               },
+              onAnalysis: () {
+                Navigator.pop(dialogContext);
+                unawaited(_openAnalysis());
+              },
             ),
           );
         });
@@ -841,6 +845,7 @@ String xiangqiResultLabel(BuildContext context, XiangqiGameState state) => switc
 class const XiangqiGameResultDialog({
   required final XiangqiGameState state,
   required final VoidCallback onNewGame,
+  final VoidCallback? onAnalysis,
   super.key,
 }) extends StatelessWidget {
   @override
@@ -861,6 +866,8 @@ class const XiangqiGameResultDialog({
       explanation: xiangqiResultLabel(context, state),
       actionsBuilder: (context, enabled) => [
         TextButton(onPressed: () => Navigator.pop(context), child: Text(context.l10n.close)),
+        if (onAnalysis != null)
+          TextButton(onPressed: onAnalysis, child: Text(context.l10n.analysis)),
         TextButton(onPressed: onNewGame, child: Text(context.l10n.mobileNewGame)),
       ],
     );

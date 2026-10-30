@@ -110,7 +110,11 @@ void main() {
     expect(find.byType(XiangqiGameResultDialog), findsOneWidget);
     expect(find.text('Analysis board'), findsOneWidget);
     await tester.tap(find.text('Analysis board'));
-    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump();
+    final route = ModalRoute.of(
+      tester.element(find.byType(XiangqiAnalysisScreen, skipOffstage: false)),
+    )!;
+    await tester.pump(route.transitionDuration + const Duration(milliseconds: 50));
     expect(find.byType(XiangqiAnalysisScreen), findsOneWidget);
     expect(transport.takeCommands().where((command) => command.startsWith('go ')), isEmpty);
   });

@@ -18,6 +18,9 @@ void main() {
     await analysis.pumpAnalysisScreen(tester, engineEvaluation: false);
     final container = ProviderScope.containerOf(tester.element(find.byType(XiangqiAnalysisScreen)));
     final controller = container.read(xiangqiAnalysisControllerProvider.notifier);
+    // A failed previous route can dispose after its tearDown and save its session again.
+    // Each branch-edit scenario explicitly starts from the standard root.
+    controller.reset();
     controller.play(analysis.moveAt('h2e2'));
     controller.play(analysis.moveAt('h9g7'));
     controller.play(analysis.moveAt('b0c2'));
@@ -48,6 +51,9 @@ void main() {
     await analysis.pumpAnalysisScreen(tester, engineEvaluation: false);
     final container = ProviderScope.containerOf(tester.element(find.byType(XiangqiAnalysisScreen)));
     final controller = container.read(xiangqiAnalysisControllerProvider.notifier);
+    // A failed previous route can dispose after its tearDown and save its session again.
+    // Each branch-edit scenario explicitly starts from the standard root.
+    controller.reset();
     controller.play(analysis.moveAt('h2e2'));
     controller.play(analysis.moveAt('h9g7'));
     controller.play(analysis.moveAt('b0c2'));
@@ -75,6 +81,9 @@ void main() {
     await analysis.pumpAnalysisScreen(tester, engineEvaluation: false);
     final container = ProviderScope.containerOf(tester.element(find.byType(XiangqiAnalysisScreen)));
     final controller = container.read(xiangqiAnalysisControllerProvider.notifier);
+    // A failed previous route can dispose after its tearDown and save its session again.
+    // Each branch-edit scenario explicitly starts from the standard root.
+    controller.reset();
     controller.play(analysis.moveAt('h2e2'));
     controller.play(analysis.moveAt('h9g7'));
     controller.play(analysis.moveAt('b0c2'));

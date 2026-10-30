@@ -98,7 +98,9 @@ void main() {
     expect(transport.takeCommands().where((command) => command.startsWith('go ')), isEmpty);
     Navigator.of(tester.element(find.byType(XiangqiBoard))).pop();
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(route.reverseTransitionDuration + const Duration(milliseconds: 50));
+    await tester.pump();
+    expect(find.byType(XiangqiBoard), findsOneWidget);
     expect(tester.widget<XiangqiBoard>(find.byType(XiangqiBoard)).position, before.position);
     expect(root.read(xiangqiAnalysisControllerProvider).moves, hasLength(1));
     expect(tester.takeException(), isNull);

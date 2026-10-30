@@ -342,7 +342,9 @@ void main() {
       await tester.tap(find.byKey(const Key('analysis-board-button')));
       // Navigation can finish while the real engine-loading chip keeps spinning.
       await tester.pump();
-      final route = ModalRoute.of(tester.element(find.byType(XiangqiAnalysisScreen)))!;
+      final route = ModalRoute.of(
+        tester.element(find.byType(XiangqiAnalysisScreen, skipOffstage: false)),
+      )!;
       await tester.pump(route.transitionDuration);
       await tester.pump();
 

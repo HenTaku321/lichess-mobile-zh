@@ -345,12 +345,15 @@ void main() {
       final route = ModalRoute.of(
         tester.element(find.byType(XiangqiAnalysisScreen, skipOffstage: false)),
       )!;
+      // The first frame built the incoming offstage route; this frame starts its animation.
+      await tester.pump();
       await tester.pump(route.transitionDuration);
       await tester.pump();
 
       // The position the editor built is the position the analysis board opened on, which is the
       // whole of what the two screens have to say to each other.
       expect(find.byType(XiangqiAnalysisScreen), findsOneWidget);
+      expect(find.byType(XiangqiBoard), findsOneWidget);
       final analysisContainer = ProviderScope.containerOf(
         tester.element(find.byType(XiangqiBoard).last),
       );

@@ -69,7 +69,9 @@ class const BoardAnalysisLayout({
                           math.min(
                             width - naturalWidth - gaugeSpace - 16 >= 250
                                 ? naturalWidth
-                                : width / kGoldenRatio,
+                                : limits.maxWidth / kGoldenRatio -
+                                      padding * 2 -
+                                      tables / boardHeightRatio,
                             width - gaugeSpace - 16,
                           ),
                         ),

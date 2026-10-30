@@ -165,10 +165,17 @@ Future<Widget> makeTestProviderScope(
 
   // Widget tests do not register native plugins. Cover focus/navigation without invoking the
   // real wakelock Pigeon transport; the controller and engine remain the actual implementations.
-  tester.binding.defaultBinaryMessenger.setMockMessageHandler(
-    'dev.flutter.pigeon.wakelock_plus_platform_interface.WakelockPlusApi.toggle',
-    (_) async => const StandardMessageCodec().encodeMessage(<Object?>[null]),
-  );
+  const wakelockChannel =
+      'dev.flutter.pigeon.wakelock_plus_platform_interface.WakelockPlusApi.toggle';
+  final messenger = tester.binding.defaultBinaryMessenger;
+  // Keep a test's explicit transport observer intact (e.g. game-status wakelock assertions).
+  if (messenger.checkMockMessageHandler(wakelockChannel, null)) {
+    messenger.setMockMessageHandler(
+      wakelockChannel,
+      (_) async => const StandardMessageCodec().encodeMessage(<Object?>[null]),
+    );
+    addTearDown(() => messenger.setMockMessageHandler(wakelockChannel, null));
+  }
 
   addTearDown(binding.reset);
 

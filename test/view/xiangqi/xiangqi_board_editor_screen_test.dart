@@ -347,10 +347,14 @@ void main() {
       // The position the editor built is the position the analysis board opened on, which is the
       // whole of what the two screens have to say to each other.
       expect(find.byType(XiangqiAnalysisScreen), findsOneWidget);
+      final analysisContainer = ProviderScope.containerOf(
+        tester.element(find.byType(XiangqiBoard).last),
+      );
       expect(
-        container.read(xiangqiAnalysisControllerProvider).position.toFen(),
+        analysisContainer.read(xiangqiAnalysisControllerProvider).position.toFen(),
         editorState(container).fen,
       );
+      expect(board(tester).position.toFen(), editorState(container).fen);
     });
 
     testWidgets('continue from here offers a game against the computer and one over the board', (

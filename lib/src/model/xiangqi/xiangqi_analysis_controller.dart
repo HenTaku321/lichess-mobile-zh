@@ -362,6 +362,20 @@ class XiangqiAnalysisController({final XiangqiAnalysisOptions? options})
     _restart();
   }
 
+  void promoteVariation() {
+    final tree = state.variationTree;
+    if (tree == null) return;
+    final path = state.moves.sublist(0, state.cursor);
+    final promoted = tree.promote(path);
+    if (identical(tree, promoted)) return;
+    final line = promoted.lineThrough(path);
+    state = _latest = state.copyWith(
+      variationTree: promoted,
+      positions: line.positions,
+      moves: line.moves,
+    );
+  }
+
   /// Takes the move that led to the position on the board back off the line.
   ///
   /// Nothing happens at the start of the line, which is also where a game that has not begun yet is.

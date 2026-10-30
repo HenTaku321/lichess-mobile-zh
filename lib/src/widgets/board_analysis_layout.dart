@@ -86,7 +86,7 @@ class const BoardAnalysisLayout({
                                   lineHeight -
                                   math.min(
                                     height / 3,
-                                    MediaQuery.textScalerOf(context).scale(88),
+                                    MediaQuery.textScalerOf(context).scale(64),
                                   )) /
                               boardHeightRatio,
                         ),

@@ -342,7 +342,9 @@ void main() {
       await tester.tap(find.byKey(const Key('analysis-board-button')));
       // Navigation can finish while the real engine-loading chip keeps spinning.
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 350));
+      final route = ModalRoute.of(tester.element(find.byType(XiangqiAnalysisScreen)))!;
+      await tester.pump(route.transitionDuration);
+      await tester.pump();
 
       // The position the editor built is the position the analysis board opened on, which is the
       // whole of what the two screens have to say to each other.

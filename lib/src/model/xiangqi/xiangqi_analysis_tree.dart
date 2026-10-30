@@ -37,6 +37,36 @@ class const XiangqiAnalysisNode({
     return node;
   }
 
+  bool canPromote(IList<XiangqiMove> path) {
+    var node = this;
+    for (final move in path) {
+      final index = node.children.indexWhere((child) => child.move == move);
+      if (index < 0) return false;
+      if (index > 0) return true;
+      node = node.children[index];
+    }
+    return false;
+  }
+
+  /// Moves the closest sideline on the selected path up one rank, retaining every subtree.
+  XiangqiAnalysisNode promote(IList<XiangqiMove> path) {
+    if (path.isEmpty) return this;
+    final index = children.indexWhere((child) => child.move == path.first);
+    if (index < 0) return this;
+    final child = children[index];
+    final promoted = child.promote(path.sublist(1));
+    final updated = children.toList();
+    if (!identical(child, promoted)) {
+      updated[index] = promoted;
+    } else if (index > 0) {
+      updated[index] = updated[index - 1];
+      updated[index - 1] = child;
+    } else {
+      return this;
+    }
+    return XiangqiAnalysisNode(position: position, move: move, children: updated.lock);
+  }
+
   XiangqiAnalysisNode add(IList<XiangqiMove> path, XiangqiMove move) {
     if (path.isEmpty) {
       if (children.any((child) => child.move == move)) return this;

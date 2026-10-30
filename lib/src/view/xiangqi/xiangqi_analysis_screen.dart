@@ -332,9 +332,21 @@ class _BodyState() extends ConsumerState<_Body> {
   }
 
   void _showMenu() {
+    final state = ref.read(xiangqiAnalysisControllerProvider);
     showAdaptiveActionSheet<void>(
       context: context,
       actions: [
+        if (state.variationTree?.canPromote(state.moves.sublist(0, state.cursor)) ?? false)
+          BottomSheetAction(
+            makeLabel: (context) => Text(context.l10n.promoteVariation),
+            onPressed: () =>
+                ref.read(xiangqiAnalysisControllerProvider.notifier).promoteVariation(),
+          ),
+        if (state.cursor > 0)
+          BottomSheetAction(
+            makeLabel: (context) => Text(context.l10n.deleteFromHere),
+            onPressed: () => ref.read(xiangqiAnalysisControllerProvider.notifier).retract(),
+          ),
         BottomSheetAction(
           makeLabel: (context) => Text(context.l10n.settingsSettings),
           onPressed: () => Navigator.of(context).push(XiangqiAnalysisSettingsScreen.buildRoute()),

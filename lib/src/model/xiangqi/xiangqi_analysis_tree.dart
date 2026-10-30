@@ -10,7 +10,7 @@ class const XiangqiAnalysisNode({
   final XiangqiMove? move,
   final IList<XiangqiAnalysisNode> children = const IListConst([]),
 }) {
-  factory XiangqiAnalysisNode.fromLine(XiangqiPosition initial, IList<XiangqiMove> moves) {
+  factory fromLine(XiangqiPosition initial, IList<XiangqiMove> moves) {
     var root = XiangqiAnalysisNode(position: initial);
     IList<XiangqiMove> path = const IListConst([]);
     for (final move in moves) {

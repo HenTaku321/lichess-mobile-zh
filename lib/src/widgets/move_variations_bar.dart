@@ -6,7 +6,7 @@ class const MoveVariationChoice<T>({
   required final T value,
   required final String label,
   required final bool mainline,
-}) {}
+});
 
 /// Shared branch selector; the adapter supplies only domain identity and notation.
 class const MoveVariationsBar<T>({

@@ -11,13 +11,22 @@ class const XiangqiAnalysisNode({
   final IList<XiangqiAnalysisNode> children = const IListConst([]),
 }) {
   factory fromLine(XiangqiPosition initial, IList<XiangqiMove> moves) {
-    var root = XiangqiAnalysisNode(position: initial);
-    IList<XiangqiMove> path = const IListConst([]);
+    final positions = <XiangqiPosition>[initial];
     for (final move in moves) {
-      root = root.add(path, move);
-      path = path.add(move);
+      positions.add(rules.play(positions.last, move));
     }
-    return root;
+    var node = XiangqiAnalysisNode(
+      position: positions.last,
+      move: moves.isEmpty ? null : moves.last,
+    );
+    for (var i = moves.length - 1; i >= 0; i--) {
+      node = XiangqiAnalysisNode(
+        position: positions[i],
+        move: i == 0 ? null : moves[i - 1],
+        children: IList([node]),
+      );
+    }
+    return node;
   }
 
   XiangqiAnalysisNode nodeAt(IList<XiangqiMove> path) {
@@ -38,6 +47,9 @@ class const XiangqiAnalysisNode({
           XiangqiAnalysisNode(position: rules.play(position, move), move: move),
         ),
       );
+    }
+    if (!children.any((child) => child.move == path.first)) {
+      throw ArgumentError.value(path, 'path', 'The analysis path does not exist.');
     }
     return XiangqiAnalysisNode(
       position: position,

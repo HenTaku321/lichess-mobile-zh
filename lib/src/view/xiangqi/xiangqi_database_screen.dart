@@ -7,6 +7,7 @@ import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
 import 'package:lichess_mobile/src/model/xiangqi/database/xiangqi_master_game.dart';
 import 'package:lichess_mobile/src/model/xiangqi/database/xiangqi_master_game_repository.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_analysis_options.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_country_names.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_locale.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_notation.dart';
@@ -15,6 +16,8 @@ import 'package:lichess_mobile/src/service/sound_service.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_analysis_screen.dart';
+import 'package:lichess_mobile/src/widgets/adaptive_action_sheet.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
 import 'package:lichess_mobile/src/widgets/history_navigation_button.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
@@ -479,6 +482,29 @@ class _GameState() extends ConsumerState<_Game> {
         onSelectMove: _goTo,
         bottomBar: BottomBar(
           children: [
+            BottomBarButton(
+              label: context.l10n.menu,
+              icon: Icons.menu,
+              onTap: () => showAdaptiveActionSheet<void>(
+                context: context,
+                actions: [
+                  BottomSheetAction(
+                    makeLabel: (context) => Text(context.l10n.analysis),
+                    onPressed: () => Navigator.of(context).push(
+                      XiangqiAnalysisScreen.buildRoute(
+                        options: XiangqiAnalysisOptions.line(
+                          sourceId: 'master:${game.slug}',
+                          initialPosition: game.positions.first,
+                          moves: game.moves,
+                          initialCursor: cursor,
+                          orientation: _isFlipped ? XiangqiSide.black : XiangqiSide.red,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             BottomBarButton(
               label: context.l10n.flipBoard,
               icon: CupertinoIcons.arrow_2_squarepath,

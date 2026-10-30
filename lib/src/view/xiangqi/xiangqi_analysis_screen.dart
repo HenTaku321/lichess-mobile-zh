@@ -9,6 +9,7 @@ import 'package:lichess_mobile/src/model/analysis/analysis_preferences.dart';
 import 'package:lichess_mobile/src/model/engine/evaluation_preferences.dart';
 import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_analysis_controller.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_analysis_options.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_export.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_move.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_notation.dart';
@@ -25,6 +26,7 @@ import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
 import 'package:lichess_mobile/src/widgets/feedback.dart';
 import 'package:lichess_mobile/src/widgets/history_navigation_button.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
+import 'package:lichess_mobile/src/widgets/move_variations_bar.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_analysis_layout.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_game_layout.dart';
@@ -69,25 +71,74 @@ class const XiangqiAnalysisScreen({
   /// Assumed well formed — its only source is [XiangqiPosition.toFen] — so a bad one throws rather
   /// than being quietly replaced by the opening.
   final String? initialFen,
+  final XiangqiAnalysisOptions? options,
 }) extends ConsumerWidget {
-  static Route<void> buildRoute({String? initialFen}) =>
-      buildScreenRoute(screen: XiangqiAnalysisScreen(initialFen: initialFen));
+  static Route<void> buildRoute({String? initialFen, XiangqiAnalysisOptions? options}) {
+    if (initialFen != null && options != null) {
+      throw ArgumentError('Pass an initial FEN or a history snapshot, not both.');
+    }
+    return buildScreenRoute(
+      screen: XiangqiAnalysisScreen(
+        options:
+            options ??
+            (initialFen == null
+                ? null
+                : XiangqiAnalysisOptions.line(
+                    sourceId: 'position',
+                    initialPosition: XiangqiPosition.fromFen(initialFen),
+                    moves: const IListConst([]),
+                  )),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Scaffold(
+    final imported = options;
+    final screen = Scaffold(
       // The game it analyses, then what the screen is: the same shape the chess analysis board's
       // title takes when it is analysing a variant, and out of the app's own two names rather than
       // one of this screen's making.
       appBar: AppBar(
         title: AppBarTitleText('${context.l10n.mobileXiangqi} · ${context.l10n.analysis}'),
       ),
-      body: _Body(initialFen: initialFen),
+      body: _Body(initialFen: initialFen, initialOrientation: imported?.orientation ?? .red),
     );
+    return imported == null
+        ? screen
+        : _ImportedAnalysisScope(
+            key: ValueKey(imported.sourceKey),
+            options: imported,
+            child: screen,
+          );
   }
 }
 
-class const _Body({final String? initialFen}) extends ConsumerStatefulWidget {
+class const _ImportedAnalysisScope({
+  required final XiangqiAnalysisOptions options,
+  required final Widget child,
+  super.key,
+}) extends StatefulWidget {
+  @override
+  State<_ImportedAnalysisScope> createState() => _ImportedAnalysisScopeState();
+}
+
+class _ImportedAnalysisScopeState() extends State<_ImportedAnalysisScope> {
+  // Stable overrides: rebuilds for a theme or locale change must not recreate the session.
+  late final _overrides = [
+    xiangqiAnalysisControllerProvider.overrideWith(
+      () => XiangqiAnalysisController(options: widget.options),
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) => ProviderScope(overrides: _overrides, child: widget.child);
+}
+
+class const _Body({
+  final String? initialFen,
+  final XiangqiSide initialOrientation = XiangqiSide.red,
+}) extends ConsumerStatefulWidget {
   @override
   ConsumerState<_Body> createState() => _BodyState();
 }
@@ -104,6 +155,7 @@ class _BodyState() extends ConsumerState<_Body> {
   @override
   void initState() {
     super.initState();
+    _isFlipped = widget.initialOrientation == XiangqiSide.black;
     // The engine is started by hand rather than watched into life: `ref.listen` never fires for the
     // value that is already there, and a screen opened with the evaluation on is exactly that value.
     // After the first frame, because the provider is read and written through the ref.
@@ -130,7 +182,7 @@ class _BodyState() extends ConsumerState<_Body> {
   /// See [EngineEvaluationPreferences].
   void _syncEngine() {
     final controller = ref.read(xiangqiAnalysisControllerProvider.notifier);
-    if (ref.read(engineEvaluationPreferencesProvider).isEnabled) {
+    if (controller.engineAllowed && ref.read(engineEvaluationPreferencesProvider).isEnabled) {
       controller.startEngine();
     } else {
       controller.stopEngine();
@@ -142,7 +194,9 @@ class _BodyState() extends ConsumerState<_Body> {
     final analysisState = ref.watch(xiangqiAnalysisControllerProvider);
     final analysisPrefs = ref.watch(analysisPreferencesProvider);
     final boardPrefs = ref.watch(boardPreferencesProvider);
-    final evalEnabled = ref.watch(engineEvaluationPreferencesProvider.select((p) => p.isEnabled));
+    final evalEnabled =
+        ref.watch(engineEvaluationPreferencesProvider.select((p) => p.isEnabled)) &&
+        ref.read(xiangqiAnalysisControllerProvider.notifier).engineAllowed;
     final numEvalLines = ref.watch(
       engineEvaluationPreferencesProvider.select((p) => p.numEvalLines),
     );
@@ -237,6 +291,20 @@ class _BodyState() extends ConsumerState<_Body> {
           // played is the whole of what makes it an analysis board.
           currentMoveIndex: analysisState.cursor,
           onSelectMove: controller.goTo,
+          panelFooter: MoveVariationsBar<XiangqiMove>(
+            choices: [
+              for (var i = 0; i < analysisState.variations.length; i++)
+                MoveVariationChoice(
+                  value: analysisState.variations[i].move!,
+                  label: xiangqiMoveNotation(
+                    analysisState.position,
+                    analysisState.variations[i].move!,
+                  ),
+                  mainline: i == 0,
+                ),
+            ],
+            onSelect: controller.selectVariation,
+          ),
           bottomBar: BottomBar(
             children: [
               BottomBarButton(label: context.l10n.menu, icon: Icons.menu, onTap: _showMenu),
@@ -245,7 +313,7 @@ class _BodyState() extends ConsumerState<_Body> {
                 onTap: () => setState(() => _isFlipped = !_isFlipped),
                 icon: CupertinoIcons.arrow_2_squarepath,
               ),
-              const XiangqiEngineButton(),
+              if (controller.engineAllowed) const XiangqiEngineButton(),
               HistoryNavigationButton(
                 forward: false,
                 onTap: analysisState.canGoBack ? controller.goBack : null,
@@ -271,18 +339,19 @@ class _BodyState() extends ConsumerState<_Body> {
           makeLabel: (context) => Text(context.l10n.settingsSettings),
           onPressed: () => Navigator.of(context).push(XiangqiAnalysisSettingsScreen.buildRoute()),
         ),
-        BottomSheetAction(
-          makeLabel: (context) => Text(context.l10n.clearLocalData),
-          onPressed: () => showConfirmDialog<void>(
-            context,
-            title: Text(context.l10n.clearLocalData),
-            onConfirm: () {
-              if (!mounted) return;
-              clearSavedXiangqiAnalysis();
-              ref.read(xiangqiAnalysisControllerProvider.notifier).reset();
-            },
+        if (ref.read(xiangqiAnalysisControllerProvider.notifier).isStandalone)
+          BottomSheetAction(
+            makeLabel: (context) => Text(context.l10n.clearLocalData),
+            onPressed: () => showConfirmDialog<void>(
+              context,
+              title: Text(context.l10n.clearLocalData),
+              onConfirm: () {
+                if (!mounted) return;
+                clearSavedXiangqiAnalysis();
+                ref.read(xiangqiAnalysisControllerProvider.notifier).reset();
+              },
+            ),
           ),
-        ),
         BottomSheetAction(
           makeLabel: (context) => Text(context.l10n.boardEditor),
           onPressed: () => Navigator.of(context).push(

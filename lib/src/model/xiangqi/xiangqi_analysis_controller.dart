@@ -8,6 +8,7 @@ import 'package:lichess_mobile/src/model/common/chess.dart';
 import 'package:lichess_mobile/src/model/engine/engine.dart';
 import 'package:lichess_mobile/src/model/engine/engine_providers.dart';
 import 'package:lichess_mobile/src/model/ui_events.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_analysis_options.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_analysis_tree.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_controller.dart'
     show xiangqiEngineProvider;
@@ -136,6 +137,8 @@ sealed class const XiangqiAnalysisState._() with _$XiangqiAnalysisState {
 ({IList<XiangqiPosition> positions, IList<XiangqiMove> moves, XiangqiAnalysisNode? tree})?
 _savedSession;
 
+final _savedImportedTrees = <XiangqiAnalysisSourceKey, XiangqiAnalysisNode>{};
+
 /// Forgets the analysis session, so that the next visit to the screen opens on an empty board.
 ///
 /// The chess analysis has the same escape hatch (`clearSavedStandaloneAnalysis`), and it is here for
@@ -143,6 +146,7 @@ _savedSession;
 /// whoever owns that screen.
 void clearSavedXiangqiAnalysis() {
   _savedSession = null;
+  _savedImportedTrees.clear();
 }
 
 /// The analysis board's own state, one session at a time.
@@ -171,7 +175,10 @@ final xiangqiAnalysisControllerProvider =
       name: 'XiangqiAnalysisControllerProvider',
     );
 
-class XiangqiAnalysisController() extends Notifier<XiangqiAnalysisState> {
+class XiangqiAnalysisController({final XiangqiAnalysisOptions? options})
+    extends Notifier<XiangqiAnalysisState> {
+  bool get engineAllowed => options?.engineAllowed ?? true;
+  bool get isStandalone => options == null;
   String? _engineError;
 
   /// The last search failure. Changes together with [XiangqiAnalysisState.isEngineRunning].
@@ -232,6 +239,19 @@ class XiangqiAnalysisController() extends Notifier<XiangqiAnalysisState> {
     // already cleared should not resurrect the analysis they cleared it from.
     ref.onCancel(() {
       final saved = _latest;
+      final imported = options;
+      if (imported != null) {
+        final tree = saved.variationTree;
+        if (tree != null) {
+          _savedImportedTrees.remove(imported.sourceKey);
+          _savedImportedTrees[imported.sourceKey] = tree;
+          // Bound in-memory imported sessions without writing games or accounts to disk.
+          if (_savedImportedTrees.length > 16) {
+            _savedImportedTrees.remove(_savedImportedTrees.keys.first);
+          }
+        }
+        return;
+      }
       _savedSession = saved.moves.isEmpty
           ? null
           : (positions: saved.positions, moves: saved.moves, tree: saved.variationTree);
@@ -245,6 +265,26 @@ class XiangqiAnalysisController() extends Notifier<XiangqiAnalysisState> {
       _search = null;
     });
 
+    final imported = options;
+    if (imported != null) {
+      final cached = _savedImportedTrees[imported.sourceKey];
+      var tree = imported.root;
+      if (cached != null && cached.position == imported.root.position) {
+        tree = cached;
+        IList<XiangqiMove> path = const IListConst([]);
+        for (final move in imported.initialMoves) {
+          tree = tree.add(path, move);
+          path = path.add(move);
+        }
+      }
+      final line = tree.lineThrough(imported.initialMoves);
+      return _latest = XiangqiAnalysisState(
+        positions: line.positions,
+        moves: line.moves,
+        cursor: imported.initialCursor,
+        variationTree: tree,
+      );
+    }
     final saved = _savedSession;
     return _latest = saved != null
         ? XiangqiAnalysisState(
@@ -269,6 +309,7 @@ class XiangqiAnalysisController() extends Notifier<XiangqiAnalysisState> {
   /// the first few depths is worse than no analysis. A position that changes is restarted by
   /// whichever method changed it.
   void startEngine() {
+    if (!engineAllowed) return;
     if (state.isEngineRunning) return;
     final cached = ref.read(xiangqiEngineProvider);
     if (cached.value?.isDead == true) {

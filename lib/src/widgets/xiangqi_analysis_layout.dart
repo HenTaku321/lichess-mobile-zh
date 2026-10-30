@@ -23,6 +23,7 @@ class const XiangqiAnalysisLayout({
   final double engineLinesHeight = 72,
   final Widget? evalGauge,
   final Widget? panelHeader,
+  final Widget? panelFooter,
   final List<Widget> panels = const [],
   final List<Tab>? tabs,
   final IList<String> moves = const IListConst([]),
@@ -58,6 +59,7 @@ class const XiangqiAnalysisLayout({
         if (sections.length > 1)
           TabBar(tabs: tabs ?? List.generate(sections.length, (i) => Tab(text: '${i + 1}'))),
         Expanded(child: sections.length == 1 ? sections.single : TabBarView(children: sections)),
+        ?panelFooter,
       ],
     );
     return DefaultTabController(

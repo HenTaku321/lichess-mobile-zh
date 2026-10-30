@@ -44,7 +44,10 @@ void main() {
         ),
       );
 
-      expect(tester.getRect(find.byKey(const Key('scaled-analysis-header'))).height, atLeast(52));
+      expect(
+        tester.getRect(find.byKey(const Key('scaled-analysis-header'))).height,
+        greaterThanOrEqualTo(52),
+      );
       expect(tester.takeException(), isNull);
     });
   }

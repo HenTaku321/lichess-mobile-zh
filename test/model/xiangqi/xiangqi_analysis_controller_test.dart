@@ -264,7 +264,7 @@ void main() {
       expect(harness.state.cursor, 0);
     });
 
-    test('a move played after stepping back is the new line, and the old one is dropped', () async {
+    test('a move played after stepping back selects its new continuation', () async {
       final harness = await makeHarness();
       final notifier = harness.notifier;
       notifier.play(move('h2e2'));

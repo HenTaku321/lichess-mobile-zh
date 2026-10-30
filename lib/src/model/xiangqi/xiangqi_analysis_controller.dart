@@ -8,6 +8,7 @@ import 'package:lichess_mobile/src/model/common/chess.dart';
 import 'package:lichess_mobile/src/model/engine/engine.dart';
 import 'package:lichess_mobile/src/model/engine/engine_providers.dart';
 import 'package:lichess_mobile/src/model/ui_events.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_analysis_tree.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_controller.dart'
     show xiangqiEngineProvider;
 // `$XiangqiEvaluationCopyWith` is freezed's own generated type and is named here for the same reason
@@ -67,6 +68,9 @@ sealed class const XiangqiAnalysisState._() with _$XiangqiAnalysisState {
     /// times, so this is always exactly one longer than [moves].
     required IList<XiangqiPosition> positions,
 
+    /// Canonical immutable history; positions/moves are its currently displayed line.
+    XiangqiAnalysisNode? variationTree,
+
     /// The moves played, in ICCS — `moves[i]` is what turned `positions[i]` into `positions[i + 1]`.
     required IList<XiangqiMove> moves,
 
@@ -114,6 +118,9 @@ sealed class const XiangqiAnalysisState._() with _$XiangqiAnalysisState {
 
   /// Whether a move later in the line can be stepped forward to.
   bool get canGoForward => cursor < moves.length;
+
+  IList<XiangqiAnalysisNode> get variations =>
+      variationTree?.nodeAt(moves.sublist(0, cursor)).children ?? const IListConst([]);
 }
 
 /// The analysis session kept in memory while the screen is away.
@@ -126,7 +133,8 @@ sealed class const XiangqiAnalysisState._() with _$XiangqiAnalysisState {
 /// The cursor and the selection are not part of it: what is worth coming back to is the line of
 /// play, and a player coming back to a board is looking at the end of it, which is where the cursor
 /// is put.
-({IList<XiangqiPosition> positions, IList<XiangqiMove> moves})? _savedSession;
+({IList<XiangqiPosition> positions, IList<XiangqiMove> moves, XiangqiAnalysisNode? tree})?
+_savedSession;
 
 /// Forgets the analysis session, so that the next visit to the screen opens on an empty board.
 ///
@@ -224,7 +232,9 @@ class XiangqiAnalysisController() extends Notifier<XiangqiAnalysisState> {
     // already cleared should not resurrect the analysis they cleared it from.
     ref.onCancel(() {
       final saved = _latest;
-      _savedSession = saved.moves.isEmpty ? null : (positions: saved.positions, moves: saved.moves);
+      _savedSession = saved.moves.isEmpty
+          ? null
+          : (positions: saved.positions, moves: saved.moves, tree: saved.variationTree);
     });
 
     ref.onDispose(() {
@@ -241,10 +251,13 @@ class XiangqiAnalysisController() extends Notifier<XiangqiAnalysisState> {
             positions: saved.positions,
             moves: saved.moves,
             cursor: saved.moves.length,
+            variationTree:
+                saved.tree ?? XiangqiAnalysisNode.fromLine(saved.positions.first, saved.moves),
           )
         : XiangqiAnalysisState(
             positions: IList([XiangqiPosition.initial()]),
             moves: const IListConst([]),
+            variationTree: XiangqiAnalysisNode(position: XiangqiPosition.initial()),
           );
   }
 
@@ -279,20 +292,23 @@ class XiangqiAnalysisController() extends Notifier<XiangqiAnalysisState> {
   /// Plays [move] on the position on the board.
   ///
   /// The move is played from wherever in the line the player is looking, so playing after stepping
-  /// back is the new continuation of the line and whatever followed the old one is dropped — the
-  /// same thing playing a move means on any analysis board.
+  /// back creates or selects a sibling continuation, without destroying the original mainline.
   ///
   /// Throws [rules.XiangqiIllegalMoveException] if the move cannot be played in this position.
   void play(XiangqiMove move) {
     final before = state.position;
     if (!rules.isLegal(before, move)) throw rules.XiangqiIllegalMoveException(move);
-    final positions = state.positions.sublist(0, state.cursor + 1).add(rules.play(before, move));
-    final moves = state.moves.sublist(0, state.cursor).add(move);
+    final path = state.moves.sublist(0, state.cursor).add(move);
+    final tree =
+        (state.variationTree ?? XiangqiAnalysisNode.fromLine(state.positions.first, state.moves))
+            .add(state.moves.sublist(0, state.cursor), move);
+    final line = tree.lineThrough(path);
     _shouldAnimateUpdate = true;
     state = _latest = state.copyWith(
-      positions: positions,
-      moves: moves,
-      cursor: positions.length - 1,
+      positions: line.positions,
+      moves: line.moves,
+      variationTree: tree,
+      cursor: path.length,
       selected: null,
     );
     final feedback = ref.read(moveFeedbackServiceProvider);
@@ -311,10 +327,15 @@ class XiangqiAnalysisController() extends Notifier<XiangqiAnalysisState> {
   void retract() {
     if (state.cursor == 0) return;
     final cursor = state.cursor - 1;
+    final tree =
+        (state.variationTree ?? XiangqiAnalysisNode.fromLine(state.positions.first, state.moves))
+            .remove(state.moves.sublist(0, state.cursor));
+    final line = tree.lineThrough(state.moves.sublist(0, cursor));
     _shouldAnimateUpdate = true;
     state = _latest = state.copyWith(
-      positions: state.positions.sublist(0, cursor + 1),
-      moves: state.moves.sublist(0, cursor),
+      positions: line.positions,
+      moves: line.moves,
+      variationTree: tree,
       cursor: cursor,
       selected: null,
     );
@@ -340,7 +361,22 @@ class XiangqiAnalysisController() extends Notifier<XiangqiAnalysisState> {
   }
 
   /// Steps one move forward along the line, if there is one.
-  void goForward({bool fastSeek = false}) => goTo(state.cursor + 1, fastSeek: fastSeek);
+  void goForward({bool fastSeek = false}) {
+    final next = state.variations.firstOrNull;
+    if (next == null) {
+      goTo(state.cursor + 1, fastSeek: fastSeek);
+    } else {
+      selectVariation(next.move!, fastSeek: fastSeek);
+    }
+  }
+
+  void selectVariation(XiangqiMove move, {bool fastSeek = false}) {
+    final tree = state.variationTree;
+    if (tree == null || !state.variations.any((child) => child.move == move)) return;
+    final line = tree.lineThrough(state.moves.sublist(0, state.cursor).add(move));
+    state = _latest = state.copyWith(positions: line.positions, moves: line.moves);
+    goTo(state.cursor + 1, fastSeek: fastSeek);
+  }
 
   /// Steps one move back along the line, if there is one.
   void goBack({bool fastSeek = false}) => goTo(state.cursor - 1, fastSeek: fastSeek);
@@ -386,6 +422,7 @@ class XiangqiAnalysisController() extends Notifier<XiangqiAnalysisState> {
       positions: IList([position]),
       moves: const IListConst([]),
       cursor: 0,
+      variationTree: XiangqiAnalysisNode(position: position),
       selected: null,
     );
     _restart();

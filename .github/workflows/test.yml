@@ -165,6 +165,7 @@ jobs:
           test/view/xiangqi/xiangqi_online_action_parity_test.dart
           test/model/xiangqi/xiangqi_analysis_branch_parity_test.dart
           test/widgets/analysis_layout_parity_test.dart
+          test/view/xiangqi/xiangqi_analysis_branch_screen_test.dart
 
       - name: Fetch fixed desktop screenshot fonts
         if: ${{ !cancelled() && steps.analyze.outcome == 'success' && steps.lifecycle.outcome == 'success' }}

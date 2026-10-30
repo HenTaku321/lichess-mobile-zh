@@ -3,20 +3,22 @@ import 'package:dartchess/dartchess.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/l10n/l10n.dart';
 import 'package:lichess_mobile/src/constants.dart';
+import 'package:lichess_mobile/src/model/engine/evaluation_preferences.dart';
 import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
 import 'package:lichess_mobile/src/styles/lichess_icons.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/screen.dart';
 import 'package:lichess_mobile/src/view/engine/engine_gauge.dart';
+import 'package:lichess_mobile/src/widgets/board_analysis_layout.dart';
 import 'package:lichess_mobile/src/widgets/pockets.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// The height of the board header or footer in the analysis layout.
-const kAnalysisBoardHeaderOrFooterHeight = 26.0;
+const kAnalysisBoardHeaderOrFooterHeight = kBoardAnalysisHeaderHeight;
 
 /// Scale factor for the small board in portrait orientation.
-const kSmallBoardScale = 0.8;
+const kSmallBoardScale = kBoardAnalysisSmallScale;
 
 typedef BoardBuilder = Widget Function(
   BuildContext context,
@@ -117,6 +119,29 @@ class const AnalysisLayout({
 }) extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Crazyhouse has extra piece pockets; keep its specialised arrangement until those slots
+    // have their own shared geometry contract. All pocket-free variants use the same shell.
+    if (pockets != null) return _buildPocketLayout(context, ref);
+    return BoardAnalysisLayout(
+      boardHeightRatio: 1,
+      boardBuilder: (context, size, radius) => boardBuilder(context, size.width, radius),
+      boardHeader: boardHeader == null
+          ? null
+          : KeyedSubtree(key: ValueKey(pov.opposite), child: boardHeader!),
+      boardFooter: boardFooter == null
+          ? null
+          : KeyedSubtree(key: ValueKey(pov), child: boardFooter!),
+      evalGauge: engineGaugeBuilder?.call(context),
+      gaugeWidth: getEvalGaugeWidth(context),
+      engineLines: engineLines,
+      engineLinesHeight: ref.watch(engineEvaluationPreferencesProvider).numEvalLines * 24.0,
+      panel: _AnalysisTabView(tabs: tabs, controller: tabController, children: children),
+      bottomBar: bottomBar,
+      smallBoard: smallBoard,
+    );
+  }
+
+  Widget _buildPocketLayout(BuildContext context, WidgetRef ref) {
     return Column(
       children: [
         Expanded(

@@ -25,6 +25,7 @@ import 'package:logging/logging.dart';
 part 'xiangqi_game_controller.freezed.dart';
 
 final _logger = Logger('XiangqiGameController');
+int _nextLocalGameIdentity = 0;
 
 /// How many times one position has to come back before the game is called a draw.
 ///
@@ -166,6 +167,7 @@ sealed class const XiangqiGameState._() with _$XiangqiGameState {
     required IList<XiangqiMove> moves,
 
     @Default(false) bool isEngineThinking,
+    @Default(false) bool isSuspended,
 
     /// The time control the game is played with. Infinite when the setup sheet did not ask for a
     /// clock, which is what every xiangqi computer game was before the clock was wired in.
@@ -224,7 +226,12 @@ sealed class const XiangqiGameState._() with _$XiangqiGameState {
 
   /// Input and drag affordances use the same policy; history and finished boards are read-only.
   bool get canMovePieces =>
-      !isFinished && !isEngineThinking && !isEvaluatingMove && isAtLivePosition && isPlayerTurn;
+      !isFinished &&
+      !isSuspended &&
+      !isEngineThinking &&
+      !isEvaluatingMove &&
+      isAtLivePosition &&
+      isPlayerTurn;
 
   bool canMovePiece(XiangqiPiece piece) => canMovePieces && piece.side == turn;
 
@@ -328,6 +335,78 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
   /// from still arrives, and this is what tells it apart from the answer to the current one.
   int _epoch = 0;
   int get generation => _epoch;
+  int _gameIdentity = 0;
+  String get analysisSourceId => 'computer:$_gameIdentity';
+  int? _analysisSuspension;
+  ({XiangqiPosition before, XiangqiMove move})? _suspendedPracticeMove;
+  void Function()? _releaseAnalysisHold;
+  bool _listenersCancelled = false;
+
+  void _releaseHold() {
+    final release = _releaseAnalysisHold;
+    _releaseAnalysisHold = null;
+    release?.call();
+  }
+
+  void _clearAnalysisSuspension() {
+    _analysisSuspension = null;
+    _suspendedPracticeMove = null;
+    _releaseHold();
+  }
+
+  /// Stop this game's owned requests before another page uses the shared engine. Keep the
+  /// controller and clock alive while its route is hidden, and preserve an unfinished assessment.
+  int suspendForAnalysis() {
+    if (_analysisSuspension == _epoch) return _epoch;
+    final pending = state.practiceMode && state.isEvaluatingMove && state.moves.isNotEmpty;
+    _suspendedPracticeMove = pending
+        ? (before: state.positions[state.positions.length - 2], move: state.moves.last)
+        : null;
+    if (_releaseAnalysisHold == null) {
+      final hold = ref.keepAlive();
+      _releaseAnalysisHold = hold.close;
+    }
+    _epoch++;
+    _analysisSuspension = _epoch;
+    _stopSearches();
+    ref.read(xiangqiClockProvider.notifier).pause();
+    state = state.copyWith(
+      isSuspended: true,
+      isEngineThinking: false,
+      isEvaluatingMove: false,
+      showingSuggestedMove: null,
+      selected: null,
+    );
+    return _epoch;
+  }
+
+  /// A stale return from an old route must neither restart an old game nor stop a newer search.
+  void resumeAfterAnalysis(int token) {
+    if (!ref.mounted || _analysisSuspension != token || _epoch != token) return;
+    final pending = _suspendedPracticeMove;
+    _analysisSuspension = null;
+    _suspendedPracticeMove = null;
+    state = state.copyWith(isSuspended: false);
+    if (!state.isFinished) {
+      if (!state.timeIncrement.isInfinite) {
+        ref.read(xiangqiClockProvider.notifier).resume(state.turn);
+      }
+      if (pending != null) {
+        unawaited(_evaluatePracticeMove(pending.before, pending.move));
+      } else if (!state.isPlayerTurn) {
+        unawaited(_playEngineMove());
+      }
+    }
+    // A pop future can finish before the route's paused provider listeners resume.
+    if (!_listenersCancelled) _releaseHold();
+  }
+
+  void cancelAnalysisSuspension(int token) {
+    if (!ref.mounted || _analysisSuspension != token) return;
+    _epoch++;
+    _stopSearches();
+    _clearAnalysisSuspension();
+  }
 
   /// The search the engine is running for this game, so that it can be stopped once its answer stops
   /// mattering.
@@ -343,6 +422,13 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
 
   @override
   XiangqiGameState build() {
+    _gameIdentity = ++_nextLocalGameIdentity;
+    ref.onCancel(() => _listenersCancelled = true);
+    ref.onResume(() {
+      _listenersCancelled = false;
+      if (_analysisSuspension == null) _releaseHold();
+    });
+    ref.listen(xiangqiClockProvider, (_, _) {});
     // Started here rather than on the first move, so that the network is written out and the engine
     // is up while the player is still choosing a side: the first move of a game against the computer
     // should not be the moment 48 MB is read off the disk.
@@ -355,6 +441,9 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
     );
 
     ref.onDispose(() {
+      _analysisSuspension = null;
+      _suspendedPracticeMove = null;
+      _releaseAnalysisHold = null;
       _epoch++;
       _stopSearches();
     });
@@ -385,6 +474,8 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
     TimeIncrement? timeIncrement,
     bool practiceMode = false,
   }) {
+    _clearAnalysisSuspension();
+    _gameIdentity = ++_nextLocalGameIdentity;
     _epoch++;
     _stopSearches();
     final effectiveTimeIncrement = timeIncrement ?? ref.read(xiangqiClockProvider).timeIncrement;
@@ -412,9 +503,12 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
     Duration? redTimeLeft,
     Duration? blackTimeLeft,
   }) {
+    _clearAnalysisSuspension();
+    _gameIdentity = ++_nextLocalGameIdentity;
     _epoch++;
     _stopSearches();
     state = game.copyWith(
+      isSuspended: false,
       isEngineThinking: false,
       isEvaluatingMove: false,
       showingSuggestedMove: null,
@@ -462,6 +556,7 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
     final index = state.undoIndex;
     if (!state.canUndo || index == null) return;
 
+    _clearAnalysisSuspension();
     _epoch++;
     _stopSearches();
     // The engine has nothing to say about a position that was already played and answered, so the
@@ -470,6 +565,7 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
       positions: state.positions.sublist(0, index + 1),
       moves: state.moves.sublist(0, index),
       isEngineThinking: false,
+      isSuspended: false,
       isEvaluatingMove: false,
       showingSuggestedMove: null,
       practiceComments: IMap({
@@ -504,10 +600,12 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
   /// The player gives up.
   void resign() {
     if (state.isFinished) return;
+    _clearAnalysisSuspension();
     _epoch++;
     _stopSearches();
     state = state.copyWith(
       resignedBy: state.playerSide,
+      isSuspended: false,
       isEngineThinking: false,
       isEvaluatingMove: false,
       showingSuggestedMove: null,
@@ -523,10 +621,12 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
   /// way a resignation does — the side that flagged has lost.
   void onFlag(XiangqiSide side) {
     if (state.isFinished) return;
+    _clearAnalysisSuspension();
     _epoch++;
     _stopSearches();
     state = state.copyWith(
       flaggedSide: side,
+      isSuspended: false,
       isEngineThinking: false,
       isEvaluatingMove: false,
       showingSuggestedMove: null,

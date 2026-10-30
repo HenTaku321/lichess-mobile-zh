@@ -12,6 +12,7 @@ import 'package:lichess_mobile/src/model/engine/evaluation_preferences.dart';
 import 'package:lichess_mobile/src/model/offline_computer/offline_computer_game_preferences.dart';
 import 'package:lichess_mobile/src/model/offline_computer/xiangqi_computer_setup.dart';
 import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_analysis_options.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_clock.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_clock_warning.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_controller.dart';
@@ -27,6 +28,8 @@ import 'package:lichess_mobile/src/utils/immersive_mode.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
 import 'package:lichess_mobile/src/utils/screen.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_analysis_screen.dart';
+import 'package:lichess_mobile/src/widgets/adaptive_action_sheet.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_bottom_sheet.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_choice_picker.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
@@ -199,6 +202,8 @@ class _BodyState() extends ConsumerState<_Body> {
   Timer? _gameResultTimer;
   XiangqiLowTimeWarning _clockWarning = XiangqiLowTimeWarning();
   bool _active = true;
+  XiangqiGameController? _pausedController;
+  int? _pausedToken;
 
   Future<void> _playLowTime() async {
     try {
@@ -221,6 +226,8 @@ class _BodyState() extends ConsumerState<_Body> {
 
   @override
   void dispose() {
+    final token = _pausedToken;
+    if (token != null) _pausedController?.cancelAnalysisSuspension(token);
     for (final timer in _moveFeedbackTimers) {
       timer.cancel();
     }
@@ -507,29 +514,14 @@ class _BodyState() extends ConsumerState<_Body> {
     // in, so both callbacks check the context is still mounted before reading anything through the
     // ref: a read on a state that is being torn down is refused outright.
     Widget content = FocusDetector(
-      onFocusGained: () => _active = true,
+      onFocusGained: _resumeGame,
       onFocusLost: () {
         if (!context.mounted) return;
-        _active = false;
-        _gameResultTimer?.cancel();
-        for (final timer in _moveFeedbackTimers) {
-          timer.cancel();
-        }
-        _moveFeedbackTimers.clear();
+        _pauseGame();
         unawaited(_saveGame(ref.read(xiangqiGameControllerProvider)));
-        ref.read(xiangqiClockProvider.notifier).pause();
-        _evaluatedPosition = null;
-        if (ref.read(xiangqiEngineAnalysisProvider).isBusy) {
-          ref.read(xiangqiEngineAnalysisProvider.notifier).stopEvaluation();
-        }
       },
       onFocusRegained: () {
-        if (!context.mounted) return;
-        final state = ref.read(xiangqiGameControllerProvider);
-        if (!state.isFinished && !state.timeIncrement.isInfinite) {
-          ref.read(xiangqiClockProvider.notifier).resume(state.turn);
-        }
-        _syncEvaluation(state);
+        _resumeGame();
       },
       child: Column(
         children: [
@@ -602,9 +594,14 @@ class _BodyState() extends ConsumerState<_Body> {
                 userActionsBar: BottomBar(
                   children: [
                     BottomBarButton(
-                      label: context.l10n.mobileNewGame,
-                      onTap: () => _showNewGameSheet(context, ref),
-                      icon: CupertinoIcons.add,
+                      label: context.l10n.menu,
+                      onTap: _showGameMenu,
+                      icon: Icons.menu,
+                    ),
+                    BottomBarButton(
+                      label: context.l10n.resign,
+                      onTap: gameState.isFinished ? null : _confirmResign,
+                      icon: CupertinoIcons.flag,
                     ),
                     BottomBarButton(
                       label: context.l10n.takeback,
@@ -618,11 +615,6 @@ class _BodyState() extends ConsumerState<_Body> {
                           : null,
                       icon: CupertinoIcons.lightbulb,
                       highlighted: hintMove != null,
-                    ),
-                    BottomBarButton(
-                      label: context.l10n.resign,
-                      onTap: gameState.isFinished ? null : _confirmResign,
-                      icon: CupertinoIcons.flag,
                     ),
                   ],
                 ),
@@ -644,6 +636,85 @@ class _BodyState() extends ConsumerState<_Body> {
     return WakelockWidget(child: content);
   }
 
+  void _pauseGame() {
+    if (!mounted) return;
+    _active = false;
+    _gameResultTimer?.cancel();
+    for (final timer in _moveFeedbackTimers) {
+      timer.cancel();
+    }
+    _moveFeedbackTimers.clear();
+    final controller = ref.read(xiangqiGameControllerProvider.notifier);
+    _pausedController = controller;
+    _pausedToken = controller.suspendForAnalysis();
+    _evaluatedPosition = null;
+    _evaluatedGeneration = null;
+    if (ref.read(xiangqiEngineAnalysisProvider).isBusy) {
+      ref.read(xiangqiEngineAnalysisProvider.notifier).stopEvaluation();
+    }
+  }
+
+  void _resumeGame() {
+    if (!mounted || !(ModalRoute.of(context)?.isCurrent ?? true)) return;
+    _active = true;
+    final token = _pausedToken;
+    if (token != null) _pausedController?.resumeAfterAnalysis(token);
+    _pausedToken = null;
+    _pausedController = null;
+    final state = ref.read(xiangqiGameControllerProvider);
+    if (!state.isFinished &&
+        !state.timeIncrement.isInfinite &&
+        ref.read(xiangqiClockProvider).activeClock == null) {
+      ref.read(xiangqiClockProvider.notifier).resume(state.turn);
+    }
+    _syncEvaluation(state);
+  }
+
+  Future<void> _openAnalysis() async {
+    final game = ref.read(xiangqiGameControllerProvider);
+    final controller = ref.read(xiangqiGameControllerProvider.notifier);
+    final flipped = ref.read(_isBoardFlippedProvider);
+    final options = XiangqiAnalysisOptions.line(
+      sourceId: controller.analysisSourceId,
+      initialPosition: game.positions.first,
+      moves: game.moves,
+      initialCursor: game.viewCursor,
+      orientation: flipped ? game.playerSide.opposite : game.playerSide,
+    );
+    _pauseGame();
+    try {
+      await Navigator.of(context).push(XiangqiAnalysisScreen.buildRoute(options: options));
+    } finally {
+      _resumeGame();
+    }
+  }
+
+  void _showGameMenu() {
+    final game = ref.read(xiangqiGameControllerProvider);
+    showAdaptiveActionSheet<void>(
+      context: context,
+      actions: [
+        BottomSheetAction(
+          makeLabel: (context) => Text(context.l10n.flipBoard),
+          onPressed: () => ref.read(_isBoardFlippedProvider.notifier).toggle(),
+        ),
+        BottomSheetAction(
+          makeLabel: (context) => Text(context.l10n.analysis),
+          onPressed: () => unawaited(_openAnalysis()),
+        ),
+        if (!game.isFinished)
+          BottomSheetAction(
+            makeLabel: (context) => Text(context.l10n.resign),
+            onPressed: _confirmResign,
+          ),
+        BottomSheetAction(
+          makeLabel: (context) => Text(context.l10n.mobileNewGame),
+          onPressed: () => _showNewGameSheet(context, ref),
+        ),
+      ],
+    );
+  }
+
   /// Starts or stops the evaluation so that it runs exactly when there is something to show and
   /// nobody else is using the engine.
   ///
@@ -658,6 +729,7 @@ class _BodyState() extends ConsumerState<_Body> {
     final shouldEvaluate =
         ref.read(engineEvaluationPreferencesProvider).isEnabled &&
         _active &&
+        !gameState.isSuspended &&
         !gameState.isEngineThinking &&
         !gameState.isEvaluatingMove &&
         gameState.isPlayerTurn &&
@@ -687,6 +759,7 @@ class _BodyState() extends ConsumerState<_Body> {
   /// superseded.
   bool _canGetHint(XiangqiGameState gameState, XiangqiEngineAnalysisState analysisState) {
     return !gameState.isFinished &&
+        !gameState.isSuspended &&
         !gameState.isEngineThinking &&
         !gameState.isEvaluatingMove &&
         gameState.isAtLivePosition &&

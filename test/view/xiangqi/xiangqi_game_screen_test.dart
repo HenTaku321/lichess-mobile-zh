@@ -380,7 +380,9 @@ void main() {
     testWidgets('the new game sheet opens on the game in progress', (tester) async {
       await pumpGameScreen(tester);
 
-      await tester.tap(find.byIcon(CupertinoIcons.add));
+      await tester.tap(find.byIcon(Icons.menu));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('New game'));
       await tester.pumpAndSettle();
 
       expect(find.text('Side'), findsOneWidget);
@@ -395,7 +397,9 @@ void main() {
     testWidgets('taking black hands the opening move to the computer, and says so', (tester) async {
       final transport = await pumpGameScreen(tester);
 
-      await tester.tap(find.byIcon(CupertinoIcons.add));
+      await tester.tap(find.byIcon(Icons.menu));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('New game'));
       await tester.pumpAndSettle();
 
       await tester.tap(find.descendant(of: sideSettingTile(), matching: find.text('Red')));
@@ -421,7 +425,9 @@ void main() {
     testWidgets('choosing a difficulty starts a game at that difficulty', (tester) async {
       final transport = await pumpGameScreen(tester);
 
-      await tester.tap(find.byIcon(CupertinoIcons.add));
+      await tester.tap(find.byIcon(Icons.menu));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('New game'));
       await tester.pumpAndSettle();
       expect(find.text('Level: ${XiangqiDifficulty.defaultLevel.level}'), findsOneWidget);
 

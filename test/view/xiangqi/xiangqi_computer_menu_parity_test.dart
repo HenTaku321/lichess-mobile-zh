@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:lichess_mobile/src/model/common/time_increment.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_clock.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_controller.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_analysis_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_game_screen.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
@@ -91,6 +92,21 @@ void main() {
     expect(root.read(xiangqiGameControllerProvider).moves, hasLength(2));
     expect(root.read(xiangqiGameControllerProvider).isEngineThinking, isFalse);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the computer result dialog offers analysis of the finished game', (tester) async {
+    final transport = await game.pumpGameScreen(tester, screen: screen, failOnOverflow: true);
+    await tester.tap(find.byIcon(CupertinoIcons.flag));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Yes'));
+    await tester.pump(const Duration(milliseconds: 501));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byType(XiangqiGameResultDialog), findsOneWidget);
+    expect(find.text('Analysis board'), findsOneWidget);
+    await tester.tap(find.text('Analysis board'));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byType(XiangqiAnalysisScreen), findsOneWidget);
+    expect(transport.takeCommands().where((command) => command.startsWith('go ')), isEmpty);
   });
 
   testWidgets('a stopped analysis search cannot cancel the resumed opponent search', (
@@ -206,7 +222,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     await startSearch(tester, transport);
     final restored = root.read(xiangqiClockProvider);
-    expect(restored.activeClock, .black);
+    expect(restored.activeClock, XiangqiSide.black);
     expect((restored.redTimeLeft! - paused.redTimeLeft!).inMilliseconds.abs(), lessThan(250));
     expect((restored.blackTimeLeft! - paused.blackTimeLeft!).inMilliseconds.abs(), lessThan(250));
     transport.emit('bestmove h9g7');

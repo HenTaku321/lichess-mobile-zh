@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override, ProviderOrFamily;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -161,6 +162,13 @@ Future<Widget> makeTestProviderScope(
   bool failOnOverflow = false,
 }) async {
   final binding = TestLichessBinding.ensureInitialized();
+
+  // Widget tests do not register native plugins. Cover focus/navigation without invoking the
+  // real wakelock Pigeon transport; the controller and engine remain the actual implementations.
+  tester.binding.defaultBinaryMessenger.setMockMessageHandler(
+    'dev.flutter.pigeon.wakelock_plus_platform_interface.WakelockPlusApi.toggle',
+    (_) async => const StandardMessageCodec().encodeMessage(<Object?>[null]),
+  );
 
   addTearDown(binding.reset);
 

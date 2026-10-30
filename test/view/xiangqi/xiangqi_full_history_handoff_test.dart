@@ -80,7 +80,11 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.text('Analysis board'));
-    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump();
+    final route = ModalRoute.of(
+      tester.element(find.byType(XiangqiAnalysisScreen, skipOffstage: false)),
+    )!;
+    await tester.pump(route.transitionDuration + const Duration(milliseconds: 50));
 
     expect(find.byType(XiangqiAnalysisScreen), findsOneWidget);
     final scoped = ProviderScope.containerOf(tester.element(find.byType(XiangqiBoard)));
@@ -93,6 +97,7 @@ void main() {
     expect(root.read(xiangqiAnalysisControllerProvider).moves, hasLength(1));
     expect(transport.takeCommands().where((command) => command.startsWith('go ')), isEmpty);
     Navigator.of(tester.element(find.byType(XiangqiBoard))).pop();
+    await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     expect(tester.widget<XiangqiBoard>(find.byType(XiangqiBoard)).position, before.position);
     expect(root.read(xiangqiAnalysisControllerProvider).moves, hasLength(1));

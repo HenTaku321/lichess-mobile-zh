@@ -43,8 +43,13 @@ Future<void> openAnalysis(WidgetTester tester) async {
   await tester.tap(find.byIcon(Icons.menu));
   await tester.pump(const Duration(milliseconds: 300));
   await tester.tap(find.text('Analysis board'));
-  await tester.pump(const Duration(milliseconds: 400));
+  await tester.pump();
+  final route = ModalRoute.of(
+    tester.element(find.byType(XiangqiAnalysisScreen, skipOffstage: false)),
+  )!;
+  await tester.pump(route.transitionDuration + const Duration(milliseconds: 50));
   await drain(tester);
+  expect(find.byType(XiangqiBoard), findsOneWidget);
 }
 
 void main() {
@@ -83,6 +88,7 @@ void main() {
     expect(root.read(xiangqiGameControllerProvider).moves, hasLength(1));
 
     Navigator.of(tester.element(find.byType(XiangqiBoard))).pop();
+    await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     final resumed = await startSearch(tester, transport);
     expect(resumed.where((command) => command.startsWith('go ')), hasLength(1));
@@ -133,6 +139,7 @@ void main() {
     expect(studying, contains('go infinite'));
     expect(root.read(xiangqiGameControllerProvider).moves, hasLength(1));
     Navigator.of(tester.element(find.byType(XiangqiBoard))).pop();
+    await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     await drain(tester);
     expect(transport.takeCommands(), contains('stop'));
@@ -169,6 +176,7 @@ void main() {
     transport.emit('bestmove b2e2');
     await drain(tester);
     Navigator.of(tester.element(find.byType(XiangqiBoard))).pop();
+    await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     expect(await startSearch(tester, transport), contains('go depth 9'));
     expect(root.read(xiangqiGameControllerProvider).isEvaluatingMove, isTrue);
@@ -219,6 +227,7 @@ void main() {
     transport.emit('bestmove h9g7');
     await drain(tester);
     Navigator.of(tester.element(find.byType(XiangqiBoard))).pop();
+    await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     await startSearch(tester, transport);
     final restored = root.read(xiangqiClockProvider);

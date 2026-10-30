@@ -347,8 +347,10 @@ void main() {
       )!;
       // The first frame built the incoming offstage route; this frame starts its animation.
       await tester.pump();
-      await tester.pump(route.transitionDuration);
+      // Cross the end boundary, rather than sampling the ticker exactly at its last frame.
+      await tester.pump(route.transitionDuration + const Duration(milliseconds: 50));
       await tester.pump();
+      expect(route.animation!.status, AnimationStatus.completed);
 
       // The position the editor built is the position the analysis board opened on, which is the
       // whole of what the two screens have to say to each other.

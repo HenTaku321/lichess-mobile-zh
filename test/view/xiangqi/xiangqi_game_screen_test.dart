@@ -99,6 +99,7 @@ Future<FakeTransport> pumpGameScreen(
   String? initialFen,
   XiangqiGameScreen? screen,
   bool failOnOverflow = false,
+  bool settle = true,
 }) async {
   final transport = FakeTransport(
     spec: const PikafishSpec(nnuePath: '/test/pikafish.nnue'),
@@ -136,7 +137,12 @@ Future<FakeTransport> pumpGameScreen(
             failOnOverflow: failOnOverflow,
           ),
   );
-  await tester.pumpAndSettle();
+  if (settle) {
+    await tester.pumpAndSettle();
+  } else {
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+  }
   return transport;
 }
 

@@ -79,7 +79,7 @@ void main() {
       find.descendant(of: find.byType(BottomBar), matching: find.byIcon(Icons.menu)),
     );
     await tester.pump(const Duration(milliseconds: 300));
-    await tester.tap(find.text('Analysis'));
+    await tester.tap(find.text('Analysis board'));
     await tester.pump(const Duration(milliseconds: 400));
 
     expect(find.byType(XiangqiAnalysisScreen), findsOneWidget);

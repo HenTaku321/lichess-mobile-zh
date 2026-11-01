@@ -637,10 +637,10 @@ void main() {
       expect(again.state.positions, leftOn.positions);
       expect(
         again.state.cursor,
-        leftOn.moves.length,
-        reason: 'a player coming back to a board is looking at the end of the line',
+        leftOn.cursor,
+        reason: 'returning to analysis keeps the position the reader actually selected',
       );
-      expect(again.state.position, leftOn.positions.last);
+      expect(again.state.position, leftOn.position);
       expect(again.state.selected, isNull);
       expect(again.state.lines, isEmpty, reason: 'the engine has said nothing about it yet');
     });

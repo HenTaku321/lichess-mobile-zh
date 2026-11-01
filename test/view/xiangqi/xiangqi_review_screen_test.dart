@@ -13,7 +13,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:l10n_esperanto/l10n_esperanto.dart';
 import 'package:lichess_mobile/l10n/l10n.dart';
+import 'package:lichess_mobile/src/model/engine/engine.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_com_protocol.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_controller.dart'
+    show xiangqiEngineProvider;
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_rules.dart' as rules;
 import 'package:lichess_mobile/src/network/xiangqi_http.dart' show xiangqiAuthStorageProvider;
@@ -85,6 +88,8 @@ Future<fx.FakeXiangqiChannelFactory> pumpReview(
   WidgetTester tester, {
   bool signedIn = true,
   SoundService? sound,
+  Engine? engine,
+  bool failOnOverflow = false,
 }) async {
   final factory = fx.FakeXiangqiChannelFactory();
   final client = XiangqiSocketClient(
@@ -106,6 +111,8 @@ Future<fx.FakeXiangqiChannelFactory> pumpReview(
         home: XiangqiReviewScreen(gameId: _gameId),
       ),
       overrides: {
+        if (engine != null)
+          xiangqiEngineProvider: xiangqiEngineProvider.overrideWith((ref) => engine),
         if (sound != null) soundServiceProvider: soundServiceProvider.overrideWithValue(sound),
         // A real client over a fake transport, and not `overrideWithValue`: the client holds a
         // heartbeat timer, and the provider's teardown is the only thing that cancels it before the
@@ -120,6 +127,7 @@ Future<fx.FakeXiangqiChannelFactory> pumpReview(
           ),
         ),
       },
+      failOnOverflow: failOnOverflow,
     ),
   );
 

@@ -59,6 +59,7 @@ Future<FakeTransport> pumpOtbScreen(
   Size surfaceSize = kTestSurfaceSize,
   String? initialFen,
   bool startGame = true,
+  bool failOnOverflow = false,
 }) async {
   final transport = FakeTransport(
     spec: const PikafishSpec(nnuePath: '/test/pikafish.nnue'),
@@ -78,6 +79,7 @@ Future<FakeTransport> pumpOtbScreen(
         ),
       },
       surfaceSize: surfaceSize,
+      failOnOverflow: failOnOverflow,
     ),
   );
   await tester.pumpAndSettle();

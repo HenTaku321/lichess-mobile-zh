@@ -14,6 +14,7 @@ class const EvaluationGauge({
   required final bool referenceSideAtBottom,
   final String? label,
   final bool disabled = false,
+  final bool isTerminal = false,
   super.key,
 }) extends StatefulWidget {
   static Color backgroundColor(BuildContext context) =>
@@ -39,8 +40,11 @@ class _EvaluationGaugeState() extends State<EvaluationGauge> {
   @override
   void didUpdateWidget(covariant EvaluationGauge oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.value?.isFinite == true) _fromValue = oldWidget.value!.clamp(0.0, 1.0);
-    if (oldWidget.label != null) _previousLabel = oldWidget.label;
+    // A game result is not a cached engine score for a historical board position.
+    if (!oldWidget.isTerminal) {
+      if (oldWidget.value?.isFinite == true) _fromValue = oldWidget.value!.clamp(0.0, 1.0);
+      if (oldWidget.label != null) _previousLabel = oldWidget.label;
+    }
   }
 
   @override

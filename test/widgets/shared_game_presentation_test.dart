@@ -120,52 +120,55 @@ void main() {
 
   testWidgets('both evaluation gauges expose the translated accessibility label', (tester) async {
     final semantics = tester.ensureSemantics();
-    addTearDown(semantics.dispose);
-    for (final xiangqi in [false, true]) {
-      final Widget gauge = xiangqi
-          ? const XiangqiEvalGauge(
-              redWinProbability: 0.6,
-              orientation: XiangqiSide.red,
-              evaluation: XiangqiEvaluation(cp: 100),
-            )
-          : const EngineGauge(
-              params: (
-                isLocalEngineAvailable: false,
-                orientation: Side.white,
-                position: Chess.initial,
-                savedEval: null,
-                serverEval: ExternalEval(cp: 100, mate: null),
-                filters: (
-                  context: EvaluationContext(
-                    id: StringId('shared-gauge-test'),
-                    variant: Variant.standard,
-                    initialPosition: Chess.initial,
+    try {
+      for (final xiangqi in [false, true]) {
+        final Widget gauge = xiangqi
+            ? const XiangqiEvalGauge(
+                redWinProbability: 0.6,
+                orientation: XiangqiSide.red,
+                evaluation: XiangqiEvaluation(cp: 100),
+              )
+            : const EngineGauge(
+                params: (
+                  isLocalEngineAvailable: false,
+                  orientation: Side.white,
+                  position: Chess.initial,
+                  savedEval: null,
+                  serverEval: ExternalEval(cp: 100, mate: null),
+                  filters: (
+                    context: EvaluationContext(
+                      id: StringId('shared-gauge-test'),
+                      variant: Variant.standard,
+                      initialPosition: Chess.initial,
+                    ),
+                    path: null,
                   ),
-                  path: null,
                 ),
-              ),
-            );
-      await tester.pumpWidget(
-        await makeTestProviderScope(
-          tester,
-          key: ValueKey(xiangqi),
-          failOnOverflow: true,
-          child: MaterialApp(
-            locale: const Locale('zh', 'CN'),
-            supportedLocales: AppLocalizations.supportedLocales,
-            localizationsDelegates: const [
-              AppLocalizations.delegate,
-              ...GlobalMaterialLocalizations.delegates,
-            ],
-            home: Center(child: SizedBox(width: 24, height: 300, child: gauge)),
+              );
+        await tester.pumpWidget(
+          await makeTestProviderScope(
+            tester,
+            key: ValueKey(xiangqi),
+            failOnOverflow: true,
+            child: MaterialApp(
+              locale: const Locale('zh', 'CN'),
+              supportedLocales: AppLocalizations.supportedLocales,
+              localizationsDelegates: const [
+                AppLocalizations.delegate,
+                ...GlobalMaterialLocalizations.delegates,
+              ],
+              home: Center(child: SizedBox(width: 24, height: 300, child: gauge)),
+            ),
           ),
-        ),
-      );
-      await tester.pump();
-      await tester.pump();
-      expect(find.bySemanticsLabel('引擎评估'), findsOneWidget);
-      expect(tester.getSemantics(find.bySemanticsLabel('引擎评估')).value, '+1.0');
-      expect(tester.takeException(), isNull);
+        );
+        await tester.pump();
+        await tester.pump();
+        expect(find.bySemanticsLabel('引擎评估'), findsOneWidget);
+        expect(tester.getSemantics(find.bySemanticsLabel('引擎评估')).value, '+1.0');
+        expect(tester.takeException(), isNull);
+      }
+    } finally {
+      semantics.dispose();
     }
   });
 

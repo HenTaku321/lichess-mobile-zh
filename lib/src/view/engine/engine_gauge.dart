@@ -61,6 +61,7 @@ class const _EvalGauge({
     final integerPart = score == null || score.startsWith('#') ? null : score.split('.').first;
     return EvaluationGauge(
       value: value,
+      isTerminal: outcome != null,
       referenceSideAtBottom: orientation == Side.white,
       label: integerPart != null && integerPart.length > 2 ? integerPart : score,
     );

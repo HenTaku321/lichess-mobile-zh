@@ -157,6 +157,7 @@ class const XiangqiEvalGauge({
               : '#'
         : _scoreLabel(evaluation),
     disabled: disabled,
+    isTerminal: outcome != null,
   );
 }
 

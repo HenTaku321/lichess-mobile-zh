@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:collection/collection.dart';
 import 'package:dartchess/dartchess.dart' show Chess;
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,6 +11,7 @@ import 'package:lichess_mobile/src/model/engine/engine_providers.dart';
 import 'package:lichess_mobile/src/model/ui_events.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_analysis_options.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_analysis_tree.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_export.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_controller.dart'
     show xiangqiEngineProvider;
 // `$XiangqiEvaluationCopyWith` is freezed's own generated type and is named here for the same reason
@@ -362,40 +364,114 @@ class XiangqiAnalysisController({final XiangqiAnalysisOptions? options})
     _restart();
   }
 
-  void promoteVariation() {
+  void promoteVariation({IList<XiangqiMove>? path, bool toMainline = false}) {
+    if (!ref.mounted) return;
+    final original = state.variationTree;
+    if (original == null) return;
+    final target = path ?? state.moves.sublist(0, state.cursor);
+    if (!original.hasPath(target)) return;
+    var tree = original.promote(target);
+    if (toMainline) {
+      while (tree.canPromote(target)) {
+        tree = tree.promote(target);
+      }
+    }
+    if (!identical(original, tree)) _publishTree(tree, state.moves.sublist(0, state.cursor));
+  }
+
+  void collapseVariations(IList<XiangqiMove> path) {
+    if (!ref.mounted) return;
     final tree = state.variationTree;
-    if (tree == null) return;
-    final path = state.moves.sublist(0, state.cursor);
-    final promoted = tree.promote(path);
-    if (identical(tree, promoted)) return;
-    final line = promoted.lineThrough(path);
-    state = _latest = state.copyWith(
-      variationTree: promoted,
-      positions: line.positions,
-      moves: line.moves,
+    if (tree == null || !tree.hasPath(path)) return;
+    _publishTree(
+      tree.updateAt(
+        path,
+        (node) => node.copyWith(
+          children: node.children.map((child) => child.copyWith(isCollapsed: true)).toIList(),
+        ),
+      ),
+      state.moves.sublist(0, state.cursor),
     );
   }
 
-  /// Takes the move that led to the position on the board back off the line.
-  ///
-  /// Nothing happens at the start of the line, which is also where a game that has not begun yet is.
-  void retract() {
-    if (state.cursor == 0) return;
-    final cursor = state.cursor - 1;
-    final tree =
-        (state.variationTree ?? XiangqiAnalysisNode.fromLine(state.positions.first, state.moves))
-            .remove(state.moves.sublist(0, state.cursor));
-    final line = tree.lineThrough(state.moves.sublist(0, cursor));
-    _shouldAnimateUpdate = true;
+  void expandVariations(IList<XiangqiMove> path) {
+    if (!ref.mounted) return;
+    final tree = state.variationTree;
+    if (tree == null || !tree.hasPath(path)) return;
+    final mainline = !tree.canPromote(path);
+    _publishTree(
+      tree.updateAt(
+        path,
+        (node) => node.copyWith(
+          children: node.children
+              .mapIndexed(
+                (i, child) => mainline && i == 0
+                    ? child
+                    : child.copyWith(
+                        isCollapsed: false,
+                        children: child.children
+                            .map((n) => n.copyWith(isCollapsed: false))
+                            .toIList(),
+                      ),
+              )
+              .toIList(),
+        ),
+      ),
+      state.moves.sublist(0, state.cursor),
+    );
+  }
+
+  void _publishTree(XiangqiAnalysisNode tree, IList<XiangqiMove> path) {
+    final line = tree.lineThrough(path);
     state = _latest = state.copyWith(
+      variationTree: tree,
       positions: line.positions,
       moves: line.moves,
-      variationTree: tree,
-      cursor: cursor,
+      cursor: path.length,
       selected: null,
     );
+  }
+
+  /// Explicit deletion is addressed by path, not by whichever branch is currently selected.
+  void deleteFromHere(IList<XiangqiMove> path) {
+    if (!ref.mounted || path.isEmpty) return;
+    final tree = state.variationTree;
+    if (tree == null || !tree.hasPath(path)) return;
+    final selected = state.moves.sublist(0, state.cursor);
+    final deletingSelected =
+        selected.length >= path.length && selected.sublist(0, path.length) == path;
+    _shouldAnimateUpdate = deletingSelected && selected.length == path.length;
+    _publishTree(tree.remove(path), deletingSelected ? path.sublist(0, path.length - 1) : selected);
+    if (deletingSelected) _restart();
+  }
+
+  /// Removes only the current move and its descendants; unrelated continuations are retained.
+  void retract() => deleteFromHere(state.moves.sublist(0, state.cursor));
+
+  void goToPath(IList<XiangqiMove> path) {
+    if (!ref.mounted) return;
+    final tree = state.variationTree;
+    if (tree == null || !tree.hasPath(path) || path == state.moves.sublist(0, state.cursor)) return;
+    _shouldAnimateUpdate = (path.length - state.cursor).abs() == 1;
+    _publishTree(tree, path);
+    if (path.isNotEmpty) {
+      final move = path.last;
+      final before = state.positions[path.length - 1];
+      ref
+          .read(soundServiceProvider)
+          .play(before.pieceAt(move.to) != null ? Sound.capture : Sound.move);
+    }
     _restart();
   }
+
+  String makeLineExport({
+    IList<XiangqiMove> path = const IListConst([]),
+    bool includeVariations = true,
+  }) => xiangqiTreeExport(
+    state.variationTree ?? XiangqiAnalysisNode.fromLine(state.positions.first, state.moves),
+    path: path,
+    includeVariations: includeVariations,
+  );
 
   /// Puts the board on the position [cursor] moves into the line, clamped to the line's ends.
   void goTo(int cursor, {bool fastSeek = false}) {

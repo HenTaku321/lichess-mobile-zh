@@ -1,4 +1,5 @@
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_analysis_tree.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_move.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_notation.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
@@ -61,6 +62,33 @@ String xiangqiMovesExport(XiangqiPosition from, IList<XiangqiMove> moves) =>
 /// told separately.
 String xiangqiLineExport(XiangqiPosition from, IList<XiangqiMove> moves) =>
     <String>[xiangqiFenExport(from), ..._moveLines(from, moves)].join('\n');
+
+/// Self-describing xiangqi notation, not a chess PGN. The starting FEN is followed by numbered
+/// Chinese moves; alternative continuations use parentheses and retain their own move numbers.
+String xiangqiTreeExport(
+  XiangqiAnalysisNode root, {
+  IList<XiangqiMove> path = const IListConst([]),
+  bool includeVariations = true,
+}) {
+  final selected = root.nodeAt(path);
+  final tree = XiangqiAnalysisNode.fromLine(root.position, path).updateAt(path, (_) => selected);
+  String moveText(XiangqiPosition before, XiangqiMove move) =>
+      '${before.fullmoveNumber}${before.turn == .red ? '.' : '...'} '
+      '${xiangqiMoveNotation(before, move)}';
+  String continuation(XiangqiAnalysisNode parent) {
+    if (parent.children.isEmpty) return '';
+    final first = parent.children.first;
+    return [
+      moveText(parent.position, first.move!),
+      if (includeVariations)
+        for (final alternative in parent.children.skip(1))
+          '(${[moveText(parent.position, alternative.move!), continuation(alternative)].where((s) => s.isNotEmpty).join(' ')})',
+      continuation(first),
+    ].where((s) => s.isNotEmpty).join(' ');
+  }
+
+  return [root.position.toFen(), continuation(tree)].where((s) => s.isNotEmpty).join('\n');
+}
 
 /// [from] with [moves] played on it, each move carrying the number it is written under.
 ///

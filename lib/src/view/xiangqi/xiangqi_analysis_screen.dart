@@ -19,6 +19,7 @@ import 'package:lichess_mobile/src/utils/focus_detector.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_analysis_settings_screen.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_analysis_tree_view.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_board_editor_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_engine_button.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_action_sheet.dart';
@@ -26,6 +27,7 @@ import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
 import 'package:lichess_mobile/src/widgets/feedback.dart';
 import 'package:lichess_mobile/src/widgets/history_navigation_button.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
+import 'package:lichess_mobile/src/widgets/move_tree_view.dart';
 import 'package:lichess_mobile/src/widgets/move_variations_bar.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_analysis_layout.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
@@ -237,6 +239,16 @@ class _BodyState() extends ConsumerState<_Body> {
       },
       child: SafeArea(
         child: XiangqiAnalysisLayout(
+          panels: [
+            XiangqiAnalysisTreeView(
+              root: analysisState.variationTree!,
+              currentPath: analysisState.moves.sublist(0, analysisState.cursor),
+              controller: controller,
+              displayMode: analysisPrefs.inlineNotation
+                  ? PgnTreeDisplayMode.inlineNotation
+                  : PgnTreeDisplayMode.twoColumn,
+            ),
+          ],
           smallBoard: analysisPrefs.smallBoard,
           inlineNotation: analysisPrefs.inlineNotation,
           boardBuilder: (context, size, radius) => BrightnessHueFilter(
@@ -381,8 +393,7 @@ class _BodyState() extends ConsumerState<_Body> {
           makeLabel: (context) =>
               Text('${context.l10n.copyToClipboard} · ${context.l10n.movesPlayed}'),
           onPressed: () {
-            final state = ref.read(xiangqiAnalysisControllerProvider);
-            unawaited(_copy(xiangqiLineExport(state.positions.first, state.moves)));
+            unawaited(_copy(ref.read(xiangqiAnalysisControllerProvider.notifier).makeLineExport()));
           },
         ),
       ],

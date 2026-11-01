@@ -235,13 +235,13 @@ sealed class const XiangqiGameState._() with _$XiangqiGameState {
 
   bool canMovePiece(XiangqiPiece piece) => canMovePieces && piece.side == turn;
 
-  /// The live player's verdict, including after the computer has answered it.
+  /// The verdict at the displayed position, including its immediate computer reply.
   XiangqiPracticeComment? get practiceComment =>
-      practiceComments[positions.length - 1] ?? practiceComments[positions.length - 2];
+      practiceComments[viewCursor] ?? practiceComments[viewCursor - 1];
 
   /// The last surviving verdict, only used faded while the next move is evaluated.
   XiangqiPracticeComment? get previousPracticeComment {
-    for (var ply = positions.length - 1; ply > 0; ply--) {
+    for (var ply = viewCursor; ply > 0; ply--) {
       final comment = practiceComments[ply];
       if (comment != null) return comment;
     }

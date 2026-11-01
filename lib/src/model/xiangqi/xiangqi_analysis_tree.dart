@@ -9,6 +9,7 @@ class const XiangqiAnalysisNode({
   required final XiangqiPosition position,
   final XiangqiMove? move,
   final IList<XiangqiAnalysisNode> children = const IListConst([]),
+  final bool isCollapsed = false,
 }) {
   factory fromLine(XiangqiPosition initial, IList<XiangqiMove> moves) {
     final positions = <XiangqiPosition>[initial];
@@ -35,6 +36,39 @@ class const XiangqiAnalysisNode({
       node = node.children.firstWhere((child) => child.move == move);
     }
     return node;
+  }
+
+  bool hasPath(IList<XiangqiMove> path) {
+    var node = this;
+    for (final move in path) {
+      final child = node.children.where((child) => child.move == move).firstOrNull;
+      if (child == null) return false;
+      node = child;
+    }
+    return true;
+  }
+
+  XiangqiAnalysisNode copyWith({IList<XiangqiAnalysisNode>? children, bool? isCollapsed}) =>
+      XiangqiAnalysisNode(
+        position: position,
+        move: move,
+        children: children ?? this.children,
+        isCollapsed: isCollapsed ?? this.isCollapsed,
+      );
+
+  XiangqiAnalysisNode updateAt(
+    IList<XiangqiMove> path,
+    XiangqiAnalysisNode Function(XiangqiAnalysisNode) update,
+  ) {
+    if (path.isEmpty) return update(this);
+    if (!hasPath(path)) return this;
+    return copyWith(
+      children: children
+          .map(
+            (child) => child.move == path.first ? child.updateAt(path.sublist(1), update) : child,
+          )
+          .toIList(),
+    );
   }
 
   bool canPromote(IList<XiangqiMove> path) {
@@ -64,15 +98,13 @@ class const XiangqiAnalysisNode({
     } else {
       return this;
     }
-    return XiangqiAnalysisNode(position: position, move: move, children: updated.lock);
+    return copyWith(children: updated.lock);
   }
 
   XiangqiAnalysisNode add(IList<XiangqiMove> path, XiangqiMove move) {
     if (path.isEmpty) {
       if (children.any((child) => child.move == move)) return this;
-      return XiangqiAnalysisNode(
-        position: position,
-        move: this.move,
+      return copyWith(
         children: children.add(
           XiangqiAnalysisNode(position: rules.play(position, move), move: move),
         ),
@@ -81,9 +113,7 @@ class const XiangqiAnalysisNode({
     if (!children.any((child) => child.move == path.first)) {
       throw ArgumentError.value(path, 'path', 'The analysis path does not exist.');
     }
-    return XiangqiAnalysisNode(
-      position: position,
-      move: this.move,
+    return copyWith(
       children: IList([
         for (final child in children)
           if (child.move == path.first) child.add(path.sublist(1), move) else child,
@@ -94,9 +124,7 @@ class const XiangqiAnalysisNode({
   /// Explicit deletion, used by retract; adding a variation never calls this operation.
   XiangqiAnalysisNode remove(IList<XiangqiMove> path) {
     if (path.isEmpty) return this;
-    return XiangqiAnalysisNode(
-      position: position,
-      move: move,
+    return copyWith(
       children: IList([
         for (final child in children)
           if (child.move != path.first)

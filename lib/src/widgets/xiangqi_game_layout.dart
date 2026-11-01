@@ -1,6 +1,7 @@
 import 'package:collection/collection.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lichess_mobile/src/constants.dart';
 import 'package:lichess_mobile/src/model/account/account_preferences.dart';
 import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_hint.dart';

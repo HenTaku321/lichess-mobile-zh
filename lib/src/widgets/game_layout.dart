@@ -3,6 +3,7 @@ import 'package:collection/collection.dart';
 import 'package:dartchess/dartchess.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lichess_mobile/src/constants.dart';
 import 'package:lichess_mobile/src/model/common/chess.dart';
 import 'package:lichess_mobile/src/model/game/game_board_params.dart';
 import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
@@ -398,7 +399,7 @@ class _GameLayoutState() extends ConsumerState<GameLayout> {
           verticalDirection: upsideDown ? VerticalDirection.up : VerticalDirection.down,
           children: [
             if (top && pocket != null) pocket,
-            top ? widget.topTable : widget.bottomTable,
+            if (top) widget.topTable else widget.bottomTable,
             if (!top && pocket != null) pocket,
           ],
         ),

@@ -12,6 +12,28 @@ void main() {
   setUp(clearSavedXiangqiAnalysis);
   tearDown(clearSavedXiangqiAnalysis);
 
+  testWidgets('a right click opens the same node menu without moving the analysis cursor', (
+    tester,
+  ) async {
+    await analysis.pumpAnalysisScreen(tester, engineEvaluation: false);
+    final container = ProviderScope.containerOf(tester.element(find.byType(XiangqiAnalysisScreen)));
+    final controller = container.read(xiangqiAnalysisControllerProvider.notifier);
+    controller.play(analysis.moveAt('h2e2'));
+    controller.play(analysis.moveAt('h9g7'));
+    await tester.pump();
+    final cursor = container.read(xiangqiAnalysisControllerProvider).cursor;
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.text('炮二平五')),
+      kind: PointerDeviceKind.mouse,
+      buttons: kSecondaryMouseButton,
+    );
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(find.text('Delete from here'), findsOneWidget);
+    expect(container.read(xiangqiAnalysisControllerProvider).cursor, cursor);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('analysis displays the original line and every retained sideline simultaneously', (
     tester,
   ) async {
@@ -78,3 +100,4 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 }
+import 'package:flutter/gestures.dart';

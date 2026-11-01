@@ -29,23 +29,17 @@ class const StudyTreeView(final StudyOptions options, {required final bool showT
         Expanded(
           child: CustomScrollView(
             slivers: [
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: Column(
-                  crossAxisAlignment: .start,
-                  children: [
-                    Expanded(
-                      child: DebouncedPgnTreeView(
-                        root: root,
-                        currentPath: studyState.currentPath,
-                        pgnRootComments: studyState.pgnRootComments,
-                        notifier: ref.read(studyControllerProvider(options).notifier),
-                        showTopDivider: showTopDivider,
-                        shouldShowAnnotations: studyPrefs.showAnnotations,
-                        displayMode: studyPrefs.inlineNotation ? .inlineNotation : .twoColumn,
-                      ),
-                    ),
-                  ],
+              // The adaptive tree needs real width constraints. An intrinsic-height fill sliver
+              // cannot measure a LayoutBuilder and also obscures long trees' scroll extent.
+              SliverToBoxAdapter(
+                child: DebouncedPgnTreeView(
+                  root: root,
+                  currentPath: studyState.currentPath,
+                  pgnRootComments: studyState.pgnRootComments,
+                  notifier: ref.read(studyControllerProvider(options).notifier),
+                  showTopDivider: showTopDivider,
+                  shouldShowAnnotations: studyPrefs.showAnnotations,
+                  displayMode: studyPrefs.inlineNotation ? .inlineNotation : .twoColumn,
                 ),
               ),
             ],

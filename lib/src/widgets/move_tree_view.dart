@@ -848,7 +848,7 @@ class const _TwoColumnMainlinePart<T>({
                 child: Container(
                   decoration: const BoxDecoration(
                     shape: BoxShape.rectangle,
-                    borderRadius: TreeInlineMove<T>.borderRadius,
+                    borderRadius: TreeInlineMove.borderRadius,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

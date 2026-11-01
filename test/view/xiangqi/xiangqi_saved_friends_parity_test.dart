@@ -91,7 +91,7 @@ void main() {
           if (request.url.path == '/api/puzzle/P/$id' && failFetch) {
             return jsonReply({}, 503);
           }
-          return server.answer(request);
+          return await server.answer(request);
         }),
         failOnOverflow: true,
       );

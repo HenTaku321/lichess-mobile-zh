@@ -30,7 +30,7 @@ class const StudyTreeView(final StudyOptions options, {required final bool showT
           child: CustomScrollView(
             slivers: [
               // The adaptive tree needs real width constraints. An intrinsic-height fill sliver
-              // cannot measure a LayoutBuilder and also obscures long trees' scroll extent.
+              // cannot measure a LayoutBuilder; a content sliver lays out the full scroll extent.
               SliverToBoxAdapter(
                 child: DebouncedPgnTreeView(
                   root: root,

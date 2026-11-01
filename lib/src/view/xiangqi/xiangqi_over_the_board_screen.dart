@@ -12,6 +12,7 @@ import 'package:lichess_mobile/src/model/common/time_increment.dart';
 import 'package:lichess_mobile/src/model/lobby/game_setup_preferences.dart';
 import 'package:lichess_mobile/src/model/over_the_board/over_the_board_preferences.dart';
 import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_analysis_options.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_clock.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_clock_warning.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_controller.dart';
@@ -26,6 +27,7 @@ import 'package:lichess_mobile/src/utils/immersive_mode.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
 import 'package:lichess_mobile/src/view/over_the_board/over_the_board_screen.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_analysis_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_game_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_local_game_scope.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_action_sheet.dart';
@@ -155,6 +157,21 @@ class _BodyState() extends ConsumerState<_Body> {
             blackTimeLeft: clock.blackTimeLeft,
           ),
         );
+  }
+
+  Future<void> _openAnalysis() async {
+    if (!mounted) return;
+    final game = ref.read(xiangqiGameControllerProvider);
+    if (!game.isFinished) return;
+    _resultTimer?.cancel();
+    final options = XiangqiAnalysisOptions.line(
+      sourceId: ref.read(xiangqiGameControllerProvider.notifier).analysisSourceId,
+      initialPosition: game.positions.first,
+      moves: game.moves,
+      initialCursor: game.viewCursor,
+      orientation: _orientation,
+    );
+    await Navigator.of(context).push(XiangqiAnalysisScreen.buildRoute(options: options));
   }
 
   /// Shows the result half a second after the game ends.
@@ -316,6 +333,7 @@ class _BodyState() extends ConsumerState<_Body> {
                     currentMoveIndex: gameState.viewCursor,
                     onSelectMove: ref.read(xiangqiGameControllerProvider.notifier).goTo,
                     userActionsBar: _OtbBottomBar(
+                      onAnalysis: () => unawaited(_openAnalysis()),
                       onFlipBoard: () {
                         setState(() {
                           _orientation = _orientation.opposite;
@@ -378,7 +396,10 @@ class const _OtbPlayer({required final XiangqiSide side, required final Key cloc
 ///
 /// There is no resign and no offer of a draw, which the chess bar has: both are one player telling
 /// the other something, and the two of them are sitting at the same board already.
-class const _OtbBottomBar({required final VoidCallback onFlipBoard}) extends ConsumerWidget {
+class const _OtbBottomBar({
+  required final VoidCallback onFlipBoard,
+  required final VoidCallback onAnalysis,
+}) extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final gameState = ref.watch(xiangqiGameControllerProvider);
@@ -431,6 +452,7 @@ class const _OtbBottomBar({required final VoidCallback onFlipBoard}) extends Con
   }
 
   Future<void> _showMenu(BuildContext context, WidgetRef ref) {
+    final game = ref.read(xiangqiGameControllerProvider);
     return showAdaptiveActionSheet(
       context: context,
       actions: [
@@ -438,6 +460,11 @@ class const _OtbBottomBar({required final VoidCallback onFlipBoard}) extends Con
           makeLabel: (context) => Text(context.l10n.mobileNewGame),
           onPressed: () => _showConfigureSheet(context),
         ),
+        if (game.isFinished)
+          BottomSheetAction(
+            makeLabel: (context) => Text(context.l10n.analysis),
+            onPressed: onAnalysis,
+          ),
         BottomSheetAction(
           makeLabel: (context) => Text(context.l10n.flipBoard),
           onPressed: onFlipBoard,

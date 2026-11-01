@@ -81,6 +81,9 @@ sealed class const XiangqiAnalysisState._() with _$XiangqiAnalysisState {
     /// the line started from and `moves.length` is the end of it.
     @Default(0) int cursor,
 
+    /// The reader's board perspective, kept with the selected path when a source is reopened.
+    @Default(XiangqiSide.red) XiangqiSide orientation,
+
     /// The square the player has picked up, or null when they have not.
     XiangqiSquare? selected,
 
@@ -133,13 +136,11 @@ sealed class const XiangqiAnalysisState._() with _$XiangqiAnalysisState {
 /// the player comes back to is the line they were looking at rather than a fresh board. Nothing
 /// reaches the disk — this is a session, not a saved analysis — so it is gone when the process is.
 ///
-/// The cursor and the selection are not part of it: what is worth coming back to is the line of
-/// play, and a player coming back to a board is looking at the end of it, which is where the cursor
-/// is put.
-({IList<XiangqiPosition> positions, IList<XiangqiMove> moves, XiangqiAnalysisNode? tree})?
-_savedSession;
+/// Keep the canonical tree, displayed line, cursor and orientation, not temporary selections,
+/// engine output or an active search. Returning must not silently choose another continuation.
+XiangqiAnalysisState? _savedSession;
 
-final _savedImportedTrees = <XiangqiAnalysisSourceKey, XiangqiAnalysisNode>{};
+final _savedImportedSessions = <XiangqiAnalysisSourceKey, XiangqiAnalysisState>{};
 
 /// Forgets the analysis session, so that the next visit to the screen opens on an empty board.
 ///
@@ -148,7 +149,7 @@ final _savedImportedTrees = <XiangqiAnalysisSourceKey, XiangqiAnalysisNode>{};
 /// whoever owns that screen.
 void clearSavedXiangqiAnalysis() {
   _savedSession = null;
-  _savedImportedTrees.clear();
+  _savedImportedSessions.clear();
 }
 
 /// The analysis board's own state, one session at a time.
@@ -236,27 +237,25 @@ class XiangqiAnalysisController({final XiangqiAnalysisOptions? options})
 
     // Saved on cancel rather than on dispose: `autoDispose` cancels the moment the last listener
     // goes away, which is the screen being popped, and it is the line as the player left it that is
-    // wanted rather than whatever a later teardown might make of it. An empty line clears the saved
-    // session rather than leaving the previous one behind — coming back to a board the player had
-    // already cleared should not resurrect the analysis they cleared it from.
+    // wanted rather than whatever a later teardown might make of it. A cleared tree replaces the
+    // previous snapshot, so returning does not resurrect a line the reader deliberately removed.
     ref.onCancel(() {
-      final saved = _latest;
+      final saved = _latest.copyWith(
+        selected: null,
+        isEngineRunning: false,
+        lines: const IListConst([]),
+      );
       final imported = options;
       if (imported != null) {
-        final tree = saved.variationTree;
-        if (tree != null) {
-          _savedImportedTrees.remove(imported.sourceKey);
-          _savedImportedTrees[imported.sourceKey] = tree;
-          // Bound in-memory imported sessions without writing games or accounts to disk.
-          if (_savedImportedTrees.length > 16) {
-            _savedImportedTrees.remove(_savedImportedTrees.keys.first);
-          }
+        _savedImportedSessions.remove(imported.sourceKey);
+        _savedImportedSessions[imported.sourceKey] = saved;
+        // Bound in-memory imported sessions without writing games or accounts to disk.
+        if (_savedImportedSessions.length > 16) {
+          _savedImportedSessions.remove(_savedImportedSessions.keys.first);
         }
         return;
       }
-      _savedSession = saved.moves.isEmpty
-          ? null
-          : (positions: saved.positions, moves: saved.moves, tree: saved.variationTree);
+      _savedSession = saved;
     });
 
     ref.onDispose(() {
@@ -269,38 +268,35 @@ class XiangqiAnalysisController({final XiangqiAnalysisOptions? options})
 
     final imported = options;
     if (imported != null) {
-      final cached = _savedImportedTrees[imported.sourceKey];
-      var tree = imported.root;
-      if (cached != null && cached.position == imported.root.position) {
-        tree = cached;
-        IList<XiangqiMove> path = const IListConst([]);
-        for (final move in imported.initialMoves) {
-          tree = tree.add(path, move);
-          path = path.add(move);
-        }
+      final cached = _savedImportedSessions[imported.sourceKey];
+      // This key includes the validated history and permissions. Do not merge the original line
+      // back into an edited session: that would resurrect nodes the reader deliberately deleted.
+      if (cached != null && cached.positions.first == imported.root.position) {
+        return _latest = cached;
       }
-      final line = tree.lineThrough(imported.initialMoves);
+      final line = imported.root.lineThrough(imported.initialMoves);
       return _latest = XiangqiAnalysisState(
         positions: line.positions,
         moves: line.moves,
         cursor: imported.initialCursor,
-        variationTree: tree,
+        orientation: imported.orientation,
+        variationTree: imported.root,
       );
     }
     final saved = _savedSession;
-    return _latest = saved != null
-        ? XiangqiAnalysisState(
-            positions: saved.positions,
-            moves: saved.moves,
-            cursor: saved.moves.length,
-            variationTree:
-                saved.tree ?? XiangqiAnalysisNode.fromLine(saved.positions.first, saved.moves),
-          )
-        : XiangqiAnalysisState(
-            positions: IList([XiangqiPosition.initial()]),
-            moves: const IListConst([]),
-            variationTree: XiangqiAnalysisNode(position: XiangqiPosition.initial()),
-          );
+    return _latest =
+        saved ??
+        XiangqiAnalysisState(
+          positions: IList([XiangqiPosition.initial()]),
+          moves: const IListConst([]),
+          variationTree: XiangqiAnalysisNode(position: XiangqiPosition.initial()),
+        );
+  }
+
+  void flipBoard() {
+    if (!ref.mounted) return;
+    _shouldAnimateUpdate = false;
+    state = _latest = state.copyWith(orientation: state.orientation.opposite);
   }
 
   /// Starts analysing the position on the board, and keeps the engine on it until the board moves

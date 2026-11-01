@@ -67,6 +67,9 @@ final class const MoveTreeNode<T>({
 
 /// View-layer callbacks. Model controllers must not depend on this widget interface.
 abstract class MoveTreeNotifier<T>() {
+  /// Some source snapshots may be browsed but must not expose an export exit.
+  bool get canExport => true;
+
   void expandVariations(MoveTreePath<T> path);
   void collapseVariations(MoveTreePath<T> path);
   void promoteVariation(MoveTreePath<T> path, bool toMainLine);
@@ -1433,28 +1436,29 @@ class const _MoveContextMenu<T>({
             onPressed: () => notifier?.promoteVariation(path, true),
           ),
         ],
-        BottomSheetContextMenuAction(
-          icon: Icons.copy,
-          child: Text(
-            lineInfo.type == _LineType.mainline
-                ? mainlineCopyLabel ?? context.l10n.copyToClipboard
-                : variationCopyLabel ?? context.l10n.copyToClipboard,
+        if (notifier?.canExport ?? false)
+          BottomSheetContextMenuAction(
+            icon: Icons.copy,
+            child: Text(
+              lineInfo.type == _LineType.mainline
+                  ? mainlineCopyLabel ?? context.l10n.copyToClipboard
+                  : variationCopyLabel ?? context.l10n.copyToClipboard,
+            ),
+            onPressed: () async {
+              final pgn = notifier?.makeLineText(
+                path,
+                includeVariations: lineInfo.type != _LineType.mainline,
+              );
+              if (pgn == null) return;
+              final line = pgn;
+              // The bottom sheet can be disposed before the clipboard write completes.
+              final messenger = ScaffoldMessenger.of(context);
+              final copiedMessage = copyMessage ?? context.l10n.success;
+              await Clipboard.setData(ClipboardData(text: line));
+              if (!messenger.mounted) return;
+              messenger.showSnackBar(SnackBar(content: Text(copiedMessage)));
+            },
           ),
-          onPressed: () async {
-            final pgn = notifier?.makeLineText(
-              path,
-              includeVariations: lineInfo.type != _LineType.mainline,
-            );
-            if (pgn == null) return;
-            final line = pgn;
-            // The bottom sheet can be disposed before the clipboard write completes.
-            final messenger = ScaffoldMessenger.of(context);
-            final copiedMessage = copyMessage ?? context.l10n.success;
-            await Clipboard.setData(ClipboardData(text: line));
-            if (!messenger.mounted) return;
-            messenger.showSnackBar(SnackBar(content: Text(copiedMessage)));
-          },
-        ),
         BottomSheetContextMenuAction(
           icon: Icons.delete,
           child: Text(context.l10n.deleteFromHere),

@@ -105,7 +105,7 @@ class const XiangqiAnalysisScreen({
       appBar: AppBar(
         title: AppBarTitleText('${context.l10n.mobileXiangqi} · ${context.l10n.analysis}'),
       ),
-      body: _Body(initialFen: initialFen, initialOrientation: imported?.orientation ?? .red),
+      body: _Body(initialFen: initialFen),
     );
     return imported == null
         ? screen
@@ -138,27 +138,15 @@ class _ImportedAnalysisScopeState() extends State<_ImportedAnalysisScope> {
   Widget build(BuildContext context) => ProviderScope(overrides: _overrides, child: widget.child);
 }
 
-class const _Body({
-  final String? initialFen,
-  final XiangqiSide initialOrientation = XiangqiSide.red,
-}) extends ConsumerStatefulWidget {
+class const _Body({final String? initialFen}) extends ConsumerStatefulWidget {
   @override
   ConsumerState<_Body> createState() => _BodyState();
 }
 
 class _BodyState() extends ConsumerState<_Body> {
-  /// Which way up the board is drawn.
-  ///
-  /// A way of looking at the board and not a fact about the position, exactly as it is in the game
-  /// screens: there is no player here to have a side, red moves first and sits at the bottom by
-  /// default, and turning it around is a glance rather than a move. Kept here rather than in a
-  /// provider because nothing outside this screen has any business with it.
-  bool _isFlipped = false;
-
   @override
   void initState() {
     super.initState();
-    _isFlipped = widget.initialOrientation == XiangqiSide.black;
     // The engine is started by hand rather than watched into life: `ref.listen` never fires for the
     // value that is already there, and a screen opened with the evaluation on is exactly that value.
     // After the first frame, because the provider is read and written through the ref.
@@ -220,7 +208,7 @@ class _BodyState() extends ConsumerState<_Body> {
       _syncEngine();
     });
 
-    final orientation = _isFlipped ? XiangqiSide.black : XiangqiSide.red;
+    final orientation = analysisState.orientation;
 
     // The engine is the app's shared one, and leaving the screen does not mean the player wants it
     // searching: losing focus stops it, exactly as the game screens' own detectors do, and
@@ -323,7 +311,7 @@ class _BodyState() extends ConsumerState<_Body> {
               BottomBarButton(label: context.l10n.menu, icon: Icons.menu, onTap: _showMenu),
               BottomBarButton(
                 label: context.l10n.flipBoard,
-                onTap: () => setState(() => _isFlipped = !_isFlipped),
+                onTap: controller.flipBoard,
                 icon: CupertinoIcons.arrow_2_squarepath,
               ),
               if (controller.engineAllowed) const XiangqiEngineButton(),
@@ -393,7 +381,7 @@ class _BodyState() extends ConsumerState<_Body> {
             onPressed: () => showXiangqiContinueFromHereMenu(
               context,
               state.position,
-              orientation: _isFlipped ? .black : .red,
+              orientation: state.orientation,
             ),
           ),
         if (toolsAllowed)

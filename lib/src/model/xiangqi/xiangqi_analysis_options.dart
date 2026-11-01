@@ -3,10 +3,11 @@ import 'package:lichess_mobile/src/model/xiangqi/xiangqi_analysis_tree.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_move.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 
-typedef XiangqiAnalysisSourceKey = (String, XiangqiPosition, IList<XiangqiMove>);
+typedef XiangqiAnalysisSourceKey = (String, XiangqiPosition, IList<XiangqiMove>, bool);
 
 /// An immutable, replay-validated handoff. The snapshot participates in the session key, so a
 /// changed game never restores branches from an older history under the same upstream id.
+/// Permissions also participate: a restricted source never inherits a broader source's edits.
 final class const XiangqiAnalysisOptions._({
   required final String sourceId,
   required final XiangqiAnalysisNode root,
@@ -31,5 +32,5 @@ final class const XiangqiAnalysisOptions._({
     engineAllowed: engineAllowed,
   );
 
-  XiangqiAnalysisSourceKey get sourceKey => (sourceId, root.position, initialMoves);
+  XiangqiAnalysisSourceKey get sourceKey => (sourceId, root.position, initialMoves, engineAllowed);
 }

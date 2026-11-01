@@ -9,12 +9,15 @@ import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_live_game.dart';
 import 'package:lichess_mobile/src/model/xiangqi/review/xiangqi_review.dart';
 import 'package:lichess_mobile/src/model/xiangqi/review/xiangqi_review_repository.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_analysis_options.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_notation.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/service/sound_service.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_analysis_screen.dart';
+import 'package:lichess_mobile/src/widgets/adaptive_action_sheet.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
 import 'package:lichess_mobile/src/widgets/history_navigation_button.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
@@ -146,6 +149,33 @@ class _ReviewState() extends ConsumerState<_Review> {
     setState(() => _cursor = clamped);
   }
 
+  void _showMenu() {
+    final generation = ref.read(xiangqiAccountGenerationProvider);
+    showAdaptiveActionSheet<void>(
+      context: context,
+      actions: [
+        BottomSheetAction(
+          makeLabel: (context) => Text(context.l10n.analysisBoard),
+          onPressed: () {
+            if (!mounted || generation != ref.read(xiangqiAccountGenerationProvider)) return;
+            final review = widget.review;
+            Navigator.of(context).push(
+              XiangqiAnalysisScreen.buildRoute(
+                options: XiangqiAnalysisOptions.line(
+                  sourceId: 'review:${review.gameId}:$generation',
+                  initialPosition: review.initialPosition,
+                  moves: review.moves,
+                  initialCursor: _cursor,
+                  orientation: _isFlipped ? .black : .red,
+                ),
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final review = widget.review;
@@ -218,6 +248,7 @@ class _ReviewState() extends ConsumerState<_Review> {
         onSelectMove: _goTo,
         bottomBar: BottomBar(
           children: [
+            BottomBarButton(label: context.l10n.menu, icon: Icons.menu, onTap: _showMenu),
             BottomBarButton(
               label: context.l10n.flipBoard,
               onTap: () => setState(() => _isFlipped = !_isFlipped),

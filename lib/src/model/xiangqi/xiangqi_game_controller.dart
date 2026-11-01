@@ -336,7 +336,7 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
   int _epoch = 0;
   int get generation => _epoch;
   int _gameIdentity = 0;
-  String get analysisSourceId => 'computer:$_gameIdentity';
+  String get analysisSourceId => '${state.opponent == .human ? 'otb' : 'computer'}:$_gameIdentity';
   int? _analysisSuspension;
   ({XiangqiPosition before, XiangqiMove move})? _suspendedPracticeMove;
   void Function()? _releaseAnalysisHold;

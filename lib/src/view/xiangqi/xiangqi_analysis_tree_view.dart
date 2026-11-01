@@ -34,6 +34,9 @@ MoveTreeNode<XiangqiMove> _treeNode(XiangqiAnalysisNode node, [XiangqiPosition? 
 class _XiangqiTreeNotifier(final XiangqiAnalysisController controller)
     extends MoveTreeNotifier<XiangqiMove> {
   @override
+  bool get canExport => controller.engineAllowed;
+
+  @override
   void userJump(MoveTreePath<XiangqiMove> path) => controller.goToPath(path.ids);
   @override
   void deleteFromHere(MoveTreePath<XiangqiMove> path) => controller.deleteFromHere(path.ids);

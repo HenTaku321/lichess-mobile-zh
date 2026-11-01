@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_analysis_controller.dart';
@@ -100,4 +101,3 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 }
-import 'package:flutter/gestures.dart';

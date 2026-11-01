@@ -23,7 +23,9 @@ import 'package:lichess_mobile/src/model/puzzle/puzzle_theme.dart';
 import 'package:lichess_mobile/src/model/tv/tv_channel.dart';
 import 'package:lichess_mobile/src/model/user/user.dart';
 import 'package:lichess_mobile/src/model/user/user_repository.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_link.dart';
 import 'package:lichess_mobile/src/service/challenge_service.dart';
+import 'package:lichess_mobile/src/service/xiangqi_links_service.dart';
 import 'package:lichess_mobile/src/tab_navigation.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
 import 'package:lichess_mobile/src/view/analysis/analysis_screen.dart';
@@ -465,8 +467,14 @@ class AppLinksService(final Ref ref, {AppLinks? appLinks}) {
   /// `/study/...` one. Both are Lichess links — see [_isFirstPartyUri] — so
   /// neither is handed to the browser while the app can show the study itself.
   Future<void> openContentLink(BuildContext context, String url) async {
+    if (!context.mounted || !ref.mounted) return;
     final uri = _contentUri(url);
     if (uri == null) return;
+
+    if (isXiangqiWebUri(uri)) {
+      await ref.read(xiangqiLinksServiceProvider).openContentLink(context, uri.toString());
+      return;
+    }
 
     if (_isFirstPartyUri(uri)) {
       try {

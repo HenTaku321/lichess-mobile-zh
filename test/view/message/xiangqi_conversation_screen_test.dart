@@ -22,15 +22,25 @@ import '../../network/xiangqi_http_test.dart' show FakeXiangqiAuthStorage, signe
 import '../../test_helpers.dart';
 import '../../test_provider_scope.dart';
 
-Future<ProviderContainer> pumpConversation(WidgetTester tester, {MockClient? httpClient}) async {
+Future<ProviderContainer> pumpConversation(
+  WidgetTester tester, {
+  MockClient? httpClient,
+  bool hiddenUsername = false,
+}) async {
   final factory = fx.FakeXiangqiChannelFactory();
+  final contact = xiangqiContactsFromChats(
+    fixture.xiangqiPagePayload([
+      {...fixture.xiangqiFirstChatRow, 'hidden_username': hiddenUsername},
+    ]),
+  ).single;
   await tester.pumpWidget(
     await makeTestProviderScopeApp(
       tester,
       home: XiangqiConversationScreen(
         chatId: fixture.xiangqiFirstChatId,
         peerId: fixture.xiangqiFirstPeerId,
-        peer: xiangqiLightUser('${fixture.xiangqiFirstPeerId}', fixture.xiangqiFirstPeerName),
+        peer: contact.user,
+        peerProfileAvailable: contact.xiangqi!.peerProfileAvailable,
       ),
       overrides: {
         if (httpClient != null)
@@ -78,6 +88,18 @@ Future<ProviderContainer> pumpConversation(WidgetTester tester, {MockClient? htt
 
 void main() {
   TestLichessBinding.ensureInitialized();
+
+  testWidgets('a hidden inbox username remains readable but never becomes a profile target', (
+    tester,
+  ) async {
+    await pumpConversation(tester, hiddenUsername: true);
+    final title = tester.widget<ListTile>(
+      find.ancestor(of: find.text(fixture.xiangqiFirstPeerName), matching: find.byType(ListTile)),
+    );
+    expect(title.onTap, isNull);
+    expect(find.byType(TextField), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'a visible PM peer name opens the xiangqi profile and preserves the conversation draft',

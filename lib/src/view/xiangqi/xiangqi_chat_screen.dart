@@ -4,6 +4,7 @@ import 'package:lichess_mobile/src/model/xiangqi/chat/xiangqi_chat.dart';
 import 'package:lichess_mobile/src/model/xiangqi/chat/xiangqi_chat_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/chat/xiangqi_chat_repository.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
+import 'package:lichess_mobile/src/service/xiangqi_links_service.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
@@ -14,7 +15,6 @@ import 'package:lichess_mobile/src/widgets/misc.dart';
 import 'package:lichess_mobile/src/widgets/rich_link_text.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_refresh.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 /// xiangqi.com's chat: the public rooms, and the clubs the account is in.
 ///
@@ -319,9 +319,11 @@ class const _Messages({
 
 /// One message: who said it, what they said, and when.
 class const _Bubble({required final XiangqiChatMessage message, required final bool isMine})
-    extends StatelessWidget {
+    extends ConsumerWidget {
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final links = ref.read(xiangqiLinksServiceProvider);
+    final account = ref.watch(xiangqiAccountGenerationProvider);
     final scheme = ColorScheme.of(context);
     final textColor = isMine ? scheme.onSecondary : scheme.onSurface;
     return ChatBubbleContextMenu(
@@ -352,12 +354,8 @@ class const _Bubble({required final XiangqiChatMessage message, required final b
                   text: message.message,
                   style: TextStyle(color: textColor),
                   linkStyle: Styles.linkStyle,
-                  onOpen: (link) async {
-                    final uri = Uri.tryParse(link.url);
-                    if (uri != null && const {'http', 'https', 'mailto'}.contains(uri.scheme)) {
-                      await launchUrl(uri);
-                    }
-                  },
+                  onOpen: (link) =>
+                      links.onLinkifyOpen(context, link, expectedAccountGeneration: account),
                 ),
               ],
             ),

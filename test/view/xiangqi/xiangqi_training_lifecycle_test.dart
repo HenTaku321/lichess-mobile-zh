@@ -195,7 +195,11 @@ void main() {
     await finishPendingPuzzle(tester);
     final solved = puzzle.attemptState(tester);
     await tester.tap(find.byIcon(Icons.menu));
-    await tester.pumpAndSettle();
+    // The original board has an intentionally pending progress indicator. Settling the whole app
+    // would advance fake time until the HTTP deadline; finish only the sheet's transition.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(puzzle.attemptState(tester).phase, XiangqiPuzzlePhase.submitting);
     await tester.tap(find.text('Analysis board'));
     await exits.finishRoute(tester, find.byType(XiangqiAnalysisScreen, skipOffstage: false));
     completion.complete(http.Response('{"p_rating":1833,"status":4}', 200));

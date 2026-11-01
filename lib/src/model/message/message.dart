@@ -94,8 +94,14 @@ sealed class LastMessage with _$LastMessage {
 /// equal a numeric `user_id` in the first place.
 @freezed
 sealed class const XiangqiConversation._() with _$XiangqiConversation {
-  const factory({required String chatId, required int peerId, required int unreadMessages}) =
-      _XiangqiConversation;
+  const factory({
+    required String chatId,
+    required int peerId,
+    required int unreadMessages,
+
+    /// Only the inbox username mapping can grant this; a display label alone is not a profile.
+    @Default(false) bool peerProfileAvailable,
+  }) = _XiangqiConversation;
 }
 
 @freezed

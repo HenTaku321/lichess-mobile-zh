@@ -31,18 +31,27 @@ import 'package:material_ui/material_ui.dart';
 /// The server sends the rows in order and the page number, and **no rank on the rows themselves**.
 /// A row's rank is worked out from where it sits — see [kXiangqiLeaderboardPageSize] — which is why
 /// the page size is written down in the model rather than left to the server to imply.
-class const XiangqiLeaderboardScreen({super.key}) extends ConsumerStatefulWidget {
-  static Route<void> buildRoute() => buildScreenRoute(screen: const XiangqiLeaderboardScreen());
+class const XiangqiLeaderboardScreen({
+  final XiangqiRatingType initialMode = XiangqiRatingType.rapid,
+  final String? initialCountry,
+  super.key,
+}) extends ConsumerStatefulWidget {
+  static Route<void> buildRoute({
+    XiangqiRatingType initialMode = XiangqiRatingType.rapid,
+    String? initialCountry,
+  }) => buildScreenRoute(
+    screen: XiangqiLeaderboardScreen(initialMode: initialMode, initialCountry: initialCountry),
+  );
 
   @override
   ConsumerState<XiangqiLeaderboardScreen> createState() => _XiangqiLeaderboardScreenState();
 }
 
 class _XiangqiLeaderboardScreenState() extends ConsumerState<XiangqiLeaderboardScreen> {
-  XiangqiRatingType _mode = XiangqiRatingType.rapid;
+  late XiangqiRatingType _mode = widget.initialMode;
 
   /// The country the board is filtered to, or null for every country.
-  String? _country;
+  late String? _country = widget.initialCountry;
 
   int _page = 1;
   bool _pickingCountry = false;
@@ -63,6 +72,7 @@ class _XiangqiLeaderboardScreenState() extends ConsumerState<XiangqiLeaderboardS
         value: board,
         builder: (context, board) => DefaultTabController(
           length: XiangqiRatingType.values.length,
+          initialIndex: widget.initialMode.index,
           child: Scaffold(
             appBar: AppBar(
               title: AppBarTitleText('${context.l10n.mobileXiangqi} · ${context.l10n.leaderboard}'),

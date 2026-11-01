@@ -68,6 +68,7 @@ class _ContactsScreenState() extends ConsumerState<ContactsScreen> {
               chatId: xiangqi.chatId,
               peerId: xiangqi.peerId,
               peer: contact.user,
+              peerProfileAvailable: xiangqi.peerProfileAvailable,
             ),
     );
     _refreshAfterConversation();

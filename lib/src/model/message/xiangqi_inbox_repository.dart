@@ -56,6 +56,7 @@ import 'package:lichess_mobile/src/model/common/id.dart';
 import 'package:lichess_mobile/src/model/message/message.dart';
 import 'package:lichess_mobile/src/model/user/user.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_link.dart';
 import 'package:lichess_mobile/src/network/xiangqi_http.dart'
     show XiangqiAuthStorage, kXiangqiMinRequestSpacing, xiangqiAuthStorageProvider;
 import 'package:lichess_mobile/src/network/xiangqi_session_store.dart';
@@ -142,6 +143,7 @@ sealed class const XiangqiChat._() with _$XiangqiChat {
     required String lastMessage,
     required DateTime lastSeen,
     required int unreadMessages,
+    @Default(false) bool peerProfileAvailable,
   }) = _XiangqiChat;
 }
 
@@ -644,6 +646,7 @@ Contact _contactOf(XiangqiChat chat) {
       chatId: chat.chatId,
       peerId: chat.peerId,
       unreadMessages: chat.unreadMessages,
+      peerProfileAvailable: chat.peerProfileAvailable,
     ),
   );
 }
@@ -677,6 +680,7 @@ IList<XiangqiChat> xiangqiChatsFromPayload(Object? payload) {
         lastMessage: lastMessage,
         lastSeen: lastSeen,
         unreadMessages: _asInt(map['unread_messages']) ?? 0,
+        peerProfileAvailable: map['hidden_username'] != true && isXiangqiProfileName(peerName),
       ),
     );
   }

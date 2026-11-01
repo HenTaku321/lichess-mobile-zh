@@ -660,7 +660,11 @@ class const _SolverRow({
         ),
       );
     } else if (state.phase != XiangqiPuzzlePhase.solving) {
-      final solved = state.recordedStatus == XiangqiPuzzleAttemptStatus.solved;
+      // The local verdict is independent of saving. A slow or failed submit must not change a
+      // correctly solved line into a neutral completion; an eventual server verdict still wins.
+      final solved = state.recordedStatus == null
+          ? state.mistakes == 0 && state.hintsUsed == 0
+          : state.recordedStatus == XiangqiPuzzleAttemptStatus.solved;
       feedback = FeedbackTile(
         leading: solved ? Icon(Icons.check, size: 36, color: context.lichessColors.good) : null,
         title: Text(

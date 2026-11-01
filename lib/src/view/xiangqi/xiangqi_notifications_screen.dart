@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/social/xiangqi_social.dart';
 import 'package:lichess_mobile/src/model/xiangqi/social/xiangqi_social_repository.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_link.dart';
+import 'package:lichess_mobile/src/service/xiangqi_links_service.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
@@ -11,7 +13,6 @@ import 'package:lichess_mobile/src/widgets/misc.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_refresh.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_refreshable_empty.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 /// What xiangqi.com has told this account.
 ///
@@ -139,10 +140,13 @@ class _XiangqiNotificationsScreenState() extends ConsumerState<XiangqiNotificati
 
 /// One notification: what it says, when it came, and the way to what it points at.
 class const _NotificationRow({required final XiangqiNotification notification})
-    extends StatelessWidget {
+    extends ConsumerWidget {
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final url = notification.url;
+    final uri = url == null ? null : xiangqiContentUri(url);
+    final links = ref.read(xiangqiLinksServiceProvider);
+    final account = ref.watch(xiangqiAccountGenerationProvider);
     return ListTile(
       // The unread mark is a dot rather than a colour on the whole row: a list where every other
       // row is tinted reads as a list of two kinds of thing, and these are one kind in two states.
@@ -168,19 +172,11 @@ class const _NotificationRow({required final XiangqiNotification notification})
             ),
       // A notification with nowhere to go is a row that says so by not being tappable, rather than
       // one that opens something and then does nothing.
-      onTap: url == null ? null : () => launchUrl(_absolute(url)),
+      onTap: uri == null
+          ? null
+          : () =>
+                links.openContentLink(context, uri.toString(), expectedAccountGeneration: account),
     );
-  }
-
-  /// [url] as something the platform can open.
-  ///
-  /// The server writes both an absolute URL and a bare path — measured both ways on 2026-10-16 —
-  /// and a path is a page on xiangqi.com, so it is resolved against the site the notification came
-  /// from rather than against nothing.
-  Uri _absolute(String url) {
-    final parsed = Uri.tryParse(url);
-    if (parsed != null && parsed.hasScheme) return parsed;
-    return Uri.https('play.xiangqi.com', url);
   }
 
   /// [instant] as a date, without a time.

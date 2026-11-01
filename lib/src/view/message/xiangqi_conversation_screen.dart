@@ -10,9 +10,9 @@
 // Two things the lichess screen has are deliberately absent, because there is nothing honest to put
 // there. There is no delete action: no capture shows how xiangqi.com deletes a conversation, and a
 // confident-looking button that does nothing would be worse than none. There is no tap-through to a
-// profile: a xiangqi.com user has no lichess profile to open. There is also no "read"/typing
-// indicator, because xiangqi.com's typing frames were never captured doing anything this app can
-// trust.
+// lichess profile. A visible username opens the xiangqi profile instead; a hidden name is not a
+// profile identity. There is also no "read"/typing indicator, because xiangqi.com's typing frames
+// were never captured doing anything this app can trust.
 //
 // The avatar is initials, not a photo: xiangqi.com does send a `profile_image` URL, but the app's
 // `UserAvatar` only fetches a remote image for a lichess flair, and it is a shared widget that this
@@ -25,6 +25,8 @@ import 'package:lichess_mobile/src/model/message/message.dart';
 import 'package:lichess_mobile/src/model/message/xiangqi_inbox_repository.dart';
 import 'package:lichess_mobile/src/model/user/user.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_link.dart';
+import 'package:lichess_mobile/src/service/xiangqi_links_service.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
@@ -35,29 +37,37 @@ import 'package:lichess_mobile/src/widgets/rich_link_text.dart';
 import 'package:lichess_mobile/src/widgets/user.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_refresh.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class const XiangqiConversationScreen({
   required final String chatId,
   required final int peerId,
   required final LightUser peer,
+  final bool peerProfileAvailable = false,
   super.key,
 }) extends ConsumerWidget {
   static Route<dynamic> buildRoute({
     required String chatId,
     required int peerId,
     required LightUser peer,
+    bool peerProfileAvailable = false,
   }) {
     return buildScreenRoute(
-      screen: XiangqiConversationScreen(chatId: chatId, peerId: peerId, peer: peer),
+      screen: XiangqiConversationScreen(
+        chatId: chatId,
+        peerId: peerId,
+        peer: peer,
+        peerProfileAvailable: peerProfileAvailable,
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final conversation = (chatId: chatId, peerId: peerId, peer: peer);
+    final account = ref.watch(xiangqiAccountGenerationProvider);
+    final links = ref.read(xiangqiLinksServiceProvider);
     return XiangqiRefreshScope(
-      identity: (conversation, ref.watch(xiangqiAccountGenerationProvider)),
+      identity: (conversation, account),
       onRefresh: () => ref.refresh(xiangqiConversationControllerProvider(conversation).future),
       builder: (context, refresh, busy) => PlatformScaffold(
         appBar: PlatformAppBar(
@@ -67,6 +77,9 @@ class const XiangqiConversationScreen({
             contentPadding: EdgeInsets.zero,
             leading: UserAvatar(peer, radius: 16),
             title: UserFullNameWidget(user: peer, showFlair: false),
+            onTap: peerProfileAvailable && isXiangqiProfileName(peer.name)
+                ? () => links.openProfile(context, peer.name, expectedAccountGeneration: account)
+                : null,
           ),
         ),
         body: _Body(conversation: conversation, onRefresh: refresh, busy: busy),
@@ -254,10 +267,12 @@ class const _MessageBubble({
   required final bool isMe,
   required final int groupLength,
   required final int groupIndex,
-}) extends StatelessWidget {
+}) extends ConsumerWidget {
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = ColorScheme.of(context);
+    final links = ref.read(xiangqiLinksServiceProvider);
+    final account = ref.watch(xiangqiAccountGenerationProvider);
     final textColor = isMe ? colorScheme.onSecondaryContainer : colorScheme.onSurface;
     final time = DateFormat.Hm().format(message.date);
     final timeStyle = TextStyle(fontSize: 11, color: textColor.withValues(alpha: 0.6));
@@ -297,12 +312,8 @@ class const _MessageBubble({
                   text: message.text,
                   style: TextStyle(color: textColor),
                   linkStyle: Styles.linkStyle,
-                  onOpen: (link) async {
-                    final uri = Uri.tryParse(link.url);
-                    if (uri != null && const {'https', 'http', 'mailto'}.contains(uri.scheme)) {
-                      await launchUrl(uri);
-                    }
-                  },
+                  onOpen: (link) =>
+                      links.onLinkifyOpen(context, link, expectedAccountGeneration: account),
                   // Reserve the same last-line timestamp space as the Lichess conversation.
                   trailing: WidgetSpan(
                     alignment: PlaceholderAlignment.baseline,

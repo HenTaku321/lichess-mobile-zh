@@ -6,6 +6,7 @@ import 'package:lichess_mobile/src/network/xiangqi_session_store.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_puzzle_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_review_screen.dart';
 import 'package:lichess_mobile/src/widgets/feedback.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
@@ -383,8 +384,9 @@ class const _Puzzles({
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final puzzles = ref.watch(xiangqiSavedPuzzlesProvider(username));
+    final generation = ref.watch(xiangqiAccountGenerationProvider);
     return XiangqiRetainedData(
-      identity: (username, ref.watch(xiangqiAccountGenerationProvider)),
+      identity: (username, generation),
       value: puzzles,
       builder: (context, puzzles) => puzzles.when(
         data: (puzzles) => ListSection(
@@ -397,6 +399,18 @@ class const _Puzzles({
               for (final puzzle in puzzles.puzzles)
                 ListTile(
                   dense: true,
+                  enabled: !busy,
+                  onTap: busy
+                      ? null
+                      : () {
+                          if (!context.mounted ||
+                              generation != ref.read(xiangqiAccountGenerationProvider) ||
+                              !(ModalRoute.of(context)?.isCurrent ?? true)) {
+                            return;
+                          }
+                          Navigator.of(context)
+                              .push(XiangqiPuzzleScreen.buildRoute(puzzleId: puzzle.id));
+                        },
                   title: Text(puzzle.id, maxLines: 1, overflow: TextOverflow.ellipsis),
                   subtitle: Text(
                     [

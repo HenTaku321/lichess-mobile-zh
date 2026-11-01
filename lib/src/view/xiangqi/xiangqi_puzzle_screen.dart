@@ -53,8 +53,13 @@ import 'package:material_ui/material_ui.dart';
 /// what [xiangqiDefaultPuzzleSearch] says. The filter is a screen of its own — the server has the
 /// vocabulary for it (`GET /api/puzzle/get_themes_tags`) and the endpoint takes it
 /// (`POST /api/puzzle/search`) — and this wave is the solving loop.
-class const XiangqiPuzzleScreen({super.key}) extends ConsumerWidget {
-  static Route<void> buildRoute() => buildScreenRoute(screen: const XiangqiPuzzleScreen());
+class const XiangqiPuzzleScreen({
+  /// A library selection bypasses search; only an explicit Next action resumes the queue.
+  final String? initialPuzzleId,
+  super.key,
+}) extends ConsumerWidget {
+  static Route<void> buildRoute({String? puzzleId}) =>
+      buildScreenRoute(screen: XiangqiPuzzleScreen(initialPuzzleId: puzzleId));
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -81,12 +86,15 @@ class const XiangqiPuzzleScreen({super.key}) extends ConsumerWidget {
           ),
         ],
       ),
-      body: _Body(key: ValueKey(ref.watch(xiangqiAccountGenerationProvider))),
+      body: _Body(
+        key: ValueKey((ref.watch(xiangqiAccountGenerationProvider), initialPuzzleId)),
+        initialPuzzleId: initialPuzzleId,
+      ),
     );
   }
 }
 
-class const _Body({super.key}) extends ConsumerStatefulWidget {
+class const _Body({final String? initialPuzzleId, super.key}) extends ConsumerStatefulWidget {
   @override
   ConsumerState<_Body> createState() => _BodyState();
 }
@@ -125,6 +133,9 @@ class _BodyState() extends ConsumerState<_Body> {
         onNext: _replace,
       );
     }
+
+    final initialId = widget.initialPuzzleId;
+    if (initialId != null) return _Puzzle(id: initialId, onNext: _replace);
 
     final search = ref.watch(xiangqiPuzzleSearchProvider(xiangqiDefaultPuzzleSearch));
     return search.when(

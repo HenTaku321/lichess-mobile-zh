@@ -90,6 +90,10 @@ sealed class const XiangqiChapterState._() with _$XiangqiChapterState {
     /// move is on the board and has not been counted as a step.
     required IList<XiangqiPosition> positions,
 
+    /// Actual accepted moves, including automatic replies and non-script multi answers. Temporary
+    /// wrong or still-verifying moves are not part of this history.
+    @Default(IListConst<XiangqiMove>([])) IList<XiangqiMove> acceptedMoves,
+
     /// Which step the chapter is on: 0 is the opening placeholder, and `cursor` is the step whose
     /// move has just been played.
     @Default(0) int cursor,
@@ -103,6 +107,8 @@ sealed class const XiangqiChapterState._() with _$XiangqiChapterState {
     /// Whether the engine is being asked about a `multi` chapter's move.
     @Default(false) bool isVerifying,
 
+    XiangqiMove? verifyingMove,
+
     /// Whether the whole script has been played.
     @Default(false) bool isSolved,
 
@@ -113,6 +119,10 @@ sealed class const XiangqiChapterState._() with _$XiangqiChapterState {
   /// The board as it stands, which is the last one: the wrong move included, while it is being
   /// shown.
   XiangqiPosition get position => positions.last;
+
+  IList<XiangqiPosition> get acceptedPositions => positions.sublist(0, acceptedMoves.length + 1);
+
+  XiangqiMove? get lastMove => wrongMove ?? verifyingMove ?? acceptedMoves.lastOrNull;
 
   /// The step the reader is being asked for, or null when the script is done.
   XiangqiChapterStep? get nextStep =>
@@ -240,6 +250,7 @@ class XiangqiChapterController(final XiangqiChapter chapter) extends Notifier<Xi
     state = state.copyWith(
       positions: state.positions.sublist(0, state.positions.length - 1),
       wrongMove: null,
+      verifyingMove: null,
       selected: null,
     );
   }
@@ -255,9 +266,11 @@ class XiangqiChapterController(final XiangqiChapter chapter) extends Notifier<Xi
     ref.read(xiangqiLessonSaveStateProvider(chapter.id).notifier).reset();
     state = state.copyWith(
       positions: state.positions.sublist(0, state.cursor),
+      acceptedMoves: state.acceptedMoves.sublist(0, state.cursor - 1),
       cursor: state.cursor - 1,
       selected: null,
       wrongMove: null,
+      verifyingMove: null,
       hint: null,
       isSolved: false,
     );
@@ -298,7 +311,7 @@ class XiangqiChapterController(final XiangqiChapter chapter) extends Notifier<Xi
     final before = state.position;
     final after = rules.playForced(before, move);
     // The board shows the move while the engine thinks, exactly as the site's own player does.
-    state = state.copyWith(positions: state.positions.add(after));
+    state = state.copyWith(positions: state.positions.add(after), verifyingMove: move);
 
     bool good;
     try {
@@ -312,7 +325,13 @@ class XiangqiChapterController(final XiangqiChapter chapter) extends Notifier<Xi
     if (generation != _generation || !ref.mounted) return;
 
     if (good) {
-      state = state.copyWith(cursor: state.cursor + 1, isVerifying: false, selected: null);
+      state = state.copyWith(
+        acceptedMoves: state.acceptedMoves.add(move),
+        cursor: state.cursor + 1,
+        isVerifying: false,
+        verifyingMove: null,
+        selected: null,
+      );
       _afterAccepted();
     } else {
       state = state.copyWith(isVerifying: false);
@@ -389,10 +408,12 @@ class XiangqiChapterController(final XiangqiChapter chapter) extends Notifier<Xi
   void _accept(XiangqiMove move, {bool scripted = false}) {
     state = state.copyWith(
       positions: state.positions.add(rules.playForced(state.position, move)),
+      acceptedMoves: state.acceptedMoves.add(move),
       cursor: state.cursor + 1,
       selected: null,
       hint: null,
       wrongMove: null,
+      verifyingMove: null,
     );
     _afterAccepted();
   }
@@ -428,7 +449,7 @@ class XiangqiChapterController(final XiangqiChapter chapter) extends Notifier<Xi
   /// Marks [move] as wrong. It is already on the board: the caller put it there, and [undoWrongMove]
   /// is what takes it off.
   void _reject(XiangqiMove move) {
-    state = state.copyWith(selected: null, hint: null, wrongMove: move);
+    state = state.copyWith(selected: null, hint: null, verifyingMove: null, wrongMove: move);
     _revert?.cancel();
     _revert = Timer(kXiangqiLessonWrongMoveDelay, () {
       if (!ref.mounted) return;

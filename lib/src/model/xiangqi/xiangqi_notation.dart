@@ -136,6 +136,32 @@ IList<String> xiangqiGameNotation(IList<XiangqiPosition> positions, IList<Xiangq
   return [for (var i = 0; i < moves.length; i++) xiangqiMoveNotation(positions[i], moves[i])].lock;
 }
 
+/// A teaching script may move the same side twice. Read the mover's side only for notation;
+/// never change the recorded position's turn or pretend that the step was a legal game move.
+String xiangqiTeachingMoveNotation(XiangqiPosition before, XiangqiMove move) {
+  final side = before.pieceAt(move.from)?.side;
+  if (side == null) return move.iccs;
+  final notation = xiangqiMoveNotation(
+    XiangqiPosition(
+      board: before.board,
+      turn: side,
+      halfmoveClock: before.halfmoveClock,
+      fullmoveNumber: before.fullmoveNumber,
+    ),
+    move,
+  );
+  return notation.isEmpty ? move.iccs : notation;
+}
+
+IList<String> xiangqiTeachingNotation(IList<XiangqiPosition> positions, IList<XiangqiMove> moves) {
+  if (positions.length != moves.length + 1) {
+    throw ArgumentError('Teaching moves need exactly one more recorded position.');
+  }
+  return [
+    for (var i = 0; i < moves.length; i++) xiangqiTeachingMoveNotation(positions[i], moves[i]),
+  ].lock;
+}
+
 /// Whether a piece of [type] leaves the file it started on when it moves.
 ///
 /// Three kinds do — the horse, the elephant and the advisor — and for those the notation gives the

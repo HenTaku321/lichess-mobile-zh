@@ -143,10 +143,11 @@ class _XiangqiLessonPlayerScreenState() extends ConsumerState<XiangqiLessonPlaye
         if (next.wrongMove != null && next.wrongMove != previous.wrongMove) {
           unawaited(ref.read(soundServiceProvider).play(Sound.error));
         } else if (next.cursor == previous.cursor + 1 && next.wrongMove == null) {
-          final move = chapter.steps[next.cursor].move;
+          final move = next.acceptedMoves.lastOrNull;
           if (move != null) {
+            final before = next.acceptedPositions[next.acceptedMoves.length - 1];
             final feedback = ref.read(moveFeedbackServiceProvider);
-            if (previous.position.pieceAt(move.to) != null) {
+            if (before.pieceAt(move.to) != null) {
               feedback.captureFeedback(null, check: rules.isCheck(next.position));
             } else {
               feedback.moveFeedback(check: rules.isCheck(next.position));
@@ -191,15 +192,9 @@ class _XiangqiLessonPlayerScreenState() extends ConsumerState<XiangqiLessonPlaye
 
     // The line as far as it has been played, which is what the move list shows. The wrong move is
     // deliberately not in it: it is not part of the line, and it is about to come off the board.
-    final playedMoves = <XiangqiMove>[
-      for (var step = 1; step <= state.cursor; step++) ?chapter.steps[step].move,
-    ];
-    final playedPositions = <XiangqiPosition>[
-      for (var step = 0; step <= state.cursor; step++) state.positions[step],
-    ];
-    final notation = playedMoves.isEmpty
+    final notation = state.acceptedMoves.isEmpty
         ? const IListConst<String>([])
-        : xiangqiGameNotation(playedPositions.lock, playedMoves.lock);
+        : xiangqiTeachingNotation(state.acceptedPositions, state.acceptedMoves);
 
     return Scaffold(
       appBar: AppBar(
@@ -236,7 +231,7 @@ class _XiangqiLessonPlayerScreenState() extends ConsumerState<XiangqiLessonPlaye
                 orientation: orientation,
                 selected: state.selected,
                 moves: boardPrefs.showLegalMoves ? state.selectedMoves : const IListConst([]),
-                lastMove: _lastMoveOf(chapter, state.cursor),
+                lastMove: state.lastMove,
                 wrongMove: state.wrongMove,
                 marked: state.intersections,
                 onTapSquare: controller.tapSquare,
@@ -331,10 +326,6 @@ class _XiangqiLessonPlayerScreenState() extends ConsumerState<XiangqiLessonPlaye
     );
   }
 }
-
-/// The move that led to the position the chapter is showing, or null at the start of it.
-XiangqiMove? _lastMoveOf(XiangqiChapter chapter, int cursor) =>
-    cursor > 0 && cursor < chapter.steps.length ? chapter.steps[cursor].move : null;
 
 /// The colour an arrow asks for, read out of the `#RRGGBB` the chapter writes it as.
 ///

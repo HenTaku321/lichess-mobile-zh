@@ -367,7 +367,9 @@ class _PuzzleBodyState() extends ConsumerState<_PuzzleBody> {
       onFocusGained: () => _active = true,
       onFocusLost: () {
         _active = false;
-        if (_canReplay(ref.read(provider))) _autoAdvanceSuppressed = true;
+        // Visibility callbacks can run after this consumer has been deactivated. Use the rendered
+        // replay state rather than reading providers through an unmounted widget's ref.
+        if (canReplay) _autoAdvanceSuppressed = true;
         _requestGeneration++;
         for (final timer in _feedbackTimers) {
           timer.cancel();

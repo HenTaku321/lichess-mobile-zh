@@ -53,3 +53,7 @@
 - `c217c43de` / `41328201296`：format 成功，analyze 发现枚举 primary-constructor、
   无 generator 的 Iterable 泛型推断及两个 if 括号问题；先修正静态错误，未算行为验证。
   补完整 FEN/计数、教学分类、能力缓存边界及当前局面校验的纯模型回归，加入前置检查。
+- `a5c8aa9ac` / `41328538737`：format/analyze、交互和桌面专项通过；lifecycle 中 260 项
+  通过、4 项失败，均为题目失焦回调在 consumer 卸载后读取 `ref`。实际 multi 交接、连续
+  同方完整教学回放、独立 OTB、缺将帅禁出口和题目交接通过。失焦改用当前渲染快照，
+  不在卸载回调访问 provider；全量与视觉矩阵仍未运行，待下一次 Actions 确认。

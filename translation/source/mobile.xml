@@ -318,6 +318,14 @@
   <string name="weWillEmailYouCode" comment="Shown on the email sign in screen before requesting a login code.">We will email you a code to sign in with.</string>
   <string name="winOrFiftyMoveDraw" comment="Tablebase verdict: the position is won, or drawn by the fifty move rule.">Win or 50 move draw</string>
   <string name="xiangqi" comment="Xiangqi, the Chinese chess variant, as opposed to international chess. Used as a game name in the offline opponent picker and as a screen title.">Xiangqi</string>
+  <string name="xiangqiTeachingReplay" comment="Read-only replay of demonstrated teaching steps that do not form a legal game.">Teaching replay</string>
+  <string name="xiangqiAnalyseCurrentPosition" comment="Start independent analysis from the current valid teaching diagram, without changing the teaching replay.">Analyse current position</string>
+  <string name="xiangqiInvalidGenerals" comment="Why an arbitrary teaching diagram cannot be handed to an engine or a new game.">Exactly one general is required on each side.</string>
+  <string name="xiangqiInvalidCounters" comment="A teaching diagram has malformed board dimensions or invalid move counters.">The board dimensions or move counters are invalid.</string>
+  <string name="xiangqiInvalidMaterial" comment="A teaching diagram exceeds the allowed number of pieces of one kind.">The diagram contains too many pieces of one kind.</string>
+  <string name="xiangqiInvalidPlacement" comment="A general, advisor, elephant or soldier is on an impossible square.">A piece is on a square it cannot occupy in a game.</string>
+  <string name="xiangqiFacingGenerals" comment="The two generals face each other down an open file in a teaching diagram.">The generals cannot face each other without a piece between them.</string>
+  <string name="xiangqiInactiveSideInCheck" comment="A teaching diagram has the side that is not to move already in check.">The side not to move cannot already be in check.</string>
   <string name="xiangqiBoardCoordinates" comment="The board coordinates setting, as it appears on the xiangqi game settings sheet. Nine files by ten ranks, unlike the chess board's eight by eight.">Board coordinates (A-I, 0-9)</string>
   <string name="xiangqiCheckmated" comment="Xiangqi game-end sentence: the side named by %s is checkmated.">%s is checkmated.</string>
   <string name="xiangqiDifficultyExplanation" comment="Xiangqi game settings sheet: the line under the difficulty setting, saying what a level actually controls.">How long the computer is allowed to think.</string>

@@ -8,9 +8,11 @@ import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
 import 'package:lichess_mobile/src/model/xiangqi/lesson/xiangqi_lesson.dart';
 import 'package:lichess_mobile/src/model/xiangqi/lesson/xiangqi_lesson_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_analysis_options.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_move.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_notation.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_replay.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_rules.dart' as rules;
 import 'package:lichess_mobile/src/service/move_feedback.dart';
 import 'package:lichess_mobile/src/service/sound_service.dart';
@@ -18,7 +20,10 @@ import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/focus_detector.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_analysis_screen.dart';
+import 'package:lichess_mobile/src/widgets/adaptive_action_sheet.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
+import 'package:lichess_mobile/src/widgets/history_navigation_button.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_game_layout.dart';
@@ -74,6 +79,9 @@ class _XiangqiLessonPlayerScreenState() extends ConsumerState<XiangqiLessonPlaye
   int _transitionGeneration = 0;
   bool _autoDelayElapsed = false;
   bool _active = true;
+  int? _viewCursor;
+  bool _historyAnimate = false;
+  bool _analysisOpen = false;
 
   XiangqiChapter get _chapter => widget.chapters[_index];
 
@@ -88,7 +96,11 @@ class _XiangqiLessonPlayerScreenState() extends ConsumerState<XiangqiLessonPlaye
     _transition?.cancel();
     _transitionGeneration++;
     _autoDelayElapsed = false;
-    setState(() => _index = index);
+    setState(() {
+      _index = index;
+      _viewCursor = null;
+      _historyAnimate = false;
+    });
   }
 
   /// Automatic navigation waits independently for the reading pause and the server's save.
@@ -108,6 +120,8 @@ class _XiangqiLessonPlayerScreenState() extends ConsumerState<XiangqiLessonPlaye
     if (!mounted ||
         !_active ||
         !_autoDelayElapsed ||
+        _viewCursor != null ||
+        _analysisOpen ||
         !chapter.autoTransition ||
         _chapter != chapter ||
         !(ModalRoute.of(context)?.isCurrent ?? true) ||
@@ -126,6 +140,76 @@ class _XiangqiLessonPlayerScreenState() extends ConsumerState<XiangqiLessonPlaye
     });
   }
 
+  void _cancelTransition() {
+    _transition?.cancel();
+    _transitionGeneration++;
+    _autoDelayElapsed = false;
+  }
+
+  void _viewHistory(int target, {bool fastSeek = false}) {
+    final state = ref.read(xiangqiChapterControllerProvider(_chapter));
+    if (!state.isSolved) return;
+    final current = _viewCursor ?? state.acceptedMoves.length;
+    final cursor = target.clamp(0, state.acceptedMoves.length);
+    _cancelTransition();
+    if (cursor == current) return;
+    if (cursor > 0) {
+      final move = state.acceptedMoves[cursor - 1];
+      final capture = state.acceptedPositions[cursor - 1].pieceAt(move.to) != null;
+      unawaited(ref.read(soundServiceProvider).play(capture ? Sound.capture : Sound.move));
+    }
+    setState(() {
+      _viewCursor = cursor;
+      _historyAnimate = !fastSeek && (cursor - current).abs() == 1;
+    });
+  }
+
+  Future<void> _openAnalysis() async {
+    if (!mounted || _analysisOpen) return;
+    final chapter = _chapter;
+    final state = ref.read(xiangqiChapterControllerProvider(chapter));
+    if (!state.isSolved) return;
+    _cancelTransition();
+    final start = state.acceptedPositions.first;
+    final replay = XiangqiReplaySnapshot.training(
+      sourceId:
+          'lesson:${widget.lessonId}:${chapter.id}:${ref.read(xiangqiAccountGenerationProvider)}',
+      positions: state.acceptedPositions,
+      moves: state.acceptedMoves,
+      initialCursor: _viewCursor ?? state.acceptedMoves.length,
+      orientation: chapter.flipBoard ? start.turn.opposite : start.turn,
+    );
+    _analysisOpen = true;
+    try {
+      await Navigator.of(context)
+          .push(XiangqiAnalysisScreen.buildRoute(options: XiangqiAnalysisOptions.snapshot(replay)));
+    } finally {
+      if (mounted) setState(() => _analysisOpen = false);
+    }
+  }
+
+  void _showMenu() {
+    _cancelTransition();
+    final account = ref.read(xiangqiAccountGenerationProvider);
+    final chapter = _chapter;
+    showAdaptiveActionSheet<void>(
+      context: context,
+      actions: [
+        if (ref.read(xiangqiChapterControllerProvider(chapter)).isSolved)
+          BottomSheetAction(
+            makeLabel: (context) => Text(context.l10n.analysis),
+            onPressed: () {
+              if (!mounted ||
+                  account != ref.read(xiangqiAccountGenerationProvider) ||
+                  chapter != _chapter)
+                return;
+              unawaited(_openAnalysis());
+            },
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final chapter = _chapter;
@@ -136,6 +220,8 @@ class _XiangqiLessonPlayerScreenState() extends ConsumerState<XiangqiLessonPlaye
       _transition?.cancel();
       _transitionGeneration++;
       _autoDelayElapsed = false;
+      _viewCursor = null;
+      _historyAnimate = false;
     });
 
     ref.listen(xiangqiChapterControllerProvider(chapter), (previous, next) {
@@ -159,6 +245,8 @@ class _XiangqiLessonPlayerScreenState() extends ConsumerState<XiangqiLessonPlaye
         _transition?.cancel();
         _transitionGeneration++;
         _autoDelayElapsed = false;
+        _viewCursor = null;
+        _historyAnimate = false;
       } else if (previous?.isSolved != true) {
         _onSolved(chapter);
       }
@@ -179,6 +267,14 @@ class _XiangqiLessonPlayerScreenState() extends ConsumerState<XiangqiLessonPlaye
     // to re-read after every move.
     final start = chapter.position ?? XiangqiPosition.initial();
     final orientation = chapter.flipBoard ? start.turn.opposite : start.turn;
+    final browsing = state.isSolved && _viewCursor != null;
+    final cursor = state.isSolved
+        ? (_viewCursor ?? state.acceptedMoves.length).clamp(0, state.acceptedMoves.length)
+        : state.acceptedMoves.length;
+    final displayedPosition = browsing ? state.acceptedPositions[cursor] : state.position;
+    final displayedMove = browsing
+        ? (cursor == 0 ? null : state.acceptedMoves[cursor - 1])
+        : state.lastMove;
 
     final hint = state.hint;
     final arrows = IList<XiangqiBoardArrow>([
@@ -227,17 +323,19 @@ class _XiangqiLessonPlayerScreenState() extends ConsumerState<XiangqiLessonPlaye
               brightness: boardPrefs.brightness,
               hue: boardPrefs.hue,
               child: XiangqiBoard(
-                position: state.position,
+                position: displayedPosition,
                 orientation: orientation,
                 selected: state.selected,
                 moves: boardPrefs.showLegalMoves ? state.selectedMoves : const IListConst([]),
-                lastMove: state.lastMove,
+                lastMove: displayedMove,
                 wrongMove: state.wrongMove,
                 marked: state.intersections,
                 onTapSquare: controller.tapSquare,
                 onDragMove: controller.movePiece,
                 onCancelInteraction: controller.clearSelection,
-                animationDuration: boardPrefs.pieceAnimationDuration,
+                animationDuration: browsing && !_historyAnimate
+                    ? Duration.zero
+                    : boardPrefs.pieceAnimationDuration,
                 showCoordinates: boardPrefs.coordinates,
                 showLastMove: boardPrefs.boardHighlights,
                 showBorder: boardPrefs.showBorder,
@@ -285,10 +383,13 @@ class _XiangqiLessonPlayerScreenState() extends ConsumerState<XiangqiLessonPlaye
               busy: saveState == XiangqiLessonSaveState.saving,
             ),
             moves: notation,
-            currentMoveIndex: notation.length,
+            currentMoveIndex: cursor,
+            onSelectMove: state.isSolved ? _viewHistory : null,
             moveListVisible: notation.isNotEmpty,
             userActionsBar: BottomBar(
               children: [
+                if (state.isSolved)
+                  BottomBarButton(label: context.l10n.menu, icon: Icons.menu, onTap: _showMenu),
                 BottomBarButton(
                   label: context.l10n.mobileXiangqiLessonHint,
                   onTap: state.isPlayable && state.expectedMove != null
@@ -308,6 +409,20 @@ class _XiangqiLessonPlayerScreenState() extends ConsumerState<XiangqiLessonPlaye
                     onTap: () => unawaited(controller.retryComplete()),
                     icon: CupertinoIcons.arrow_clockwise,
                   ),
+                if (state.isSolved) ...[
+                  HistoryNavigationButton(
+                    forward: false,
+                    onTap: cursor > 0 ? () => _viewHistory(cursor - 1) : null,
+                    onRepeat: () => _viewHistory(cursor - 1, fastSeek: true),
+                  ),
+                  HistoryNavigationButton(
+                    forward: true,
+                    onTap: cursor < state.acceptedMoves.length
+                        ? () => _viewHistory(cursor + 1)
+                        : null,
+                    onRepeat: () => _viewHistory(cursor + 1, fastSeek: true),
+                  ),
+                ],
                 BottomBarButton(
                   label: context.l10n.mobileXiangqiLessonPreviousChapter,
                   onTap: _index > 0 ? () => _goTo(_index - 1) : null,

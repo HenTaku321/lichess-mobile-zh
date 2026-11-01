@@ -1,6 +1,7 @@
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_move.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_replay.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_rules.dart' as rules;
 
 /// Immutable analysis history. The first child is the main continuation; siblings are retained
@@ -24,6 +25,23 @@ class const XiangqiAnalysisNode({
       node = XiangqiAnalysisNode(
         position: positions[i],
         move: i == 0 ? null : moves[i - 1],
+        children: IList([node]),
+      );
+    }
+    return node;
+  }
+
+  /// Keep every validated recorded position, including non-alternating teaching steps. Only the
+  /// snapshot's factory may validate forced transitions; game add/play methods remain strict.
+  factory fromReplay(XiangqiReplaySnapshot snapshot) {
+    var node = XiangqiAnalysisNode(
+      position: snapshot.positions.last,
+      move: snapshot.moves.lastOrNull,
+    );
+    for (var i = snapshot.moves.length - 1; i >= 0; i--) {
+      node = XiangqiAnalysisNode(
+        position: snapshot.positions[i],
+        move: i == 0 ? null : snapshot.moves[i - 1],
         children: IList([node]),
       );
     }

@@ -63,6 +63,17 @@ String xiangqiMovesExport(XiangqiPosition from, IList<XiangqiMove> moves) =>
 String xiangqiLineExport(XiangqiPosition from, IList<XiangqiMove> moves) =>
     <String>[xiangqiFenExport(from), ..._moveLines(from, moves)].join('\n');
 
+/// Explicit teaching steps, not a game PGN or an alternating game move list. The recorded starting
+/// FEN and ICCS identities preserve every demonstrated step even when no Chinese notation exists.
+String xiangqiTeachingExport(IList<XiangqiPosition> positions, IList<XiangqiMove> moves) {
+  final notation = xiangqiTeachingNotation(positions, moves);
+  return [
+    'Teaching replay',
+    positions.first.toFen(),
+    for (var i = 0; i < moves.length; i++) '${i + 1}. ${notation[i]} [${moves[i].iccs}]',
+  ].join('\n');
+}
+
 /// Self-describing xiangqi notation, not a chess PGN. The starting FEN is followed by numbered
 /// Chinese moves; alternative continuations use parentheses and retain their own move numbers.
 String xiangqiTreeExport(

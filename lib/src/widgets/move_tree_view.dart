@@ -43,6 +43,9 @@ final class const MoveTreeNode<T>({
   required final bool firstSideToMove,
   final T? moveId,
   final String notation = '',
+
+  /// Teaching records number each demonstrated step rather than pairs of alternating moves.
+  final int? stepNumber,
   final IList<MoveTreeNode<T>> children = const IListConst([]),
   final IList<String> comments = const IListConst([]),
   final IList<int>? nags,
@@ -69,6 +72,7 @@ final class const MoveTreeNode<T>({
 abstract class MoveTreeNotifier<T>() {
   /// Some source snapshots may be browsed but must not expose an export exit.
   bool get canExport => true;
+  bool get canEditHistory => true;
 
   void expandVariations(MoveTreePath<T> path);
   void collapseVariations(MoveTreePath<T> path);
@@ -1247,7 +1251,11 @@ class const TreeInlineMove<T>({
         mainlineCopyLabel: params.mainlineCopyLabel,
         variationCopyLabel: params.variationCopyLabel,
         copyMessage: params.copyMessage,
-        title: ply.isOdd ? '${(ply / 2).ceil()}. $moveLabel' : '${(ply / 2).ceil()}... $moveLabel',
+        title: branch.stepNumber != null
+            ? '${branch.stepNumber}. $moveLabel'
+            : ply.isOdd
+            ? '${(ply / 2).ceil()}. $moveLabel'
+            : '${(ply / 2).ceil()}... $moveLabel',
         path: path,
         branch: branch,
         lineInfo: lineInfo,
@@ -1271,7 +1279,9 @@ class const TreeInlineMove<T>({
 
     final indexTextStyle = textStyle.copyWith(color: _textColor(context, kIndexOpacity));
     final indexText = showIndex
-        ? branch.ply.isOdd
+        ? branch.stepNumber != null
+              ? TextSpan(text: '${branch.stepNumber}. ', style: indexTextStyle)
+              : branch.ply.isOdd
               ? TextSpan(text: '${(branch.ply / 2).ceil()}. ', style: indexTextStyle)
               : (lineInfo.startLine
                     ? TextSpan(text: '${(branch.ply / 2).ceil()}… ', style: indexTextStyle)
@@ -1419,7 +1429,7 @@ class const _MoveContextMenu<T>({
             child: Text(branch.textComments.join(' ')),
           ),
         const PlatformDivider(indent: 0),
-        if (lineInfo.type != _LineType.mainline) ...[
+        if (lineInfo.type != _LineType.mainline && (notifier?.canEditHistory ?? false)) ...[
           BottomSheetContextMenuAction(
             icon: Icons.subtitles_off,
             child: Text(context.l10n.collapseVariations),
@@ -1459,11 +1469,12 @@ class const _MoveContextMenu<T>({
               messenger.showSnackBar(SnackBar(content: Text(copiedMessage)));
             },
           ),
-        BottomSheetContextMenuAction(
-          icon: Icons.delete,
-          child: Text(context.l10n.deleteFromHere),
-          onPressed: () => notifier?.deleteFromHere(path),
-        ),
+        if (notifier?.canEditHistory ?? false)
+          BottomSheetContextMenuAction(
+            icon: Icons.delete,
+            child: Text(context.l10n.deleteFromHere),
+            onPressed: () => notifier?.deleteFromHere(path),
+          ),
       ],
     );
   }

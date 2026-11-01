@@ -11,9 +11,11 @@ import 'package:lichess_mobile/src/model/xiangqi/puzzle/xiangqi_puzzle.dart';
 import 'package:lichess_mobile/src/model/xiangqi/puzzle/xiangqi_puzzle_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/puzzle/xiangqi_puzzle_repository.dart';
 import 'package:lichess_mobile/src/model/xiangqi/quota/xiangqi_quota.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_analysis_options.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_move.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_notation.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_replay.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_rules.dart' as rules;
 import 'package:lichess_mobile/src/service/move_feedback.dart';
 import 'package:lichess_mobile/src/service/sound_service.dart';
@@ -22,8 +24,11 @@ import 'package:lichess_mobile/src/utils/focus_detector.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
 import 'package:lichess_mobile/src/view/auth/xiangqi_login_screen.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_analysis_screen.dart';
+import 'package:lichess_mobile/src/widgets/adaptive_action_sheet.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
 import 'package:lichess_mobile/src/widgets/feedback.dart';
+import 'package:lichess_mobile/src/widgets/history_navigation_button.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
 import 'package:lichess_mobile/src/widgets/settings.dart';
 import 'package:lichess_mobile/src/widgets/training_feedback.dart';
@@ -187,7 +192,11 @@ class _PuzzleBodyState() extends ConsumerState<_PuzzleBody> {
   XiangqiSquare? _selected;
 
   bool _autoAdvanced = false;
+  bool _autoAdvanceSuppressed = false;
   bool _loadingNext = false;
+  bool _analysisOpen = false;
+  int? _viewCursor;
+  bool _historyAnimate = false;
   bool _active = true;
   int _requestGeneration = 0;
   final Set<Timer> _feedbackTimers = {};
@@ -202,6 +211,75 @@ class _PuzzleBodyState() extends ConsumerState<_PuzzleBody> {
 
   /// The attempt this screen is showing.
   XiangqiPuzzleAttemptKey get _key => (puzzle: widget.puzzle, attempt: widget.attempt);
+
+  bool _canReplay(XiangqiPuzzleAttemptState state) =>
+      state.puzzle.solution != null &&
+      state.phase != .solving &&
+      state.wrongMove == null &&
+      state.moves.length == state.puzzle.solution!.length + 1;
+
+  void _viewHistory(int target, {bool fastSeek = false}) {
+    final state = ref.read(xiangqiPuzzleControllerProvider(_key));
+    if (!_canReplay(state)) return;
+    final current = _viewCursor ?? state.moves.length;
+    final cursor = target.clamp(0, state.moves.length);
+    _autoAdvanceSuppressed = true;
+    _requestGeneration++;
+    if (cursor == current) return;
+    if (cursor > 0) {
+      final move = state.moves[cursor - 1];
+      final capture = state.positions[cursor - 1].pieceAt(move.to) != null;
+      unawaited(ref.read(soundServiceProvider).play(capture ? Sound.capture : Sound.move));
+    }
+    setState(() {
+      _selected = null;
+      _viewCursor = cursor;
+      _historyAnimate = !fastSeek && (cursor - current).abs() == 1;
+    });
+  }
+
+  Future<void> _openAnalysis() async {
+    if (!mounted || _analysisOpen || _loadingNext) return;
+    final state = ref.read(xiangqiPuzzleControllerProvider(_key));
+    if (!_canReplay(state)) return;
+    _autoAdvanceSuppressed = true;
+    _requestGeneration++;
+    final replay = XiangqiReplaySnapshot.recorded(
+      sourceId:
+          'puzzle:${widget.puzzle.id}:${widget.attempt}:${ref.read(xiangqiAccountGenerationProvider)}',
+      kind: .game,
+      positions: state.positions,
+      moves: state.moves,
+      initialCursor: _viewCursor ?? state.moves.length,
+      orientation: state.puzzle.playerSide,
+    );
+    _analysisOpen = true;
+    try {
+      await Navigator.of(context)
+          .push(XiangqiAnalysisScreen.buildRoute(options: XiangqiAnalysisOptions.snapshot(replay)));
+    } finally {
+      if (mounted) setState(() => _analysisOpen = false);
+    }
+  }
+
+  void _showMenu() {
+    _autoAdvanceSuppressed = true;
+    _requestGeneration++;
+    final account = ref.read(xiangqiAccountGenerationProvider);
+    showAdaptiveActionSheet<void>(
+      context: context,
+      actions: [
+        if (_canReplay(ref.read(xiangqiPuzzleControllerProvider(_key))))
+          BottomSheetAction(
+            makeLabel: (context) => Text(context.l10n.analysis),
+            onPressed: () {
+              if (!mounted || account != ref.read(xiangqiAccountGenerationProvider)) return;
+              unawaited(_openAnalysis());
+            },
+          ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -242,6 +320,7 @@ class _PuzzleBodyState() extends ConsumerState<_PuzzleBody> {
     });
     ref.listen(provider, (previous, next) {
       if (_autoAdvanced ||
+          _autoAdvanceSuppressed ||
           !_active ||
           previous?.phase == next.phase ||
           next.phase != XiangqiPuzzlePhase.recorded ||
@@ -251,8 +330,14 @@ class _PuzzleBodyState() extends ConsumerState<_PuzzleBody> {
         return;
       }
       _autoAdvanced = true;
+      final generation = _requestGeneration;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || !_autoAdvanced || !(ModalRoute.of(context)?.isCurrent ?? true)) return;
+        if (!mounted ||
+            !_autoAdvanced ||
+            _autoAdvanceSuppressed ||
+            generation != _requestGeneration ||
+            !(ModalRoute.of(context)?.isCurrent ?? true))
+          return;
         unawaited(nextPuzzle());
       });
     });
@@ -264,6 +349,13 @@ class _PuzzleBodyState() extends ConsumerState<_PuzzleBody> {
     // The solver's own side at the bottom of the screen, which is what a puzzle wants: the line is
     // theirs to find, and a board turned around would ask them to find it upside down.
     final orientation = puzzle.playerSide;
+    final canReplay = _canReplay(state);
+    final browsing = canReplay && _viewCursor != null;
+    final cursor = canReplay
+        ? (_viewCursor ?? state.moves.length).clamp(0, state.moves.length)
+        : state.moves.length;
+    final position = browsing ? state.positions[cursor] : state.position;
+    final lastMove = browsing ? (cursor == 0 ? null : state.moves[cursor - 1]) : state.lastMove;
 
     final selected = _selected;
     final selectedMoves = selected == null
@@ -274,6 +366,7 @@ class _PuzzleBodyState() extends ConsumerState<_PuzzleBody> {
       onFocusGained: () => _active = true,
       onFocusLost: () {
         _active = false;
+        if (_canReplay(ref.read(provider))) _autoAdvanceSuppressed = true;
         _requestGeneration++;
         for (final timer in _feedbackTimers) {
           timer.cancel();
@@ -286,11 +379,11 @@ class _PuzzleBodyState() extends ConsumerState<_PuzzleBody> {
             brightness: boardPrefs.brightness,
             hue: boardPrefs.hue,
             child: XiangqiBoard(
-              position: state.position,
+              position: position,
               orientation: orientation,
               selected: selected,
               moves: boardPrefs.showLegalMoves ? selectedMoves : const IListConst([]),
-              lastMove: state.lastMove,
+              lastMove: lastMove,
               onTapSquare: _onTapSquare,
               onDragMove: (from, to) {
                 final move = XiangqiMove(from, to);
@@ -303,7 +396,9 @@ class _PuzzleBodyState() extends ConsumerState<_PuzzleBody> {
                 controller.onUserMove(move);
               },
               onCancelInteraction: () => setState(() => _selected = null),
-              animationDuration: boardPrefs.pieceAnimationDuration,
+              animationDuration: browsing && !_historyAnimate
+                  ? Duration.zero
+                  : boardPrefs.pieceAnimationDuration,
               showCoordinates: boardPrefs.coordinates,
               showLastMove: boardPrefs.boardHighlights,
               showBorder: boardPrefs.showBorder,
@@ -332,12 +427,16 @@ class _PuzzleBodyState() extends ConsumerState<_PuzzleBody> {
             ],
           ),
           moves: xiangqiGameNotation(state.positions, state.moves),
-          // There is no cursor: the attempt only ever goes forwards, so the move the list marks is
-          // always the one just played.
-          currentMoveIndex: state.moves.length,
-          onSelectMove: null,
+          currentMoveIndex: cursor,
+          onSelectMove: canReplay ? _viewHistory : null,
           userActionsBar: BottomBar(
             children: [
+              if (canReplay)
+                BottomBarButton(
+                  label: context.l10n.menu,
+                  icon: Icons.menu,
+                  onTap: _loadingNext ? null : _showMenu,
+                ),
               BottomBarButton(
                 label: context.l10n.getAHint,
                 onTap: state.canHint ? _hint : null,
@@ -350,6 +449,20 @@ class _PuzzleBodyState() extends ConsumerState<_PuzzleBody> {
                   onTap: () => unawaited(controller.retrySubmit()),
                   icon: CupertinoIcons.arrow_clockwise,
                 ),
+              if (canReplay) ...[
+                HistoryNavigationButton(
+                  forward: false,
+                  onTap: cursor > 0 && !_loadingNext ? () => _viewHistory(cursor - 1) : null,
+                  onRepeat: () => _viewHistory(cursor - 1, fastSeek: true),
+                ),
+                HistoryNavigationButton(
+                  forward: true,
+                  onTap: cursor < state.moves.length && !_loadingNext
+                      ? () => _viewHistory(cursor + 1)
+                      : null,
+                  onRepeat: () => _viewHistory(cursor + 1, fastSeek: true),
+                ),
+              ],
               BottomBarButton(
                 label: context.l10n.puzzleNextPuzzle,
                 onTap: state.isLineComplete && !_loadingNext ? () => unawaited(nextPuzzle()) : null,

@@ -22,6 +22,8 @@ import 'package:lichess_mobile/src/model/xiangqi/xiangqi_hint.dart'
     show $XiangqiEvaluationCopyWith, XiangqiEvaluation, xiangqiEvaluationFromEngine;
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_move.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position_validation.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_replay.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_rules.dart' as rules;
 import 'package:lichess_mobile/src/service/move_feedback.dart';
 import 'package:lichess_mobile/src/service/sound_service.dart';
@@ -180,7 +182,15 @@ final xiangqiAnalysisControllerProvider =
 
 class XiangqiAnalysisController({final XiangqiAnalysisOptions? options})
     extends Notifier<XiangqiAnalysisState> {
-  bool get engineAllowed => options?.engineAllowed ?? true;
+  XiangqiAnalysisCapabilities get capabilities =>
+      options?.capabilities ?? kFullXiangqiAnalysisCapabilities;
+  bool get engineAllowed => capabilities.engine;
+  bool get isTeachingReplay => options?.replay.kind == XiangqiReplayKind.teaching;
+  XiangqiPositionError? get positionError =>
+      isTeachingReplay ? xiangqiPositionError(state.position) : null;
+  bool get canAnalysePosition => capabilities.positionAnalysis && positionError == null;
+  bool get canContinueGame =>
+      capabilities.continueGame && positionError == null && !state.isFinished;
   bool get isStandalone => options == null;
   String? _engineError;
 
@@ -335,6 +345,7 @@ class XiangqiAnalysisController({final XiangqiAnalysisOptions? options})
   ///
   /// Throws [rules.XiangqiIllegalMoveException] if the move cannot be played in this position.
   void play(XiangqiMove move) {
+    if (!capabilities.editHistory) return;
     final before = state.position;
     if (!rules.isLegal(before, move)) throw rules.XiangqiIllegalMoveException(move);
     final path = state.moves.sublist(0, state.cursor).add(move);
@@ -361,7 +372,7 @@ class XiangqiAnalysisController({final XiangqiAnalysisOptions? options})
   }
 
   void promoteVariation({IList<XiangqiMove>? path, bool toMainline = false}) {
-    if (!ref.mounted) return;
+    if (!ref.mounted || !capabilities.editHistory) return;
     final original = state.variationTree;
     if (original == null) return;
     final target = path ?? state.moves.sublist(0, state.cursor);
@@ -430,7 +441,7 @@ class XiangqiAnalysisController({final XiangqiAnalysisOptions? options})
 
   /// Explicit deletion is addressed by path, not by whichever branch is currently selected.
   void deleteFromHere(IList<XiangqiMove> path) {
-    if (!ref.mounted || path.isEmpty) return;
+    if (!ref.mounted || !capabilities.editHistory || path.isEmpty) return;
     final tree = state.variationTree;
     if (tree == null || !tree.hasPath(path)) return;
     final selected = state.moves.sublist(0, state.cursor);
@@ -463,11 +474,15 @@ class XiangqiAnalysisController({final XiangqiAnalysisOptions? options})
   String makeLineExport({
     IList<XiangqiMove> path = const IListConst([]),
     bool includeVariations = true,
-  }) => xiangqiTreeExport(
-    state.variationTree ?? XiangqiAnalysisNode.fromLine(state.positions.first, state.moves),
-    path: path,
-    includeVariations: includeVariations,
-  );
+  }) {
+    if (!capabilities.exportHistory) throw StateError('This analysis source cannot be exported.');
+    if (isTeachingReplay) return xiangqiTeachingExport(state.positions, state.moves);
+    return xiangqiTreeExport(
+      state.variationTree ?? XiangqiAnalysisNode.fromLine(state.positions.first, state.moves),
+      path: path,
+      includeVariations: includeVariations,
+    );
+  }
 
   /// Puts the board on the position [cursor] moves into the line, clamped to the line's ends.
   void goTo(int cursor, {bool fastSeek = false}) {
@@ -514,6 +529,7 @@ class XiangqiAnalysisController({final XiangqiAnalysisOptions? options})
   /// own that has somewhere to go picks the piece up, a tap on a square it may reach plays the move,
   /// and a tap anywhere else puts the piece back down. See [XiangqiGameController.tapSquare].
   void tapSquare(XiangqiSquare square) {
+    if (!capabilities.editHistory) return;
     final selected = state.selected;
     if (selected != null && state.selectedMoves.any((move) => move.to == square)) {
       play(XiangqiMove(selected, square));
@@ -531,6 +547,7 @@ class XiangqiAnalysisController({final XiangqiAnalysisOptions? options})
   void clearSelection() => state = _latest = state.copyWith(selected: null);
 
   void movePiece(XiangqiSquare from, XiangqiSquare to) {
+    if (!capabilities.editHistory) return;
     final move = XiangqiMove(from, to);
     if (rules.isLegal(state.position, move)) play(move);
   }
@@ -544,6 +561,7 @@ class XiangqiAnalysisController({final XiangqiAnalysisOptions? options})
   void reset() => _setStart(XiangqiPosition.initial());
 
   void _setStart(XiangqiPosition position) {
+    if (!capabilities.editHistory) return;
     _shouldAnimateUpdate = false;
     state = _latest = state.copyWith(
       positions: IList([position]),

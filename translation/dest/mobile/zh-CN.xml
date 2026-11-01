@@ -267,6 +267,14 @@
   </plurals>
   <string name="youCannotChallengeYourself" comment="Error snackbar when trying to challenge yourself from the board editor.">您无法向自己发起挑战</string>
   <string name="xiangqi" comment="Xiangqi, the Chinese chess variant, as opposed to international chess. Used as a game name in the offline opponent picker and as a screen title.">象棋</string>
+  <string name="xiangqiTeachingReplay">教学回放</string>
+  <string name="xiangqiAnalyseCurrentPosition">分析当前局面</string>
+  <string name="xiangqiInvalidGenerals">红黑双方必须各有一枚帅／将。</string>
+  <string name="xiangqiInvalidCounters">棋盘尺寸或着法计数不合法。</string>
+  <string name="xiangqiInvalidMaterial">局面中某种棋子的数量超出限制。</string>
+  <string name="xiangqiInvalidPlacement">有棋子位于对局中不可能到达的位置。</string>
+  <string name="xiangqiFacingGenerals">帅与将之间不能没有棋子阻隔。</string>
+  <string name="xiangqiInactiveSideInCheck">非行棋方不能已经被将军。</string>
   <string name="xiangqiBoardCoordinates" comment="The board coordinates setting, as it appears on the xiangqi game settings sheet. Nine files by ten ranks, unlike the chess board's eight by eight.">棋盘坐标 (A-I, 0-9)</string>
   <string name="xiangqiCheckmated" comment="Xiangqi game-end sentence: the side named by %s is checkmated.">%s被将死。</string>
   <string name="xiangqiDifficultyExplanation" comment="Xiangqi game settings sheet: the line under the difficulty setting, saying what a level actually controls.">电脑可以思考多久。</string>

@@ -14,6 +14,7 @@ import 'package:lichess_mobile/src/model/xiangqi/xiangqi_export.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_move.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_notation.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position_validation.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/focus_detector.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
@@ -249,9 +250,11 @@ class _BodyState() extends ConsumerState<_Body> {
               selected: analysisState.selected,
               moves: boardPrefs.showLegalMoves ? analysisState.selectedMoves : const IListConst([]),
               lastMove: analysisState.lastMove,
-              onTapSquare: controller.tapSquare,
-              onDragMove: controller.movePiece,
-              onCancelInteraction: controller.clearSelection,
+              onTapSquare: controller.capabilities.editHistory ? controller.tapSquare : null,
+              onDragMove: controller.capabilities.editHistory ? controller.movePiece : null,
+              onCancelInteraction: controller.capabilities.editHistory
+                  ? controller.clearSelection
+                  : null,
               animationDuration: controller.shouldAnimateUpdate
                   ? boardPrefs.pieceAnimationDuration
                   : Duration.zero,
@@ -262,13 +265,19 @@ class _BodyState() extends ConsumerState<_Body> {
               magnifyDraggedPiece: boardPrefs.magnifyDraggedPiece,
               dragTargetKind: boardPrefs.dragTargetKind,
               settings: XiangqiBoardSettings.fromPreferences(boardPrefs),
-              canStartDrag: (piece) => piece.side == analysisState.position.turn,
+              canStartDrag: (piece) =>
+                  controller.capabilities.editHistory && piece.side == analysisState.position.turn,
               style: XiangqiBoardStyle.fromChessboardColorScheme(boardPrefs.boardTheme.colors),
             ),
           ),
           // Above the board: how deep the engine has got. The score is not repeated here — it is on
           // the bar beside the board, which is what a bar is for.
-          boardHeader: _AnalysisDepth(depth: analysisState.depth),
+          boardHeader: controller.isTeachingReplay
+              ? Text(
+                  context.l10n.mobileXiangqiTeachingReplay,
+                  style: TextTheme.of(context).bodySmall,
+                )
+              : _AnalysisDepth(depth: analysisState.depth),
           // Under it: what the engine says, in as many lines as the player has asked to be shown.
           engineLinesHeight: numEvalLines * _kEngineLineHeight,
           engineLines: !evalEnabled || !analysisPrefs.showEngineLines || numEvalLines == 0
@@ -286,26 +295,30 @@ class _BodyState() extends ConsumerState<_Body> {
                       : null,
                 )
               : null,
-          moves: xiangqiGameNotation(analysisState.positions, analysisState.moves),
+          moves: controller.isTeachingReplay
+              ? xiangqiTeachingNotation(analysisState.positions, analysisState.moves)
+              : xiangqiGameNotation(analysisState.positions, analysisState.moves),
           // The line of play the player has made, marked at the move they are looking at. Unlike the
           // game screen's, this list is a control: stepping back and forward through what has been
           // played is the whole of what makes it an analysis board.
           currentMoveIndex: analysisState.cursor,
           onSelectMove: controller.goTo,
-          panelFooter: MoveVariationsBar<XiangqiMove>(
-            choices: [
-              for (var i = 0; i < analysisState.variations.length; i++)
-                MoveVariationChoice(
-                  value: analysisState.variations[i].move!,
-                  label: xiangqiMoveNotation(
-                    analysisState.position,
-                    analysisState.variations[i].move!,
-                  ),
-                  mainline: i == 0,
+          panelFooter: controller.isTeachingReplay
+              ? null
+              : MoveVariationsBar<XiangqiMove>(
+                  choices: [
+                    for (var i = 0; i < analysisState.variations.length; i++)
+                      MoveVariationChoice(
+                        value: analysisState.variations[i].move!,
+                        label: xiangqiMoveNotation(
+                          analysisState.position,
+                          analysisState.variations[i].move!,
+                        ),
+                        mainline: i == 0,
+                      ),
+                  ],
+                  onSelect: controller.selectVariation,
                 ),
-            ],
-            onSelect: controller.selectVariation,
-          ),
           bottomBar: BottomBar(
             children: [
               BottomBarButton(label: context.l10n.menu, icon: Icons.menu, onTap: _showMenu),
@@ -334,17 +347,21 @@ class _BodyState() extends ConsumerState<_Body> {
 
   void _showMenu() {
     final state = ref.read(xiangqiAnalysisControllerProvider);
-    final toolsAllowed = ref.read(xiangqiAnalysisControllerProvider.notifier).engineAllowed;
+    final controller = ref.read(xiangqiAnalysisControllerProvider.notifier);
+    final capabilities = controller.capabilities;
+    final positionError = controller.positionError;
     showAdaptiveActionSheet<void>(
       context: context,
+      title: positionError == null ? null : Text(_positionErrorLabel(context, positionError)),
       actions: [
-        if (state.variationTree?.canPromote(state.moves.sublist(0, state.cursor)) ?? false)
+        if (capabilities.editHistory &&
+            (state.variationTree?.canPromote(state.moves.sublist(0, state.cursor)) ?? false))
           BottomSheetAction(
             makeLabel: (context) => Text(context.l10n.promoteVariation),
             onPressed: () =>
                 ref.read(xiangqiAnalysisControllerProvider.notifier).promoteVariation(),
           ),
-        if (state.cursor > 0)
+        if (capabilities.editHistory && state.cursor > 0)
           BottomSheetAction(
             makeLabel: (context) => Text(context.l10n.deleteFromHere),
             onPressed: () => ref.read(xiangqiAnalysisControllerProvider.notifier).retract(),
@@ -366,7 +383,7 @@ class _BodyState() extends ConsumerState<_Body> {
               },
             ),
           ),
-        if (toolsAllowed)
+        if (capabilities.editPosition)
           BottomSheetAction(
             makeLabel: (context) => Text(context.l10n.boardEditor),
             onPressed: () => Navigator.of(context).push(
@@ -375,7 +392,24 @@ class _BodyState() extends ConsumerState<_Body> {
               ),
             ),
           ),
-        if (toolsAllowed)
+        if (controller.isTeachingReplay && controller.canAnalysePosition)
+          BottomSheetAction(
+            makeLabel: (context) => Text(context.l10n.mobileXiangqiAnalyseCurrentPosition),
+            onPressed: () {
+              if (!mounted) return;
+              Navigator.of(context).push(
+                XiangqiAnalysisScreen.buildRoute(
+                  options: XiangqiAnalysisOptions.line(
+                    sourceId: '${controller.options!.sourceId}:position:${state.position.toFen()}',
+                    initialPosition: state.position,
+                    moves: const IListConst([]),
+                    orientation: state.orientation,
+                  ),
+                ),
+              );
+            },
+          ),
+        if (controller.canContinueGame)
           BottomSheetAction(
             makeLabel: (context) => Text(context.l10n.continueFromHere),
             onPressed: () => showXiangqiContinueFromHereMenu(
@@ -384,13 +418,13 @@ class _BodyState() extends ConsumerState<_Body> {
               orientation: state.orientation,
             ),
           ),
-        if (toolsAllowed)
+        if (capabilities.exportHistory)
           BottomSheetAction(
             makeLabel: (context) => Text('${context.l10n.copyToClipboard} · FEN'),
             onPressed: () =>
                 _copy(xiangqiFenExport(ref.read(xiangqiAnalysisControllerProvider).position)),
           ),
-        if (toolsAllowed)
+        if (capabilities.exportHistory)
           BottomSheetAction(
             makeLabel: (context) =>
                 Text('${context.l10n.copyToClipboard} · ${context.l10n.movesPlayed}'),
@@ -413,6 +447,15 @@ class _BodyState() extends ConsumerState<_Body> {
     }
   }
 }
+
+String _positionErrorLabel(BuildContext context, XiangqiPositionError error) => switch (error) {
+  .generals => context.l10n.mobileXiangqiInvalidGenerals,
+  .counters => context.l10n.mobileXiangqiInvalidCounters,
+  .material => context.l10n.mobileXiangqiInvalidMaterial,
+  .placement => context.l10n.mobileXiangqiInvalidPlacement,
+  .facingGenerals => context.l10n.mobileXiangqiFacingGenerals,
+  .inactiveSideInCheck => context.l10n.mobileXiangqiInactiveSideInCheck,
+};
 
 /// How deep the engine has got, written above the board.
 ///

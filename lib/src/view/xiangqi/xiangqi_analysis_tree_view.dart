@@ -20,21 +20,36 @@ class const XiangqiAnalysisTreeView({
   State<XiangqiAnalysisTreeView> createState() => _XiangqiAnalysisTreeViewState();
 }
 
-MoveTreeNode<XiangqiMove> _treeNode(XiangqiAnalysisNode node, [XiangqiPosition? before]) =>
-    MoveTreeNode(
-      moveId: node.move,
-      ply: (node.position.fullmoveNumber - 1) * 2 + (node.position.turn == .black ? 1 : 0),
-      fullmoveNumber: node.position.fullmoveNumber,
-      firstSideToMove: node.position.turn == .red,
-      notation: node.move == null ? '' : xiangqiMoveNotation(before!, node.move!),
-      children: node.children.map((child) => _treeNode(child, node.position)).toIList(),
-      isCollapsed: node.isCollapsed,
-    );
+MoveTreeNode<XiangqiMove> _treeNode(
+  XiangqiAnalysisNode node, {
+  XiangqiPosition? before,
+  int depth = 0,
+  bool teaching = false,
+}) => MoveTreeNode(
+  moveId: node.move,
+  ply: teaching
+      ? depth
+      : (node.position.fullmoveNumber - 1) * 2 + (node.position.turn == .black ? 1 : 0),
+  fullmoveNumber: node.position.fullmoveNumber,
+  firstSideToMove: node.position.turn == .red,
+  stepNumber: teaching && node.move != null ? depth : null,
+  notation: node.move == null
+      ? ''
+      : teaching
+      ? xiangqiTeachingMoveNotation(before!, node.move!)
+      : xiangqiMoveNotation(before!, node.move!),
+  children: node.children
+      .map((child) => _treeNode(child, before: node.position, depth: depth + 1, teaching: teaching))
+      .toIList(),
+  isCollapsed: node.isCollapsed,
+);
 
 class _XiangqiTreeNotifier(final XiangqiAnalysisController controller)
     extends MoveTreeNotifier<XiangqiMove> {
   @override
-  bool get canExport => controller.engineAllowed;
+  bool get canExport => controller.capabilities.exportHistory;
+  @override
+  bool get canEditHistory => controller.capabilities.editHistory;
 
   @override
   void userJump(MoveTreePath<XiangqiMove> path) => controller.goToPath(path.ids);
@@ -59,14 +74,16 @@ class _XiangqiAnalysisTreeViewState() extends State<XiangqiAnalysisTreeView> {
   @override
   void initState() {
     super.initState();
-    _root = _treeNode(widget.root);
+    _root = _treeNode(widget.root, teaching: widget.controller.isTeachingReplay);
     _notifier = _XiangqiTreeNotifier(widget.controller);
   }
 
   @override
   void didUpdateWidget(covariant XiangqiAnalysisTreeView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!identical(widget.root, oldWidget.root)) _root = _treeNode(widget.root);
+    if (!identical(widget.root, oldWidget.root) || oldWidget.controller != widget.controller) {
+      _root = _treeNode(widget.root, teaching: widget.controller.isTeachingReplay);
+    }
     if (oldWidget.controller != widget.controller) {
       _notifier = _XiangqiTreeNotifier(widget.controller);
     }
@@ -79,7 +96,7 @@ class _XiangqiAnalysisTreeViewState() extends State<XiangqiAnalysisTreeView> {
       currentPath: MoveTreePath(widget.currentPath),
       pgnRootComments: const IListConst([]),
       notifier: _notifier,
-      displayMode: widget.displayMode,
+      displayMode: widget.controller.isTeachingReplay ? .inlineNotation : widget.displayMode,
     ),
   );
 }

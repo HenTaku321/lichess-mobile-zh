@@ -21,7 +21,8 @@ import 'package:lichess_mobile/src/view/xiangqi/xiangqi_analysis_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_engine_button.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_watch_screen.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
-import 'package:lichess_mobile/src/widgets/move_list.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_analysis_tree_view.dart';
+import 'package:lichess_mobile/src/widgets/move_tree_view.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_game_layout.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -144,7 +145,10 @@ void main() {
     await tester.pump();
     expect(find.byType(XiangqiEvalGauge), findsNothing);
     expect(analysis.board(tester).arrows, isEmpty);
-    expect(tester.widget<MoveList>(find.byType(MoveList)).type, MoveListType.inline);
+    expect(
+      tester.widget<XiangqiAnalysisTreeView>(find.byType(XiangqiAnalysisTreeView)).displayMode,
+      PgnTreeDisplayMode.inlineNotation,
+    );
   });
 
   testDesktop('playing a shorter replacement analysis branch is still a new played move', (

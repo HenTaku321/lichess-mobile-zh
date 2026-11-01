@@ -288,25 +288,36 @@ class _DebouncedMoveTreeViewState<T>() extends ConsumerState<DebouncedMoveTreeVi
   // using the fast replay buttons.
   @override
   Widget build(BuildContext context) {
-    return _PgnTreeView<T>(
-      root: widget.root,
-      rootComments: widget.pgnRootComments,
-      params: (
-        shouldShowComputerAnalysis: widget.shouldShowComputerAnalysis,
-        shouldShowAnnotations: widget.shouldShowAnnotations,
-        shouldShowComments: widget.shouldShowComments,
-        currentMoveKey: currentMoveKey,
-        pathToCurrentMove: pathToCurrentMove,
-        pathToLiveMove: pathToLiveMove,
-        premovePaths: widget.premovePaths,
-        showTopDivider: widget.showTopDivider,
-        displayMode: widget.displayMode,
-        notifier: widget.notifier,
-        usesChessFont: widget.usesChessFont,
-        mainlineCopyLabel: widget.mainlineCopyLabel,
-        variationCopyLabel: widget.variationCopyLabel,
-        copyMessage: widget.copyMessage,
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // A compact panel must not squeeze a complete move into half of an unreadable column.
+        // Use the same inline fallback for both games, accounting for the reader's text scale.
+        final mode =
+            widget.displayMode == PgnTreeDisplayMode.twoColumn &&
+                constraints.maxWidth < MediaQuery.textScalerOf(context).scale(260)
+            ? PgnTreeDisplayMode.inlineNotation
+            : widget.displayMode;
+        return _PgnTreeView<T>(
+          root: widget.root,
+          rootComments: widget.pgnRootComments,
+          params: (
+            shouldShowComputerAnalysis: widget.shouldShowComputerAnalysis,
+            shouldShowAnnotations: widget.shouldShowAnnotations,
+            shouldShowComments: widget.shouldShowComments,
+            currentMoveKey: currentMoveKey,
+            pathToCurrentMove: pathToCurrentMove,
+            pathToLiveMove: pathToLiveMove,
+            premovePaths: widget.premovePaths,
+            showTopDivider: widget.showTopDivider,
+            displayMode: mode,
+            notifier: widget.notifier,
+            usesChessFont: widget.usesChessFont,
+            mainlineCopyLabel: widget.mainlineCopyLabel,
+            variationCopyLabel: widget.variationCopyLabel,
+            copyMessage: widget.copyMessage,
+          ),
+        );
+      },
     );
   }
 }
@@ -1293,20 +1304,37 @@ class const TreeInlineMove<T>({
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text.rich(
-              TextSpan(
-                children: [
-                  ?indexText,
+            Flexible(
+              child: Tooltip(
+                message: moveWithNag,
+                triggerMode: TooltipTriggerMode.manual,
+                excludeFromSemantics: true,
+                child: Text.rich(
                   TextSpan(
-                    text: moveWithNag,
-                    style: moveTextStyle.copyWith(
-                      color: isPremove
-                          // TODO Possibly choose a more suitable color
-                          ? LichessColors.brag
-                          : _textColor(context, isCurrentMove ? 1 : 0.9, nag: nag),
-                    ),
+                    children: [
+                      ?indexText,
+                      TextSpan(
+                        text: moveWithNag,
+                        style: moveTextStyle.copyWith(
+                          color: isPremove
+                              // TODO Possibly choose a more suitable color
+                              ? LichessColors.brag
+                              : _textColor(context, isCurrentMove ? 1 : 0.9, nag: nag),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                  maxLines:
+                      params.displayMode == PgnTreeDisplayMode.twoColumn &&
+                          lineInfo.type == _LineType.mainline
+                      ? 1
+                      : null,
+                  overflow:
+                      params.displayMode == PgnTreeDisplayMode.twoColumn &&
+                          lineInfo.type == _LineType.mainline
+                      ? TextOverflow.ellipsis
+                      : null,
+                ),
               ),
             ),
             if (eval != null)

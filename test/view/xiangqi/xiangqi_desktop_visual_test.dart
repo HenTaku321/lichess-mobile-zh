@@ -475,6 +475,11 @@ void main() {
             testWidgets(
               name,
               (tester) async {
+                // Dispose the old route before resetting its remembered analysis. In particular,
+                // a failed screenshot must not save its tree during the next scene's first pump.
+                await tester.pumpWidget(const SizedBox.shrink());
+                await tester.runAsync(() => pumpEventQueue(times: 2));
+                clearSavedXiangqiAnalysis();
                 final fake = analysis.fakeXiangqiEngine();
                 final factory = fx.FakeXiangqiChannelFactory();
                 final socket = XiangqiSocketClient(

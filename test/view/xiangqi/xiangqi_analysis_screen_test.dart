@@ -17,7 +17,7 @@ import 'package:lichess_mobile/src/view/more/more_tab_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_analysis_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_engine_button.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
-import 'package:lichess_mobile/src/widgets/move_list.dart';
+import 'package:lichess_mobile/src/widgets/move_tree_view.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_game_layout.dart';
 import 'package:material_ui/material_ui.dart';
@@ -80,6 +80,11 @@ Future<FakeTransport> pumpAnalysisScreen(
   bool engineEvaluation = true,
   String? initialFen,
 }) async {
+  // Dispose an earlier route before clearing its session. A failing scenario must not save
+  // its tree after the next scenario's setUp has already cleared the cache.
+  await tester.pumpWidget(const SizedBox.shrink());
+  await tester.runAsync(() => pumpEventQueue(times: 2));
+  clearSavedXiangqiAnalysis();
   final (:engine, :transport) = fakeXiangqiEngine();
 
   await tester.pumpWidget(
@@ -160,7 +165,7 @@ void main() {
       );
 
       // Nothing has been played, so there is no line to show and nowhere to step through it.
-      expect(find.byType(StackedMoveItem), findsNothing);
+      expect(find.byType(TreeInlineMove<XiangqiMove>), findsNothing);
       expect(board(tester).position, XiangqiPosition.initial());
       expect(barButton(tester, CupertinoIcons.chevron_back).onTap, isNull);
       expect(barButton(tester, CupertinoIcons.chevron_forward).onTap, isNull);
@@ -302,7 +307,7 @@ void main() {
       await tapSquare(tester, 'e2');
       await tapSquare(tester, 'h9');
       await tapSquare(tester, 'g7');
-      expect(find.byType(StackedMoveItem), findsNWidgets(2));
+      expect(find.byType(TreeInlineMove<XiangqiMove>), findsNWidgets(2));
       final afterBothMoves = board(tester).position;
 
       // The list counts the way a scoresheet does — the first move of the line is move 1 — and its
@@ -320,7 +325,7 @@ void main() {
       );
     });
 
-    testWidgets('playing a move while looking back at the line drops what followed it', (
+    testWidgets('playing from history retains the original continuation in the tree', (
       tester,
     ) async {
       await pumpAnalysisScreen(tester, engineEvaluation: false);
@@ -332,17 +337,17 @@ void main() {
       await tester.tap(find.byIcon(CupertinoIcons.chevron_back));
       await tester.pump();
 
-      // Anything else from here is the new continuation of the line, and the old one is gone —
-      // the same thing playing a move means on any analysis board.
+      // A new continuation is a sibling, not replacement of the original chess-style mainline.
       await tapSquare(tester, 'g6');
       await tapSquare(tester, 'g5');
 
-      expect(find.text('卒7进1'), findsOneWidget);
-      expect(
-        find.text('马8进7'),
-        findsNothing,
-        reason: 'the move that followed the one stepped back to is no longer in the line',
-      );
+      expect(find.textContaining('卒7进1'), findsOneWidget);
+      expect(find.textContaining('马8进7'), findsOneWidget);
+      expect(board(tester).lastMove, moveAt('g6g5'));
+      await tester.tap(find.textContaining('马8进7'));
+      await tester.pump();
+      expect(board(tester).lastMove, moveAt('h9g7'));
+      expect(find.textContaining('卒7进1'), findsOneWidget);
       expect(barButton(tester, CupertinoIcons.chevron_forward).onTap, isNull);
     });
 
@@ -441,7 +446,7 @@ void main() {
       await pumpAnalysisScreen(tester, engineEvaluation: false);
       await tapSquare(tester, 'h2');
       await tapSquare(tester, 'e2');
-      expect(find.byType(StackedMoveItem), findsOneWidget);
+      expect(find.byType(TreeInlineMove<XiangqiMove>), findsOneWidget);
       expect(find.text('炮二平五'), findsOneWidget);
 
       await tester.tap(find.byIcon(Icons.menu));
@@ -452,7 +457,7 @@ void main() {
       await tester.tap(find.text('OK'));
       await tester.pump();
 
-      expect(find.byType(StackedMoveItem), findsNothing);
+      expect(find.byType(TreeInlineMove<XiangqiMove>), findsNothing);
       expect(board(tester).position, XiangqiPosition.initial());
       expect(barButton(tester, CupertinoIcons.chevron_back).onTap, isNull);
     });

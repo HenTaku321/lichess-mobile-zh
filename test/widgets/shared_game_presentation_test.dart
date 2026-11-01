@@ -134,7 +134,7 @@ void main() {
                 orientation: Side.white,
                 position: Chess.initial,
                 savedEval: null,
-                serverEval: ExternalEval(cp: 100),
+                serverEval: ExternalEval(cp: 100, mate: null),
                 filters: (
                   context: EvaluationContext(
                     id: StringId('shared-gauge-test'),

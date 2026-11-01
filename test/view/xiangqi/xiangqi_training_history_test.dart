@@ -47,8 +47,10 @@ class RecordingTrainingSound() extends FakeSoundService {
 Future<FakeTransport> pumpTrainingLesson(
   WidgetTester tester, {
   required XiangqiChapter chapter,
+  IList<XiangqiChapter> followingChapters = const IListConst([]),
   RecordingTrainingSound? sound,
   List<http.Request>? requests,
+  Future<http.Response> Function(http.Request)? answer,
 }) async {
   final (:engine, :transport) = analysis.fakeXiangqiEngine();
   await tester.pumpWidget(
@@ -60,7 +62,7 @@ Future<FakeTransport> pumpTrainingLesson(
       home: XiangqiLessonPlayerScreen(
         lessonId: 'TrainingHistoryLesson',
         lessonTitle: 'Training history',
-        chapters: IList([chapter]),
+        chapters: IList([chapter, ...followingChapters]),
         initialIndex: 0,
       ),
       overrides: {
@@ -73,6 +75,7 @@ Future<FakeTransport> pumpTrainingLesson(
           (_) => FakeHttpClientFactory(
             () => MockClient((request) async {
               requests?.add(request);
+              if (answer != null) return answer(request);
               return http.Response('{}', request.url.path.endsWith('/complete') ? 200 : 404);
             }),
           ),

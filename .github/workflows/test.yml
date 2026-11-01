@@ -164,6 +164,7 @@ jobs:
           test/widgets/practice_feedback_card_test.dart
           test/view/xiangqi/xiangqi_training_feedback_parity_test.dart
           test/view/xiangqi/xiangqi_training_history_test.dart
+          test/view/xiangqi/xiangqi_training_lifecycle_test.dart
           test/model/xiangqi/xiangqi_replay_test.dart
           test/model/xiangqi/lesson/xiangqi_lesson_controller_test.dart
           test/model/xiangqi/lesson/xiangqi_lesson_save_test.dart

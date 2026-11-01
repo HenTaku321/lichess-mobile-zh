@@ -14,6 +14,8 @@ import 'package:lichess_mobile/src/network/xiangqi_http.dart';
 import 'package:lichess_mobile/src/service/sound_service.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_analysis_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_lesson_player_screen.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_over_the_board_screen.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_puzzle_screen.dart';
 import 'package:lichess_mobile/src/widgets/history_navigation_button.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
 import 'package:material_ui/material_ui.dart';
@@ -220,4 +222,135 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('nonstandard teaching replay retains every step and only continues a new game', (
+    tester,
+  ) async {
+    final chapter = lesson.chapter(
+      fen: trainingFen,
+      steps: IList([
+        lesson.step(null),
+        lesson.step('i0i1', nextMove: 'b'),
+        lesson.step('i1i2', nextMove: 'b'),
+      ]),
+    );
+    final transport = await pumpTrainingLesson(tester, chapter: chapter);
+    await lesson.tapSquare(tester, 'i0');
+    await lesson.tapSquare(tester, 'i1');
+    await lesson.tapSquare(tester, 'i1');
+    await lesson.tapSquare(tester, 'i2');
+    final recorded = tester.widget<XiangqiBoard>(find.byType(XiangqiBoard)).position.toFen();
+    expect(find.byIcon(Icons.menu), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.menu));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Analysis board'));
+    await exits.finishRoute(tester, find.byType(XiangqiAnalysisScreen, skipOffstage: false));
+    final container = ProviderScope.containerOf(tester.element(find.byType(XiangqiBoard)));
+    final before = container.read(xiangqiAnalysisControllerProvider);
+    expect(before.moves.map((move) => move.iccs), ['i0i1', 'i1i2']);
+    expect(before.position.toFen(), recorded);
+    expect(find.textContaining('车一进一'), findsNWidgets(2));
+    expect(find.textContaining('Teaching replay'), findsOneWidget);
+    expect(tester.widget<XiangqiBoard>(find.byType(XiangqiBoard)).onDragMove, isNull);
+    expect(container.read(xiangqiAnalysisControllerProvider.notifier).engineAllowed, isFalse);
+    await tester.tap(find.byIcon(Icons.menu));
+    await tester.pumpAndSettle();
+    expect(find.text('Delete from here'), findsNothing);
+    expect(find.text('Board editor'), findsNothing);
+    expect(find.text('Analyse current position'), findsOneWidget);
+    expect(find.text('Continue from here'), findsOneWidget);
+    await tester.tap(find.text('Continue from here'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Over the board'));
+    await exits.finishRoute(tester, find.byType(XiangqiOverTheBoardScreen, skipOffstage: false));
+    await tester.ensureVisible(find.text('Play'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Play'));
+    await tester.pump();
+    final child = ProviderScope.containerOf(tester.element(find.byType(XiangqiBoard)));
+    expect(child.read(xiangqiGameControllerProvider).gamePosition.toFen(), recorded);
+    expect(child.read(xiangqiGameControllerProvider).moves, isEmpty);
+    expect(container.read(xiangqiAnalysisControllerProvider).moves, before.moves);
+    expect(transport.takeCommands().where((command) => command.startsWith('go ')), isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('teaching replay with missing generals has no engine or current-position exits', (
+    tester,
+  ) async {
+    final transport = await pumpTrainingLesson(tester, chapter: lesson.chapter());
+    await lesson.tapSquare(tester, 'i0');
+    await lesson.tapSquare(tester, 'i9');
+    await puzzle.settle(tester);
+    expect(find.byIcon(Icons.menu), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.menu));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Analysis board'));
+    await exits.finishRoute(tester, find.byType(XiangqiAnalysisScreen, skipOffstage: false));
+    expect(find.textContaining('Teaching replay'), findsOneWidget);
+    final container = ProviderScope.containerOf(tester.element(find.byType(XiangqiBoard)));
+    expect(container.read(xiangqiAnalysisControllerProvider.notifier).engineAllowed, isFalse);
+    await tester.tap(find.byIcon(Icons.menu));
+    await tester.pumpAndSettle();
+    expect(find.text('Continue from here'), findsNothing);
+    expect(find.text('Analyse current position'), findsNothing);
+    expect(find.textContaining('Exactly one general is required on each side.'), findsOneWidget);
+    expect(find.textContaining('Copy to clipboard'), findsWidgets);
+    expect(transport.takeCommands().where((command) => command.startsWith('go ')), isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a solved puzzle transfers its displayed history and does not fetch another puzzle', (
+    tester,
+  ) async {
+    final (:engine, :transport) = analysis.fakeXiangqiEngine();
+    final server = puzzle.PuzzleServer();
+    await tester.pumpWidget(
+      await makeTestProviderScopeApp(
+        tester,
+        surfaceSize: const Size(1280, 720),
+        failOnOverflow: true,
+        home: const XiangqiPuzzleScreen(),
+        defaultPreferences: analysis.evaluationPreferences(isEnabled: false),
+        overrides: {
+          xiangqiEngineProvider: xiangqiEngineProvider.overrideWith((ref) => engine),
+          xiangqiAuthStorageProvider: xiangqiAuthStorageProvider.overrideWithValue(
+            FakeXiangqiAuthStorage(fixture.xiangqiTestSession),
+          ),
+          httpClientFactoryProvider: httpClientFactoryProvider.overrideWith(
+            (_) => FakeHttpClientFactory(() => server.client),
+          ),
+        },
+      ),
+    );
+    await puzzle.settle(tester);
+    await puzzle.playTheLine(tester);
+    final solved = puzzle.attemptState(tester);
+    expect(find.byIcon(Icons.menu), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.menu));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Analysis board'));
+    await exits.finishRoute(tester, find.byType(XiangqiAnalysisScreen, skipOffstage: false));
+    final container = ProviderScope.containerOf(tester.element(find.byType(XiangqiBoard)));
+    final state = container.read(xiangqiAnalysisControllerProvider);
+    expect(state.moves, solved.moves);
+    expect(
+      state.positions.map((position) => position.toFen()),
+      solved.positions.map((position) => position.toFen()),
+    );
+    expect(
+      tester.widget<XiangqiBoard>(find.byType(XiangqiBoard)).orientation,
+      fixture.xiangqiTestPuzzle.playerSide,
+    );
+    expect(
+      server.requests.where((request) => request.url.path.endsWith('/complete')),
+      hasLength(1),
+    );
+    expect(
+      server.requests.where((request) => request.url.path == '/api/puzzle/search'),
+      hasLength(1),
+    );
+    expect(transport.takeCommands().where((command) => command.startsWith('go ')), isEmpty);
+    expect(tester.takeException(), isNull);
+  });
 }

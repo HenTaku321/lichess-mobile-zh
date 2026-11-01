@@ -7,7 +7,7 @@ import 'package:lichess_mobile/src/model/common/chess.dart';
 import 'package:lichess_mobile/src/model/xiangqi/lesson/xiangqi_lesson.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_analysis_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_controller.dart'
-    show xiangqiEngineProvider;
+    show xiangqiEngineProvider, xiangqiGameControllerProvider;
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/network/http.dart';
 import 'package:lichess_mobile/src/network/xiangqi_http.dart';

@@ -1,35 +1,18 @@
 import 'package:dartchess/dartchess.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/common/eval.dart';
 import 'package:lichess_mobile/src/model/engine/engine_utils.dart';
 import 'package:lichess_mobile/src/model/engine/position_evaluator.dart';
-import 'package:lichess_mobile/src/styles/styles.dart';
-import 'package:lichess_mobile/src/utils/l10n_context.dart';
-import 'package:lichess_mobile/src/utils/screen.dart';
+import 'package:lichess_mobile/src/widgets/evaluation_gauge.dart';
 import 'package:material_ui/material_ui.dart';
 
-const double _kEvalGaugeSize = 24.0;
-const double _kEvalGaugeFontSize = 11.0;
-
-double getEvalGaugeWidth(BuildContext context) {
-  return isTabletOrLarger(context) ? _kEvalGaugeSize : _kEvalGaugeSize - 2.0;
-}
-
-double getEvalGaugeFontSize(BuildContext context) {
-  return isTabletOrLarger(context) ? _kEvalGaugeFontSize : _kEvalGaugeFontSize - 2.0;
-}
+double getEvalGaugeWidth(BuildContext context) => evaluationGaugeWidth(context);
+double getEvalGaugeFontSize(BuildContext context) => evaluationGaugeFontSize(context);
 
 class const EngineGauge({required final EngineGaugeParams params, super.key})
     extends ConsumerWidget {
-  static Color backgroundColor(BuildContext context) =>
-      Theme.of(context).brightness == Brightness.dark
-      ? lighten(ColorScheme.of(context).surface, .07)
-      : lighten(ColorScheme.of(context).onSurface, .17);
-
-  static Color valueColor(BuildContext context) => Theme.of(context).brightness == Brightness.dark
-      ? darken(ColorScheme.of(context).onSurface, .1)
-      : darken(ColorScheme.of(context).surface, .01);
+  static Color backgroundColor(BuildContext context) => EvaluationGauge.backgroundColor(context);
+  static Color valueColor(BuildContext context) => EvaluationGauge.valueColor(context);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -56,146 +39,30 @@ class const _EvalGauge({
   required final Position position,
   required final Side orientation,
   final Eval? eval,
-}) extends StatefulWidget {
-  double? get whiteWinningChances => eval?.winningChances(Side.white);
-  double? get animationValue => position.outcome != null
-      ? position.outcome!.winner == null
-            ? 0.5
-            : position.outcome!.winner == Side.white
-            ? 1.0
-            : 0.0
-      : whiteWinningChances != null
-      ? (((whiteWinningChances! + 1) * 0.5).abs() * 100).roundToDouble() / 100
-      : null;
-
-  @override
-  State<_EvalGauge> createState() => _EvalGaugeState();
-}
-
-class _EvalGaugeState() extends State<_EvalGauge> {
-  double fromValue = 0.5;
-
-  Eval? oldEval;
-
-  double get toValue => widget.animationValue ?? fromValue;
-
-  @override
-  void didUpdateWidget(_EvalGauge oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    fromValue = oldWidget.animationValue ?? fromValue;
-    if (oldWidget.eval != null) {
-      oldEval = oldWidget.eval;
-    }
-  }
-
+}) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    String? evalDisplay = widget.position.outcome != null
-        ? widget.position.outcome!.winner == null
+    final chances = eval?.winningChances(Side.white);
+    final outcome = position.outcome;
+    final value = outcome != null
+        ? outcome.winner == null
+              ? 0.5
+              : outcome.winner == Side.white
+              ? 1.0
+              : 0.0
+        : chances == null
+        ? null
+        : (((chances + 1) * 0.5).abs() * 100).roundToDouble() / 100;
+    final score = outcome != null
+        ? outcome.winner == null
               ? '0.0'
               : '#'
-        : widget.eval?.evalString ?? oldEval?.evalString;
-
-    final evalIntegerPart = evalDisplay == null || evalDisplay.startsWith('#')
-        ? null
-        : evalDisplay.split('.').first;
-
-    evalDisplay = evalIntegerPart != null && evalIntegerPart.length > 2
-        ? evalIntegerPart
-        : evalDisplay;
-
-    final evalStyle = TextStyle(
-      color: toValue >= 0.5 ? Colors.black54 : Colors.white70,
-      fontSize: getEvalGaugeFontSize(context),
-      letterSpacing: -0.8,
-      fontWeight: FontWeight.bold,
-      fontFeatures: const [FontFeature.tabularFigures()],
+        : eval?.evalString;
+    final integerPart = score == null || score.startsWith('#') ? null : score.split('.').first;
+    return EvaluationGauge(
+      value: value,
+      referenceSideAtBottom: orientation == Side.white,
+      label: integerPart != null && integerPart.length > 2 ? integerPart : score,
     );
-
-    final width = getEvalGaugeWidth(context);
-
-    return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: fromValue, end: toValue),
-      duration: const Duration(milliseconds: 800),
-      curve: Curves.ease,
-      builder: (BuildContext context, double value, Widget? child) {
-        return Semantics(
-          label: 'Engine evaluation',
-          value: evalDisplay ?? context.l10n.loadingEngine,
-          child: RepaintBoundary(
-            child: Container(
-              constraints: BoxConstraints(minWidth: width, minHeight: double.infinity),
-              width: width,
-              child: CustomPaint(
-                painter: _EvalGaugeVerticalPainter(
-                  orientation: widget.orientation,
-                  backgroundColor: EngineGauge.backgroundColor(context),
-                  valueColor: EngineGauge.valueColor(context),
-                  value: value,
-                ),
-                child: evalDisplay != null && evalDisplay.isNotEmpty
-                    ? Align(
-                        alignment: toValue >= 0.5
-                            ? widget.orientation == Side.white
-                                  ? Alignment.bottomCenter
-                                  : Alignment.topCenter
-                            : widget.orientation == Side.white
-                            ? Alignment.topCenter
-                            : Alignment.bottomCenter,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 1.0, vertical: 3.0),
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text(evalDisplay, style: evalStyle),
-                          ),
-                        ),
-                      )
-                    : null,
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class const _EvalGaugeVerticalPainter({
-  required final Color backgroundColor,
-  required final Color valueColor,
-  required final double value,
-  required final Side orientation,
-}) extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final Paint paint = Paint()
-      ..color = backgroundColor
-      ..style = PaintingStyle.fill;
-    canvas.drawRect(Offset.zero & size, paint);
-
-    paint.color = valueColor;
-
-    void drawBar(double y, double height) {
-      if (height == 0.0) {
-        return;
-      }
-
-      canvas.drawRect(Offset(0.0, y) & Size(size.width, height), paint);
-    }
-
-    final double height = clampDouble(value, 0.0, 1.0) * size.height;
-
-    drawBar(
-      orientation == Side.white ? size.height : 0.0,
-      height * (orientation == Side.white ? -1.0 : 1.0),
-    );
-  }
-
-  @override
-  bool shouldRepaint(_EvalGaugeVerticalPainter oldPainter) {
-    return oldPainter.orientation != orientation ||
-        oldPainter.backgroundColor != backgroundColor ||
-        oldPainter.valueColor != valueColor ||
-        oldPainter.value != value;
   }
 }

@@ -1,34 +1,21 @@
-import 'dart:math' as math;
-
 import 'package:collection/collection.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lichess_mobile/src/constants.dart';
 import 'package:lichess_mobile/src/model/account/account_preferences.dart';
 import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_hint.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
-import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/screen.dart';
+import 'package:lichess_mobile/src/widgets/evaluation_gauge.dart';
+import 'package:lichess_mobile/src/widgets/game_surface_layout.dart';
 import 'package:lichess_mobile/src/widgets/move_list.dart';
 import 'package:material_ui/material_ui.dart';
 
-/// How wide an evaluation bar is drawn, in logical pixels.
-///
-/// The same two numbers the chess screens' own `EngineGauge` is drawn at, and for the same reason:
-/// a bar is a margin note beside the board, and anything wider would be a column of its own. The
-/// gauge itself cannot be reused here — it is typed to a dartchess `Position` and `Eval` from its
-/// constructor down — so this is the same shape at the same size rather than a second opinion
-/// about how large one should be. See `engine_gauge.dart`.
-const double _kEvalGaugeSize = 24.0;
-const double _kEvalGaugeFontSize = 11.0;
+/// Compatibility helpers; both games use the same evaluation-gauge presentation.
+double xiangqiEvalGaugeWidth(BuildContext context) => evaluationGaugeWidth(context);
 
-double xiangqiEvalGaugeWidth(BuildContext context) =>
-    isTabletOrLarger(context) ? _kEvalGaugeSize : _kEvalGaugeSize - 2.0;
-
-double xiangqiEvalGaugeFontSize(BuildContext context) =>
-    isTabletOrLarger(context) ? _kEvalGaugeFontSize : _kEvalGaugeFontSize - 2.0;
+double xiangqiEvalGaugeFontSize(BuildContext context) => evaluationGaugeFontSize(context);
 
 /// How tall the board is for a given width.
 ///
@@ -40,19 +27,8 @@ double xiangqiEvalGaugeFontSize(BuildContext context) =>
 /// sitting in the gap it did not use.
 double xiangqiBoardHeightRatio(BoardPrefs boardPrefs) => boardPrefs.coordinates ? 11 / 10 : 10 / 9;
 
-/// The board and everything around it, arranged for the room the screen has.
-///
-/// Modelled on [GameLayout], the chess screens' own layout, rather than reusing it: that one is
-/// typed to dartchess from its parameters down — a `Side` for its orientation, a chessboard for its
-/// board — and none of it survives the crossing into nine files by ten ranks. Only the arrangement
-/// is shared. On a portrait screen the board sits in the middle with a table above and below it; on
-/// a landscape one the board sits on the left or the right — whichever [BoardPrefs
-/// .landscapeBoardPosition] says — with everything else in a column beside it. A tablet gets side
-/// padding so the board is not edge to edge; a short screen drops the inline move list, which is
-/// the first thing there is no room for.
-///
-/// The board is sized here rather than by the caller, because the evaluation bar beside it has to
-/// be exactly as tall as it is, and only one of the two can measure the other.
+/// Thin xiangqi adapter for the shared game layout. Only rectangular board geometry, notation
+/// and the piece surface are supplied here; sizing, player-table placement and chrome are common.
 class const XiangqiGameLayout({
   /// The board itself, already wrapped in whatever colour filter the user's settings ask for.
   required final Widget board,
@@ -99,163 +75,38 @@ class const XiangqiGameLayout({
 
   super.key,
 }) extends ConsumerWidget {
-  /// Wraps [board] in the card the chess screens put their board in: the shared radius's rounding
-  /// with the shared shadows under it, clipped so nothing the board draws spills past the corner.
-  Widget _boardCard(Widget board, BorderRadius radius) {
-    return Container(
-      decoration: BoxDecoration(borderRadius: radius, boxShadow: boardShadows),
-      child: ClipRRect(borderRadius: radius, child: board),
-    );
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final boardPrefs = ref.watch(boardPreferencesProvider);
-    final heightRatio = xiangqiBoardHeightRatio(boardPrefs);
-    final showMoveList = moveListVisible && boardPrefs.moveListDisplay && moves != null;
-    final gaugeWidth = evalGauge == null ? 0.0 : xiangqiEvalGaugeWidth(context);
-    final isTablet = isTabletOrLarger(context);
-    final sidePadding = isTablet ? kTabletBoardTableSidePadding : 12.0;
-    final top = RotatedBox(quarterTurns: topTableUpsideDown ? 2 : 0, child: topTable);
-    final bottom = RotatedBox(quarterTurns: bottomTableUpsideDown ? 2 : 0, child: bottomTable);
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isLandscape = constraints.maxWidth > constraints.maxHeight;
-        final radius = boardRadius ?? (isTablet ? Styles.boardBorderRadius : null);
-        final boardInCard = radius != null ? _boardCard(board, radius) : board;
-
-        if (isLandscape) {
-          final innerHeight = constraints.maxHeight - kTabletBoardTableSidePadding * 2;
-          final innerWidth = constraints.maxWidth - kTabletBoardTableSidePadding * 2;
-          final defaultBoardWidth = innerHeight / heightRatio;
-          final gaugeSpace = evalGauge == null ? 0.0 : gaugeWidth + 4.0;
-          final sideWidth = innerWidth - defaultBoardWidth - gaugeSpace;
-          final boardWidth = math.max(
-            0.0,
-            math.min(
-              innerHeight / heightRatio,
-              math.min(
-                sideWidth >= 250.0 ? defaultBoardWidth : innerWidth / kGoldenRatio,
-                innerWidth - gaugeSpace - 16.0,
-              ),
-            ),
+    final prefs = ref.watch(boardPreferencesProvider);
+    final radius = boardRadius ?? (isTabletOrLarger(context) ? Styles.boardBorderRadius : null);
+    final framedBoard = radius == null
+        ? board
+        : Container(
+            decoration: BoxDecoration(borderRadius: radius, boxShadow: boardShadows),
+            child: ClipRRect(borderRadius: radius, child: board),
           );
-          final boardHeight = boardWidth * heightRatio;
-
-          return Padding(
-            padding: const EdgeInsets.all(kTabletBoardTableSidePadding),
-            child: Row(
-              // The preference says which side of the screen the board is on; the other things go
-              // in the column beside it either way.
-              textDirection: switch (boardPrefs.landscapeBoardPosition) {
-                .left => TextDirection.ltr,
-                .right => TextDirection.rtl,
-              },
-              mainAxisSize: MainAxisSize.max,
-              children: [
-                SizedBox(width: boardWidth, height: boardHeight, child: boardInCard),
-                if (evalGauge != null) ...[
-                  const SizedBox(width: 4.0),
-                  SizedBox(width: gaugeWidth, height: boardHeight, child: evalGauge),
-                ],
-                const SizedBox(width: 16.0),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      top,
-                      if (showMoveList)
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.only(top: 16.0),
-                            child: MoveList(
-                              type: MoveListType.stacked,
-                              slicedMoves: moves!.asMap().entries.slices(2),
-                              currentMoveIndex: currentMoveIndex,
-                              pieceNotation: PieceNotation.letter,
-                              onSelectMove: onSelectMove,
-                            ),
-                          ),
-                        )
-                      else
-                        const Spacer(),
-                      if (userActionsBar != null)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 16.0),
-                          child: userActionsBar,
-                        ),
-                      bottom,
-                    ],
-                  ),
-                ),
-              ],
+    return GameSurfaceLayout(
+      boardBuilder: (_, _) => framedBoard,
+      boardHeightRatio: xiangqiBoardHeightRatio(prefs),
+      topTableBuilder: (_, _) =>
+          RotatedBox(quarterTurns: topTableUpsideDown ? 2 : 0, child: topTable),
+      bottomTableBuilder: (_, _) =>
+          RotatedBox(quarterTurns: bottomTableUpsideDown ? 2 : 0, child: bottomTable),
+      topTableFlex: topTableFlex,
+      bottomTableFlex: bottomTableFlex,
+      evalGauge: evalGauge,
+      gaugeWidth: xiangqiEvalGaugeWidth(context),
+      moveListVisible: moveListVisible,
+      moveListBuilder: moves == null
+          ? null
+          : (type) => MoveList(
+              type: type,
+              slicedMoves: moves!.asMap().entries.slices(2),
+              currentMoveIndex: currentMoveIndex,
+              pieceNotation: PieceNotation.letter,
+              onSelectMove: onSelectMove,
             ),
-          );
-        }
-
-        final isShortScreen = isShortVerticalScreen(context);
-        final defaultBoardWidth = constraints.biggest.shortestSide;
-        var boardWidth =
-            (isTablet ? defaultBoardWidth - kTabletBoardTableSidePadding * 2 : defaultBoardWidth) -
-            (evalGauge == null ? 0.0 : gaugeWidth + 4.0);
-
-        // Room for the tables, the actions bar, and — when it is shown — the inline move list, so
-        // that the board is never asked to give up more than it has to.
-        final textScale = MediaQuery.textScalerOf(context).scale(16.0) / 16.0;
-        final maxBoardHeight = math.max(
-          0.0,
-          constraints.maxHeight - 180.0 * math.max(1.0, textScale),
-        );
-        if (boardWidth * heightRatio > maxBoardHeight) {
-          boardWidth = maxBoardHeight / heightRatio;
-        }
-        if (isShortScreen) {
-          boardWidth = math.max(0.0, boardWidth - 16);
-        }
-        final boardHeight = boardWidth * heightRatio;
-
-        return Column(
-          mainAxisSize: MainAxisSize.max,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (showMoveList && !isShortScreen)
-              MoveList(
-                type: MoveListType.inline,
-                slicedMoves: moves!.asMap().entries.slices(2),
-                currentMoveIndex: currentMoveIndex,
-                pieceNotation: PieceNotation.letter,
-                onSelectMove: onSelectMove,
-              ),
-            Expanded(
-              flex: topTableFlex,
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: sidePadding),
-                child: top,
-              ),
-            ),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (evalGauge != null) ...[
-                  SizedBox(width: gaugeWidth, height: boardHeight, child: evalGauge),
-                  const SizedBox(width: 4.0),
-                ],
-                SizedBox(width: boardWidth, height: boardHeight, child: boardInCard),
-              ],
-            ),
-            Expanded(
-              flex: bottomTableFlex,
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: sidePadding),
-                child: bottom,
-              ),
-            ),
-            ?userActionsBar,
-          ],
-        );
-      },
+      userActionsBar: userActionsBar,
     );
   }
 }
@@ -283,109 +134,29 @@ class const XiangqiEvalGauge({
   final bool disabled = false,
 
   super.key,
-}) extends StatefulWidget {
-  /// The colour of the part of the bar the position has not claimed.
-  static Color backgroundColor(BuildContext context) =>
-      Theme.of(context).brightness == Brightness.dark
-      ? lighten(ColorScheme.of(context).surface, .07)
-      : lighten(ColorScheme.of(context).onSurface, .17);
-
-  /// The colour of the part that has been claimed — red's, whoever the bar is drawn from.
-  static Color valueColor(BuildContext context) => Theme.of(context).brightness == Brightness.dark
-      ? darken(ColorScheme.of(context).onSurface, .1)
-      : darken(ColorScheme.of(context).surface, .01);
+}) extends StatelessWidget {
+  static Color backgroundColor(BuildContext context) => EvaluationGauge.backgroundColor(context);
+  static Color valueColor(BuildContext context) => EvaluationGauge.valueColor(context);
 
   @override
-  State<XiangqiEvalGauge> createState() => _XiangqiEvalGaugeState();
-}
-
-class _XiangqiEvalGaugeState() extends State<XiangqiEvalGauge> {
-  double _fromValue = 0.5;
-  XiangqiEvaluation? _previousEvaluation;
-
-  double get _toValue => widget.outcome != null
-      ? widget.outcome!.winner == null
-            ? 0.5
-            : widget.outcome!.winner == .red
-            ? 1.0
-            : 0.0
-      : widget.evaluation == null
-      ? _fromValue
-      : widget.redWinProbability.clamp(0.0, 1.0);
-
-  @override
-  void didUpdateWidget(covariant XiangqiEvalGauge oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.outcome != null) {
-      _fromValue = oldWidget.outcome!.winner == null
-          ? 0.5
-          : oldWidget.outcome!.winner == .red
-          ? 1.0
-          : 0.0;
-    } else if (oldWidget.evaluation != null) {
-      _fromValue = oldWidget.redWinProbability.clamp(0.0, 1.0);
-    }
-    if (oldWidget.evaluation != null) _previousEvaluation = oldWidget.evaluation;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isRedAtBottom = widget.orientation == XiangqiSide.red;
-    final redIsAhead = _toValue >= 0.5;
-    final label = widget.outcome != null
-        ? widget.outcome!.winner == null
+  Widget build(BuildContext context) => EvaluationGauge(
+    value: outcome != null
+        ? outcome!.winner == null
+              ? 0.5
+              : outcome!.winner == .red
+              ? 1.0
+              : 0.0
+        : evaluation == null
+        ? null
+        : redWinProbability,
+    referenceSideAtBottom: orientation == .red,
+    label: outcome != null
+        ? outcome!.winner == null
               ? '0.0'
               : '#'
-        : _scoreLabel(widget.evaluation ?? _previousEvaluation);
-
-    // The label sits at the end the advantage is on: on the claimed half of the bar when ahead,
-    // on the unclaimed one behind it. The claimed half is the lighter tone of the theme and the
-    // unclaimed the darker, so the ink is whichever of the scheme's pair reads on that half.
-    final style = TextStyle(
-      color: redIsAhead ? Colors.black54 : Colors.white70,
-      fontSize: xiangqiEvalGaugeFontSize(context),
-      letterSpacing: -0.8,
-      fontWeight: FontWeight.bold,
-      fontFeatures: const [FontFeature.tabularFigures()],
-    );
-
-    return Opacity(
-      opacity: widget.disabled ? 0.5 : 1.0,
-      child: TweenAnimationBuilder<double>(
-        tween: Tween<double>(begin: _fromValue, end: _toValue),
-        duration: const Duration(milliseconds: 800),
-        curve: Curves.ease,
-        builder: (context, value, _) => Semantics(
-          label: context.l10n.mobileEngineEvaluation,
-          value: label ?? context.l10n.loadingEngine,
-          child: RepaintBoundary(
-            child: CustomPaint(
-              painter: _XiangqiEvalGaugePainter(
-                backgroundColor: XiangqiEvalGauge.backgroundColor(context),
-                valueColor: XiangqiEvalGauge.valueColor(context),
-                value: value,
-                isRedAtBottom: isRedAtBottom,
-              ),
-              child: label == null
-                  ? null
-                  : Align(
-                      alignment: redIsAhead == isRedAtBottom
-                          ? Alignment.bottomCenter
-                          : Alignment.topCenter,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 1.0, vertical: 3.0),
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Text(label, style: style),
-                        ),
-                      ),
-                    ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+        : _scoreLabel(evaluation),
+    disabled: disabled,
+  );
 }
 
 /// What the number on the bar says: a mate count, or centipawns to one decimal.
@@ -402,40 +173,4 @@ String? _scoreLabel(XiangqiEvaluation? evaluation) {
   if (label.startsWith('#')) return 'M${label.substring(1)}';
   final integerPart = label.split('.').first;
   return integerPart.length > 2 ? integerPart : label;
-}
-
-class const _XiangqiEvalGaugePainter({
-  required final Color backgroundColor,
-  required final Color valueColor,
-  required final double value,
-  required final bool isRedAtBottom,
-}) extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = backgroundColor
-      ..style = PaintingStyle.fill;
-    canvas.drawRect(Offset.zero & size, paint);
-
-    paint.color = valueColor;
-
-    // Red's share grows from red's own end of the bar. The board turns around under the player and
-    // the bar turns with it, so red is always at the end of the screen red is at.
-    final height = value.clamp(0.0, 1.0) * size.height;
-    if (height > 0.0) {
-      canvas.drawRect(
-        (isRedAtBottom ? Offset(0.0, size.height - height) : Offset.zero) &
-            Size(size.width, height),
-        paint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(_XiangqiEvalGaugePainter oldPainter) {
-    return oldPainter.backgroundColor != backgroundColor ||
-        oldPainter.valueColor != valueColor ||
-        oldPainter.value != value ||
-        oldPainter.isRedAtBottom != isRedAtBottom;
-  }
 }

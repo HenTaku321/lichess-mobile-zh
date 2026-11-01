@@ -45,6 +45,7 @@ import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:lichess_mobile/src/widgets/material_diff.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
 import 'package:lichess_mobile/src/widgets/non_linear_slider.dart';
+import 'package:lichess_mobile/src/widgets/player_table.dart';
 import 'package:lichess_mobile/src/widgets/practice_feedback_card.dart';
 import 'package:lichess_mobile/src/widgets/settings.dart';
 import 'package:lichess_mobile/src/widgets/variant_app_bar_title.dart';
@@ -441,51 +442,47 @@ class const _Player({required final Side side}) extends ConsumerWidget {
         : null;
 
     if (isEngine) {
-      return Row(
-        children: [
-          OpponentIcon(game.opponentSpec),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      game.opponentSpec.displayName,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (gameState.isEngineThinking) ...const [
-                      SizedBox(width: 8),
-                      Icon(Icons.hourglass_top, size: 16),
+      return PlayerTable(
+        clock: _PlayerClock(side: side, clockKey: const ValueKey('engineClock')),
+        clockPosition: boardPreferences.clockPosition,
+        content: Row(
+          children: [
+            OpponentIcon(game.opponentSpec),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  PlayerIdentityLine(
+                    name: game.opponentSpec.displayName,
+                    clockPosition: boardPreferences.clockPosition,
+                    afterName: [
+                      if (gameState.isEngineThinking) ...const [
+                        SizedBox(width: 8),
+                        Icon(Icons.hourglass_top, size: 16),
+                      ],
                     ],
-                  ],
-                ),
-                MaterialDifferenceDisplay(
-                  materialDiff: materialDiff,
-                  materialDifferenceFormat: boardPreferences.materialDifferenceFormat,
-                ),
-              ],
+                  ),
+                  MaterialDifferenceDisplay(
+                    materialDiff: materialDiff,
+                    materialDifferenceFormat: boardPreferences.materialDifferenceFormat,
+                  ),
+                ],
+              ),
             ),
-          ),
-          _PlayerClock(side: side, clockKey: const ValueKey('engineClock')),
-        ],
+          ],
+        ),
       );
     }
 
-    final playerRow = Row(
-      mainAxisSize: .max,
-      mainAxisAlignment: .start,
-      children: [
-        MaterialDifferenceDisplay(
-          materialDiff: materialDiff,
-          materialDifferenceFormat: boardPreferences.materialDifferenceFormat,
-        ),
-        const Spacer(),
-        _PlayerClock(side: side, clockKey: const ValueKey('playerClock')),
-      ],
+    final playerRow = PlayerTable(
+      clockPosition: boardPreferences.clockPosition,
+      clock: _PlayerClock(side: side, clockKey: const ValueKey('playerClock')),
+      content: MaterialDifferenceDisplay(
+        materialDiff: materialDiff,
+        materialDifferenceFormat: boardPreferences.materialDifferenceFormat,
+      ),
     );
     if (!game.practiceMode) return playerRow;
     final comment = gameState.practiceComment;

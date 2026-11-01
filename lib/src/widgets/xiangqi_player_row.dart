@@ -3,7 +3,7 @@ import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
-import 'package:lichess_mobile/src/utils/screen.dart';
+import 'package:lichess_mobile/src/widgets/player_table.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_avatar.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
 import 'package:material_ui/material_ui.dart';
@@ -35,100 +35,88 @@ class const XiangqiPlayerRow({
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final playerName = name ?? side.label(context.l10n);
-    final fontSize = compact
-        ? 13.0
-        : isShortVerticalScreen(context)
-        ? 15.0
-        : 16.0;
     final effectiveClockPosition =
         clockPosition ?? ref.watch(boardPreferencesProvider).clockPosition;
 
-    return Row(
-      children: [
-        if (clock != null && effectiveClockPosition == .left) Flexible(flex: 3, child: clock!),
-        if (clock != null && effectiveClockPosition == .left) const SizedBox(width: 8),
-        XiangqiPieceAvatar(side: side, size: avatarSize, style: style),
-        const SizedBox(width: 8),
-        Expanded(
-          flex: 7,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  Flexible(
-                    child: Tooltip(
-                      message: playerName,
-                      child: Text(
-                        playerName,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  ),
-                  if (rating != null) ...[
-                    const SizedBox(width: 4),
-                    Flexible(
-                      child: Text(
-                        rating!,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: compact ? 11 : 14,
-                          color: textShade(context, 0.7),
+    return PlayerTable(
+      clock: clock,
+      clockPosition: effectiveClockPosition,
+      content: Row(
+        children: [
+          XiangqiPieceAvatar(side: side, size: avatarSize, style: style),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                PlayerIdentityLine(
+                  name: playerName,
+                  compact: compact,
+                  clockPosition: effectiveClockPosition,
+                  afterName: [
+                    if (rating != null) ...[
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          rating!,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: compact ? 11 : 14,
+                            color: textShade(context, 0.7),
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                  if (isMe) ...[
-                    const SizedBox(width: 4),
-                    Icon(Icons.person, size: 16, color: textShade(context, 0.5)),
-                  ],
-                  if (isBot) ...[
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Tooltip(
-                        message: context.l10n.computer,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: context.lichessColors.fancy,
-                            borderRadius: const BorderRadius.all(Radius.circular(3)),
-                          ),
-                          child: Text(
-                            context.l10n.computer,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                              letterSpacing: 0.5,
+                    ],
+                    if (isMe) ...[
+                      const SizedBox(width: 4),
+                      Icon(Icons.person, size: 16, color: textShade(context, 0.5)),
+                    ],
+                    if (isBot) ...[
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Tooltip(
+                          message: context.l10n.computer,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: context.lichessColors.fancy,
+                              borderRadius: const BorderRadius.all(Radius.circular(3)),
+                            ),
+                            child: Text(
+                              context.l10n.computer,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                letterSpacing: 0.5,
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
+                    ],
+                    if (thinking) ...const [
+                      SizedBox(width: 8),
+                      Icon(Icons.hourglass_top, size: 16),
+                    ],
                   ],
-                  if (thinking) ...const [SizedBox(width: 8), Icon(Icons.hourglass_top, size: 16)],
-                ],
-              ),
-              ?detail,
-              if (status case final status? when status.isNotEmpty)
-                Text(
-                  status,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontStyle: FontStyle.italic, color: textShade(context, 0.7)),
                 ),
-            ],
+                ?detail,
+                if (status case final text? when text.isNotEmpty)
+                  Text(
+                    text,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontStyle: FontStyle.italic, color: textShade(context, 0.7)),
+                  ),
+              ],
+            ),
           ),
-        ),
-        if (clock != null && effectiveClockPosition == .right) ...[
-          const SizedBox(width: 8),
-          Flexible(flex: 3, child: clock!),
         ],
-      ],
+      ),
     );
   }
 }

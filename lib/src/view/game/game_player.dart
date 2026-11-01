@@ -22,6 +22,7 @@ import 'package:lichess_mobile/src/widgets/buttons.dart';
 import 'package:lichess_mobile/src/widgets/clock.dart';
 import 'package:lichess_mobile/src/widgets/material_diff.dart';
 import 'package:lichess_mobile/src/widgets/network_image.dart';
+import 'package:lichess_mobile/src/widgets/player_table.dart';
 import 'package:lichess_mobile/src/widgets/user.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -71,11 +72,10 @@ class const GamePlayer({
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (!zenMode)
-          Row(
-            mainAxisAlignment: clockPosition == ClockPosition.right
-                ? MainAxisAlignment.start
-                : MainAxisAlignment.end,
-            children: [
+          PlayerIdentityLine(
+            name: player.displayName(context.l10n),
+            clockPosition: clockPosition,
+            beforeName: [
               if (matchupScore != null) ...[
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 2.0),
@@ -135,16 +135,8 @@ class const GamePlayer({
                 ),
                 const SizedBox(width: 5),
               ],
-              Flexible(
-                child: Tooltip(
-                  message: player.displayName(context.l10n),
-                  child: Text(
-                    player.displayName(context.l10n),
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: playerFontSize, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ),
+            ],
+            afterName: [
               if (player.user?.flair != null) ...[
                 const SizedBox(width: 5),
                 HttpNetworkImageWidget(
@@ -213,50 +205,28 @@ class const GamePlayer({
       );
     }
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        if (clock != null && clockPosition == ClockPosition.left) Flexible(flex: 3, child: clock!),
-        if (mePlaying && confirmMoveCallbacks != null && canGoForward == false)
-          Expanded(
-            flex: 7,
-            child: Padding(
-              padding: const EdgeInsets.only(right: 16.0),
-              child: ConfirmMove(
-                onConfirm: confirmMoveCallbacks!.confirm,
-                onCancel: confirmMoveCallbacks!.cancel,
-              ),
-            ),
-          )
-        else
-          Expanded(
-            flex: 7,
-            child: Padding(
-              padding: const EdgeInsets.only(right: 16.0),
-              child: shouldLinkToUserProfile
-                  ? Consumer(
-                      builder: (context, ref, _) {
-                        return GestureDetector(
-                          onTap: player.user != null
-                              ? () {
-                                  if (mePlaying) {
-                                    ref.invalidate(accountProvider);
-                                  }
-                                  Navigator.of(context)
-                                      .push(UserOrProfileScreen.buildRoute(player.user!));
-                                }
-                              : null,
-                          child: playerWidget,
-                        );
-                      },
-                    )
-                  : playerWidget,
-            ),
-          ),
-        if (clock != null && clockPosition == ClockPosition.right) Flexible(flex: 3, child: clock!),
-      ],
-    );
+    final Widget content;
+    if (mePlaying && confirmMoveCallbacks != null && !canGoForward) {
+      content = ConfirmMove(
+        onConfirm: confirmMoveCallbacks!.confirm,
+        onCancel: confirmMoveCallbacks!.cancel,
+      );
+    } else if (shouldLinkToUserProfile) {
+      content = Consumer(
+        builder: (context, ref, _) => GestureDetector(
+          onTap: player.user == null
+              ? null
+              : () {
+                  if (mePlaying) ref.invalidate(accountProvider);
+                  Navigator.of(context).push(UserOrProfileScreen.buildRoute(player.user!));
+                },
+          child: playerWidget,
+        ),
+      );
+    } else {
+      content = playerWidget;
+    }
+    return PlayerTable(content: content, clock: clock, clockPosition: clockPosition);
   }
 }
 

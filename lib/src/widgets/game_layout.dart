@@ -3,13 +3,13 @@ import 'package:collection/collection.dart';
 import 'package:dartchess/dartchess.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lichess_mobile/src/constants.dart';
 import 'package:lichess_mobile/src/model/common/chess.dart';
 import 'package:lichess_mobile/src/model/game/game_board_params.dart';
 import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/screen.dart';
 import 'package:lichess_mobile/src/widgets/board.dart';
+import 'package:lichess_mobile/src/widgets/game_surface_layout.dart';
 import 'package:lichess_mobile/src/widgets/move_list.dart';
 import 'package:lichess_mobile/src/widgets/pockets.dart';
 import 'package:material_ui/material_ui.dart';
@@ -365,211 +365,70 @@ class _GameLayoutState() extends ConsumerState<GameLayout> {
             _ => null,
           };
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final orientation = constraints.maxWidth > constraints.maxHeight
-            ? Orientation.landscape
-            : Orientation.portrait;
-        final isTablet = isTabletOrLarger(context);
-
-        final defaultSettings = boardPrefs
-            .toBoardSettings(variant)
-            .copyWith(
-              borderRadius: isTablet ? Styles.boardBorderRadius : BorderRadius.zero,
-              boxShadow: isTablet ? boardShadows : const <BoxShadow>[],
+    final isTablet = isTabletOrLarger(context);
+    final defaultSettings = boardPrefs
+        .toBoardSettings(variant)
+        .copyWith(
+          borderRadius: isTablet ? Styles.boardBorderRadius : BorderRadius.zero,
+          boxShadow: isTablet ? boardShadows : const <BoxShadow>[],
+        );
+    final settings = widget.boardSettingsOverrides?.merge(defaultSettings) ?? defaultSettings;
+    final shapes = widget.shapes?.unlock ?? const <Shape>{};
+    final premoveDropRole = switch (_controller?.premove) {
+      DropMove(:final role) => role,
+      _ => null,
+    };
+    Widget table(Size size, {required bool top}) {
+      final upsideDown = top ? widget.topTableUpsideDown : widget.bottomTableUpsideDown;
+      final pocket = pockets == null
+          ? null
+          : PocketsMenu(
+              side: top ? widget.orientation.opposite : widget.orientation,
+              sideToMove: sideToMove,
+              playerSide: playerSide,
+              pockets: pockets,
+              squareSize: pocketSquareSize(boardSize: size.width, isTablet: isTablet),
+              isUpsideDown: upsideDown,
+              premoveDropRole: premoveDropRole,
             );
+      return RotatedBox(
+        quarterTurns: upsideDown ? 2 : 0,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          verticalDirection: upsideDown ? VerticalDirection.up : VerticalDirection.down,
+          children: [
+            if (top && pocket != null) pocket,
+            top ? widget.topTable : widget.bottomTable,
+            if (!top && pocket != null) pocket,
+          ],
+        ),
+      );
+    }
 
-        final settings = widget.boardSettingsOverrides != null
-            ? widget.boardSettingsOverrides!.merge(defaultSettings)
-            : defaultSettings;
-
-        final shapes = widget.shapes?.unlock ?? const <Shape>{};
-
-        final premoveDropRole = switch (_controller?.premove) {
-          DropMove(:final role) => role,
-          _ => null,
-        };
-
-        Widget topTable({required double boardSize}) => RotatedBox(
-          quarterTurns: widget.topTableUpsideDown ? 2 : 0,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            verticalDirection: widget.topTableUpsideDown
-                ? VerticalDirection.up
-                : VerticalDirection.down,
-            children: [
-              if (pockets != null)
-                PocketsMenu(
-                  side: widget.orientation.opposite,
-                  sideToMove: sideToMove,
-                  playerSide: playerSide,
-                  pockets: pockets,
-                  squareSize: pocketSquareSize(boardSize: boardSize, isTablet: isTablet),
-                  isUpsideDown: widget.topTableUpsideDown,
-                  premoveDropRole: premoveDropRole,
-                ),
-              widget.topTable,
-            ],
-          ),
-        );
-
-        Widget bottomTable({required double boardSize}) => RotatedBox(
-          quarterTurns: widget.bottomTableUpsideDown ? 2 : 0,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            verticalDirection: widget.bottomTableUpsideDown
-                ? VerticalDirection.up
-                : VerticalDirection.down,
-            children: [
-              widget.bottomTable,
-              if (pockets != null)
-                PocketsMenu(
-                  side: widget.orientation,
-                  sideToMove: sideToMove,
-                  playerSide: playerSide,
-                  pockets: pockets,
-                  squareSize: pocketSquareSize(boardSize: boardSize, isTablet: isTablet),
-                  isUpsideDown: widget.bottomTableUpsideDown,
-                  premoveDropRole: premoveDropRole,
-                ),
-            ],
-          ),
-        );
-
-        if (orientation == Orientation.landscape) {
-          final defaultBoardSize =
-              constraints.biggest.shortestSide - (kTabletBoardTableSidePadding * 2);
-          final sideWidth = constraints.biggest.longestSide - defaultBoardSize;
-          final boardSize = sideWidth >= 250
-              ? defaultBoardSize
-              : constraints.biggest.longestSide / kGoldenRatio - (kTabletBoardTableSidePadding * 2);
-
-          return Padding(
-            padding: const EdgeInsets.all(kTabletBoardTableSidePadding),
-            child: Row(
-              textDirection: switch (boardPrefs.landscapeBoardPosition) {
-                .left => TextDirection.ltr,
-                .right => TextDirection.rtl,
-              },
-              mainAxisSize: MainAxisSize.max,
-              children: [
-                BoardWidget(
-                  size: boardSize,
-                  orientation: widget.orientation,
-                  controller: _controller!,
-                  onMove: rawOnMove,
-                  shapes: shapes,
-                  settings: settings,
-                  boardKey: widget.boardKey,
-                  boardOverlay: widget.boardOverlay,
-                  error: widget.errorMessage,
-                ),
-                const SizedBox(width: 16.0),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      topTable(boardSize: boardSize),
-                      if (boardPrefs.moveListDisplay && !widget.zenMode && _hasMoveList)
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.only(top: 16.0),
-                            child: _moveListContent(MoveListType.stacked),
-                          ),
-                        )
-                      else
-                        const Spacer(),
-
-                      if (widget.userActionsBar != null)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 16.0),
-                          child: widget.userActionsBar,
-                        ),
-
-                      bottomTable(boardSize: boardSize),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          );
-        } else {
-          final defaultBoardSize = constraints.biggest.shortestSide;
-          final maxHeight = constraints.maxHeight;
-
-          final isShortScreen = isShortVerticalScreen(context);
-
-          final pocketsPadding = (pockets != null && (isTablet || isShortScreen))
-              ? _kAdditionalBoardSidePaddingForPockets
-              : 0;
-
-          double effectiveBoardSize =
-              (isTablet ? defaultBoardSize - kTabletBoardTableSidePadding * 2 : defaultBoardSize) -
-              pocketsPadding;
-
-          //Reserve vertical space for the top and bottom tables and the user actions bar if present.
-          final maxAllowedBoardSize = maxHeight - 180.0;
-          if (effectiveBoardSize > maxAllowedBoardSize) {
-            effectiveBoardSize = maxAllowedBoardSize;
-          }
-
-          if (isShortScreen) {
-            effectiveBoardSize -= 16;
-          }
-
-          return Column(
-            mainAxisSize: MainAxisSize.max,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (boardPrefs.moveListDisplay &&
-                  _hasMoveList &&
-                  !isShortScreen &&
-                  !(isTablet && pockets != null))
-                if (widget.zenMode)
-                  // display empty move list to keep the layout consistent in zen mode
-                  const MoveList(type: MoveListType.inline, slicedMoves: [], currentMoveIndex: 0)
-                else
-                  _moveListContent(MoveListType.inline),
-              Expanded(
-                flex: widget.topTableFlex,
-                child: Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: isTablet ? kTabletBoardTableSidePadding : 12.0,
-                  ),
-                  child: topTable(boardSize: effectiveBoardSize),
-                ),
-              ),
-              Padding(
-                padding: isTablet
-                    ? const EdgeInsets.symmetric(horizontal: kTabletBoardTableSidePadding)
-                    : EdgeInsets.zero,
-                child: BoardWidget(
-                  size: effectiveBoardSize,
-                  orientation: widget.orientation,
-                  controller: _controller!,
-                  onMove: rawOnMove,
-                  shapes: shapes,
-                  settings: settings,
-                  boardKey: widget.boardKey,
-                  boardOverlay: widget.boardOverlay,
-                  error: widget.errorMessage,
-                ),
-              ),
-              Expanded(
-                flex: widget.bottomTableFlex,
-                child: Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: isTablet ? kTabletBoardTableSidePadding : 12.0,
-                  ),
-                  child: bottomTable(boardSize: effectiveBoardSize),
-                ),
-              ),
-              if (widget.userActionsBar != null) widget.userActionsBar!,
-            ],
-          );
-        }
-      },
+    return GameSurfaceLayout(
+      boardHeightRatio: 1,
+      boardBuilder: (context, size) => BoardWidget(
+        size: size.width,
+        orientation: widget.orientation,
+        controller: _controller!,
+        onMove: rawOnMove,
+        shapes: shapes,
+        settings: settings,
+        boardKey: widget.boardKey,
+        boardOverlay: widget.boardOverlay,
+        error: widget.errorMessage,
+      ),
+      topTableBuilder: (_, size) => table(size, top: true),
+      bottomTableBuilder: (_, size) => table(size, top: false),
+      topTableFlex: widget.topTableFlex,
+      bottomTableFlex: widget.bottomTableFlex,
+      moveListBuilder: _hasMoveList ? _moveListContent : null,
+      zenMode: widget.zenMode,
+      allowPortraitMoveList: !(isTablet && pockets != null),
+      portraitBoardWidthReduction: pockets != null && (isTablet || isShortVerticalScreen(context))
+          ? _kAdditionalBoardSidePaddingForPockets
+          : 0,
+      userActionsBar: widget.userActionsBar,
     );
   }
 }

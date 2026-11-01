@@ -61,6 +61,10 @@ class _EvaluationGaugeState() extends State<EvaluationGauge> {
         duration: const Duration(milliseconds: 800),
         curve: Curves.ease,
         builder: (context, value, _) => Semantics(
+          // Expose one labelled indicator. The painted score must not also become a child label
+          // and make screen readers announce the same number twice.
+          container: true,
+          excludeSemantics: true,
           label: context.l10n.mobileEngineEvaluation,
           value: label ?? context.l10n.loadingEngine,
           child: RepaintBoundary(

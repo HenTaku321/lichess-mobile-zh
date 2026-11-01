@@ -164,6 +164,7 @@ void main() {
       await tester.pump();
       await tester.pump();
       expect(find.bySemanticsLabel('引擎评估'), findsOneWidget);
+      expect(tester.getSemantics(find.bySemanticsLabel('引擎评估')).value, '+1.0');
       expect(tester.takeException(), isNull);
     }
   });

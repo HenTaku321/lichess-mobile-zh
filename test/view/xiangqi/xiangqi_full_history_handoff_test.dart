@@ -142,8 +142,8 @@ void main() {
     expect(before.orientation, XiangqiSide.black);
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    expect(find.text('Analysis'), findsOneWidget);
-    await tester.tap(find.text('Analysis'));
+    expect(find.text('Analysis board'), findsOneWidget);
+    await tester.tap(find.text('Analysis board'));
     await exits.finishRoute(tester, find.byType(XiangqiAnalysisScreen, skipOffstage: false));
 
     final scoped = ProviderScope.containerOf(tester.element(find.byType(XiangqiBoard)));
@@ -172,7 +172,7 @@ void main() {
     await otb.pumpOtbScreen(tester, failOnOverflow: true);
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
-    expect(find.text('Analysis'), findsNothing);
+    expect(find.text('Analysis board'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

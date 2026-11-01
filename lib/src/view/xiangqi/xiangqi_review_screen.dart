@@ -155,7 +155,7 @@ class _ReviewState() extends ConsumerState<_Review> {
       context: context,
       actions: [
         BottomSheetAction(
-          makeLabel: (context) => Text(context.l10n.analysisBoard),
+          makeLabel: (context) => Text(context.l10n.analysis),
           onPressed: () {
             if (!mounted || generation != ref.read(xiangqiAccountGenerationProvider)) return;
             final review = widget.review;

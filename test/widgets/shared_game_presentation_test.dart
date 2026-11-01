@@ -168,4 +168,76 @@ void main() {
       expect(tester.takeException(), isNull);
     }
   });
+
+  testWidgets('returning from a terminal board does not retain its checkmate label', (
+    tester,
+  ) async {
+    final mate = Chess.fromSetup(Setup.parseFen('7k/7Q/7K/8/8/8/8/8 b - - 0 1'));
+    expect(mate.outcome?.winner, Side.white);
+    for (final xiangqi in [false, true]) {
+      Widget gauge({bool finished = false, bool pending = false}) => xiangqi
+          ? XiangqiEvalGauge(
+              redWinProbability: 0.6,
+              orientation: XiangqiSide.red,
+              evaluation: finished || pending ? null : const XiangqiEvaluation(cp: 100),
+              outcome: finished ? (winner: XiangqiSide.red) : null,
+            )
+          : EngineGauge(
+              params: (
+                isLocalEngineAvailable: false,
+                orientation: Side.white,
+                position: finished ? mate : Chess.initial,
+                savedEval: null,
+                serverEval: finished || pending ? null : const ExternalEval(cp: 100, mate: null),
+                filters: (
+                  context: const EvaluationContext(
+                    id: StringId('terminal-gauge-test'),
+                    variant: Variant.standard,
+                    initialPosition: Chess.initial,
+                  ),
+                  path: null,
+                ),
+              ),
+            );
+      final child = ValueNotifier<Widget>(gauge());
+      addTearDown(child.dispose);
+      await tester.pumpWidget(
+        await makeTestProviderScope(
+          tester,
+          key: ValueKey(xiangqi),
+          failOnOverflow: true,
+          child: MaterialApp(
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              ...GlobalMaterialLocalizations.delegates,
+            ],
+            home: Center(
+              child: SizedBox(
+                width: 24,
+                height: 300,
+                child: ValueListenableBuilder(
+                  valueListenable: child,
+                  builder: (_, value, _) => value,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(find.text('+1.0'), findsOneWidget);
+      child.value = gauge(finished: true);
+      await tester.pump();
+      expect(find.text('#'), findsOneWidget);
+      child.value = gauge(pending: true);
+      await tester.pump();
+      expect(
+        find.text('#'),
+        findsNothing,
+        reason: 'A historical position is not mate, xiangqi=$xiangqi',
+      );
+      expect(find.text('+1.0'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    }
+  });
 }

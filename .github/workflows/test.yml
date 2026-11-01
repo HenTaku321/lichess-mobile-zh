@@ -177,6 +177,8 @@ jobs:
           test/view/study/study_opening_test.dart
           test/view/study/study_screen_test.dart
           test/view/xiangqi/xiangqi_full_history_handoff_test.dart
+          test/view/xiangqi/xiangqi_saved_friends_parity_test.dart
+          test/view/xiangqi/xiangqi_puzzle_screen_test.dart
           test/view/xiangqi/xiangqi_board_editor_screen_test.dart
           test/view/xiangqi/xiangqi_computer_menu_parity_test.dart
 

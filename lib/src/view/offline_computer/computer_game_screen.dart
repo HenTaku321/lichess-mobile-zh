@@ -22,12 +22,14 @@ class const ComputerGameScreen() extends ConsumerWidget {
     final setup = ref.watch(pendingXiangqiComputerSetupProvider);
 
     if (!xiangqi) return const OfflineComputerGameScreen();
-    if (setup == null) return const XiangqiGameScreen();
-    return XiangqiGameScreen(
-      initialSide: setup.side,
-      initialDifficulty: setup.difficulty,
-      initialTimeIncrement: setup.timeIncrement,
-      initialPracticeMode: setup.practiceMode,
+    if (setup == null) return XiangqiGameScreen.withOwnSession(const XiangqiGameScreen());
+    return XiangqiGameScreen.withOwnSession(
+      XiangqiGameScreen(
+        initialSide: setup.side,
+        initialDifficulty: setup.difficulty,
+        initialTimeIncrement: setup.timeIncrement,
+        initialPracticeMode: setup.practiceMode,
+      ),
     );
   }
 }

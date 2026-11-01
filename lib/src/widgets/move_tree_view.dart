@@ -1229,6 +1229,29 @@ class const TreeInlineMove<T>({
         : null;
   }
 
+  void _showMoveMenu(BuildContext context) {
+    final moveLabel =
+        branch.notation +
+        (params.shouldShowAnnotations ? moveAnnotationChar(branch.nags ?? const []) : '');
+    final ply = branch.ply;
+    showModalBottomSheet<void>(
+      context: context,
+      isDismissible: true,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) => _MoveContextMenu<T>(
+        notifier: params.notifier,
+        mainlineCopyLabel: params.mainlineCopyLabel,
+        variationCopyLabel: params.variationCopyLabel,
+        copyMessage: params.copyMessage,
+        title: ply.isOdd ? '${(ply / 2).ceil()}. $moveLabel' : '${(ply / 2).ceil()}... $moveLabel',
+        path: path,
+        branch: branch,
+        lineInfo: lineInfo,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final pieceNotation = ref
@@ -1260,7 +1283,6 @@ class const TreeInlineMove<T>({
             : '');
 
     final nag = params.shouldShowAnnotations ? branch.nags?.firstOrNull : null;
-    final ply = branch.ply;
 
     final eval = params.shouldShowComputerAnalysis && canShowEval ? branch.evaluation : null;
 
@@ -1275,28 +1297,8 @@ class const TreeInlineMove<T>({
       key: isCurrentMove ? params.currentMoveKey : null,
       borderRadius: borderRadius,
       onTap: params.notifier != null ? () => params.notifier?.userJump(path) : null,
-      onLongPress: params.notifier != null
-          ? () {
-              showModalBottomSheet<void>(
-                context: context,
-                isDismissible: true,
-                isScrollControlled: true,
-                showDragHandle: true,
-                builder: (context) => _MoveContextMenu<T>(
-                  notifier: params.notifier,
-                  mainlineCopyLabel: params.mainlineCopyLabel,
-                  variationCopyLabel: params.variationCopyLabel,
-                  copyMessage: params.copyMessage,
-                  title: ply.isOdd
-                      ? '${(ply / 2).ceil()}. $moveWithNag'
-                      : '${(ply / 2).ceil()}... $moveWithNag',
-                  path: path,
-                  branch: branch,
-                  lineInfo: lineInfo,
-                ),
-              );
-            }
-          : null,
+      onLongPress: params.notifier == null ? null : () => _showMoveMenu(context),
+      onSecondaryTap: params.notifier == null ? null : () => _showMoveMenu(context),
       child: Container(
         padding: kInlineMovePadding,
         decoration: _boxDecoration(context, isCurrentMove, isLiveMove),

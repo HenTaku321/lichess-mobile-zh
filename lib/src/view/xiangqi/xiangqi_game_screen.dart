@@ -28,6 +28,7 @@ import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
 import 'package:lichess_mobile/src/utils/screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_analysis_screen.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_local_game_scope.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_bottom_sheet.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_choice_picker.dart';
 import 'package:lichess_mobile/src/widgets/clock.dart';
@@ -86,14 +87,26 @@ class const XiangqiGameScreen({
     TimeIncrement? initialTimeIncrement,
     bool initialPracticeMode = false,
   }) => buildScreenRoute(
-    screen: XiangqiGameScreen(
-      initialFen: initialFen,
-      initialSide: initialSide,
-      initialDifficulty: initialDifficulty,
-      initialTimeIncrement: initialTimeIncrement,
-      initialPracticeMode: initialPracticeMode,
+    screen: withOwnSession(
+      XiangqiGameScreen(
+        initialFen: initialFen,
+        initialSide: initialSide,
+        initialDifficulty: initialDifficulty,
+        initialTimeIncrement: initialTimeIncrement,
+        initialPracticeMode: initialPracticeMode,
+      ),
+      transient: initialFen != null,
     ),
   );
+
+  static Widget withOwnSession(XiangqiGameScreen screen, {bool transient = false}) =>
+      XiangqiLocalGameScope(
+        transient: transient,
+        child: ProviderScope(
+          overrides: [_isBoardFlippedProvider.overrideWith(_IsBoardFlippedNotifier.new)],
+          child: screen,
+        ),
+      );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -107,10 +120,15 @@ class const XiangqiGameScreen({
             icon: const Icon(Icons.settings),
             tooltip: context.l10n.settingsSettings,
             onPressed: () {
+              final container = ProviderScope.containerOf(context);
               showModalBottomSheet<void>(
                 context: context,
-                builder: (_) =>
-                    _XiangqiGameSettingsSheet(onNewGame: () => _showNewGameSheet(context, ref)),
+                builder: (_) => UncontrolledProviderScope(
+                  container: container,
+                  child: _XiangqiGameSettingsSheet(
+                    onNewGame: () => _showNewGameSheet(context, ref),
+                  ),
+                ),
               );
             },
           ),
@@ -138,12 +156,16 @@ class const XiangqiGameScreen({
 /// starts over from the standard opening.
 void _showNewGameSheet(BuildContext context, WidgetRef ref, {String? initialFen}) {
   final gameState = ref.read(xiangqiGameControllerProvider);
+  final container = ProviderScope.containerOf(context);
   showModalBottomSheet<void>(
     context: context,
-    builder: (context) => _NewGameSheet(
-      side: gameState.playerSide,
-      difficulty: gameState.difficulty,
-      initialFen: initialFen,
+    builder: (_) => UncontrolledProviderScope(
+      container: container,
+      child: _NewGameSheet(
+        side: gameState.playerSide,
+        difficulty: gameState.difficulty,
+        initialFen: initialFen,
+      ),
     ),
   );
 }

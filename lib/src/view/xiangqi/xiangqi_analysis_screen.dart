@@ -18,6 +18,7 @@ import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/focus_detector.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_analysis_actions.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_analysis_settings_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_analysis_tree_view.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_board_editor_screen.dart';
@@ -345,6 +346,7 @@ class _BodyState() extends ConsumerState<_Body> {
 
   void _showMenu() {
     final state = ref.read(xiangqiAnalysisControllerProvider);
+    final toolsAllowed = ref.read(xiangqiAnalysisControllerProvider.notifier).engineAllowed;
     showAdaptiveActionSheet<void>(
       context: context,
       actions: [
@@ -376,26 +378,40 @@ class _BodyState() extends ConsumerState<_Body> {
               },
             ),
           ),
-        BottomSheetAction(
-          makeLabel: (context) => Text(context.l10n.boardEditor),
-          onPressed: () => Navigator.of(context).push(
-            XiangqiBoardEditorScreen.buildRoute(
-              initialFen: ref.read(xiangqiAnalysisControllerProvider).position.toFen(),
+        if (toolsAllowed)
+          BottomSheetAction(
+            makeLabel: (context) => Text(context.l10n.boardEditor),
+            onPressed: () => Navigator.of(context).push(
+              XiangqiBoardEditorScreen.buildRoute(
+                initialFen: ref.read(xiangqiAnalysisControllerProvider).position.toFen(),
+              ),
             ),
           ),
-        ),
-        BottomSheetAction(
-          makeLabel: (context) => Text('${context.l10n.copyToClipboard} · FEN'),
-          onPressed: () =>
-              _copy(xiangqiFenExport(ref.read(xiangqiAnalysisControllerProvider).position)),
-        ),
-        BottomSheetAction(
-          makeLabel: (context) =>
-              Text('${context.l10n.copyToClipboard} · ${context.l10n.movesPlayed}'),
-          onPressed: () {
-            unawaited(_copy(ref.read(xiangqiAnalysisControllerProvider.notifier).makeLineExport()));
-          },
-        ),
+        if (toolsAllowed)
+          BottomSheetAction(
+            makeLabel: (context) => Text(context.l10n.continueFromHere),
+            onPressed: () => showXiangqiContinueFromHereMenu(
+              context,
+              state.position,
+              orientation: _isFlipped ? .black : .red,
+            ),
+          ),
+        if (toolsAllowed)
+          BottomSheetAction(
+            makeLabel: (context) => Text('${context.l10n.copyToClipboard} · FEN'),
+            onPressed: () =>
+                _copy(xiangqiFenExport(ref.read(xiangqiAnalysisControllerProvider).position)),
+          ),
+        if (toolsAllowed)
+          BottomSheetAction(
+            makeLabel: (context) =>
+                Text('${context.l10n.copyToClipboard} · ${context.l10n.movesPlayed}'),
+            onPressed: () {
+              unawaited(
+                _copy(ref.read(xiangqiAnalysisControllerProvider.notifier).makeLineExport()),
+              );
+            },
+          ),
       ],
     );
   }

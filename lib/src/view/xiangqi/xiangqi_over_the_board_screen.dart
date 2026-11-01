@@ -27,6 +27,7 @@ import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
 import 'package:lichess_mobile/src/view/over_the_board/over_the_board_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_game_screen.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_local_game_scope.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_action_sheet.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_bottom_sheet.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_choice_picker.dart';
@@ -68,8 +69,12 @@ class const XiangqiOverTheBoardScreen({
   /// throws rather than being quietly replaced by the opening.
   final String? initialFen,
 }) extends StatelessWidget {
-  static Route<void> buildRoute({String? initialFen}) =>
-      buildScreenRoute(screen: XiangqiOverTheBoardScreen(initialFen: initialFen));
+  static Route<void> buildRoute({String? initialFen}) => buildScreenRoute(
+    screen: XiangqiLocalGameScope(
+      transient: initialFen != null,
+      child: XiangqiOverTheBoardScreen(initialFen: initialFen),
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -483,11 +488,15 @@ class const _XiangqiOtbResultDialog({
 /// it is only ever given when the screen was opened with one: the timing is still the whole of what
 /// the sheet asks, this is only what the game it starts is set up on.
 void _showConfigureSheet(BuildContext context, {String? initialFen}) {
+  final container = ProviderScope.containerOf(context);
   showModalBottomSheet<void>(
     context: context,
     isDismissible: true,
     isScrollControlled: true,
-    builder: (context) => _ConfigureXiangqiOtbSheet(initialFen: initialFen),
+    builder: (_) => UncontrolledProviderScope(
+      container: container,
+      child: _ConfigureXiangqiOtbSheet(initialFen: initialFen),
+    ),
   );
 }
 

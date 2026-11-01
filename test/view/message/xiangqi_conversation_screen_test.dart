@@ -1,11 +1,15 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:lichess_mobile/src/model/message/xiangqi_inbox_repository.dart';
+import 'package:lichess_mobile/src/network/http.dart';
 import 'package:lichess_mobile/src/network/socket.dart' show webSocketChannelFactoryProvider;
 import 'package:lichess_mobile/src/network/xiangqi_http.dart';
 import 'package:lichess_mobile/src/network/xiangqi_session_store.dart';
 import 'package:lichess_mobile/src/network/xiangqi_socket.dart';
 import 'package:lichess_mobile/src/view/message/xiangqi_conversation_screen.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_profile_screen.dart';
 import 'package:lichess_mobile/src/widgets/rich_link_text.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_refresh.dart';
 import 'package:material_ui/material_ui.dart';
@@ -13,11 +17,12 @@ import 'package:material_ui/material_ui.dart';
 import '../../binding.dart';
 import '../../model/message/xiangqi_inbox_repository_test.dart' as fixture;
 import '../../model/xiangqi/online/xiangqi_online_game_fixture.dart' as fx;
+import '../../network/fake_http_client_factory.dart';
 import '../../network/xiangqi_http_test.dart' show FakeXiangqiAuthStorage, signedInSession;
 import '../../test_helpers.dart';
 import '../../test_provider_scope.dart';
 
-Future<ProviderContainer> pumpConversation(WidgetTester tester) async {
+Future<ProviderContainer> pumpConversation(WidgetTester tester, {MockClient? httpClient}) async {
   final factory = fx.FakeXiangqiChannelFactory();
   await tester.pumpWidget(
     await makeTestProviderScopeApp(
@@ -28,6 +33,10 @@ Future<ProviderContainer> pumpConversation(WidgetTester tester) async {
         peer: xiangqiLightUser('${fixture.xiangqiFirstPeerId}', fixture.xiangqiFirstPeerName),
       ),
       overrides: {
+        if (httpClient != null)
+          httpClientFactoryProvider: httpClientFactoryProvider.overrideWith(
+            (_) => FakeHttpClientFactory(() => httpClient),
+          ),
         webSocketChannelFactoryProvider: webSocketChannelFactoryProvider.overrideWithValue(factory),
         xiangqiAuthStorageProvider: xiangqiAuthStorageProvider.overrideWithValue(
           FakeXiangqiAuthStorage(signedInSession.copyWith(userId: fixture.xiangqiAccountId)),
@@ -69,6 +78,36 @@ Future<ProviderContainer> pumpConversation(WidgetTester tester) async {
 
 void main() {
   TestLichessBinding.ensureInitialized();
+
+  testWidgets(
+    'a visible PM peer name opens the xiangqi profile and preserves the conversation draft',
+    (tester) async {
+      await pumpConversation(
+        tester,
+        httpClient: MockClient((_) async => http.Response('{"items":[]}', 200)),
+      );
+      await tester.enterText(find.byType(TextField), 'Draft before profile');
+      await tester.tap(find.text(fixture.xiangqiFirstPeerName));
+      await tester.pump();
+      final profile = find.byType(XiangqiProfileScreen, skipOffstage: false);
+      expect(profile, findsOneWidget);
+      expect(tester.widget<XiangqiProfileScreen>(profile).username, fixture.xiangqiFirstPeerName);
+      final context = tester.element(profile);
+      final route = ModalRoute.of(context)!;
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 1600));
+      }
+      Navigator.of(context).pop();
+      await tester.pump();
+      await tester.pump(route.reverseTransitionDuration + const Duration(milliseconds: 50));
+      expect(find.byType(XiangqiConversationScreen), findsOneWidget);
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller!.text,
+        'Draft before profile',
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('failed PM sending retains the draft and rolls back the optimistic bubble', (
     tester,

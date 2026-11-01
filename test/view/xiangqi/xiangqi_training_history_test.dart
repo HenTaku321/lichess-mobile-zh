@@ -75,7 +75,7 @@ Future<FakeTransport> pumpTrainingLesson(
           (_) => FakeHttpClientFactory(
             () => MockClient((request) async {
               requests?.add(request);
-              if (answer != null) return answer(request);
+              if (answer != null) return await answer(request);
               return http.Response('{}', request.url.path.endsWith('/complete') ? 200 : 404);
             }),
           ),

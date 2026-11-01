@@ -34,11 +34,10 @@ import 'package:lichess_mobile/src/utils/navigation.dart';
 import 'package:lichess_mobile/src/view/analysis/analysis_screen.dart';
 import 'package:lichess_mobile/src/view/game/status_l10n.dart';
 import 'package:lichess_mobile/src/view/offline_computer/opponent_picker.dart';
-import 'package:lichess_mobile/src/widgets/adaptive_action_sheet.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_bottom_sheet.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_choice_picker.dart';
 import 'package:lichess_mobile/src/widgets/board_preview.dart';
-import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
+import 'package:lichess_mobile/src/widgets/computer_game_actions.dart';
 import 'package:lichess_mobile/src/widgets/clock.dart';
 import 'package:lichess_mobile/src/widgets/game_layout.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
@@ -319,52 +318,26 @@ class const _BottomBar({required final VoidCallback onNewGame}) extends Consumer
   Widget build(BuildContext context, WidgetRef ref) {
     final gameState = ref.watch(offlineComputerGameControllerProvider);
 
-    return BottomBar(
-      children: [
-        BottomBarButton(
-          label: context.l10n.menu,
-          onTap: () => _showGameMenu(context, ref),
-          icon: Icons.menu,
-        ),
-        BottomBarButton(
-          label: context.l10n.resign,
-          onTap: gameState.game.resignable ? () => _showResignDialog(context, ref) : null,
-          icon: CupertinoIcons.flag,
-        ),
-        BottomBarButton(
-          label: context.l10n.takeback,
-          onTap: gameState.canTakeback && (gameState.game.casual || gameState.game.practiceMode)
-              ? () => ref.read(offlineComputerGameControllerProvider.notifier).takeback()
-              : null,
-          icon: CupertinoIcons.arrow_uturn_left,
-        ),
-        BottomBarButton(
-          label: context.l10n.getAHint,
-          onTap: _canGetHint(gameState)
-              ? () => ref.read(offlineComputerGameControllerProvider.notifier).hint()
-              : null,
-          icon: CupertinoIcons.lightbulb,
-          highlighted: gameState.hintSquare != null,
-        ),
-      ],
+    return ComputerGameBottomBar(
+      onMenu: () => _showGameMenu(context, ref),
+      onResign: gameState.game.resignable ? () => _showResignDialog(context, ref) : null,
+      onTakeback: gameState.canTakeback && (gameState.game.casual || gameState.game.practiceMode)
+          ? () => ref.read(offlineComputerGameControllerProvider.notifier).takeback()
+          : null,
+      onHint: _canGetHint(gameState)
+          ? () => ref.read(offlineComputerGameControllerProvider.notifier).hint()
+          : null,
+      hintVisible: gameState.hintSquare != null,
     );
   }
 
   Future<void> _showGameMenu(BuildContext context, WidgetRef ref) {
     final gameState = ref.read(offlineComputerGameControllerProvider);
-    return showAdaptiveActionSheet(
-      context: context,
-      actions: [
-        BottomSheetAction(
-          makeLabel: (context) => Text(context.l10n.flipBoard),
-          onPressed: () {
-            ref.read(_isBoardFlippedProvider.notifier).toggle();
-          },
-        ),
-        if (gameState.game.finished || gameState.game.casual || gameState.game.practiceMode)
-          BottomSheetAction(
-            makeLabel: (context) => Text(context.l10n.analysis),
-            onPressed: () => Navigator.of(context).push(
+    return showComputerGameMenu(
+      context,
+      onFlipBoard: () => ref.read(_isBoardFlippedProvider.notifier).toggle(),
+      onAnalysis: gameState.game.finished || gameState.game.casual || gameState.game.practiceMode
+          ? () => Navigator.of(context).push(
               AnalysisScreen.buildRoute(
                 AnalysisOptions.pgn(
                   id: gameState.game.id,
@@ -374,18 +347,10 @@ class const _BottomBar({required final VoidCallback onNewGame}) extends Consumer
                   variant: gameState.game.meta.variant,
                 ),
               ),
-            ),
-          ),
-        if (gameState.game.resignable)
-          BottomSheetAction(
-            makeLabel: (context) => Text(context.l10n.resign),
-            onPressed: () => _showResignDialog(context, ref),
-          ),
-        BottomSheetAction(
-          makeLabel: (context) => Text(context.l10n.mobileNewGame),
-          onPressed: onNewGame,
-        ),
-      ],
+            )
+          : null,
+      onResign: gameState.game.resignable ? () => _showResignDialog(context, ref) : null,
+      onNewGame: onNewGame,
     );
   }
 

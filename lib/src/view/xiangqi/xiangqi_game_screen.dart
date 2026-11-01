@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:chessground/chessground.dart';
-import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/account/account_preferences.dart';
@@ -29,10 +28,9 @@ import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
 import 'package:lichess_mobile/src/utils/screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_analysis_screen.dart';
-import 'package:lichess_mobile/src/widgets/adaptive_action_sheet.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_bottom_sheet.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_choice_picker.dart';
-import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
+import 'package:lichess_mobile/src/widgets/computer_game_actions.dart';
 import 'package:lichess_mobile/src/widgets/clock.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
@@ -595,32 +593,14 @@ class _BodyState() extends ConsumerState<_Body> {
                 moves: xiangqiGameNotation(gameState.positions, gameState.moves),
                 currentMoveIndex: gameState.viewCursor,
                 onSelectMove: controller.goTo,
-                userActionsBar: BottomBar(
-                  children: [
-                    BottomBarButton(
-                      label: context.l10n.menu,
-                      onTap: _showGameMenu,
-                      icon: Icons.menu,
-                    ),
-                    BottomBarButton(
-                      label: context.l10n.resign,
-                      onTap: gameState.isFinished ? null : _confirmResign,
-                      icon: CupertinoIcons.flag,
-                    ),
-                    BottomBarButton(
-                      label: context.l10n.takeback,
-                      onTap: gameState.canUndo ? controller.undo : null,
-                      icon: CupertinoIcons.arrow_uturn_left,
-                    ),
-                    BottomBarButton(
-                      label: context.l10n.getAHint,
-                      onTap: _canGetHint(gameState, analysisState)
-                          ? () => _requestHint(gameState)
-                          : null,
-                      icon: CupertinoIcons.lightbulb,
-                      highlighted: hintMove != null,
-                    ),
-                  ],
+                userActionsBar: ComputerGameBottomBar(
+                  onMenu: _showGameMenu,
+                  onResign: gameState.isFinished ? null : _confirmResign,
+                  onTakeback: gameState.canUndo ? controller.undo : null,
+                  onHint: _canGetHint(gameState, analysisState)
+                      ? () => _requestHint(gameState)
+                      : null,
+                  hintVisible: hintMove != null,
                 ),
               ),
             ),
@@ -695,27 +675,12 @@ class _BodyState() extends ConsumerState<_Body> {
 
   void _showGameMenu() {
     final game = ref.read(xiangqiGameControllerProvider);
-    showAdaptiveActionSheet<void>(
-      context: context,
-      actions: [
-        BottomSheetAction(
-          makeLabel: (context) => Text(context.l10n.flipBoard),
-          onPressed: () => ref.read(_isBoardFlippedProvider.notifier).toggle(),
-        ),
-        BottomSheetAction(
-          makeLabel: (context) => Text(context.l10n.analysis),
-          onPressed: () => unawaited(_openAnalysis()),
-        ),
-        if (!game.isFinished)
-          BottomSheetAction(
-            makeLabel: (context) => Text(context.l10n.resign),
-            onPressed: _confirmResign,
-          ),
-        BottomSheetAction(
-          makeLabel: (context) => Text(context.l10n.mobileNewGame),
-          onPressed: () => _showNewGameSheet(context, ref),
-        ),
-      ],
+    showComputerGameMenu(
+      context,
+      onFlipBoard: () => ref.read(_isBoardFlippedProvider.notifier).toggle(),
+      onAnalysis: () => unawaited(_openAnalysis()),
+      onResign: game.isFinished ? null : _confirmResign,
+      onNewGame: () => _showNewGameSheet(context, ref),
     );
   }
 

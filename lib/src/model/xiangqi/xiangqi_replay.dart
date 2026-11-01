@@ -4,7 +4,10 @@ import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position_validation.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_rules.dart' as rules;
 
-enum XiangqiReplayKind { game, teaching }
+enum XiangqiReplayKind() {
+  game,
+  teaching,
+}
 
 /// A handoff of already displayed moves only. No solution, unplayed script, completion callback
 /// or upstream client belongs to a replay. Recorded counters are checked as well as board/turn.
@@ -97,7 +100,7 @@ final class const XiangqiReplaySnapshot._({
     );
     final game =
         positions.every((position) => xiangqiPositionError(position) == null) &&
-        Iterable.generate(moves.length).every((i) => rules.isLegal(positions[i], moves[i]));
+        Iterable<int>.generate(moves.length).every((i) => rules.isLegal(positions[i], moves[i]));
     return !game
         ? teaching
         : XiangqiReplaySnapshot.recorded(

@@ -336,8 +336,9 @@ class _PuzzleBodyState() extends ConsumerState<_PuzzleBody> {
             !_autoAdvanced ||
             _autoAdvanceSuppressed ||
             generation != _requestGeneration ||
-            !(ModalRoute.of(context)?.isCurrent ?? true))
+            !(ModalRoute.of(context)?.isCurrent ?? true)) {
           return;
+        }
         unawaited(nextPuzzle());
       });
     });

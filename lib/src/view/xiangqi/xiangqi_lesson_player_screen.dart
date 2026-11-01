@@ -201,8 +201,9 @@ class _XiangqiLessonPlayerScreenState() extends ConsumerState<XiangqiLessonPlaye
             onPressed: () {
               if (!mounted ||
                   account != ref.read(xiangqiAccountGenerationProvider) ||
-                  chapter != _chapter)
+                  chapter != _chapter) {
                 return;
+              }
               unawaited(_openAnalysis());
             },
           ),

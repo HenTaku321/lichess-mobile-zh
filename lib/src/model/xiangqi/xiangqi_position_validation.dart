@@ -1,7 +1,7 @@
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_rules.dart' as rules;
 
-enum XiangqiPositionError {
+enum XiangqiPositionError() {
   counters,
   generals,
   material,
@@ -54,7 +54,7 @@ XiangqiPositionError? xiangqiPositionError(XiangqiPosition position) {
   final red = generals[XiangqiSide.red]!;
   final black = generals[XiangqiSide.black]!;
   if (red.file == black.file &&
-      Iterable.generate(
+      Iterable<int>.generate(
         black.rank - red.rank - 1,
         (i) => red.rank + i + 1,
       ).every((rank) => position.pieceAt(XiangqiSquare.at(red.file, rank)) == null)) {

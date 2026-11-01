@@ -11,12 +11,12 @@ import 'package:material_ui/material_ui.dart';
 export 'package:lichess_mobile/src/widgets/move_tree_view.dart'
     show
         PgnTreeDisplayMode,
-        kInlineMovePadding,
-        kIndexOpacity,
-        kViewVerticalPadding,
-        kViewHorizontalPadding,
         kCommentVerticalPadding,
         kFastReplayDebounceDelay,
+        kIndexOpacity,
+        kInlineMovePadding,
+        kViewHorizontalPadding,
+        kViewVerticalPadding,
         moveAnnotationChar;
 
 /// Retain the public chess move-cell type for existing consumers and tests.
@@ -119,7 +119,7 @@ class const DebouncedPgnTreeView({
   ConsumerState<DebouncedPgnTreeView> createState() => _DebouncedPgnTreeViewState();
 }
 
-class _DebouncedPgnTreeViewState extends ConsumerState<DebouncedPgnTreeView> {
+class _DebouncedPgnTreeViewState() extends ConsumerState<DebouncedPgnTreeView> {
   late MoveTreeNode<UciCharPair> _root;
   MoveTreeNotifier<UciCharPair>? _notifier;
   @override

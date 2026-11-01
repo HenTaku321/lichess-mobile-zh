@@ -50,7 +50,7 @@ class _XiangqiTreeNotifier(final XiangqiAnalysisController controller)
       controller.makeLineExport(path: path.ids, includeVariations: includeVariations);
 }
 
-class _XiangqiAnalysisTreeViewState extends State<XiangqiAnalysisTreeView> {
+class _XiangqiAnalysisTreeViewState() extends State<XiangqiAnalysisTreeView> {
   late MoveTreeNode<XiangqiMove> _root;
   late _XiangqiTreeNotifier _notifier;
   @override
@@ -64,8 +64,9 @@ class _XiangqiAnalysisTreeViewState extends State<XiangqiAnalysisTreeView> {
   void didUpdateWidget(covariant XiangqiAnalysisTreeView oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!identical(widget.root, oldWidget.root)) _root = _treeNode(widget.root);
-    if (oldWidget.controller != widget.controller)
+    if (oldWidget.controller != widget.controller) {
       _notifier = _XiangqiTreeNotifier(widget.controller);
+    }
   }
 
   @override

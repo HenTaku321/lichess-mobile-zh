@@ -15,14 +15,11 @@ import 'package:material_ui/material_ui.dart';
 
 /// Typed move identities, with no assumption about square count or encoded path length.
 @immutable
-final class MoveTreePath<T> {
-  const MoveTreePath(this.ids);
-  factory MoveTreePath.empty() => MoveTreePath(IList<T>());
-  factory MoveTreePath.fromIds(Iterable<T> ids) => MoveTreePath(ids.toIList());
-  factory MoveTreePath.join(MoveTreePath<T> a, MoveTreePath<T> b) =>
-      MoveTreePath(a.ids.addAll(b.ids));
+final class const MoveTreePath<T>(final IList<T> ids) {
+  factory empty() => MoveTreePath(IList<T>());
+  factory fromIds(Iterable<T> ids) => MoveTreePath(ids.toIList());
+  factory join(MoveTreePath<T> a, MoveTreePath<T> b) => MoveTreePath(a.ids.addAll(b.ids));
 
-  final IList<T> ids;
   int get size => ids.length;
   bool get isEmpty => ids.isEmpty;
   MoveTreePath<T> operator +(T id) => MoveTreePath(ids.add(id));
@@ -40,39 +37,23 @@ final class MoveTreePath<T> {
 /// Immutable projection used only for presenting a game tree. Adapters derive numbering,
 /// notation, evaluation labels and identities from their own rules and model types.
 @immutable
-final class MoveTreeNode<T> {
-  const MoveTreeNode({
-    required this.ply,
-    required this.fullmoveNumber,
-    required this.firstSideToMove,
-    this.moveId,
-    this.notation = '',
-    this.children = const IListConst([]),
-    this.comments = const IListConst([]),
-    this.nags,
-    this.evaluation,
-    this.clock,
-    this.elapsedMoveTime,
-    this.isCollapsed = false,
-    this.isComputerVariation = false,
-    this.isUserAdded = false,
-  });
-  final T? moveId;
+final class const MoveTreeNode<T>({
+  required final int ply,
+  required final int fullmoveNumber,
+  required final bool firstSideToMove,
+  final T? moveId,
+  final String notation = '',
+  final IList<MoveTreeNode<T>> children = const IListConst([]),
+  final IList<String> comments = const IListConst([]),
+  final IList<int>? nags,
+  final String? evaluation,
+  final Duration? clock,
+  final Duration? elapsedMoveTime,
+  final bool isCollapsed = false,
+  final bool isComputerVariation = false,
+  final bool isUserAdded = false,
+}) {
   T get id => moveId!;
-  final int ply;
-  final int fullmoveNumber;
-  final bool firstSideToMove;
-  final String notation;
-  final IList<MoveTreeNode<T>> children;
-  final IList<String> comments;
-  final IList<int>? nags;
-  final String? evaluation;
-  final Duration? clock;
-  final Duration? elapsedMoveTime;
-  final bool isCollapsed;
-  final bool isComputerVariation;
-  final bool isUserAdded;
-
   bool get hasTextComment => comments.isNotEmpty;
   IList<String> get textComments => comments;
   Iterable<MoveTreeNode<T>> get mainline sync* {
@@ -85,7 +66,7 @@ final class MoveTreeNode<T> {
 }
 
 /// View-layer callbacks. Model controllers must not depend on this widget interface.
-abstract class MoveTreeNotifier<T> {
+abstract class MoveTreeNotifier<T>() {
   void expandVariations(MoveTreePath<T> path);
   void collapseVariations(MoveTreePath<T> path);
   void promoteVariation(MoveTreePath<T> path, bool toMainLine);
@@ -645,7 +626,7 @@ enum _LineType() {
 /// Metadata about a move's role in the tree view.
 typedef _LineInfo<T> = ({_LineType type, bool startLine, MoveTreePath<T> pathToLine});
 
-List<InlineSpan> _moveWithComment(
+List<InlineSpan> _moveWithComment<T>(
   MoveTreeNode<T> branch, {
   required TextStyle textStyle,
   required _LineInfo<T> lineInfo,

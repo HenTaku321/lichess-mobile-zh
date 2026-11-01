@@ -52,6 +52,8 @@ void main() {
     expect(find.text('Over the board'), findsOneWidget);
     await tester.tap(find.text('Over the board'));
     await finishRoute(tester, find.byType(XiangqiOverTheBoardScreen, skipOffstage: false));
+    await tester.ensureVisible(find.text('Play'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Play'));
     await tester.pump();
     final child = ProviderScope.containerOf(tester.element(find.byType(XiangqiBoard).last));
@@ -124,6 +126,8 @@ void main() {
                 : find.byType(XiangqiGameScreen, skipOffstage: false))
             .last,
       );
+      await tester.ensureVisible(find.text('Play'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Play'));
       await tester.pump();
       final child = ProviderScope.containerOf(tester.element(find.byType(XiangqiBoard).last));

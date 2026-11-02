@@ -53,6 +53,9 @@ class const XiangqiProfileScreen({required final String username, super.key})
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profile = ref.watch(xiangqiUserProvider(username));
+    // The history section is a lazy ListView child. Keep its controller owned by this route so
+    // scrolling that section out of view cannot dispose the page range and load page one again.
+    ref.watch(xiangqiGameHistoryControllerProvider(username));
 
     // Signing out is offered only on the account's own profile: it is an action on the session this
     // device holds, and a profile of somebody else has nothing to sign out of.

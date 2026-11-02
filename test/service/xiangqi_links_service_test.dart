@@ -76,7 +76,7 @@ void main() {
       await tester.pumpAndSettle();
       final root = Navigator.of(sourceContext!, rootNavigator: true);
       if (covered) {
-        root.push(buildScreenRoute(screen: const Scaffold(body: Text('Root covering page'))));
+        root.push(buildScreenRoute<void>(screen: const Scaffold(body: Text('Root covering page'))));
         await tester.pumpAndSettle();
         // The nested route is still its own navigator's top, which is not sufficient to be visible.
         expect(ModalRoute.of(sourceContext!)!.isCurrent, isTrue);

@@ -480,6 +480,14 @@ void main() {
             testWidgets(
               name,
               (tester) async {
+                final previousErrorHandler = FlutterError.onError!;
+                FlutterError.onError = (details) {
+                  // Keep the framework's failure handling; preserve the actual constrained widget
+                  // and RenderFlex diagnostics instead of only a later takeException assertion.
+                  debugPrint('Visual layout diagnostic ($name):\n$details');
+                  previousErrorHandler(details);
+                };
+                addTearDown(() => FlutterError.onError = previousErrorHandler);
                 // Dispose the old route before resetting its remembered analysis. In particular,
                 // a failed screenshot must not save its tree during the next scene's first pump.
                 await tester.pumpWidget(const SizedBox.shrink());
@@ -643,10 +651,14 @@ void main() {
                 }
                 if (scene == 'profile-partial-error') {
                   expect(find.text(longName), findsAtLeastNWidgets(1));
-                  expect(
-                    find.text(key.currentContext!.l10n.mobileSomethingWentWrong),
-                    findsAtLeastNWidgets(1),
-                  );
+                  final localError = find.text(key.currentContext!.l10n.mobileSomethingWentWrong);
+                  // At 200% text on a short window the record sections are below the fold. Enter
+                  // that real lazy section before expecting its failed request to be rendered.
+                  for (var step = 0; step < 10 && localError.evaluate().isEmpty; step++) {
+                    await tester.drag(find.byType(ListView).first, const Offset(0, -120));
+                    await tester.pump(const Duration(milliseconds: 1600));
+                  }
+                  expect(localError, findsAtLeastNWidgets(1));
                 }
                 final exception = tester.takeException();
                 final container = ProviderScope.containerOf(

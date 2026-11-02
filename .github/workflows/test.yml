@@ -374,7 +374,7 @@ jobs:
               event = json.loads(line)
               if event['type'] == 'testStart': names[event['test']['id']] = event['test']['name']
               if event['type'] == 'testDone': results[event['testID']] = event['result']
-              if event['type'] == 'print' and 'EXCEPTION' in event.get('message', ''):
+              if event['type'] == 'print' and any(marker in event.get('message', '') for marker in ('EXCEPTION', 'Visual layout diagnostic')):
                   messages.setdefault(event['testID'], []).append(event['message'][:6000])
               if event['type'] == 'error': messages.setdefault(event['testID'], []).append(event['error'][:1000])
           summary = {'counts': dict(Counter(results.values())), 'failed': [

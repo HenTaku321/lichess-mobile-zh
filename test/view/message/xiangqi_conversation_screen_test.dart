@@ -11,6 +11,7 @@ import 'package:lichess_mobile/src/network/xiangqi_socket.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/view/message/xiangqi_conversation_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_profile_screen.dart';
+import 'package:lichess_mobile/src/widgets/chat_presentation.dart';
 import 'package:lichess_mobile/src/widgets/rich_link_text.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_refresh.dart';
 import 'package:material_ui/material_ui.dart';
@@ -109,7 +110,13 @@ void main() {
       ]),
     );
     final anchor = find.byWidgetPredicate((w) => w is RichLinkText && w.text == 'Message 12');
-    await tester.scrollUntilVisible(anchor, 200);
+    await tester.scrollUntilVisible(
+      anchor,
+      200,
+      scrollable: find
+          .descendant(of: find.byType(ChatMessageList), matching: find.byType(Scrollable))
+          .first,
+    );
     await tester.ensureVisible(anchor);
     await tester.pumpAndSettle();
     final before = tester.getTopLeft(anchor).dy;

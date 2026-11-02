@@ -237,7 +237,13 @@ void main() {
       }),
     );
     final anchor = find.text('Peer 8');
-    await tester.scrollUntilVisible(anchor, 200);
+    await tester.scrollUntilVisible(
+      anchor,
+      200,
+      scrollable: find
+          .descendant(of: find.byType(ContactsListView), matching: find.byType(Scrollable))
+          .first,
+    );
     await tester.ensureVisible(anchor);
     await tester.pumpAndSettle();
     final before = tester.getTopLeft(anchor).dy;

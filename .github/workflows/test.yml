@@ -152,6 +152,8 @@ jobs:
           test/view/message/xiangqi_conversation_screen_test.dart
           test/view/xiangqi/xiangqi_notifications_screen_test.dart
           test/model/xiangqi/xiangqi_link_test.dart
+          test/view/xiangqi/xiangqi_chat_entry_parity_test.dart
+          test/view/xiangqi/xiangqi_chat_screen_test.dart
 
       - name: Run xiangqi lifecycle regressions
         id: lifecycle

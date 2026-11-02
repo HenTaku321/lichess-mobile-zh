@@ -27,13 +27,12 @@ import 'package:lichess_mobile/src/model/user/user.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_link.dart';
 import 'package:lichess_mobile/src/service/xiangqi_links_service.dart';
-import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
 import 'package:lichess_mobile/src/view/chat/chat_context_menu.dart';
+import 'package:lichess_mobile/src/widgets/chat_presentation.dart';
 import 'package:lichess_mobile/src/widgets/feedback.dart';
 import 'package:lichess_mobile/src/widgets/platform.dart';
-import 'package:lichess_mobile/src/widgets/rich_link_text.dart';
 import 'package:lichess_mobile/src/widgets/user.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_refresh.dart';
 import 'package:material_ui/material_ui.dart';
@@ -107,34 +106,26 @@ class const _Body({
             return Column(
               children: [
                 Expanded(
-                  child: GestureDetector(
-                    onTap: () => FocusScope.of(context).unfocus(),
-                    child: ListView.builder(
-                      // The bottom padding the input row already provides.
-                      padding: MediaQuery.paddingOf(context).copyWith(bottom: 0),
-                      // Newest at the bottom: the server hands the page over newest-first and the list
-                      // is drawn the way a chat reads.
-                      reverse: true,
-                      itemCount: items.length,
-                      itemBuilder: (context, index) {
-                        final item = items[index];
-                        return switch (item) {
-                          _DateItem(:final date) => _DateBubble(date: date),
-                          _MessageItem(
-                            :final message,
-                            :final isMe,
-                            :final groupLength,
-                            :final groupIndex,
-                          ) =>
-                            _MessageBubble(
-                              message: message,
-                              isMe: isMe,
-                              groupLength: groupLength,
-                              groupIndex: groupIndex,
-                            ),
-                        };
-                      },
-                    ),
+                  child: ChatMessageList(
+                    itemCount: items.length,
+                    itemBuilder: (context, index) {
+                      final item = items[index];
+                      return switch (item) {
+                        _DateItem(:final date) => ChatDaySeparator(date: date),
+                        _MessageItem(
+                          :final message,
+                          :final isMe,
+                          :final groupLength,
+                          :final groupIndex,
+                        ) =>
+                          _MessageBubble(
+                            message: message,
+                            isMe: isMe,
+                            groupLength: groupLength,
+                            groupIndex: groupIndex,
+                          ),
+                      };
+                    },
                   ),
                 ),
                 _MessageInput(
@@ -226,41 +217,6 @@ class _MessageItem(
   required final int groupIndex,
 }) extends _DisplayItem;
 
-/// The day label, built to the lichess conversation's own: today, yesterday, or a short date.
-class const _DateBubble({required final DateTime date}) extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final yesterday = DateTime(now.year, now.month, now.day - 1);
-    final aDate = DateTime(date.year, date.month, date.day);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12.0),
-      child: Center(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.tertiaryContainer.withValues(alpha: 0.7),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Text(
-            aDate.isAtSameMomentAs(today)
-                ? context.l10n.today
-                : aDate.isAtSameMomentAs(yesterday)
-                ? context.l10n.yesterday
-                : DateFormat.yMMMd().format(date),
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onTertiaryContainer.withValues(alpha: 0.8),
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 /// One message, drawn with the lichess conversation's bubble colours and side.
 class const _MessageBubble({
   required final Message message,
@@ -270,67 +226,20 @@ class const _MessageBubble({
 }) extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final colorScheme = ColorScheme.of(context);
     final links = ref.read(xiangqiLinksServiceProvider);
     final account = ref.watch(xiangqiAccountGenerationProvider);
-    final textColor = isMe ? colorScheme.onSecondaryContainer : colorScheme.onSurface;
-    final time = DateFormat.Hm().format(message.date);
-    final timeStyle = TextStyle(fontSize: 11, color: textColor.withValues(alpha: 0.6));
-    final grouped = groupLength > 1;
-    final first = groupIndex == 0;
-    final last = groupIndex == groupLength - 1;
-    const radius = Radius.circular(16);
-    const inGroupRadius = Radius.circular(4);
-
     return ChatBubbleContextMenu(
       message: message.text,
-      child: FractionallySizedBox(
-        alignment: isMe ? .centerRight : .centerLeft,
-        widthFactor: 0.85,
-        child: Align(
-          alignment: isMe ? .centerRight : .centerLeft,
-          child: Container(
-            margin: EdgeInsets.only(
-              bottom: !grouped || first ? 8 : 2,
-              top: !grouped || last ? 8 : 2,
-              left: 8,
-              right: 8,
-            ),
-            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
-            decoration: BoxDecoration(
-              color: isMe ? colorScheme.secondaryContainer : colorScheme.surfaceContainer,
-              borderRadius: BorderRadius.only(
-                topLeft: !isMe && grouped && !last ? inGroupRadius : radius,
-                topRight: isMe && grouped && !last ? inGroupRadius : radius,
-                bottomLeft: !isMe && grouped && !first ? inGroupRadius : radius,
-                bottomRight: isMe && grouped && !first ? inGroupRadius : radius,
-              ),
-            ),
-            child: Stack(
-              children: [
-                RichLinkText(
-                  text: message.text,
-                  style: TextStyle(color: textColor),
-                  linkStyle: Styles.linkStyle,
-                  onOpen: (link) =>
-                      links.onLinkifyOpen(context, link, expectedAccountGeneration: account),
-                  // Reserve the same last-line timestamp space as the Lichess conversation.
-                  trailing: WidgetSpan(
-                    alignment: PlaceholderAlignment.baseline,
-                    baseline: TextBaseline.alphabetic,
-                    child: Opacity(
-                      opacity: 0,
-                      child: Padding(
-                        padding: const EdgeInsets.only(left: 8),
-                        child: Text(time, style: timeStyle),
-                      ),
-                    ),
-                  ),
-                ),
-                Positioned(right: 0, bottom: 0, child: Text(time, style: timeStyle)),
-              ],
-            ),
-          ),
+      child: ChatBubbleSurface(
+        appearance: .conversation,
+        isMine: isMe,
+        groupLength: groupLength,
+        groupIndex: groupIndex,
+        child: ChatMessageContent(
+          text: message.text,
+          time: DateFormat.Hm().format(message.date),
+          onLinkOpen: (link) =>
+              links.onLinkifyOpen(context, link, expectedAccountGeneration: account),
         ),
       ),
     );
@@ -380,33 +289,16 @@ class _MessageInputState() extends ConsumerState<_MessageInput> {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        child: TextField(
-          decoration: InputDecoration(
-            contentPadding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 15.0),
-            suffixIcon: IconButton(
-              tooltip: context.l10n.send,
-              icon: _sending
-                  ? const SizedBox.square(
-                      dimension: 20,
-                      child: CircularProgressIndicator.adaptive(),
-                    )
-                  : const Icon(Icons.send),
-              onPressed: _sending ? null : send,
-            ),
-            border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(20.0))),
-          ),
-          controller: controller,
-          keyboardType: TextInputType.text,
-          textCapitalization: TextCapitalization.sentences,
-          minLines: 1,
-          maxLines: 4,
-          enableSuggestions: true,
-          onSubmitted: (_) => send(),
-        ),
+    return ChatComposerInput(
+      appearance: .conversation,
+      controller: controller,
+      onSubmitted: (_) => send(),
+      sendButton: IconButton(
+        tooltip: context.l10n.send,
+        icon: _sending
+            ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator.adaptive())
+            : const Icon(Icons.send),
+        onPressed: _sending ? null : send,
       ),
     );
   }

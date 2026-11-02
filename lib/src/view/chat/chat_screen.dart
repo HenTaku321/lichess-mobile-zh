@@ -3,7 +3,6 @@ import 'package:lichess_mobile/src/model/auth/auth_controller.dart';
 import 'package:lichess_mobile/src/model/chat/chat.dart';
 import 'package:lichess_mobile/src/model/chat/chat_providers.dart';
 import 'package:lichess_mobile/src/service/app_links_service.dart';
-import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/tab_navigation.dart';
 import 'package:lichess_mobile/src/utils/focus_detector.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
@@ -13,7 +12,7 @@ import 'package:lichess_mobile/src/view/user/user_or_profile_screen.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_bottom_sheet.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
 import 'package:lichess_mobile/src/widgets/buttons.dart';
-import 'package:lichess_mobile/src/widgets/rich_link_text.dart';
+import 'package:lichess_mobile/src/widgets/chat_presentation.dart';
 import 'package:lichess_mobile/src/widgets/user.dart';
 import 'package:lichess_mobile/src/widgets/yes_no_dialog.dart';
 import 'package:material_ui/material_ui.dart';
@@ -127,28 +126,21 @@ class _ChatScreenState() extends ConsumerState<ChatScreen> with RouteAware {
                   ),
                 ),
               Expanded(
-                child: GestureDetector(
-                  onTap: () => FocusScope.of(context).unfocus(),
-                  // remove the automatic bottom padding of the ListView which is here taken care
-                  // of by the _ChatBottomBar
-                  child: ListView.builder(
-                    padding: MediaQuery.paddingOf(context).copyWith(bottom: 0),
-                    reverse: true,
-                    itemCount: value.messages.length,
-                    itemBuilder: (context, index) {
-                      final message = value.messages[value.messages.length - index - 1];
-                      return (message.username == 'lichess')
-                          ? _MessageAction(message: message.message)
-                          : (message.username == authUser?.user.name)
-                          ? _MessageBubble(options: widget.options, you: true, message: message)
-                          : _MessageBubble(
-                              options: widget.options,
-                              you: false,
-                              message: message,
-                              showUsername: widget.options.isPublic,
-                            );
-                    },
-                  ),
+                child: ChatMessageList(
+                  itemCount: value.messages.length,
+                  itemBuilder: (context, index) {
+                    final message = value.messages[value.messages.length - index - 1];
+                    return (message.username == 'lichess')
+                        ? _MessageAction(message: message.message)
+                        : (message.username == authUser?.user.name)
+                        ? _MessageBubble(options: widget.options, you: true, message: message)
+                        : _MessageBubble(
+                            options: widget.options,
+                            you: false,
+                            message: message,
+                            showUsername: widget.options.isPublic,
+                          );
+                  },
                 ),
               ),
               if (widget.options.writeable) _ChatBottomBar(options: widget.options),
@@ -168,12 +160,6 @@ class const _MessageBubble({
   required final ChatMessage message,
   final bool showUsername = false,
 }) extends ConsumerWidget {
-  Color _bubbleColor(BuildContext context) =>
-      you ? ColorScheme.of(context).secondary : ColorScheme.of(context).surfaceContainerHigh;
-
-  Color _textColor(BuildContext context) =>
-      you ? ColorScheme.of(context).onSecondary : ColorScheme.of(context).onSurface;
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return ChatBubbleContextMenu(
@@ -200,40 +186,21 @@ class const _MessageBubble({
             child: const Text('Report'),
           ),
       ],
-      child: FractionallySizedBox(
-        alignment: you ? Alignment.centerRight : Alignment.centerLeft,
-        widthFactor: 0.9,
-        child: Align(
-          alignment: you ? Alignment.centerRight : Alignment.centerLeft,
-          child: Container(
-            margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 16.0),
-            padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 15.0),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16.0),
-              color: _bubbleColor(context),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (showUsername && message.user != null)
-                  UserFullNameWidget(
-                    user: message.user,
-                    style: TextStyle(fontWeight: FontWeight.bold, color: _textColor(context)),
-                    onTap: () =>
-                        Navigator.of(context).push(UserOrProfileScreen.buildRoute(message.user!)),
-                  ),
-                RichLinkText(
-                  onOpen: (link) async =>
-                      await ref.read(appLinksServiceProvider).onLinkifyOpen(context, link),
-                  linkifiers: AppLinksService.kLichessLinkifiers,
-                  text: message.message,
-                  style: TextStyle(color: _textColor(context)),
-                  linkStyle: Styles.linkStyle,
+      child: ChatBubbleSurface(
+        appearance: .room,
+        isMine: you,
+        child: ChatMessageContent(
+          text: message.message,
+          linkifiers: AppLinksService.kLichessLinkifiers,
+          onLinkOpen: (link) => ref.read(appLinksServiceProvider).onLinkifyOpen(context, link),
+          sender: !showUsername || message.user == null
+              ? null
+              : UserFullNameWidget(
+                  user: message.user,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  onTap: () =>
+                      Navigator.of(context).push(UserOrProfileScreen.buildRoute(message.user!)),
                 ),
-              ],
-            ),
-          ),
         ),
       ),
     );
@@ -300,26 +267,12 @@ class _ChatBottomBarState() extends ConsumerState<_ChatBottomBar> {
       ),
     );
     final placeholder = authUser != null ? context.l10n.talkInChat : context.l10n.loginToChat;
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-        child: TextField(
-          decoration: InputDecoration(
-            contentPadding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 15.0),
-            suffixIcon: sendButton,
-            border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(20.0))),
-            hintText: placeholder,
-          ),
-          controller: _textController,
-          keyboardType: TextInputType.text,
-          textCapitalization: TextCapitalization.sentences,
-          minLines: 1,
-          maxLines: 4,
-          enableSuggestions: true,
-          readOnly: authUser == null,
-        ),
-      ),
+    return ChatComposerInput(
+      appearance: .room,
+      hintText: placeholder,
+      sendButton: sendButton,
+      controller: _textController,
+      readOnly: authUser == null,
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter/foundation.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_link.dart';
 
 /// One public room of `GET /api/chat_rooms/`.
 ///
@@ -50,6 +51,9 @@ final class const XiangqiChatMessage({
 
   /// What they are called, or a placeholder when they have hidden their name.
   final String? senderName,
+
+  /// Only a visible real username is a profile target; hidden labels and guest names are not.
+  final bool senderProfileAvailable = false,
 
   /// The account kind, on the same scale as a game's players: 10 human, 20 guest, 30 bot, 40 guest
   /// bot.
@@ -104,12 +108,20 @@ XiangqiChatMessage? xiangqiChatMessageFromJson(Object? json) {
   final text = json['message'];
   if (text is! String || text.isEmpty) return null;
   final id = json['id'];
+  final name = json['sender_name'] is String ? json['sender_name'] as String : null;
+  final type = json['sender_type'] is num ? (json['sender_type'] as num).toInt() : null;
   return XiangqiChatMessage(
     id: id is num ? id.toInt() : null,
     message: text,
     senderId: json['sender_id'] is num ? (json['sender_id'] as num).toInt() : null,
-    senderName: json['sender_name'] is String ? json['sender_name'] as String : null,
-    senderType: json['sender_type'] is num ? (json['sender_type'] as num).toInt() : null,
+    senderName: name,
+    senderType: type,
+    senderProfileAvailable:
+        json['sender_hidden_username'] != true &&
+        name != null &&
+        isXiangqiProfileName(name) &&
+        type != 20 &&
+        type != 40,
     timestamp: _timestampOf(json['timestamp']),
   );
 }

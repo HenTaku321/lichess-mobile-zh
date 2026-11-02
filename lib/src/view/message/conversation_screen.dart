@@ -5,14 +5,13 @@ import 'package:lichess_mobile/src/model/message/message.dart';
 import 'package:lichess_mobile/src/model/message/message_repository.dart';
 import 'package:lichess_mobile/src/model/user/user.dart';
 import 'package:lichess_mobile/src/service/app_links_service.dart';
-import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/tab_navigation.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
 import 'package:lichess_mobile/src/view/chat/chat_context_menu.dart';
 import 'package:lichess_mobile/src/view/user/user_or_profile_screen.dart';
+import 'package:lichess_mobile/src/widgets/chat_presentation.dart';
 import 'package:lichess_mobile/src/widgets/platform.dart';
-import 'package:lichess_mobile/src/widgets/rich_link_text.dart';
 import 'package:lichess_mobile/src/widgets/user.dart';
 import 'package:lichess_mobile/src/widgets/yes_no_dialog.dart';
 import 'package:material_ui/material_ui.dart';
@@ -127,40 +126,32 @@ class const _Body({required final LightUser user}) extends ConsumerWidget {
         return Column(
           children: [
             Expanded(
-              child: GestureDetector(
-                onTap: () => FocusScope.of(context).unfocus(),
-                child: ListView.builder(
-                  // remove the automatic bottom padding of the ListView which is here taken care
-                  // of by the _MessageInput
-                  padding: MediaQuery.paddingOf(context).copyWith(bottom: 0),
-                  reverse: true,
-                  itemCount: items.length,
-                  itemBuilder: (context, index) {
-                    final item = items[index];
-                    switch (item) {
-                      case DateItem(:final date):
-                        return _DateBubble(date: date);
-                      case MessageItem(:final message, :final isMe):
-                        return _MessageBubble(
-                          message: message,
-                          isMe: isMe,
-                          groupLength: item.groupLength,
-                          groupIndex: item.groupIndex,
-                        );
-                      case GetMoreItem():
-                        return Center(
-                          child: TextButton(
-                            onPressed: () => ref
-                                .read(conversationControllerProvider(user.id).notifier)
-                                .getMore(),
-                            child: Text(context.l10n.mobileLoadMore),
-                          ),
-                        );
-                      case ContactTypingItem():
-                        return _ContactTyping(user: user);
-                    }
-                  },
-                ),
+              child: ChatMessageList(
+                itemCount: items.length,
+                itemBuilder: (context, index) {
+                  final item = items[index];
+                  switch (item) {
+                    case DateItem(:final date):
+                      return ChatDaySeparator(date: date);
+                    case MessageItem(:final message, :final isMe):
+                      return _MessageBubble(
+                        message: message,
+                        isMe: isMe,
+                        groupLength: item.groupLength,
+                        groupIndex: item.groupIndex,
+                      );
+                    case GetMoreItem():
+                      return Center(
+                        child: TextButton(
+                          onPressed: () =>
+                              ref.read(conversationControllerProvider(user.id).notifier).getMore(),
+                          child: Text(context.l10n.mobileLoadMore),
+                        ),
+                      );
+                    case ContactTypingItem():
+                      return _ContactTyping(user: user);
+                  }
+                },
               ),
             ),
             _MessageInput(user: user, state: value),
@@ -266,155 +257,28 @@ class const _ContactTyping({required final LightUser user}) extends ConsumerWidg
   }
 }
 
-class const _DateBubble({required final DateTime date}) extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final yesterday = DateTime(now.year, now.month, now.day - 1);
-    final aDate = DateTime(date.year, date.month, date.day);
-    final formatted = DateFormat.yMMMd().format(date);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12.0),
-      child: Center(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.tertiaryContainer.withValues(alpha: 0.7),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Text(
-            aDate.isAtSameMomentAs(today)
-                ? context.l10n.today
-                : aDate.isAtSameMomentAs(yesterday)
-                ? context.l10n.yesterday
-                : formatted,
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onTertiaryContainer.withValues(alpha: 0.8),
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class const _MessageBubble({
   required final Message message,
   required final bool isMe,
   required final int groupLength,
   required final int groupIndex,
 }) extends ConsumerWidget {
-  Color _bubbleColor(BuildContext context) {
-    return isMe
-        ? ColorScheme.of(context).secondaryContainer
-        : ColorScheme.of(context).surfaceContainer;
-  }
-
-  Color _textColor(BuildContext context) {
-    return isMe ? ColorScheme.of(context).onSecondaryContainer : ColorScheme.of(context).onSurface;
-  }
-
-  bool get isInGroup => groupLength > 1;
-  bool get isFirstInGroup => groupIndex == 0;
-  bool get isLastInGroup => groupIndex == groupLength - 1;
-
-  static const _bubbleRadius = Radius.circular(16);
-  static const _inGroupRadius = Radius.circular(4);
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final time = DateFormat.Hm().format(message.date);
-
     return ChatBubbleContextMenu(
       message: message.text,
-      child: FractionallySizedBox(
-        alignment: isMe ? .centerRight : .centerLeft,
-        widthFactor: 0.85,
-        child: Align(
-          alignment: isMe ? .centerRight : .centerLeft,
-          child: Container(
-            margin: EdgeInsets.only(
-              bottom: !isInGroup || isFirstInGroup ? 8 : 2,
-              top: !isInGroup || isLastInGroup ? 8 : 2,
-              left: 8,
-              right: 8,
-            ),
-            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
-            decoration: BoxDecoration(
-              color: _bubbleColor(context),
-              borderRadius: BorderRadius.only(
-                topLeft: isMe
-                    ? _bubbleRadius
-                    : isInGroup && !isLastInGroup
-                    ? _inGroupRadius
-                    : _bubbleRadius,
-                topRight: isMe
-                    ? isInGroup && !isLastInGroup
-                          ? _inGroupRadius
-                          : _bubbleRadius
-                    : _bubbleRadius,
-                bottomLeft: isMe
-                    ? _bubbleRadius
-                    : isInGroup && !isFirstInGroup
-                    ? _inGroupRadius
-                    : _bubbleRadius,
-                bottomRight: isMe
-                    ? isInGroup && !isFirstInGroup
-                          ? _inGroupRadius
-                          : _bubbleRadius
-                    : _bubbleRadius,
-              ),
-            ),
-            child: _MessageContent(
-              text: message.text,
-              time: time,
-              textColor: _textColor(context),
-              onLinkOpen: (link) => ref.read(appLinksServiceProvider).onLinkifyOpen(context, link),
-            ),
-          ),
+      child: ChatBubbleSurface(
+        appearance: .conversation,
+        isMine: isMe,
+        groupLength: groupLength,
+        groupIndex: groupIndex,
+        child: ChatMessageContent(
+          text: message.text,
+          time: DateFormat.Hm().format(message.date),
+          linkifiers: AppLinksService.kLichessLinkifiers,
+          onLinkOpen: (link) => ref.read(appLinksServiceProvider).onLinkifyOpen(context, link),
         ),
       ),
-    );
-  }
-}
-
-class const _MessageContent({
-  required final String text,
-  required final String time,
-  required final Color textColor,
-  required final LinkCallback onLinkOpen,
-}) extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final timeStyle = TextStyle(fontSize: 11, color: textColor.withValues(alpha: 0.6));
-    // workaround to prevent the message text from overlapping with the timestamp
-    final spacer = WidgetSpan(
-      alignment: PlaceholderAlignment.baseline,
-      baseline: TextBaseline.alphabetic,
-      child: Opacity(
-        opacity: 0,
-        child: Padding(
-          padding: const EdgeInsets.only(left: 8),
-          child: Text(time, style: timeStyle),
-        ),
-      ),
-    );
-
-    final linkSpan = buildTextSpan(
-      linkify(text, linkifiers: AppLinksService.kLichessLinkifiers),
-      style: TextStyle(color: textColor),
-      linkStyle: Styles.linkStyle,
-      onOpen: onLinkOpen,
-    );
-
-    return Stack(
-      children: [
-        Text.rich(TextSpan(children: [linkSpan, spacer])),
-        Positioned(right: 0, bottom: 0, child: Text(time, style: timeStyle)),
-      ],
     );
   }
 }
@@ -470,32 +334,18 @@ class _MessageInputState() extends ConsumerState<_MessageInput> {
       },
     );
 
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        child: TextField(
-          decoration: InputDecoration(
-            contentPadding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 15.0),
-            suffixIcon: sendButton,
-            border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(20.0))),
-            hintText: isBlocked
-                ? 'This conversation is blocked.'
-                : isBot
-                ? 'Bot accounts cannot send nor receive messages.'
-                : !canPost
-                ? "${widget.user.name} doesn't accept new messages."
-                : null,
-          ),
-          controller: controller,
-          keyboardType: TextInputType.text,
-          textCapitalization: TextCapitalization.sentences,
-          minLines: 1,
-          maxLines: 4,
-          enableSuggestions: true,
-          readOnly: readOnly,
-        ),
-      ),
+    return ChatComposerInput(
+      appearance: .conversation,
+      sendButton: sendButton,
+      hintText: isBlocked
+          ? 'This conversation is blocked.'
+          : isBot
+          ? 'Bot accounts cannot send nor receive messages.'
+          : !canPost
+          ? "${widget.user.name} doesn't accept new messages."
+          : null,
+      controller: controller,
+      readOnly: readOnly,
     );
   }
 }

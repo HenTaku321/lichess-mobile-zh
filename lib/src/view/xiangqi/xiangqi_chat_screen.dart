@@ -1,7 +1,10 @@
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lichess_mobile/src/model/message/xiangqi_inbox_repository.dart'
+    show xiangqiLightUser;
 import 'package:lichess_mobile/src/model/xiangqi/chat/xiangqi_chat.dart';
 import 'package:lichess_mobile/src/model/xiangqi/chat/xiangqi_chat_controller.dart';
+import 'package:lichess_mobile/src/model/xiangqi/chat/xiangqi_chat_drafts.dart';
 import 'package:lichess_mobile/src/model/xiangqi/chat/xiangqi_chat_repository.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
 import 'package:lichess_mobile/src/service/xiangqi_links_service.dart';
@@ -9,10 +12,12 @@ import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
 import 'package:lichess_mobile/src/view/chat/chat_context_menu.dart';
+import 'package:lichess_mobile/src/widgets/buttons.dart';
+import 'package:lichess_mobile/src/widgets/chat_presentation.dart';
 import 'package:lichess_mobile/src/widgets/feedback.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
-import 'package:lichess_mobile/src/widgets/rich_link_text.dart';
+import 'package:lichess_mobile/src/widgets/user.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_refresh.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -142,7 +147,18 @@ class _XiangqiChatRoomScreenState() extends ConsumerState<XiangqiChatRoomScreen>
   final _input = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    _input.text = ref.read(xiangqiChatDraftsProvider)[widget.roomKey] ?? '';
+    _input.addListener(_rememberDraft);
+  }
+
+  void _rememberDraft() =>
+      ref.read(xiangqiChatDraftsProvider.notifier).remember(widget.roomKey, _input.text);
+
+  @override
   void dispose() {
+    _input.removeListener(_rememberDraft);
     _input.dispose();
     super.dispose();
   }
@@ -239,7 +255,7 @@ class _XiangqiChatRoomScreenState() extends ConsumerState<XiangqiChatRoomScreen>
                 controller: _input,
                 enabled: state.isConnected && !_sending,
                 onSend: _send,
-                hint: context.l10n.mobileXiangqiChatSend,
+                hint: context.l10n.talkInChat,
               ),
             ],
           ),
@@ -290,11 +306,7 @@ class const _Messages({
     }
 
     final messages = state.messages;
-    return ListView.builder(
-      // Bottom-up: the newest message is the one the reader is looking at, and a message that
-      // arrives does not push the rest of the room up the screen.
-      reverse: true,
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
+    return ChatMessageList(
       itemCount: messages.length + (state.hasMore ? 1 : 0),
       itemBuilder: (context, index) {
         if (index == messages.length) {
@@ -324,42 +336,30 @@ class const _Bubble({required final XiangqiChatMessage message, required final b
   Widget build(BuildContext context, WidgetRef ref) {
     final links = ref.read(xiangqiLinksServiceProvider);
     final account = ref.watch(xiangqiAccountGenerationProvider);
-    final scheme = ColorScheme.of(context);
-    final textColor = isMine ? scheme.onSecondary : scheme.onSurface;
     return ChatBubbleContextMenu(
       message: message.message,
-      child: FractionallySizedBox(
-        alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
-        widthFactor: 0.9,
-        child: Align(
-          alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
-          child: Container(
-            margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 16.0),
-            padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 15.0),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16.0),
-              color: isMine ? scheme.secondary : scheme.surfaceContainerHigh,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (!isMine && message.senderName != null)
-                  Text(
-                    message.senderName!,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontWeight: FontWeight.bold, color: textColor),
-                  ),
-                RichLinkText(
-                  text: message.message,
-                  style: TextStyle(color: textColor),
-                  linkStyle: Styles.linkStyle,
-                  onOpen: (link) =>
-                      links.onLinkifyOpen(context, link, expectedAccountGeneration: account),
+      child: ChatBubbleSurface(
+        appearance: .room,
+        isMine: isMine,
+        child: ChatMessageContent(
+          text: message.message,
+          onLinkOpen: (link) =>
+              links.onLinkifyOpen(context, link, expectedAccountGeneration: account),
+          sender: isMine || message.senderName == null
+              ? null
+              : UserFullNameWidget(
+                  user: xiangqiLightUser(message.senderId, message.senderName!),
+                  showFlair: false,
+                  showPatron: false,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  onTap: !message.senderProfileAvailable
+                      ? null
+                      : () => links.openProfile(
+                          context,
+                          message.senderName!,
+                          expectedAccountGeneration: account,
+                        ),
                 ),
-              ],
-            ),
-          ),
         ),
       ),
     );
@@ -375,29 +375,20 @@ class const _Composer({
 }) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      child: TextField(
-        controller: controller,
-        enabled: enabled,
-        textInputAction: TextInputAction.send,
-        keyboardType: TextInputType.text,
-        textCapitalization: TextCapitalization.sentences,
-        minLines: 1,
-        maxLines: 4,
-        onSubmitted: (_) => onSend(),
-        decoration: InputDecoration(
-          hintText: enabled ? hint : context.l10n.mobileXiangqiChatOffline,
-          contentPadding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 15.0),
-          border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(20.0))),
-          suffixIcon: ValueListenableBuilder<TextEditingValue>(
-            valueListenable: controller,
-            builder: (context, value, _) => IconButton(
-              onPressed: enabled && value.text.trim().isNotEmpty ? () => onSend() : null,
-              icon: const Icon(Icons.send),
-              tooltip: hint,
-            ),
-          ),
+    return ChatComposerInput(
+      appearance: .room,
+      controller: controller,
+      enabled: enabled,
+      textInputAction: TextInputAction.send,
+      onSubmitted: (_) => onSend(),
+      hintText: enabled ? hint : context.l10n.mobileXiangqiChatOffline,
+      sendButton: ValueListenableBuilder<TextEditingValue>(
+        valueListenable: controller,
+        builder: (context, value, _) => SemanticIconButton(
+          onPressed: enabled && value.text.trim().isNotEmpty ? () => onSend() : null,
+          icon: const Icon(Icons.send),
+          padding: EdgeInsets.zero,
+          semanticsLabel: context.l10n.send,
         ),
       ),
     );

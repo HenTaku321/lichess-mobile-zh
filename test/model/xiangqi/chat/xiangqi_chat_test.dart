@@ -70,6 +70,24 @@ void main() {
   });
 
   group('the messages of a room', () {
+    test('profile entry follows visible usernames, not hidden labels or guest identities', () {
+      expect(xiangqiChatMessageFromJson(message())!.senderProfileAvailable, isTrue);
+      for (final row in [
+        {...message(), 'sender_hidden_username': true},
+        message(senderType: 20),
+        message(senderType: 40),
+        message(senderName: null),
+        message(senderName: 'not/a/username'),
+      ]) {
+        expect(xiangqiChatMessageFromJson(row)!.senderProfileAvailable, isFalse);
+      }
+      final hidden = xiangqiChatMessageFromJson({
+        ...message(senderName: 'Anonymous label'),
+        'sender_hidden_username': true,
+      })!;
+      expect(hidden.senderName, 'Anonymous label');
+    });
+
     test('are read oldest first, whichever way the page came in', () {
       // A page is a hundred messages with the newest first; a chat is read from its oldest. The
       // reversal happens once, here, at the edge where the wire's order enters the model.

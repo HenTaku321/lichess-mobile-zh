@@ -112,7 +112,7 @@ class XiangqiLinksService(final Ref ref) {
   /// nearest ModalRoute permits callbacks from a page the user can no longer see.
   bool Function() _routeVisibility(BuildContext context) {
     final route = ModalRoute.of(context);
-    final routes = <ModalRoute<dynamic>>{if (route != null) route};
+    final routes = <ModalRoute<dynamic>>{?route};
     final offstage = <Element>[];
     context.visitAncestorElements((element) {
       if (element.widget is Navigator) {

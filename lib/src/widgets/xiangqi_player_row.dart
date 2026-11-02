@@ -1,9 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lichess_mobile/src/model/account/account_preferences.dart';
 import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
-import 'package:lichess_mobile/src/view/account/rating_pref_aware.dart';
 import 'package:lichess_mobile/src/widgets/player_table.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_avatar.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
@@ -36,6 +36,7 @@ class const XiangqiPlayerRow({
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final playerName = name ?? side.label(context.l10n);
+    final showRatings = rating != null && ref.watch(ratingsVisibleProvider(false));
     final effectiveClockPosition =
         clockPosition ?? ref.watch(boardPreferencesProvider).clockPosition;
 
@@ -57,22 +58,19 @@ class const XiangqiPlayerRow({
                   compact: compact,
                   clockPosition: effectiveClockPosition,
                   afterName: [
-                    if (rating != null)
+                    if (showRatings && rating != null) ...[
+                      const SizedBox(width: 4),
                       Flexible(
-                        child: RatingPrefAware(
-                          child: Padding(
-                            padding: const EdgeInsets.only(left: 4),
-                            child: Text(
-                              rating!,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: compact ? 11 : 14,
-                                color: textShade(context, 0.7),
-                              ),
-                            ),
+                        child: Text(
+                          rating!,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: compact ? 11 : 14,
+                            color: textShade(context, 0.7),
                           ),
                         ),
                       ),
+                    ],
                     if (isMe) ...[
                       const SizedBox(width: 4),
                       Icon(Icons.person, size: 16, color: textShade(context, 0.5)),

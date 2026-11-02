@@ -28,8 +28,8 @@
 | 批次 | 内容 | 当前状态 |
 |---|---|---|
 | 1 | 全入口／状态清单、源码根因登记 | 已登记；行为与主观验收未开始 |
-| 2 | 编辑器安全出口、联系人异步导航与账号入口 | Actions 已复现；最小修复已写，待同 SHA 绿 |
-| 3 | 隐藏评分、缩略图偏好、题目完成操作栏 | Actions 已复现，显示策略/完成动作已写，待绿；实战例外语义补专项 |
+| 2 | 编辑器安全出口、联系人异步导航与账号入口 | 指定86项在47eab2a81通过；完整页面/身份矩阵仍待后续 |
+| 3 | 隐藏评分、缩略图偏好、题目完成操作栏 | 发现 test scope 固定评分yes和硬编码标签，旧相关R撤回；real 模式/负向对照重跑 |
 | 4 | 私信／通知分页及无 ID 通道超时隔离 | 待协议测试与实现 |
 | 5 | 好友／赛事／资料分页、局部失败与返回恢复 | 待红 → 绿 |
 | 6 | 全页面配对、DPI 与字缩放分离 | 待实现 |
@@ -78,8 +78,12 @@
 - Modify: `lib/src/view/analysis/analysis_hub_screen.dart`、`lib/src/view/board_editor/board_editor_hub_screen.dart`
 - Reference: `lib/src/view/account/rating_pref_aware.dart`、`lib/src/view/puzzle/puzzle_screen.dart`
 - Test: `test/widgets/shared_game_presentation_test.dart`、`test/view/xiangqi/xiangqi_training_history_test.dart`
+- Test: `test/view/xiangqi/xiangqi_preference_presentation_contract_test.dart`
+- Modify: `test/test_provider_scope.dart`（real 模式只移除默认评分覆盖，旧布局测试保持原行为）
+- Create: `scripts/verify-xiangqi-rating-negative-control.sh`（只在 Actions 恢复原始渲染、验证真实 UI 失败，退出恢复当前代码）
 
-1. 用实际偏好供给测试 `yes`、`no`、`exceptInGame`；只在当前用户正在实战时传 active 语义，观战／复盘不误隐藏。
+1. 禁用 test scope 的固定 yes 覆盖；每次修改后显式断言真实 showRatingsPrefProvider，供给 `yes`、`no`、`exceptInGame`。
+   在 Actions 用原始渲染做相同测试，确保失败来自 UI 而非夹具/编译；只在当前用户实战传 active，观战/复盘不误隐藏。
 2. 账号／题目／好友／排行榜／资料的评级及最高评分都必须服从隐藏偏好，非评分统计保留。
 3. 配对缩略图统一禁止坐标、关闭交互／动画，亮度和 hue 等照用主题偏好；保留象棋长宽比。
 4. 完成题目直接提供分析；完成后不残留无用提示；继续训练图标与国象一致。

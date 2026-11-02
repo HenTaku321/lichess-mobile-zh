@@ -134,6 +134,20 @@ jobs:
           test/view/message/contacts_screen_test.dart
           test/view/account/account_menu_test.dart
 
+      - name: Verify real-rating negative control
+        id: rating_negative_control
+        if: ${{ !cancelled() && steps.analyze.outcome == 'success' }}
+        run: bash scripts/verify-xiangqi-rating-negative-control.sh
+
+      - name: Export real-rating negative control
+        if: ${{ !cancelled() && steps.rating_negative_control.outcome != 'skipped' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: xiangqi-real-ratings-negative-control-${{ github.sha }}
+          path: out/parity-negative-control
+          retention-days: 7
+          if-no-files-found: error
+
       - name: Run xiangqi preference presentation regressions
         id: preference_presentation
         if: ${{ !cancelled() && steps.analyze.outcome == 'success' }}

@@ -120,6 +120,7 @@ Future<_RouteRecorder> pumpWatchScreen(
   WidgetTester tester,
   Object? body, {
   int status = 200,
+  bool useRealRatingPreferences = false,
 }) async {
   final recorder = _RouteRecorder();
   final client = MockClient(
@@ -132,6 +133,7 @@ Future<_RouteRecorder> pumpWatchScreen(
   await tester.pumpWidget(
     await makeTestProviderScope(
       tester,
+      useRealRatingPreferences: useRealRatingPreferences,
       child: MaterialApp(
         localizationsDelegates: const [
           AppLocalizations.delegate,

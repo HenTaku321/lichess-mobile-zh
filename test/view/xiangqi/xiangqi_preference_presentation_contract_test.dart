@@ -11,6 +11,7 @@ import 'package:lichess_mobile/src/model/settings/preferences_storage.dart';
 import 'package:lichess_mobile/src/model/xiangqi/puzzle/xiangqi_puzzle_repository.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_analysis_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
+import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/view/analysis/analysis_hub_screen.dart';
 import 'package:lichess_mobile/src/view/board_editor/board_editor_hub_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_analysis_screen.dart';
@@ -42,6 +43,8 @@ Future<void> changeRatings(
   final container = ProviderScope.containerOf(tester.element(find.byType(Scaffold).first));
   await container.read(accountPreferencesProvider.future);
   await container.read(accountPreferencesProvider.notifier).setShowRatings(preference);
+  // This assertion rejects the old suite-wide `yes` override before any UI result is counted.
+  expect(await container.read(showRatingsPrefProvider.future), preference);
   if (liveClocks) {
     await tester.pump();
     await tester.pump();
@@ -59,6 +62,7 @@ void main() {
     await tester.pumpWidget(
       await makeTestProviderScopeApp(
         tester,
+        useRealRatingPreferences: true,
         home: const Scaffold(
           body: XiangqiPlayerRow(
             side: XiangqiSide.red,
@@ -79,7 +83,7 @@ void main() {
   });
 
   testWidgets('watch rows hide ratings without hiding names or game information', (tester) async {
-    await watch.pumpWatchScreen(tester, [watch.entry()]);
+    await watch.pumpWatchScreen(tester, [watch.entry()], useRealRatingPreferences: true);
     expect(find.text('2815'), findsOneWidget);
     expect(find.text('2869'), findsOneWidget);
     await changeRatings(tester, ShowRatings.no);
@@ -97,6 +101,7 @@ void main() {
       (tester) async {
         final factory = await online.pumpGame(
           tester,
+          useRealRatingPreferences: true,
           token: fx.xiangqiTestToken(playing ? fx.xiangqiTestViewerId : fx.xiangqiTestSpectatorId),
         );
         await online.receive(tester, factory, fx.xiangqiSnapshotFrame());
@@ -117,6 +122,7 @@ void main() {
   ) async {
     await leaderboard.pumpLeaderboard(
       tester,
+      useRealRatingPreferences: true,
       boards: (_) => leaderboard.board(
         data: [leaderboard.row(name: 'Rated leader', rating: 4660)],
         totalPlayers: 1,
@@ -135,6 +141,7 @@ void main() {
   ) async {
     await account.pumpAccountMenu(
       tester,
+      useRealRatingPreferences: true,
       session: account.xiangqiSession(isGuest: false),
       client: MockClient(
         (_) async => account.utf8Response(jsonEncode(account.xiangqiAccountPayload()), 200),
@@ -149,7 +156,11 @@ void main() {
   });
 
   testWidgets('profile ratings obey the preference', (tester) async {
-    await profile.pumpProfile(tester, client: profile.profileClient());
+    await profile.pumpProfile(
+      tester,
+      client: profile.profileClient(),
+      useRealRatingPreferences: true,
+    );
     expect(find.text('900'), findsOneWidget);
     expect(find.text('1200'), findsOneWidget);
     await changeRatings(tester, ShowRatings.no);
@@ -162,7 +173,11 @@ void main() {
   testWidgets('a profile record does not leak the highest rating when ratings are hidden', (
     tester,
   ) async {
-    await profile.pumpProfile(tester, client: profile.profileClient());
+    await profile.pumpProfile(
+      tester,
+      client: profile.profileClient(),
+      useRealRatingPreferences: true,
+    );
     await profile.scrollDown(tester);
     expect(find.textContaining('Highest rating'), findsWidgets);
     await changeRatings(tester, ShowRatings.no);
@@ -186,6 +201,7 @@ void main() {
         }
         return saved.jsonReply({'items': <Object?>[]});
       }),
+      useRealRatingPreferences: true,
     );
     expect(find.textContaining('1500'), findsOneWidget);
     await changeRatings(tester, ShowRatings.no);
@@ -196,7 +212,11 @@ void main() {
   testWidgets('puzzle difficulty follows the rating preference but does not hide the board', (
     tester,
   ) async {
-    await puzzle.pumpPuzzleScreen(tester, server: puzzle.PuzzleServer());
+    await puzzle.pumpPuzzleScreen(
+      tester,
+      server: puzzle.PuzzleServer(),
+      useRealRatingPreferences: true,
+    );
     final container = ProviderScope.containerOf(tester.element(find.byType(Scaffold).first));
     final difficulty = container
         .read(xiangqiPuzzleProvider(xiangqiTestPuzzleId))
@@ -217,6 +237,7 @@ void main() {
           await makeTestProviderScopeApp(
             tester,
             home: hub,
+            useRealRatingPreferences: true,
             defaultPreferences: {PrefCategory.board.storageKey: jsonEncode(prefs.toJson())},
           ),
         );
@@ -241,23 +262,27 @@ void main() {
         tester,
         server: puzzle.PuzzleServer(),
         engine: engine,
+        useRealRatingPreferences: true,
         defaultPreferences: analysis_fixture.evaluationPreferences(isEnabled: false),
       );
+      final l10n = tester.element(find.byType(XiangqiBoard)).l10n;
       expect(
         tester
             .widgetList<BottomBarButton>(find.byType(BottomBarButton))
             .map((button) => button.label),
-        isNot(contains('Analysis')),
+        isNot(contains(l10n.analysis)),
       );
       await puzzle.playTheLine(tester);
       final completed = puzzle.attemptState(tester);
       final buttons = tester.widgetList<BottomBarButton>(find.byType(BottomBarButton)).toList();
-      expect(buttons.map((button) => button.label), contains('Analysis'));
-      expect(buttons.where((button) => button.label == 'Get a hint'), isEmpty);
-      final continueTraining = buttons.singleWhere((button) => button.label == 'Continue training');
+      expect(buttons.map((button) => button.label), contains(l10n.analysis));
+      expect(buttons.where((button) => button.label == l10n.getAHint), isEmpty);
+      final continueTraining = buttons.singleWhere(
+        (button) => button.label == l10n.puzzleContinueTraining,
+      );
       expect(continueTraining.onTap, isNotNull);
       expect(continueTraining.icon, CupertinoIcons.play_arrow_solid);
-      await tester.tap(find.bySemanticsLabel('Analysis'));
+      await tester.tap(find.bySemanticsLabel(l10n.analysis));
       await puzzle.settle(tester);
       expect(find.byType(XiangqiAnalysisScreen), findsOneWidget);
       final analysis = ProviderScope.containerOf(

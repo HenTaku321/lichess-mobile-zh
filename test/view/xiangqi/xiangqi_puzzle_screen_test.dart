@@ -130,11 +130,13 @@ Future<void> pumpPuzzleScreen(
   bool failOnOverflow = false,
   Engine? engine,
   Map<String, Object>? defaultPreferences,
+  bool useRealRatingPreferences = false,
 }) async {
   await tester.pumpWidget(
     await makeTestProviderScopeApp(
       tester,
       home: const XiangqiPuzzleScreen(),
+      useRealRatingPreferences: useRealRatingPreferences,
       failOnOverflow: failOnOverflow,
       defaultPreferences: defaultPreferences,
       overrides: {

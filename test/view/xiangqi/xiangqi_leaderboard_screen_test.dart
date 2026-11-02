@@ -75,6 +75,7 @@ Future<void> pumpLeaderboard(
   WidgetTester tester, {
   required Map<String, Object?> Function(String mode) boards,
   void Function(http.Request)? onRequest,
+  bool useRealRatingPreferences = false,
 }) async {
   final client = MockClient((request) async {
     onRequest?.call(request);
@@ -103,6 +104,7 @@ Future<void> pumpLeaderboard(
   await tester.pumpWidget(
     await makeTestProviderScope(
       tester,
+      useRealRatingPreferences: useRealRatingPreferences,
       child: const MaterialApp(
         localizationsDelegates: [
           AppLocalizations.delegate,

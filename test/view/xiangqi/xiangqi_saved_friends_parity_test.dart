@@ -31,11 +31,13 @@ Future<void> pumpRemote(
   Widget screen,
   MockClient client, {
   bool failOnOverflow = false,
+  bool useRealRatingPreferences = false,
 }) async {
   await tester.pumpWidget(
     await makeTestProviderScopeApp(
       tester,
       home: screen,
+      useRealRatingPreferences: useRealRatingPreferences,
       failOnOverflow: failOnOverflow,
       overrides: {
         xiangqiAuthStorageProvider: xiangqiAuthStorageProvider.overrideWithValue(

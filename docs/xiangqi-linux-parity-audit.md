@@ -109,13 +109,13 @@
 
 | ID | 优先级／证据 | 根因与源码边界 | 最小复现与期望 |
 |---|---|---|---|
-| B1 | P0 / R | 编辑器 `_BottomBar` 仅 `pieceCount > 0`；分析 `positionError` 仅验证 teaching；公共 continue menu 不防任意图 | 缺黑将图点击分析/继续，或直接普通分析传同图；引擎不搜索、继续不可用，有明确原因；合法初始图不受限 |
-| B2 | P0 / R | Contacts 的两次 `await Navigator.push` 后无 mounted/身份 guard；dispose 不释放 controller/focus | 联系人推对话、移除父路由、返回；无已卸载 ref 访问；换号后旧回调不改新状态 |
-| B3 | P1 / R | account_menu inbox 条件只含国象 user/account；More inbox 位于 `if (user != null)` | 只登录象棋正式账号，两处入口可打开合并联系人；游客不冒充正式，国象儿童限制不绕过 |
-| B4 | P1 / R | Contacts 无导航 gate，`_refreshAfterConversation` 无条件清查询/focus | 注册行回调两次仅一页；同账号返回保留搜索与位置，旧 callback 不清新输入 |
-| B5 | P1 / R（部分） | PlayerRow、Watch、题目、好友、排行榜、资料、保存和账号 subtitle 的评级直接 Text | 真实 ShowRatings.no 不泄露评分；已复现玩家行、观战、排行榜、账号、资料及最高评分、题目与保存；好友/Hub及实战例外仍待专项 |
+| B1 | P0 / G（已列用例） | 编辑器 `_BottomBar` 仅 `pieceCount > 0`；分析 `positionError` 仅验证 teaching；公共 continue menu 不防任意图 | 缺黑将图点击分析/继续，或直接普通分析传同图；引擎不搜索、继续不可用，有明确原因；合法初始图不受限 |
+| B2 | P0 / G（已列用例） | Contacts 的两次 `await Navigator.push` 后无 mounted/身份 guard；dispose 不释放 controller/focus | 联系人推对话、移除父路由、返回；无已卸载 ref 访问；换号后旧回调不改新状态 |
+| B3 | P1 / G（单账号/游客） | account_menu inbox 条件只含国象 user/account；More inbox 位于 `if (user != null)` | 只登录象棋正式账号，两处入口可打开合并联系人；游客不冒充正式；儿童限制源码共用，完整儿童矩阵仍待补 |
+| B4 | P1 / G（查询/重入） | Contacts 无导航 gate，`_refreshAfterConversation` 无条件清查询/focus | 注册行回调两次仅一页；同账号返回保留搜索，换号取消旧 debounce，token续期不清；滚动锚点不在本次 G 范围 |
+| B5 | P1 / S（旧R撤回） | PlayerRow、Watch、题目、好友、排行榜、资料、保存和账号 subtitle 的评级直接 Text | 共用 test scope 强制 showRatings=yes，之前评分 R 不能证明真实偏好链；新增 real 模式和原始渲染负向对照后重跑 |
 | B6 | P1 / R（坐标） | Analysis/Editor Hub 象棋预览未完整映射亮度/hue，坐标与国象缩略图相反 | 两个 Hub 坐标违约已复现；无坐标/交互及亮度/hue最终检查待绿；长宽比差异明确保留 |
-| B7 | P1 / R（分析入口） | 题目完成栏只在菜单给分析、残留 disabled Hint，Next 图标另起契约 | 完成态缺直接 Analysis 已复现；完整按钮组合/继续图标/进行态权限待绿 |
+| B7 | P1 / S（真实标签重跑） | 题目完成栏只在菜单给分析、残留 disabled Hint，Next 图标另起契约 | 当前已加直接入口，但测试硬编码 Analysis 不等于实际 l10n.analysis（Analysis board）；改取真实标签后，原始/当前渲染重跑 |
 | B8 | P0/P1 / S | Inbox 固定第1页并丢信封；messages 无 page；待办仅 chatId；超时后旧同通道帧可能匹配下一请求 | 两页请求不合并为一个；A 超时 B 排队 A 迟到，B 不接 A；对局独立连接不被断开 |
 | B9 | P1 / S | Friends provider 固定 `page:1`，模型已有 nextPage，页面无更多 | 筛选第2页/尾页/失败原页重试；换号清私有内容，搜索重置页但不丢申请分区 |
 | B10 | P1 / S | 合并 contacts 任一来源异常时静默移除该来源内容；搜索/首次失败 raw 英文异常；Linux 无显式刷新 | 一来源失败保另一来源，并给可重试提示；不伪装为空、泄露异常或强行显示后台品牌 |
@@ -134,14 +134,17 @@
 | 审查 / `d2f89a627` | 仅源码边界 S，未跑新测试 | P/N/U未验证 | 可开始优先项的真实红测试，不表示修复或一致 |
 | 首轮红 / `0eb86a4ea` / Actions `41385753695` | analyze通过；非法图实际出现 `position fen 9/9/9/9/9/9/9/9/9/4K4 w - - 0 1`；编辑器出口可点击；联系人返回清 `chab`、卸载后访问 ref；两处单账号入口缺失 | P/N/U未验证 | B1/B2/B3和B4查询均为行为红，不是语法错误 |
 | 身份红 / `cb0401302` / Actions `41385947642` | analyze通过；账号变更后旧 debounced query 仍为 `chab`；同账号 token续期保持查询的正向对照 | P/N/U未验证 | 身份边界真实失败，不能将 token轮换等同换号 |
-| 呈现红 / `518a61024` / Actions `41386918242` | analyze通过；同一行回调重入推两页；实际偏好写 `no` 后多页面仍显示评分；Hub仍有坐标；题目完成缺直接分析 | P/N/U未验证 | 可做最小整改；所有新回归的绿和实战例外仍待跑 |
+| 呈现检查 / `518a61024` / Actions `41386918242` | analyze通过；行回调重入推两页和 Hub坐标有效；评分使用了固定 yes 夹具、分析标签硬编码，相关 R 撤回 | P/N/U未验证 | 保留有效行为证据；评分与完成栏要用真实依赖和标签重新做负向对照 |
 | 静态检查 / `bc842f51d` / Actions `41388581094` | analyze发现 accountProvider 的内容本身为 nullable User，以及一处测试 import 排序；行为步骤未执行 | P/N/U未验证 | 不算行为红；已改为非空且 id 属于当前账号才开放，修正 import，仍须重跑 |
 | 静态检查 / `ae4f3cae7` / Actions `41390983202` | 仅测试 import alias `analysisFixture` 违反 snake_case lint；行为步骤未执行 | P/N/U未验证 | 已改 `analysis_fixture`；不能据此宣称任何行为绿 |
+| 行为 / `47eab2a81` / Actions `41391940598` | analyze通过；编辑器/模型/联系人/账号专项86通过；桌面118、生命周期275、旧截图1032通过；呈现3通过10失败 | P/N/U未验证 | B1–B4指定用例 G；调查呈现失败确认固定 yes 夹具和硬编码标签陷阱，不把它们算当前UI失败 |
 
 代码已加入 B1 的入口/公共菜单/模型安全边界、B2/B4 的 mounted+身份保护与释放、B3 的统一收件箱权限判断。
-这些源码改动尚未拿到同 SHA 绿；评分策略已共用并接入数字/元数据槽，最高评分携带角色而非预过滤文本，
+编辑器/联系人/单账号入口指定用例已有同 SHA 绿；评分策略已共用并接入数字/元数据槽，最高评分携带角色而非预过滤文本，
 避免刷新/失败缓存恢复时泄露评分。两个 Hub 缩略图已关闭坐标并应用亮度/hue；题目完成栏已提供直接分析、
-去除提示并使用继续训练图标，增加真实直接分析交接/返回回归。实战例外语义仍待行为红再接入。
+去除提示并使用继续训练图标，增加直接分析交接/返回回归。评分 real 模式、真实 l10n 标签及原始渲染负向对照
+位于 `test/view/xiangqi/xiangqi_preference_presentation_contract_test.dart` 和
+`scripts/verify-xiangqi-rating-negative-control.sh`；所有评分和完成栏结论要重跑，实战例外仍待有效红再接入。
 新增 PageStorageKey 也不等于所有返回锚点已经验收；B8–B17 未在此批宣称完成。
 
 ## 分页协议边界

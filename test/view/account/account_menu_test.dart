@@ -100,11 +100,13 @@ Future<void> pumpAccountMenu(
   WidgetTester tester, {
   required XiangqiSession? session,
   required MockClient client,
+  bool useRealRatingPreferences = false,
 }) async {
   await tester.pumpWidget(
     await makeTestProviderScopeApp(
       tester,
       home: const AccountMenuScreen(),
+      useRealRatingPreferences: useRealRatingPreferences,
       overrides: {
         xiangqiAuthStorageProvider: xiangqiAuthStorageProvider.overrideWith(
           (ref) => fx.FakeXiangqiAuthStorage(session),

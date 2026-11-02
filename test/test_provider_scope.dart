@@ -71,6 +71,7 @@ Future<Widget> makeTestProviderScopeApp(
   Map<ProviderOrFamily, Override>? overrides,
   AuthUser? authUser,
   Map<String, Object>? defaultPreferences,
+  bool useRealRatingPreferences = false,
   Size surfaceSize = kTestSurfaceSize,
   bool failOnOverflow = false,
 }) {
@@ -80,6 +81,7 @@ Future<Widget> makeTestProviderScopeApp(
     overrides: overrides,
     authUser: authUser,
     defaultPreferences: defaultPreferences,
+    useRealRatingPreferences: useRealRatingPreferences,
     surfaceSize: surfaceSize,
     failOnOverflow: failOnOverflow,
   );
@@ -157,6 +159,7 @@ Future<Widget> makeTestProviderScope(
   Map<ProviderOrFamily, Override>? overrides,
   AuthUser? authUser,
   Map<String, Object>? defaultPreferences,
+  bool useRealRatingPreferences = false,
   Size surfaceSize = kTestSurfaceSize,
   Key? key,
   bool failOnOverflow = false,
@@ -270,7 +273,10 @@ Future<Widget> makeTestProviderScope(
     ),
     // Otherwise every engine move in the suite would wait out a human-looking think.
     thinkingTimeProvider: thinkingTimeProvider.overrideWithValue(const ThinkingTime.instant()),
-    showRatingsPrefProvider: showRatingsPrefProvider.overrideWith((ref) => ShowRatings.yes),
+    // Most older layout tests fix visibility for deterministic geometry. Preference-contract
+    // tests must retain the real account-preference projection and its dependency notifications.
+    if (!useRealRatingPreferences)
+      showRatingsPrefProvider: showRatingsPrefProvider.overrideWith((ref) => ShowRatings.yes),
     soundServiceProvider: soundServiceProvider.overrideWithValue(FakeSoundService()),
     openingServiceProvider: openingServiceProvider.overrideWithValue(const FakeOpeningService()),
     preloadedDataProvider: preloadedDataProvider.overrideWith((ref) {

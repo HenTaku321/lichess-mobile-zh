@@ -162,10 +162,12 @@ Future<void> pumpProfile(
   required MockClient client,
   String? sessionName = _username,
   bool isGuest = true,
+  bool useRealRatingPreferences = false,
 }) async {
   await tester.pumpWidget(
     await makeTestProviderScope(
       tester,
+      useRealRatingPreferences: useRealRatingPreferences,
       child: const MaterialApp(
         localizationsDelegates: [
           AppLocalizations.delegate,

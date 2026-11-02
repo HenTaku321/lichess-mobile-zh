@@ -14,32 +14,36 @@ void main() {
           tester,
           surfaceSize: const Size(480, 480),
           failOnOverflow: true,
-          home: SizedBox(
-            height: 356,
-            child: GameSurfaceLayout(
-              boardBuilder: (_, _) => const SizedBox(key: Key('surface-board')),
-              boardHeightRatio: 1.1,
-              topTableBuilder: (_, _) => const SizedBox(
-                key: Key('top-table-content'),
-                height: 200,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [Text('Top start'), Text('Top end')],
+          home: Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              width: 480,
+              height: 356,
+              child: GameSurfaceLayout(
+                boardBuilder: (_, _) => const SizedBox(key: Key('surface-board')),
+                boardHeightRatio: 1.1,
+                topTableBuilder: (_, _) => const SizedBox(
+                  key: Key('top-table-content'),
+                  height: 200,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [Text('Top start'), Text('Top end')],
+                  ),
                 ),
-              ),
-              bottomTableBuilder: (_, _) => const SizedBox(
-                key: Key('bottom-table-content'),
-                height: 160,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [Text('Bottom start'), Text('Bottom end')],
+                bottomTableBuilder: (_, _) => const SizedBox(
+                  key: Key('bottom-table-content'),
+                  height: 160,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [Text('Bottom start'), Text('Bottom end')],
+                  ),
                 ),
-              ),
-              moveListBuilder: moves ? (_) => const SizedBox(key: Key('surface-moves')) : null,
-              userActionsBar: const SizedBox(
-                key: Key('surface-actions'),
-                height: 56,
-                child: Text('Actions'),
+                moveListBuilder: moves ? (_) => const SizedBox(key: Key('surface-moves')) : null,
+                userActionsBar: const SizedBox(
+                  key: Key('surface-actions'),
+                  height: 56,
+                  child: Text('Actions'),
+                ),
               ),
             ),
           ),
@@ -48,6 +52,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       final surface = tester.getRect(find.byType(GameSurfaceLayout));
+      expect(surface.size, const Size(480, 356));
       final actions = tester.getRect(find.byKey(const Key('surface-actions')));
       expect(actions.top, greaterThanOrEqualTo(surface.top));
       expect(actions.bottom, lessThanOrEqualTo(surface.bottom));

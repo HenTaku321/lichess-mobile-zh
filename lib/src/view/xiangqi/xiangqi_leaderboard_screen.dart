@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/account/account_preferences.dart';
@@ -14,7 +16,6 @@ import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
 import 'package:lichess_mobile/src/widgets/platform_search_bar.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_refresh.dart';
-import 'package:lichess_mobile/src/widgets/xiangqi_refreshable_empty.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// xiangqi.com's leaderboards, one board per rating.
@@ -54,20 +55,20 @@ class _XiangqiLeaderboardScreenState() extends ConsumerState<XiangqiLeaderboardS
   /// The country the board is filtered to, or null for every country.
   late String? _country = widget.initialCountry;
 
-  int _page = 1;
   bool _pickingCountry = false;
 
   @override
   Widget build(BuildContext context) {
-    final board = ref.watch(xiangqiLeaderboardProvider((_mode, _country, _page)));
+    final board = ref.watch(xiangqiLeaderboardControllerProvider((_mode, _country)));
 
     // The tabs are a plain `TabBar` over a `DefaultTabController`: the screen keeps the mode in its
     // own state and the controller is only what the bar needs to draw itself, so there is nothing
     // for a controller of the screen's own to do that its state does not already do.
-    final identity = (_mode, _country, _page, ref.watch(xiangqiAccountGenerationProvider));
+    final identity = (_mode, _country, ref.watch(xiangqiAccountGenerationProvider));
     return XiangqiRefreshScope(
       identity: identity,
-      onRefresh: () => ref.refresh(xiangqiLeaderboardProvider((_mode, _country, _page)).future),
+      onRefresh: () =>
+          ref.read(xiangqiLeaderboardControllerProvider((_mode, _country)).notifier).refresh(),
       builder: (context, refresh, busy) => XiangqiRetainedData(
         identity: identity,
         value: board,
@@ -90,7 +91,6 @@ class _XiangqiLeaderboardScreenState() extends ConsumerState<XiangqiLeaderboardS
                 tabAlignment: TabAlignment.start,
                 onTap: (index) => setState(() {
                   _mode = XiangqiRatingType.values[index];
-                  _page = 1;
                 }),
                 tabs: [
                   for (final mode in XiangqiRatingType.values) Tab(text: _modeLabel(context, mode)),
@@ -98,31 +98,64 @@ class _XiangqiLeaderboardScreenState() extends ConsumerState<XiangqiLeaderboardS
               ),
             ),
             body: board.when(
-              data: (board) => board.entries.isEmpty
-                  ? XiangqiRefreshableEmpty(
-                      onRefresh: refresh,
-                      child: const Padding(padding: Styles.bodySectionPadding, child: _Empty()),
-                    )
-                  : RefreshIndicator.adaptive(
-                      onRefresh: refresh,
-                      child: ListView(
-                        physics: const AlwaysScrollableScrollPhysics(),
+              data: (selected) => RefreshIndicator.adaptive(
+                onRefresh: refresh,
+                child: ListView(
+                  key: PageStorageKey(('xiangqi-leaders', identity, selected.pageNumber)),
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  children: [
+                    if (selected.page.entries.isEmpty)
+                      const Padding(padding: Styles.bodySectionPadding, child: _Empty())
+                    else
+                      ListSection(
+                        header: Text(
+                          context.l10n.mobileXiangqiLeaderboardPlayers(
+                            '${selected.page.totalPlayers}',
+                          ),
+                        ),
+                        hasLeading: true,
                         children: [
-                          ListSection(
-                            header: Text(
-                              context.l10n.mobileXiangqiLeaderboardPlayers('${board.totalPlayers}'),
-                            ),
-                            hasLeading: true,
-                            children: [for (final entry in board.entries) _LeaderRow(entry: entry)],
-                          ),
-                          _Pager(
-                            page: board.currentPage,
-                            hasNext: board.hasNextPage,
-                            onChanged: (page) => setState(() => _page = page),
-                          ),
+                          for (final entry in selected.page.entries) _LeaderRow(entry: entry),
                         ],
                       ),
-                    ),
+                    if (selected.busy)
+                      const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Center(child: CircularProgressIndicator.adaptive()),
+                      ),
+                    if (selected.error != null)
+                      XiangqiRetryTile(
+                        onRetry: selected.busy
+                            ? null
+                            : () => unawaited(
+                                ref
+                                    .read(
+                                      xiangqiLeaderboardControllerProvider((_mode, _country))
+                                          .notifier,
+                                    )
+                                    .retry(),
+                              ),
+                      ),
+                    if (selected.pageNumber > 1 ||
+                        selected.page.hasNextPage ||
+                        selected.page.totalPages > 1)
+                      _Pager(
+                        page: selected.pageNumber,
+                        hasNext: selected.page.hasNextPage,
+                        onChanged: selected.busy
+                            ? null
+                            : (page) => unawaited(
+                                ref
+                                    .read(
+                                      xiangqiLeaderboardControllerProvider((_mode, _country))
+                                          .notifier,
+                                    )
+                                    .selectPage(page),
+                              ),
+                      ),
+                  ],
+                ),
+              ),
               loading: () => const Center(child: CircularProgressIndicator.adaptive()),
               error: (error, stackTrace) => Center(
                 child: Padding(
@@ -168,7 +201,6 @@ class _XiangqiLeaderboardScreenState() extends ConsumerState<XiangqiLeaderboardS
       if (!mounted || choice == _country) return;
       setState(() {
         _country = choice;
-        _page = 1;
       });
     } catch (_) {
       if (context.mounted) {
@@ -237,7 +269,7 @@ class const _LeaderRow({required final XiangqiLeaderboardEntry entry}) extends C
 class const _Pager({
   required final int page,
   required final bool hasNext,
-  required final void Function(int) onChanged,
+  required final void Function(int)? onChanged,
 }) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -247,13 +279,13 @@ class const _Pager({
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           TextButton.icon(
-            onPressed: page > 1 ? () => onChanged(page - 1) : null,
+            onPressed: page > 1 && onChanged != null ? () => onChanged!(page - 1) : null,
             icon: const Icon(Icons.chevron_left),
             label: Text('${page - 1}'),
           ),
           Text('$page'),
           TextButton.icon(
-            onPressed: hasNext ? () => onChanged(page + 1) : null,
+            onPressed: hasNext && onChanged != null ? () => onChanged!(page + 1) : null,
             icon: const Icon(Icons.chevron_right),
             label: Text('${page + 1}'),
           ),

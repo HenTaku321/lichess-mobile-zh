@@ -177,6 +177,26 @@ jobs:
           retention-days: 90
           if-no-files-found: error
 
+      - name: Collect small per-pair metadata separately from screenshots
+        if: ${{ !cancelled() }}
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import shutil
+          for source in Path('out/visual-pairs').glob('*/report.json'):
+              target = Path('out/pair-metadata') / source.parent.name / 'report.json'
+              target.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copyfile(source, target)
+          PY
+      - name: Export small per-pair metadata
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: xiangqi-visual-metadata-${{ github.run_id }}-${{ matrix.shard }}
+          path: out/pair-metadata
+          retention-days: 90
+          if-no-files-found: error
+
   coverage:
     needs: [plan, render]
     if: ${{ always() && needs.plan.result == 'success' }}

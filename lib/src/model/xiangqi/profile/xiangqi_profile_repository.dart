@@ -5,6 +5,7 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/xiangqi/profile/xiangqi_profile.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_page.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_page_selection.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_pagination.dart';
 import 'package:lichess_mobile/src/network/connectivity.dart';
 import 'package:lichess_mobile/src/network/http.dart' show ServerException;
@@ -66,6 +67,45 @@ final xiangqiLeaderboardProvider = FutureProvider.autoDispose
         'page': '$page',
       }).then(xiangqiLeaderboardFromJson);
     }, name: 'XiangqiLeaderboardProvider');
+
+final xiangqiLeaderboardControllerProvider = AsyncNotifierProvider.autoDispose
+    .family<
+      XiangqiLeaderboardController,
+      XiangqiSelectedPage<XiangqiLeaderboard>,
+      (XiangqiRatingType, String?)
+    >(XiangqiLeaderboardController.new, name: 'XiangqiLeaderboardControllerProvider');
+
+class XiangqiLeaderboardController(final (XiangqiRatingType, String?) key)
+    extends XiangqiPageSelectionController<XiangqiLeaderboard> {
+  @override
+  Future<XiangqiLeaderboard> loadPage(int number) async {
+    final (mode, country) = key;
+    final json = await _getJson(ref, 'leaders/v2/list', {
+      'mode': _leaderboardModeOf(mode),
+      'country': ?country,
+      'page': '$number',
+    }, watchConnectivity: false);
+    if (json is! Map<String, dynamic> ||
+        json['data'] is! List ||
+        json['meta'] is! Map<String, dynamic>) {
+      throw const FormatException('Invalid xiangqi.com leaderboard envelope.');
+    }
+    final result = xiangqiLeaderboardFromJson(json);
+    XiangqiPage.fromMetadata(
+      items: result.entries,
+      requestedPage: number,
+      metadata: json['meta']! as Map<String, dynamic>,
+    );
+    return result;
+  }
+
+  @override
+  int? totalPages(XiangqiLeaderboard page) => page.totalPages;
+  @override
+  bool isEmpty(XiangqiLeaderboard page) => page.entries.isEmpty;
+  @override
+  int? responsePage(XiangqiLeaderboard page) => page.currentPage;
+}
 
 /// One page of [username]'s finished games, from `GET /api/users/games/<username>`.
 final xiangqiGameHistoryProvider = FutureProvider.autoDispose

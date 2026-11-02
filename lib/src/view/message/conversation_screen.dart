@@ -254,21 +254,7 @@ class const _ContactTyping({required final LightUser user}) extends ConsumerWidg
     final isTyping = ref.watch(
       conversationControllerProvider(user.id).select((state) => state.value?.contactTyping == true),
     );
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-      child: isTyping
-          ? Text(
-              '${user.name} is typing...',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                fontSize: Theme.of(context).textTheme.bodyMedium?.fontSize,
-              ),
-            )
-          : Text(
-              '', // Empty text to maintain layout when not typing
-              style: TextStyle(fontSize: Theme.of(context).textTheme.bodyMedium?.fontSize),
-            ),
-    );
+    return ChatTypingStatus(text: isTyping ? '${user.name} is typing...' : null);
   }
 }
 

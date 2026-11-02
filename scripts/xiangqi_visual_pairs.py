@@ -166,7 +166,7 @@ def equal_preference(expected, actual):
     return canonical(expected) == canonical(actual)
 
 
-def checked_png(root, record, expected_size=None):
+def checked_png(root, record, expected_size=None, decode=False):
     path = (root / record["path"]).resolve()
     if not path.is_relative_to(root.resolve()) or not path.is_file():
         raise ValueError("Missing image or path outside evidence root")
@@ -206,7 +206,91 @@ def checked_png(root, record, expected_size=None):
     pixels = decoder.decompress(bytes(compressed), size + 1)
     if len(pixels) != size or not decoder.eof or decoder.unconsumed_tail:
         raise ValueError("Truncated/oversized screenshot pixels")
-    return width, height
+    if not decode:
+        return width, height
+    stride = width * channels
+    decoded = bytearray(height * stride)
+    previous = bytearray(stride)
+    for y in range(height):
+        start = y * (stride + 1)
+        filtering = pixels[start]
+        row = bytearray(pixels[start + 1:start + stride + 1])
+        if filtering in (2, 4) and row.count(0) == stride:
+            row = previous.copy()
+        elif filtering == 1 and row[channels:].count(0) == stride - channels:
+            row = row[:channels] * width
+        elif filtering == 2:
+            row = bytearray((a + b) & 255 for a, b in zip(row, previous))
+        elif filtering in (1, 3, 4):
+            for index in range(stride):
+                left = row[index - channels] if index >= channels else 0
+                up = previous[index]
+                upper_left = previous[index - channels] if index >= channels else 0
+                if filtering == 1:
+                    prediction = left
+                elif filtering == 3:
+                    prediction = (left + up) // 2
+                else:
+                    p = left + up - upper_left
+                    distances = (abs(p - left), abs(p - up), abs(p - upper_left))
+                    prediction = (left if distances[0] <= min(distances[1:])
+                                  else up if distances[1] <= distances[2] else upper_left)
+                row[index] = (row[index] + prediction) & 255
+        elif filtering != 0:
+            raise ValueError("Unknown PNG filter")
+        decoded[y * stride:(y + 1) * stride] = row
+        previous = row
+    return width, height, channels, decoded
+
+
+def crop_row(image, rect, y, width):
+    image_width, image_height, channels, pixels = image
+    left, top, crop_width, crop_height = rect
+    result = bytearray(width * 4)
+    if y >= crop_height or not 0 <= top + y < image_height:
+        return result
+    start = max(left, 0)
+    end = min(left + crop_width, image_width)
+    if end <= start:
+        return result
+    first = ((top + y) * image_width + start) * channels
+    row = pixels[first:first + (end - start) * channels]
+    destination = (start - left) * 4
+    if channels == 4:
+        result[destination:destination + len(row)] = row
+    else:
+        for index in range(end - start):
+            sample = row[index * channels:(index + 1) * channels]
+            result[destination + index * 4:destination + (index + 1) * 4] = (
+                sample + b'\xff' if channels == 3 else sample[:1] * 3 + (sample[1:] if channels == 2 else b'\xff'))
+    return result
+
+
+def verify_difference(root, record, images, rects, dpi):
+    def rounded(number):
+        return math.floor(number + 0.5) if number >= 0 else math.ceil(number - 0.5)
+    crops = [tuple(rounded(number * dpi) for number in rect) for rect in rects]
+    width, height = max(rect[2] for rect in crops), max(rect[3] for rect in crops)
+    diff = checked_png(root, record['image'], [width, height], decode=True)
+    changed = 0
+    for y in range(height):
+        rows = [crop_row(image, rect, y, width) for image, rect in zip(images, crops)]
+        expected = bytearray(b'\x00\x00\x00\xff' * width)
+        if rows[0] != rows[1]:
+            for x in range(width):
+                index = x * 4
+                different = False
+                for channel in range(3):
+                    delta = abs(rows[0][index + channel] - rows[1][index + channel])
+                    expected[index + channel] = delta
+                    different |= delta != 0
+                changed += different
+        actual = crop_row(diff, (0, 0, width, height), y, width)
+        if actual != expected:
+            raise ValueError('Role difference image is not derived from the supplied originals')
+    if isinstance(record.get('changedPixels'), bool) or record.get('changedPixels') != changed:
+        raise ValueError('Role difference pixel count is not derived from its image')
+    return changed
 
 
 def evaluate_case(case, report, root, now):
@@ -226,6 +310,7 @@ def evaluate_case(case, report, root, now):
         environment = case["configuration"]["environment"]
         physical = [int(number * environment["dpi"]) for number in environment["size"]]
         failures = []
+        images = []
         for side in ("lichess", "xiangqi"):
             result = report["sides"][side]
             if result["stage"] != case["state"] or result.get("realRatingPreferences") is not True:
@@ -242,7 +327,7 @@ def evaluate_case(case, report, root, now):
                 for name, expected in case["configuration"]["preferences"].items()
             ):
                 raise ValueError("Requested preference was overridden or did not take effect")
-            checked_png(root, result["original"], physical)
+            images.append(checked_png(root, result["original"], physical, decode=True))
             for role in case["requiredRoles"]:
                 rect = result["roles"][role]["rect"]
                 if len(rect) != 4 or any(isinstance(n, bool) or not isinstance(n, (int, float)) or not math.isfinite(n) for n in rect) or min(rect[2:]) <= 0:
@@ -255,8 +340,8 @@ def evaluate_case(case, report, root, now):
             if not intentional and max(abs(a - b) for a, b in zip(left, right)) > 1:
                 failures.append(f"{role}: geometry differs by more than one logical pixel")
             difference = report["differences"][role]
-            checked_png(root, difference["image"])
-            if role in case["pixelRoles"] and difference["changedPixels"] != 0:
+            changed = verify_difference(root, difference, images, [left, right], environment['dpi'])
+            if role in case["pixelRoles"] and changed != 0:
                 failures.append(f"{role}: shared-role pixels differ")
         return {"status": "failed" if failures else "passed", "reason": "; ".join(failures)}
     except (KeyError, TypeError, ValueError, OSError, struct.error, zlib.error) as error:

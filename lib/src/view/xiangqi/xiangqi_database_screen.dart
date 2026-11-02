@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:chessground/chessground.dart' show BrightnessHueFilter;
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
@@ -51,7 +53,6 @@ class const XiangqiDatabaseScreen({super.key}) extends ConsumerStatefulWidget {
 class _XiangqiDatabaseScreenState() extends ConsumerState<XiangqiDatabaseScreen> {
   final _searchController = TextEditingController();
   String _search = '';
-  int _page = 1;
 
   @override
   void dispose() {
@@ -62,24 +63,13 @@ class _XiangqiDatabaseScreenState() extends ConsumerState<XiangqiDatabaseScreen>
   @override
   Widget build(BuildContext context) {
     final locale = xiangqiLocaleOf(Localizations.localeOf(context));
-    final players = ref.watch(
-      xiangqiMasterPlayersProvider((
-        search: _search.isEmpty ? null : _search,
-        page: _page,
-        locale: locale,
-      )),
-    );
+    final query = (search: _search.isEmpty ? null : _search, locale: locale);
+    final players = ref.watch(xiangqiMasterPlayersControllerProvider(query));
 
-    final identity = (_search, _page, locale, ref.watch(xiangqiAccountGenerationProvider));
+    final identity = (_search, locale, ref.watch(xiangqiAccountGenerationProvider));
     return XiangqiRefreshScope(
       identity: identity,
-      onRefresh: () => ref.refresh(
-        xiangqiMasterPlayersProvider((
-          search: _search.isEmpty ? null : _search,
-          page: _page,
-          locale: locale,
-        )).future,
-      ),
+      onRefresh: () => ref.read(xiangqiMasterPlayersControllerProvider(query).notifier).refresh(),
       builder: (context, refresh, busy) => XiangqiRetainedData(
         identity: identity,
         value: players,
@@ -99,35 +89,64 @@ class _XiangqiDatabaseScreenState() extends ConsumerState<XiangqiDatabaseScreen>
                   hintText: context.l10n.search,
                   onChanged: (value) => setState(() {
                     _search = value;
-                    _page = 1;
                   }),
                 ),
               ),
               Expanded(
                 child: players.when(
-                  data: (players) => players.items.isEmpty
-                      ? Center(
-                          child: Padding(
-                            padding: Styles.bodySectionPadding,
-                            child: Text(context.l10n.mobileXiangqiDatabasePlayersEmpty),
-                          ),
+                  data: (selected) => ListView(
+                    key: PageStorageKey((
+                      'xiangqi-database-players',
+                      identity,
+                      selected.pageNumber,
+                    )),
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: [
+                      if (selected.page.items.isEmpty)
+                        Padding(
+                          padding: Styles.bodySectionPadding,
+                          child: Text(context.l10n.mobileXiangqiDatabasePlayersEmpty),
                         )
-                      : ListView(
+                      else
+                        ListSection(
+                          hasLeading: true,
+                          header: Text(context.l10n.mobileXiangqiDatabasePlayers),
                           children: [
-                            ListSection(
-                              hasLeading: true,
-                              header: Text(context.l10n.mobileXiangqiDatabasePlayers),
-                              children: [
-                                for (final player in players.items) _PlayerRow(player: player),
-                              ],
-                            ),
-                            _Pager(
-                              page: players.totalPages == 0 ? 1 : _page,
-                              hasNext: players.hasNextPage,
-                              onChanged: (page) => setState(() => _page = page),
-                            ),
+                            for (final player in selected.page.items) _PlayerRow(player: player),
                           ],
                         ),
+                      if (selected.busy)
+                        const Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Center(child: CircularProgressIndicator.adaptive()),
+                        ),
+                      if (selected.error != null)
+                        XiangqiRetryTile(
+                          onRetry: selected.busy
+                              ? null
+                              : () => unawaited(
+                                  ref
+                                      .read(xiangqiMasterPlayersControllerProvider(query).notifier)
+                                      .retry(),
+                                ),
+                        ),
+                      if (selected.pageNumber > 1 ||
+                          selected.page.hasNextPage ||
+                          selected.page.totalPages > 1)
+                        _Pager(
+                          page: selected.pageNumber,
+                          hasNext: selected.page.hasNextPage,
+                          nextPage: selected.page.nextPage,
+                          onChanged: selected.busy
+                              ? null
+                              : (page) => unawaited(
+                                  ref
+                                      .read(xiangqiMasterPlayersControllerProvider(query).notifier)
+                                      .selectPage(page),
+                                ),
+                        ),
+                    ],
+                  ),
                   loading: () => const Center(child: CircularProgressIndicator.adaptive()),
                   error: (error, stackTrace) => _Failed(onRetry: refresh),
                 ),
@@ -575,7 +594,8 @@ class const _PlayerLine({
 class const _Pager({
   required final int page,
   required final bool hasNext,
-  required final void Function(int) onChanged,
+  final int? nextPage,
+  required final void Function(int)? onChanged,
 }) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -585,15 +605,15 @@ class const _Pager({
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           TextButton.icon(
-            onPressed: page > 1 ? () => onChanged(page - 1) : null,
+            onPressed: page > 1 && onChanged != null ? () => onChanged!(page - 1) : null,
             icon: const Icon(Icons.chevron_left),
             label: Text('${page - 1}'),
           ),
           Text('$page'),
           TextButton.icon(
-            onPressed: hasNext ? () => onChanged(page + 1) : null,
+            onPressed: hasNext && onChanged != null ? () => onChanged!(nextPage ?? page + 1) : null,
             icon: const Icon(Icons.chevron_right),
-            label: Text('${page + 1}'),
+            label: Text('${nextPage ?? page + 1}'),
           ),
         ],
       ),

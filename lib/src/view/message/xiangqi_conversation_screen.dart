@@ -117,6 +117,7 @@ class const _Body({
                         switch (item) {
                           _DateItem(:final date) => ('day', date),
                           _MessageItem(:final message) => ('message', message),
+                          _StatusItem() => 'status',
                         },
                       'history-footer',
                     ].toIList(),
@@ -168,6 +169,7 @@ class const _Body({
                       }
                       final item = items[index];
                       return switch (item) {
+                        _StatusItem() => const ChatTypingStatus(),
                         _DateItem(:final date) => ChatDaySeparator(
                           key: ValueKey(('day', date)),
                           date: date,
@@ -221,7 +223,7 @@ class const _Body({
   /// Bubble alignment uses the actual Xiangqi sender, not the app's scalar Lichess identity and
   /// never the assumption that every unknown sender must be this device.
   List<_DisplayItem> _buildItems(IList<Message> messages, UserId selfId) {
-    final items = <_DisplayItem>[];
+    final items = <_DisplayItem>[_StatusItem()];
     DateTime? currentDay;
     final dayMessages = <Message>[];
 
@@ -265,6 +267,8 @@ class const _Body({
 }
 
 sealed class _DisplayItem();
+
+class _StatusItem() extends _DisplayItem;
 
 class _DateItem(final DateTime date) extends _DisplayItem;
 

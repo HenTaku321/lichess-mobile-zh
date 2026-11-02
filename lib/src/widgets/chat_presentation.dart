@@ -155,6 +155,22 @@ class const ChatDaySeparator({required final DateTime date, super.key}) extends 
   }
 }
 
+/// Reserves the same conversation-status line even when no typing text is available. Passing no
+/// text means exactly that: it does not invent an online flag or a protocol typing capability.
+class const ChatTypingStatus({final String? text, super.key}) extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 8),
+    child: Text(
+      text ?? '',
+      style: TextStyle(
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+        fontSize: Theme.of(context).textTheme.bodyMedium?.fontSize,
+      ),
+    ),
+  );
+}
+
 /// Reverse chronology, safe-area padding and tapping empty message space to dismiss the keyboard
 /// are presentation rules, independent of page tokens, typing events or message identifiers.
 class const ChatMessageList({

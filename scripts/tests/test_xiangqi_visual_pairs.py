@@ -2,6 +2,10 @@
 import copy
 import sys
 import json
+import hashlib
+import struct
+import tempfile
+import zlib
 import unittest
 from pathlib import Path
 
@@ -30,14 +34,40 @@ def registry(extra_axes=None):
             "id": "board",
             "sources": {"lichess": "lib/chess.dart", "xiangqi": "lib/xiangqi.dart"},
             "states": [{
-                "id": "normal",
-                "driver": "board",
-                "axes": list(axes),
-                "requiredRoles": ["toolbar"],
-                "allowedDifferences": ["board-art"],
+                "id": "normal", "driver": "board", "axes": list(axes),
+                "requiredRoles": ["toolbar"], "allowedDifferences": ["board-art"],
             }],
         }],
     }
+
+
+def png(width, height, color=(0, 0, 0, 255)):
+    def chunk(kind, data):
+        return struct.pack('>I', len(data)) + kind + data + struct.pack('>I', zlib.crc32(kind + data))
+    pixels = b''.join(b'\x00' + bytes(color) * width for _ in range(height))
+    return (b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', width, height, 8, 6, 0, 0, 0))
+            + chunk(b'IDAT', zlib.compress(pixels)) + chunk(b'IEND', b''))
+
+
+def evidence(root):
+    case = {
+        'caseId': 'a' * 64, 'sourceSha': 'a' * 40, 'registryHash': 'b' * 64, 'renderFingerprint': 'c' * 64,
+        'state': 'normal', 'configuration': {'environment': {'size': [2, 2], 'locale': 'en-GB', 'mode': 'light', 'textScale': 1, 'dpi': 2}, 'preferences': {}},
+        'allowedDifferences': [], 'requiredRoles': ['toolbar'], 'pixelRoles': ['toolbar'],
+    }
+    def save(name, data):
+        (root / name).write_bytes(data)
+        return {'path': name, 'sha256': hashlib.sha256(data).hexdigest()}
+    report = {**case, 'generatedAt': '2026-11-02T00:00:00Z', 'status': 'captured', 'sides': {},
+              'differences': {'toolbar': {'image': save('diff.png', png(4, 4)), 'changedPixels': 0}}}
+    for side in ['lichess', 'xiangqi']:
+        report['sides'][side] = {
+            'stage': case['state'], 'realRatingPreferences': True, 'environment': case['configuration']['environment'],
+            'physicalSize': [4, 4], 'preferences': {}, 'driverProof': [{'tap': 'open'}],
+            'controllerProof': {'page': 1}, 'requests': [], 'original': save(f'{side}.png', png(4, 4)),
+            'roles': {'toolbar': {'rect': [0, 0, 2, 2]}},
+        }
+    return case, report
 
 
 class MatrixTests(unittest.TestCase):
@@ -125,6 +155,58 @@ class MatrixTests(unittest.TestCase):
         self.assertEqual(len(value["roles"]), 49)
         self.assertEqual(len({role["id"] for role in value["roles"]}), 49)
         self.assertTrue(all(value["nonVisualAcceptance"][kind] == "not-run" for kind in value["nonVisualAcceptance"]))
+
+
+class EvidenceTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        self.case, self.report = evidence(self.root)
+
+    def verdict(self, now='2026-11-02T00:01:00Z'):
+        return pairs.evaluate_case(self.case, self.report, self.root, now)
+
+    def test_complete_matching_pair_has_positive_control(self):
+        self.assertEqual(self.verdict()['status'], 'passed')
+
+    def test_missing_original_is_not_a_visual_success(self):
+        self.report['sides']['xiangqi']['original']['path'] = 'missing.png'
+        self.assertEqual(self.verdict()['status'], 'invalid')
+
+    def test_text_scale_cannot_substitute_for_true_dpi(self):
+        self.report['sides']['xiangqi']['physicalSize'] = [2, 2]
+        self.assertEqual(self.verdict()['status'], 'invalid')
+
+    def test_geometry_greater_than_one_logical_pixel_fails(self):
+        self.report['sides']['xiangqi']['roles']['toolbar']['rect'][0] = 1.01
+        self.assertEqual(self.verdict()['status'], 'failed')
+
+    def test_new_mask_or_old_renderer_invalidates_evidence(self):
+        self.report['renderFingerprint'] = 'd' * 64
+        self.assertEqual(self.verdict()['status'], 'invalid')
+        self.report['renderFingerprint'] = self.case['renderFingerprint']
+        self.report['allowedDifferences'] = ['posthoc-mask']
+        self.assertEqual(self.verdict()['status'], 'invalid')
+
+    def test_expired_evidence_is_not_counted(self):
+        self.assertEqual(self.verdict('2027-02-01T00:00:00Z')['status'], 'invalid')
+
+    def test_fixed_yes_rating_override_is_rejected(self):
+        self.report['sides']['xiangqi']['realRatingPreferences'] = False
+        self.assertEqual(self.verdict()['status'], 'invalid')
+
+    def test_colored_diff_cannot_claim_zero_changed_pixels(self):
+        data = png(4, 4, (255, 0, 0, 255))
+        (self.root / 'diff.png').write_bytes(data)
+        self.report['differences']['toolbar']['image']['sha256'] = hashlib.sha256(data).hexdigest()
+        self.assertEqual(self.verdict()['status'], 'invalid')
+
+    def test_a_fabricated_black_diff_cannot_hide_different_originals(self):
+        data = png(4, 4, (255, 0, 0, 255))
+        (self.root / 'xiangqi.png').write_bytes(data)
+        self.report['sides']['xiangqi']['original']['sha256'] = hashlib.sha256(data).hexdigest()
+        self.assertEqual(self.verdict()['status'], 'invalid')
 
 
 if __name__ == "__main__":

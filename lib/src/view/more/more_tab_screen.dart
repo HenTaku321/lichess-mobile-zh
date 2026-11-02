@@ -6,6 +6,7 @@ import 'package:lichess_mobile/src/model/analysis/analysis_controller.dart';
 import 'package:lichess_mobile/src/model/auth/auth_controller.dart';
 import 'package:lichess_mobile/src/model/common/chess.dart';
 import 'package:lichess_mobile/src/model/common/id.dart';
+import 'package:lichess_mobile/src/model/message/inbox_access.dart';
 import 'package:lichess_mobile/src/model/message/message_repository.dart';
 import 'package:lichess_mobile/src/model/team/team_providers.dart';
 import 'package:lichess_mobile/src/network/connectivity.dart';
@@ -273,7 +274,7 @@ class const _AccountSection() extends ConsumerWidget {
       header: user != null ? SettingsSectionTitle(user.name) : null,
       hasLeading: true,
       children: [
-        if (user != null) ...[
+        if (user != null)
           ListTile(
             leading: const Icon(Icons.person_outlined),
             title: Text(context.l10n.profile),
@@ -284,35 +285,34 @@ class const _AccountSection() extends ConsumerWidget {
               Navigator.of(context).push(ProfileScreen.buildRoute());
             },
           ),
-          if (!kidMode) ...[
-            ListTile(
-              leading: Badge.count(
-                isLabelVisible: unreadMessages > 0,
-                count: unreadMessages,
-                child: const Icon(Icons.mail_outline),
-              ),
-              title: Text(context.l10n.inbox),
-              trailing: isIOS ? const CupertinoListTileChevron() : null,
-              enabled: isOnline,
-              onTap: () {
-                Navigator.of(context).push(ContactsScreen.buildRoute());
-              },
+        if (ref.watch(canOpenInboxProvider))
+          ListTile(
+            leading: Badge.count(
+              isLabelVisible: unreadMessages > 0,
+              count: unreadMessages,
+              child: const Icon(Icons.mail_outline),
             ),
-            ListTile(
-              leading: Badge.count(
-                isLabelVisible: unreadTeamUpdates > 0,
-                count: unreadTeamUpdates,
-                child: const Icon(Icons.groups_outlined),
-              ),
-              title: Text(context.l10n.teamTeamUpdates),
-              trailing: isIOS ? const CupertinoListTileChevron() : null,
-              enabled: isOnline,
-              onTap: () {
-                Navigator.of(context).push(TeamUpdatesScreen.buildRoute());
-              },
+            title: Text(context.l10n.inbox),
+            trailing: isIOS ? const CupertinoListTileChevron() : null,
+            enabled: isOnline,
+            onTap: () {
+              Navigator.of(context).push(ContactsScreen.buildRoute());
+            },
+          ),
+        if (user != null && !kidMode)
+          ListTile(
+            leading: Badge.count(
+              isLabelVisible: unreadTeamUpdates > 0,
+              count: unreadTeamUpdates,
+              child: const Icon(Icons.groups_outlined),
             ),
-          ],
-        ],
+            title: Text(context.l10n.teamTeamUpdates),
+            trailing: isIOS ? const CupertinoListTileChevron() : null,
+            enabled: isOnline,
+            onTap: () {
+              Navigator.of(context).push(TeamUpdatesScreen.buildRoute());
+            },
+          ),
         ListTile(
           leading: const Icon(Icons.settings_outlined),
           title: Text(context.l10n.settingsSettings),

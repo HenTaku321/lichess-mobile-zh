@@ -6,6 +6,7 @@ import 'package:lichess_mobile/src/model/account/account_repository.dart';
 import 'package:lichess_mobile/src/model/auth/auth_controller.dart';
 import 'package:lichess_mobile/src/model/common/perf.dart';
 import 'package:lichess_mobile/src/model/common/preloaded_data.dart';
+import 'package:lichess_mobile/src/model/message/inbox_access.dart';
 import 'package:lichess_mobile/src/model/message/message_repository.dart';
 import 'package:lichess_mobile/src/model/team/team_providers.dart';
 import 'package:lichess_mobile/src/model/user/user.dart';
@@ -265,7 +266,7 @@ class _AccountMenuScreenState()
           ),
           ListSection(
             children: [
-              if (user != null && account.hasValue && !kidMode) ...[
+              if (ref.watch(canOpenInboxProvider))
                 ListTile(
                   leading: Badge.count(
                     isLabelVisible: unreadMessages > 0,
@@ -281,6 +282,7 @@ class _AccountMenuScreenState()
                     _navigate(context, ContactsScreen.buildRoute());
                   },
                 ),
+              if (user != null && account.hasValue && !kidMode)
                 ListTile(
                   leading: Badge.count(
                     isLabelVisible: unreadTeamUpdates > 0,
@@ -296,7 +298,6 @@ class _AccountMenuScreenState()
                     _navigate(context, TeamUpdatesScreen.buildRoute());
                   },
                 ),
-              ],
               ListTile(
                 leading: const Icon(Icons.settings_outlined),
                 trailing: Theme.of(context).platform == TargetPlatform.iOS

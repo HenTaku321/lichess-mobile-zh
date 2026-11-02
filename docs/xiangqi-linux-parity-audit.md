@@ -6,7 +6,7 @@
 - 工作树 `mobile-xiangqi-parity`，审查基线 `d2f89a627`；生产代码等同 `4bd6c07cf`。
 - 完整实施顺序：`docs/plans/2026-11-02-xiangqi-linux-systematic-audit.md`。
 - 本表覆盖页面、Hub、菜单、弹层、预览和内容链接。**清单完整不等于全部行为已验收。**
-- 当前本轮仅有源码证据；旧 Actions `41380249454` 的绿只作为历史回归基线。
+- 本轮 Actions 已证实下列 R 项；旧 Actions `41380249454` 的绿只作为历史回归基线。
 - 安装包与源码不是同一基线；不根据用户已安装包推断最新代码已经验收。
 
 证据等级：
@@ -95,7 +95,7 @@
 
 | 页面／入口 | 源码／参考 | 待验收状态及已登记差异 |
 |---|---|---|
-| 合并联系人／搜索 | `message/contacts_screen.dart`；同页 | 非空/空/加载/单源失败/双方失败/重试/页2/双击/返回/身份；B2/B4/B8/B10 |
+| 合并联系人／搜索 | `message/contacts_screen.dart`；同页 | 非空/空/加载/单源失败/双方失败/重试/页2/双击/返回/身份；B2/B4/B8/B10/B16 |
 | 象棋私信／输入／菜单 | `message/xiangqi_conversation_screen.dart`；国象 conversation | 正常/空/加载/更多失败/发送失败/重试/草稿/复制/链接/返回/身份；B8，已有共用气泡不等于分组配对验收 |
 | 房间目录 | `xiangqi_chat_screen.dart` | 非空/空/加载/失败/重试/返回/身份 |
 | 房间消息／历史／输入 | `XiangqiChatRoomScreen`（同文件）；国象 chat | 正常/空/更多失败/发送失败/重试/草稿/复制/链接/返回/身份；分页已独立，滚动锚点待验收 |
@@ -109,13 +109,13 @@
 
 | ID | 优先级／证据 | 根因与源码边界 | 最小复现与期望 |
 |---|---|---|---|
-| B1 | P0 / S | 编辑器 `_BottomBar` 仅 `pieceCount > 0`；分析 `positionError` 仅验证 teaching；公共 continue menu 不防任意图 | 缺黑将图点击分析/继续，或直接普通分析传同图；引擎不搜索、继续不可用，有明确原因；合法初始图不受限 |
-| B2 | P0 / S | Contacts 的两次 `await Navigator.push` 后无 mounted/身份 guard；dispose 不释放 controller/focus | 联系人推对话、移除父路由、返回；无已卸载 ref 访问；换号后旧回调不改新状态 |
-| B3 | P1 / S | account_menu inbox 条件只含国象 user/account；More inbox 位于 `if (user != null)` | 只登录象棋正式账号，两处入口可打开合并联系人；游客不冒充正式，国象儿童限制不绕过 |
-| B4 | P1 / S | Contacts 无导航 gate，`_refreshAfterConversation` 无条件清查询/focus | 快速双击仅一页；同账号返回保留搜索与位置，旧 callback 不清新输入 |
-| B5 | P1 / S | PlayerRow、Watch、题目、好友、排行榜、资料、保存和账号 subtitle 的评级直接 Text | 真实 ShowRatings.no 不泄露评分；exceptInGame 只隐藏当前用户实战，观战/复盘照偏好 |
-| B6 | P1 / S | Analysis/Editor Hub 象棋预览未完整映射亮度/hue，坐标与国象缩略图相反 | 同主题/偏好配对缩略图，无坐标/交互；亮度/hue 生效，长宽比差异明确保留 |
-| B7 | P1 / S | 题目完成栏只在菜单给分析、残留 disabled Hint，Next 图标另起契约 | 完成态直接 Analysis + History + Continue；进行态不泄露分析/答案；提交慢/失败保持历史契约 |
+| B1 | P0 / R | 编辑器 `_BottomBar` 仅 `pieceCount > 0`；分析 `positionError` 仅验证 teaching；公共 continue menu 不防任意图 | 缺黑将图点击分析/继续，或直接普通分析传同图；引擎不搜索、继续不可用，有明确原因；合法初始图不受限 |
+| B2 | P0 / R | Contacts 的两次 `await Navigator.push` 后无 mounted/身份 guard；dispose 不释放 controller/focus | 联系人推对话、移除父路由、返回；无已卸载 ref 访问；换号后旧回调不改新状态 |
+| B3 | P1 / R | account_menu inbox 条件只含国象 user/account；More inbox 位于 `if (user != null)` | 只登录象棋正式账号，两处入口可打开合并联系人；游客不冒充正式，国象儿童限制不绕过 |
+| B4 | P1 / R | Contacts 无导航 gate，`_refreshAfterConversation` 无条件清查询/focus | 注册行回调两次仅一页；同账号返回保留搜索与位置，旧 callback 不清新输入 |
+| B5 | P1 / R（部分） | PlayerRow、Watch、题目、好友、排行榜、资料、保存和账号 subtitle 的评级直接 Text | 真实 ShowRatings.no 不泄露评分；已复现玩家行、观战、排行榜、账号、资料及最高评分、题目与保存；好友/Hub及实战例外仍待专项 |
+| B6 | P1 / R（坐标） | Analysis/Editor Hub 象棋预览未完整映射亮度/hue，坐标与国象缩略图相反 | 两个 Hub 坐标违约已复现；无坐标/交互及亮度/hue最终检查待绿；长宽比差异明确保留 |
+| B7 | P1 / R（分析入口） | 题目完成栏只在菜单给分析、残留 disabled Hint，Next 图标另起契约 | 完成态缺直接 Analysis 已复现；完整按钮组合/继续图标/进行态权限待绿 |
 | B8 | P0/P1 / S | Inbox 固定第1页并丢信封；messages 无 page；待办仅 chatId；超时后旧同通道帧可能匹配下一请求 | 两页请求不合并为一个；A 超时 B 排队 A 迟到，B 不接 A；对局独立连接不被断开 |
 | B9 | P1 / S | Friends provider 固定 `page:1`，模型已有 nextPage，页面无更多 | 筛选第2页/尾页/失败原页重试；换号清私有内容，搜索重置页但不丢申请分区 |
 | B10 | P1 / S | 合并 contacts 任一来源异常时静默移除该来源内容；搜索/首次失败 raw 英文异常；Linux 无显式刷新 | 一来源失败保另一来源，并给可重试提示；不伪装为空、泄露异常或强行显示后台品牌 |
@@ -124,12 +124,19 @@
 | B13 | P0/P1 / S | 通知 `FutureProvider` 发空 data，仅按 success 名 firstWhere，共用对局 Socket，无分页串行 | 并发刷新/更多/mark不会串包；超时后独立通道重建，页2实际可达 |
 | B14 | P2 / S | 在线 `_Failed(message: error.toString())` 与零散名单呈现没有共用错误/可链接身份契约 | 网络失败显示可读本地化并可重试，游客/机器人不出现假资料入口；unknown URL保留原查询/片段 |
 | B15 | P1 / S | 旧 screenshot `scale` 是 TextScaler，输出 `toImage()` 无 pixelRatio；大多只有象棋场景 | 字缩放/DPI独立命名与输出；每个布局角色同阶段配对，不冒称1032张就是完整验收 |
+| B16 | P1 / S | Contacts 搜索只调用国象 `/inbox/search`，body 搜索分支还要求国象 `me != null` | 只登录象棋账号输入搜索目前没有对应效果；必须明确真实可用搜索范围，不猜 `inbox.others` 响应或新会话协议 |
 
 ## 新证据记录
 
 | 批次／SHA | 复现与回归 | 渲染/原生/主观 | 结论 |
 |---|---|---|---|
 | 审查 / `d2f89a627` | 仅源码边界 S，未跑新测试 | P/N/U未验证 | 可开始优先项的真实红测试，不表示修复或一致 |
+| 首轮红 / `0eb86a4ea` / Actions `41385753695` | analyze通过；非法图实际出现 `position fen 9/9/9/9/9/9/9/9/9/4K4 w - - 0 1`；编辑器出口可点击；联系人返回清 `chab`、卸载后访问 ref；两处单账号入口缺失 | P/N/U未验证 | B1/B2/B3和B4查询均为行为红，不是语法错误 |
+| 身份红 / `cb0401302` / Actions `41385947642` | analyze通过；账号变更后旧 debounced query 仍为 `chab`；同账号 token续期保持查询的正向对照 | P/N/U未验证 | 身份边界真实失败，不能将 token轮换等同换号 |
+| 呈现红 / `518a61024` / Actions `41386918242` | analyze通过；同一行回调重入推两页；实际偏好写 `no` 后多页面仍显示评分；Hub仍有坐标；题目完成缺直接分析 | P/N/U未验证 | 可做最小整改；所有新回归的绿和实战例外仍待跑 |
+
+代码已加入 B1 的入口/公共菜单/模型安全边界、B2/B4 的 mounted+身份保护与释放、B3 的统一收件箱权限判断。
+这些源码改动尚未拿到同 SHA 绿；评分与题目动作栏本轮仍在实施。新增 PageStorageKey 也不等于所有返回锚点已经验收。
 
 ## 分页协议边界
 

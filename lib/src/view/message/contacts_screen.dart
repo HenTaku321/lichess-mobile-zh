@@ -2,9 +2,11 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:lichess_mobile/src/model/auth/auth_controller.dart';
+import 'package:lichess_mobile/src/model/common/id.dart';
 import 'package:lichess_mobile/src/model/message/message.dart';
 import 'package:lichess_mobile/src/model/message/message_repository.dart';
 import 'package:lichess_mobile/src/model/user/user.dart';
+import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
 import 'package:lichess_mobile/src/utils/l10n.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
@@ -20,7 +22,7 @@ import 'package:material_ui/material_ui.dart';
 final messageSearchQueryProvider = StateProvider.autoDispose<String>((ref) => '');
 
 final messageSearchResultsProvider = FutureProvider.autoDispose<SearchResult>((ref) async {
-  final repo = ref.read(messageRepositoryProvider);
+  final repo = ref.watch(messageRepositoryProvider);
   final query = ref.watch(messageSearchQueryProvider);
   if (query.length < 3) {
     return _emptySearchResult;
@@ -47,10 +49,16 @@ class _ContactsScreenState() extends ConsumerState<ContactsScreen> {
   final onChangedDebouncer = Debouncer(const Duration(milliseconds: 300));
   final controller = TextEditingController();
   final focusNode = FocusNode();
+  bool _openingConversation = false;
+
+  (UserId?, int) get _accountIdentity =>
+      (ref.read(authControllerProvider)?.user.id, ref.read(xiangqiAccountGenerationProvider));
 
   @override
   void dispose() {
     onChangedDebouncer.cancel();
+    controller.dispose();
+    focusNode.dispose();
     super.dispose();
   }
 
@@ -61,7 +69,7 @@ class _ContactsScreenState() extends ConsumerState<ContactsScreen> {
   /// only thing that differs is which one, and the row carries everything the screen needs.
   Future<void> pushConversationScreen(Contact contact) async {
     final xiangqi = contact.xiangqi;
-    await Navigator.of(context, rootNavigator: true).push(
+    await _openConversation(
       xiangqi == null
           ? ConversationScreen.buildRoute(user: contact.user)
           : XiangqiConversationScreen.buildRoute(
@@ -71,20 +79,31 @@ class _ContactsScreenState() extends ConsumerState<ContactsScreen> {
               peerProfileAvailable: xiangqi.peerProfileAvailable,
             ),
     );
-    _refreshAfterConversation();
   }
 
   /// Opens a lichess conversation for a user reached as a search result rather than as a row.
   Future<void> pushUserConversation(LightUser user) async {
-    await Navigator.of(
-      context,
-      rootNavigator: true,
-    ).push(ConversationScreen.buildRoute(user: user));
-    _refreshAfterConversation();
+    await _openConversation(ConversationScreen.buildRoute(user: user));
   }
 
-  void _refreshAfterConversation() {
+  Future<void> _openConversation(Route<dynamic> route) async {
+    if (!mounted || _openingConversation || !(ModalRoute.of(context)?.isCurrent ?? true)) return;
+    final identity = _accountIdentity;
+    _openingConversation = true;
+    try {
+      await Navigator.of(context, rootNavigator: true).push(route);
+    } finally {
+      if (mounted) _openingConversation = false;
+    }
+    if (!mounted || identity != _accountIdentity) return;
     ref.invalidate(contactsProvider);
+    // Returning updates unread rows, not the user's search, selection or scroll position.
+    focusNode.unfocus();
+  }
+
+  void _clearSearchForNewAccount() {
+    if (!mounted) return;
+    onChangedDebouncer.cancel();
     ref.read(messageSearchQueryProvider.notifier).state = '';
     controller.clear();
     focusNode.unfocus();
@@ -92,6 +111,12 @@ class _ContactsScreenState() extends ConsumerState<ContactsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(authControllerProvider.select((auth) => auth?.user.id), (_, _) {
+      _clearSearchForNewAccount();
+    });
+    ref.listen(xiangqiAccountGenerationProvider, (_, _) {
+      _clearSearchForNewAccount();
+    });
     final searchQuery = ref.watch(messageSearchQueryProvider);
     final searchResultsAsync = ref.watch(messageSearchResultsProvider);
     final me = ref.watch(authControllerProvider)?.user;
@@ -121,6 +146,7 @@ class _ContactsScreenState() extends ConsumerState<ContactsScreen> {
       body: searchQuery.isNotEmpty && me != null
           ? searchResultsAsync.when(
               data: (result) => ListView(
+                key: PageStorageKey(('message-search', _accountIdentity, searchQuery)),
                 children: [
                   if (result.contacts.isNotEmpty) _SearchCategoryTitle(context.l10n.discussions),
                   ...result.contacts.map(
@@ -163,6 +189,11 @@ class const ContactsListView({required final void Function(Contact contact) open
       case AsyncData(:final value):
         final contacts = value.contacts;
         return ListView.separated(
+          key: PageStorageKey((
+            'message-contacts',
+            ref.watch(authControllerProvider)?.user.id,
+            ref.watch(xiangqiAccountGenerationProvider),
+          )),
           separatorBuilder: (context, index) => Theme.of(context).platform == TargetPlatform.iOS
               ? const PlatformDivider(
                   height: 1,

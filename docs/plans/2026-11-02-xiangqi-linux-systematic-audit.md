@@ -28,8 +28,8 @@
 | 批次 | 内容 | 当前状态 |
 |---|---|---|
 | 1 | 全入口／状态清单、源码根因登记 | 已登记；行为与主观验收未开始 |
-| 2 | 编辑器安全出口、联系人异步导航与账号入口 | 待 Actions 红 → 修复 → 绿 |
-| 3 | 隐藏评分、缩略图偏好、题目完成操作栏 | 待红 → 绿 |
+| 2 | 编辑器安全出口、联系人异步导航与账号入口 | Actions 已复现；最小修复已写，待同 SHA 绿 |
+| 3 | 隐藏评分、缩略图偏好、题目完成操作栏 | Actions 已复现，待最小修复与绿；实战例外语义补专项 |
 | 4 | 私信／通知分页及无 ID 通道超时隔离 | 待协议测试与实现 |
 | 5 | 好友／赛事／资料分页、局部失败与返回恢复 | 待红 → 绿 |
 | 6 | 全页面配对、DPI 与字缩放分离 | 待实现 |
@@ -107,8 +107,8 @@ class const XiangqiPage<T>({
   required final int totalPages,
 });
 
-Future<XiangqiPage<XiangqiInboxChat>> loadChatsPage(int page);
-Future<XiangqiPage<XiangqiInboxMessage>> loadMessagesPage(String chatId, int page);
+Future<XiangqiPage<Contact>> loadChatsPage(int page);
+Future<XiangqiPage<Message>> loadMessagesPage(String chatId, int page);
 ```
 
 1. 根据已捕获的 `inbox.join {page}`、`inbox.chat.user {chat_id,page}`、`get.notifications {page}` 写页信封测试。

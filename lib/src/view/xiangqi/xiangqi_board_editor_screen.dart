@@ -8,14 +8,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_board_editor_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position_validation.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_rules.dart' as rules;
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
 import 'package:lichess_mobile/src/utils/share.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_analysis_actions.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_analysis_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_board_editor_filters.dart';
-import 'package:lichess_mobile/src/view/xiangqi/xiangqi_game_screen.dart';
-import 'package:lichess_mobile/src/view/xiangqi/xiangqi_over_the_board_screen.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_position_error.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_action_sheet.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
 import 'package:lichess_mobile/src/widgets/buttons.dart';
@@ -389,92 +391,84 @@ class const _BottomBar(final String? initialFen) extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final editorController = xiangqiBoardEditorControllerProvider(initialFen);
     final editorState = ref.watch(editorController);
-    final pieceCount = editorState.pieceCount;
+    final error = xiangqiPositionError(editorState.position);
+    final canContinue = error == null && !rules.isGameOver(editorState.position);
 
-    return BottomBar(
+    return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        BottomBarButton(
-          icon: Icons.menu,
-          label: context.l10n.menu,
-          onTap: () => showAdaptiveActionSheet<void>(
-            context: context,
-            actions: [
-              BottomSheetAction(
-                makeLabel: (context) => Text(context.l10n.startPosition),
-                onPressed: () => ref.read(editorController.notifier).loadFen(kXiangqiInitialFen),
+        if (error != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            child: Semantics(
+              liveRegion: true,
+              child: Text(
+                xiangqiPositionErrorLabel(context, error),
+                style: TextTheme.of(context).bodySmall
+                    ?.copyWith(color: ColorScheme.of(context).error),
               ),
-              if (pieceCount > 0)
-                BottomSheetAction(
-                  makeLabel: (context) => Text(context.l10n.continueFromHere),
-                  onPressed: () => _showContinueFromHereMenu(context, editorState.fen),
-                ),
-              BottomSheetAction(
-                makeLabel: (context) => Text(context.l10n.clearBoard),
-                onPressed: () => ref.read(editorController.notifier).clearBoard(),
+            ),
+          ),
+        BottomBar(
+          children: [
+            BottomBarButton(
+              icon: Icons.menu,
+              label: context.l10n.menu,
+              onTap: () => showAdaptiveActionSheet<void>(
+                context: context,
+                actions: [
+                  BottomSheetAction(
+                    makeLabel: (context) => Text(context.l10n.startPosition),
+                    onPressed: () =>
+                        ref.read(editorController.notifier).loadFen(kXiangqiInitialFen),
+                  ),
+                  if (canContinue)
+                    BottomSheetAction(
+                      makeLabel: (context) => Text(context.l10n.continueFromHere),
+                      onPressed: () =>
+                          showXiangqiContinueFromHereMenu(context, editorState.position),
+                    ),
+                  BottomSheetAction(
+                    makeLabel: (context) => Text(context.l10n.clearBoard),
+                    onPressed: () => ref.read(editorController.notifier).clearBoard(),
+                  ),
+                ],
               ),
-            ],
-          ),
-        ),
-        BottomBarButton(
-          key: const Key('flip-button'),
-          label: context.l10n.flipBoard,
-          onTap: ref.read(editorController.notifier).flipBoard,
-          icon: CupertinoIcons.arrow_2_squarepath,
-        ),
-        BottomBarButton(
-          key: const Key('analysis-board-button'),
-          label: context.l10n.analysis,
-          // An empty board is the only thing that cannot be analysed, because a position is all the
-          // analysis board is asked for and a FEN is written from any board at all. The chess editor
-          // gates this on its variant being playable as well, which is a thing about chess: there is
-          // no variant here to be unplayable, and no position the editor can hold that toFen cannot
-          // write. So a board with a piece on it always opens, including boards — no generals, two
-          // red advisors on the same square's colour, forty pieces — that no game could reach and
-          // that the chess editor would refuse outright.
-          onTap: pieceCount > 0
-              ? () =>
-                    Navigator.of(context)
-                        .push(XiangqiAnalysisScreen.buildRoute(initialFen: editorState.fen))
-              : null,
-          icon: Icons.biotech,
-        ),
-        BottomBarButton(
-          label: context.l10n.mobileFilters,
-          onTap: () => showModalBottomSheet<void>(
-            context: context,
-            builder: (BuildContext context) => XiangqiBoardEditorFilters(initialFen: initialFen),
-            showDragHandle: true,
-            constraints: BoxConstraints(minHeight: MediaQuery.heightOf(context) * 0.5),
-          ),
-          icon: Icons.tune,
+            ),
+            BottomBarButton(
+              key: const Key('flip-button'),
+              label: context.l10n.flipBoard,
+              onTap: ref.read(editorController.notifier).flipBoard,
+              icon: CupertinoIcons.arrow_2_squarepath,
+            ),
+            BottomBarButton(
+              key: const Key('analysis-board-button'),
+              label: context.l10n.analysis,
+              // Editing and exporting arbitrary diagrams remain available; only engine/game exits
+              // require a locally legal position, just like other FEN and teaching entry points.
+              onTap: error == null
+                  ? () =>
+                        Navigator.of(context)
+                            .push(XiangqiAnalysisScreen.buildRoute(initialFen: editorState.fen))
+                  : null,
+              icon: Icons.biotech,
+            ),
+            BottomBarButton(
+              label: context.l10n.mobileFilters,
+              onTap: () => showModalBottomSheet<void>(
+                context: context,
+                builder: (BuildContext context) =>
+                    XiangqiBoardEditorFilters(initialFen: initialFen),
+                showDragHandle: true,
+                constraints: BoxConstraints(minHeight: MediaQuery.heightOf(context) * 0.5),
+              ),
+              icon: Icons.tune,
+            ),
+          ],
         ),
       ],
     );
   }
-}
-
-/// Where the position on the board can be taken next: a game against the engine, or a game between
-/// two people over the board.
-///
-/// Two, where the chess editor has three: the third is a challenge, and a xiangqi challenge has no
-/// position to be created from — see [XiangqiBoardEditorScreen]. The board to play on is the analysis
-/// board's, so the position is handed over as a FEN, which is the one thing the editor and the two
-/// game screens both speak.
-Future<void> _showContinueFromHereMenu(BuildContext context, String fen) {
-  return showAdaptiveActionSheet(
-    context: context,
-    actions: [
-      BottomSheetAction(
-        makeLabel: (context) => Text(context.l10n.playAgainstComputer),
-        onPressed: () => Navigator.of(context).push(XiangqiGameScreen.buildRoute(initialFen: fen)),
-      ),
-      BottomSheetAction(
-        makeLabel: (context) => Text(context.l10n.mobileOverTheBoard),
-        onPressed: () =>
-            Navigator.of(context).push(XiangqiOverTheBoardScreen.buildRoute(initialFen: fen)),
-      ),
-    ],
-  );
 }
 
 class const _FenDialog({required final void Function(String fen) onFenLoaded})

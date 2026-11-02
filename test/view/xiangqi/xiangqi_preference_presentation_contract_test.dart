@@ -19,21 +19,32 @@ import 'package:lichess_mobile/src/widgets/xiangqi_player_row.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../binding.dart';
+import '../../model/xiangqi/online/xiangqi_online_game_fixture.dart' as fx;
 import '../../model/xiangqi/puzzle/xiangqi_puzzle_fixture.dart';
 import '../../test_provider_scope.dart';
 import '../account/account_menu_test.dart' as account;
 import 'xiangqi_leaderboard_screen_test.dart' as leaderboard;
 import 'xiangqi_profile_screen_test.dart' as profile;
+import 'xiangqi_online_game_screen_test.dart' as online;
 import 'xiangqi_puzzle_screen_test.dart' as puzzle;
 import 'xiangqi_saved_friends_parity_test.dart' as saved;
 import 'xiangqi_watch_screen_test.dart' as watch;
 
 /// Use the actual anonymous account-preference persistence path, not a provider override.
-Future<void> changeRatings(WidgetTester tester, ShowRatings preference) async {
+Future<void> changeRatings(
+  WidgetTester tester,
+  ShowRatings preference, {
+  bool liveClocks = false,
+}) async {
   final container = ProviderScope.containerOf(tester.element(find.byType(Scaffold).first));
   await container.read(accountPreferencesProvider.future);
   await container.read(accountPreferencesProvider.notifier).setShowRatings(preference);
-  await tester.pumpAndSettle();
+  if (liveClocks) {
+    await tester.pump();
+    await tester.pump();
+  } else {
+    await tester.pumpAndSettle();
+  }
 }
 
 void main() {
@@ -76,6 +87,27 @@ void main() {
     await changeRatings(tester, ShowRatings.exceptInGame);
     expect(find.text('2815'), findsOneWidget, reason: 'watching is not the current user playing');
   });
+
+  for (final playing in [true, false]) {
+    testWidgets(
+      'except-in-game follows the whole online game role, not just a player row ($playing)',
+      (tester) async {
+        final factory = await online.pumpGame(
+          tester,
+          token: fx.xiangqiTestToken(playing ? fx.xiangqiTestViewerId : fx.xiangqiTestSpectatorId),
+        );
+        await online.receive(tester, factory, fx.xiangqiSnapshotFrame());
+        expect(find.text('${fx.xiangqiTestBlackRating}'), findsOneWidget);
+        await changeRatings(tester, ShowRatings.exceptInGame, liveClocks: true);
+        expect(find.text('${fx.xiangqiTestBlackRating}'), playing ? findsNothing : findsOneWidget);
+        if (playing) {
+          await online.playTheGame(tester, factory);
+          await online.receive(tester, factory, fx.xiangqiEndFrame());
+          expect(find.text('${fx.xiangqiTestBlackRating}'), findsOneWidget);
+        }
+      },
+    );
+  }
 
   testWidgets('leaderboard ratings follow the preference while rank and player remain', (
     tester,

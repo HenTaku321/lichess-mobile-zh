@@ -184,10 +184,9 @@ class XiangqiAnalysisController({final XiangqiAnalysisOptions? options})
     extends Notifier<XiangqiAnalysisState> {
   XiangqiAnalysisCapabilities get capabilities =>
       options?.capabilities ?? kFullXiangqiAnalysisCapabilities;
-  bool get engineAllowed => capabilities.engine;
+  bool get engineAllowed => capabilities.engine && positionError == null;
   bool get isTeachingReplay => options?.replay.kind == XiangqiReplayKind.teaching;
-  XiangqiPositionError? get positionError =>
-      isTeachingReplay ? xiangqiPositionError(state.position) : null;
+  XiangqiPositionError? get positionError => xiangqiPositionError(state.position);
   bool get canAnalysePosition => capabilities.positionAnalysis && positionError == null;
   bool get canContinueGame =>
       capabilities.continueGame && positionError == null && !state.isFinished;
@@ -577,7 +576,10 @@ class XiangqiAnalysisController({final XiangqiAnalysisOptions? options})
   /// one before it.
   void _restart() {
     _cancel();
-    state = _latest = state.copyWith(lines: const IListConst([]));
+    state = _latest = state.copyWith(
+      lines: const IListConst([]),
+      isEngineRunning: state.isEngineRunning && engineAllowed,
+    );
     if (!state.isEngineRunning) return;
     unawaited(_analyse(state.position, _generation));
   }

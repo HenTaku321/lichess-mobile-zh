@@ -14,7 +14,6 @@ import 'package:lichess_mobile/src/model/xiangqi/xiangqi_export.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_move.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_notation.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
-import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position_validation.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/focus_detector.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
@@ -24,6 +23,7 @@ import 'package:lichess_mobile/src/view/xiangqi/xiangqi_analysis_settings_screen
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_analysis_tree_view.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_board_editor_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_engine_button.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_position_error.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_action_sheet.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
 import 'package:lichess_mobile/src/widgets/feedback.dart';
@@ -352,7 +352,7 @@ class _BodyState() extends ConsumerState<_Body> {
     final positionError = controller.positionError;
     showAdaptiveActionSheet<void>(
       context: context,
-      title: positionError == null ? null : Text(_positionErrorLabel(context, positionError)),
+      title: positionError == null ? null : Text(xiangqiPositionErrorLabel(context, positionError)),
       actions: [
         if (capabilities.editHistory &&
             (state.variationTree?.canPromote(state.moves.sublist(0, state.cursor)) ?? false))
@@ -447,15 +447,6 @@ class _BodyState() extends ConsumerState<_Body> {
     }
   }
 }
-
-String _positionErrorLabel(BuildContext context, XiangqiPositionError error) => switch (error) {
-  .generals => context.l10n.mobileXiangqiInvalidGenerals,
-  .counters => context.l10n.mobileXiangqiInvalidCounters,
-  .material => context.l10n.mobileXiangqiInvalidMaterial,
-  .placement => context.l10n.mobileXiangqiInvalidPlacement,
-  .facingGenerals => context.l10n.mobileXiangqiFacingGenerals,
-  .inactiveSideInCheck => context.l10n.mobileXiangqiInactiveSideInCheck,
-};
 
 /// How deep the engine has got, written above the board.
 ///

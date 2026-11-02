@@ -133,6 +133,12 @@ jobs:
           test/model/xiangqi/xiangqi_analysis_controller_test.dart
           test/view/message/contacts_screen_test.dart
           test/view/account/account_menu_test.dart
+
+      - name: Run xiangqi preference presentation regressions
+        id: preference_presentation
+        if: ${{ !cancelled() && steps.analyze.outcome == 'success' }}
+        run: >-
+          flutter test --no-pub --reporter expanded
           test/view/xiangqi/xiangqi_preference_presentation_contract_test.dart
 
       - name: Run xiangqi interaction regressions

@@ -107,7 +107,9 @@ void main() {
         peer: xiangqiLightUser(fixture.xiangqiFirstPeerId, fixture.xiangqiFirstPeerName),
       )).notifier,
     );
-    await withClock(Clock.fixed(DateTime(2026, 11, 2)), () async {
+    // Keep the fixed clock after the handshake's wall clock so this row-identity test does not
+    // also rewind the socket pacer's clock.
+    await withClock(Clock.fixed(DateTime(2099)), () async {
       expect(await controller.sendMessage('The same local text'), isTrue);
       expect(await controller.sendMessage('The same local text'), isTrue);
     });

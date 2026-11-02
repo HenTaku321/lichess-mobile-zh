@@ -116,7 +116,7 @@ def case_at(registry, ordinal):
         return {
             "index": str(ordinal), "role": role["id"], "state": state["id"], "driver": state["driver"],
             "sources": role["sources"], "configuration": configuration,
-            "expectedResolvedLocale": value.get('localeResolution', {}).get(configuration['environment']['locale'], configuration['environment']['locale']),
+            "expectedResolvedLocale": registry.get('localeResolution', {}).get(configuration['environment']['locale'], configuration['environment']['locale']),
             "requiredRoles": state["requiredRoles"], "pixelRoles": state["pixelRoles"],
             "allowedDifferences": state["allowedDifferences"],
             "differenceDefinitions": {key: registry.get("differences", {}).get(key, {}) for key in state["allowedDifferences"]},

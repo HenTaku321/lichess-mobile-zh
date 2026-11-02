@@ -358,7 +358,43 @@ jobs:
           XIANGQI_DESKTOP_VISUALS: '1'
           XIANGQI_VISUAL_FONT_DIR: out/visual-fonts
           XIANGQI_SCREENSHOT_DIR: out/desktop-screenshots
-        run: flutter test --no-pub --reporter expanded test/view/xiangqi/xiangqi_desktop_visual_test.dart
+        run: |
+          mkdir -p out/visual-matrix-diagnostics
+          set +e
+          flutter test --no-pub --reporter json test/view/xiangqi/xiangqi_desktop_visual_test.dart \
+            > out/visual-matrix-diagnostics/tests.jsonl
+          status=$?
+          python3 - <<'PY'
+          import json
+          from collections import Counter
+          from pathlib import Path
+          root = Path('out/visual-matrix-diagnostics')
+          names, results, messages = {}, {}, {}
+          for line in (root / 'tests.jsonl').read_text().splitlines():
+              event = json.loads(line)
+              if event['type'] == 'testStart': names[event['test']['id']] = event['test']['name']
+              if event['type'] == 'testDone': results[event['testID']] = event['result']
+              if event['type'] == 'print' and 'EXCEPTION' in event.get('message', ''):
+                  messages.setdefault(event['testID'], []).append(event['message'][:6000])
+              if event['type'] == 'error': messages.setdefault(event['testID'], []).append(event['error'][:1000])
+          summary = {'counts': dict(Counter(results.values())), 'failed': [
+              {'name': names.get(test), 'result': result, 'diagnostics': messages.get(test, [])}
+              for test, result in results.items() if result != 'success'
+          ]}
+          (root / 'summary.json').write_text(json.dumps(summary, ensure_ascii=False))
+          print(summary['counts'])
+          print('Failed scenes:', [row['name'] for row in summary['failed']])
+          PY
+          exit "$status"
+
+      - name: Export small visual-matrix diagnostics
+        if: ${{ !cancelled() && steps.desktop_visual.outcome != 'skipped' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: xiangqi-visual-matrix-diagnostics-${{ github.sha }}
+          path: out/visual-matrix-diagnostics
+          retention-days: 7
+          if-no-files-found: error
 
       - name: Export desktop screenshots and geometry
         if: ${{ !cancelled() && steps.desktop_visual.outcome != 'skipped' }}

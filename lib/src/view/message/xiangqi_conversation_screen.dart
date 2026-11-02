@@ -295,7 +295,6 @@ class const _MessageBubble({
   required final bool isMe,
   required final int groupLength,
   required final int groupIndex,
-  super.key,
 }) extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {

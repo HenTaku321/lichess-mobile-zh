@@ -43,8 +43,8 @@ class const _TableColumnLayout({required final double minimumMoveHeight, require
 class _RenderGameTableColumn(double minimumMoveHeight)
     extends RenderBox
     with
-        ContainerRenderObjectMixin<RenderBox, ContainerBoxParentData<RenderBox>>,
-        RenderBoxContainerDefaultsMixin<RenderBox, ContainerBoxParentData<RenderBox>> {
+        ContainerRenderObjectMixin<RenderBox, _TableParentData>,
+        RenderBoxContainerDefaultsMixin<RenderBox, _TableParentData> {
   double _minimumMoveHeight = minimumMoveHeight;
 
   double get minimumMoveHeight => _minimumMoveHeight;
@@ -57,8 +57,8 @@ class _RenderGameTableColumn(double minimumMoveHeight)
 
   @override
   void setupParentData(RenderBox child) {
-    if (child.parentData is! ContainerBoxParentData<RenderBox>) {
-      child.parentData = ContainerBoxParentData<RenderBox>();
+    if (child.parentData is! _TableParentData) {
+      child.parentData = _TableParentData();
     }
   }
 
@@ -102,7 +102,7 @@ class _RenderGameTableColumn(double minimumMoveHeight)
     );
     var y = 0.0;
     for (final child in children) {
-      (child.parentData! as ContainerBoxParentData<RenderBox>).offset = Offset(0, y);
+      (child.parentData! as _TableParentData).offset = Offset(0, y);
       y += child.size.height;
     }
   }
@@ -114,3 +114,5 @@ class _RenderGameTableColumn(double minimumMoveHeight)
   bool hitTestChildren(BoxHitTestResult result, {required Offset position}) =>
       defaultHitTestChildren(result, position: position);
 }
+
+class _TableParentData() extends ContainerBoxParentData<RenderBox>;

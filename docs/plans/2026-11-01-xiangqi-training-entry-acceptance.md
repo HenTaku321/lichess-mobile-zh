@@ -90,3 +90,9 @@
   Navigator 的父路由覆盖边界。`9edeefe2e` 的待运行 run 被 concurrency 自动取代；
   `dbee8a32c` / `41377468533` 被新 Flutter SDK 的 unnecessary-unawaited lint 阻挡，
   移除对标记了 @awaitNotRequired 的 Navigator.push 的多余包装，尚未得到行为结果。
+- `d23b2bb99` / `41378229409`：严格推断要求覆盖测试显式 `buildScreenRoute<void>`；
+  `34ee78f73` / `41378754122` format/analyze 通过，真实国象私信呈现三项通过，嵌套
+  路由覆盖测试确认父路由被覆盖时仍错误打开排行榜。未覆盖对照用例误把网络连通性
+  HEAD 探测计入业务请求，改为精确统计 xiangqi 上游调用，不放宽导航或请求次数断言。
+- 链接服务在异步之前捕获完整父路由链/Offstage 元素，覆盖页与未选中的标签页均拒绝
+  陈旧导航，邮件链接采用同一可见性边界；新增未选标签页对照，等待下一轮 Actions。

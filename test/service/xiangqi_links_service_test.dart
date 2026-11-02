@@ -18,18 +18,22 @@ import '../test_provider_scope.dart';
 
 class const NestedLinkHost({
   required final void Function(BuildContext, Future<void> Function()) onReady,
+  final bool offstage = false,
 }) extends StatelessWidget {
   @override
-  Widget build(BuildContext context) => Navigator(
-    onGenerateRoute: (_) => buildScreenRoute(
-      screen: Consumer(
-        builder: (context, ref, _) {
-          onReady(
-            context,
-            () => ref.read(xiangqiLinksServiceProvider).openContentLink(context, '/leaders'),
-          );
-          return const Scaffold(body: Text('Nested link source'));
-        },
+  Widget build(BuildContext context) => Offstage(
+    offstage: offstage,
+    child: Navigator(
+      onGenerateRoute: (_) => buildScreenRoute(
+        screen: Consumer(
+          builder: (context, ref, _) {
+            onReady(
+              context,
+              () => ref.read(xiangqiLinksServiceProvider).openContentLink(context, '/leaders'),
+            );
+            return const Scaffold(body: Text('Nested link source'));
+          },
+        ),
       ),
     ),
   );
@@ -38,8 +42,10 @@ class const NestedLinkHost({
 void main() {
   TestLichessBinding.ensureInitialized();
 
-  for (final covered in [false, true]) {
-    testWidgets('content links respect the parent route of a nested navigator ($covered)', (
+  for (final scene in ['visible', 'covered', 'offstage']) {
+    final covered = scene == 'covered';
+    final visible = scene == 'visible';
+    testWidgets('content links respect the parent route of a nested navigator ($scene)', (
       tester,
     ) async {
       BuildContext? sourceContext;
@@ -49,6 +55,7 @@ void main() {
         await makeTestProviderScopeApp(
           tester,
           home: NestedLinkHost(
+            offstage: scene == 'offstage',
             onReady: (context, callback) {
               sourceContext = context;
               open = callback;
@@ -85,9 +92,10 @@ void main() {
       unawaited(open!());
       await tester.pumpAndSettle();
       final screen = find.byType(XiangqiLeaderboardScreen, skipOffstage: false);
-      expect(screen, covered ? findsNothing : findsOneWidget);
-      expect(requests, covered ? isEmpty : hasLength(1));
-      if (!covered) {
+      expect(screen, visible ? findsOneWidget : findsNothing);
+      final upstream = requests.where((request) => request.url.host == 'api.xiangqi.com');
+      expect(upstream, visible ? hasLength(1) : isEmpty);
+      if (visible) {
         root.pop();
         await tester.pumpAndSettle();
       }

@@ -34,11 +34,12 @@ class XiangqiLinksService(final Ref ref) {
   }) async {
     if (!context.mounted || !ref.mounted) return;
     final account = ref.read(xiangqiAccountGenerationProvider);
+    final visible = _routeVisibility(context);
     bool current() =>
         context.mounted &&
         ref.mounted &&
         account == ref.read(xiangqiAccountGenerationProvider) &&
-        (ModalRoute.of(context)?.isCurrent ?? true);
+        visible();
     if ((expectedAccountGeneration != null && expectedAccountGeneration != account) || !current()) {
       return;
     }
@@ -87,6 +88,7 @@ class XiangqiLinksService(final Ref ref) {
   }) async {
     if (link is EmailElement) {
       if (!context.mounted || !ref.mounted) return;
+      if (!_routeVisibility(context)()) return;
       if (expectedAccountGeneration != null &&
           expectedAccountGeneration != ref.read(xiangqiAccountGenerationProvider)) {
         return;
@@ -103,6 +105,27 @@ class XiangqiLinksService(final Ref ref) {
         expectedAccountGeneration: expectedAccountGeneration,
       );
     }
+  }
+
+  /// A tab's nested navigator can have a current route while the root route is covered. Capture
+  /// the complete route chain and tab offstage elements before any async gap; checking just the
+  /// nearest ModalRoute permits callbacks from a page the user can no longer see.
+  bool Function() _routeVisibility(BuildContext context) {
+    final route = ModalRoute.of(context);
+    final routes = <ModalRoute<dynamic>>{if (route != null) route};
+    final offstage = <Element>[];
+    context.visitAncestorElements((element) {
+      if (element.widget is Navigator) {
+        final parent = ModalRoute.of(element);
+        if (parent != null) routes.add(parent);
+      }
+      if (element.widget is Offstage) offstage.add(element);
+      return true;
+    });
+    return () =>
+        context.mounted &&
+        routes.every((route) => route.isActive && route.isCurrent) &&
+        offstage.every((element) => !(element.widget as Offstage).offstage);
   }
 
   Route<dynamic>? _route(BuildContext context, Uri uri) {

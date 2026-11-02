@@ -120,3 +120,7 @@
 - 手动 `54b7e0bbf` / Actions `41444712056` 停在真实环境断言：请求 en-GB，AppLocalizations
   实际支持 en（zh-CN 同理解析成 zh），不能将这次夹具错误算气泡几何红。现由编译的 locale
   目录和 Flutter 实际 locale resolution 推导期待值，仍保留原48环境、真实语言／DPI断言。
+- `54b7e0bbf` / Actions `41444571536` 的整个 Tests workflow 已 success（包含全量测试）；
+  不将该全流程绿代替仍失败的手动视觉批次。
+- `02d73bf5c` / Actions `41446590912` 新边界测试确认重复本地消息／非连续相同日期会碰撞
+  全局行 key。使用仅用于呈现的 occurrence 区分重复行，不赋予消息任何服务器 ID 或送达含义。

@@ -107,6 +107,8 @@ class const _Body({
         switch (stateAsync) {
           case AsyncData(:final value):
             final items = _buildItems(value.convo.messages, value.selfId);
+            final messageOccurrences = <Message, int>{};
+            final dayOccurrences = <DateTime, int>{};
             return Column(
               children: [
                 Expanded(
@@ -115,8 +117,20 @@ class const _Body({
                     itemKeys: [
                       for (final item in items)
                         switch (item) {
-                          _DateItem(:final date) => ('day', date),
-                          _MessageItem(:final message) => ('message', message),
+                          _DateItem(:final date) => (
+                            'day',
+                            date,
+                            dayOccurrences.update(date, (count) => count + 1, ifAbsent: () => 0),
+                          ),
+                          _MessageItem(:final message) => (
+                            'message',
+                            message,
+                            messageOccurrences.update(
+                              message,
+                              (count) => count + 1,
+                              ifAbsent: () => 0,
+                            ),
+                          ),
                           _StatusItem() => 'status',
                         },
                       'history-footer',
@@ -170,10 +184,7 @@ class const _Body({
                       final item = items[index];
                       return switch (item) {
                         _StatusItem() => const ChatTypingStatus(),
-                        _DateItem(:final date) => ChatDaySeparator(
-                          key: ValueKey(('day', date)),
-                          date: date,
-                        ),
+                        _DateItem(:final date) => ChatDaySeparator(date: date),
                         _MessageItem(
                           :final message,
                           :final isMe,
@@ -181,7 +192,6 @@ class const _Body({
                           :final groupIndex,
                         ) =>
                           _MessageBubble(
-                            key: ValueKey(('message', message)),
                             message: message,
                             isMe: isMe,
                             groupLength: groupLength,

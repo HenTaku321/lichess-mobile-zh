@@ -125,6 +125,7 @@ class const _Body({required final LightUser user}) extends ConsumerWidget {
       case AsyncData(:final value):
         final items = buildDisplayItems(value);
         final occurrences = <Message, int>{};
+        final days = <DateTime, int>{};
         return Column(
           children: [
             Expanded(
@@ -133,7 +134,11 @@ class const _Body({required final LightUser user}) extends ConsumerWidget {
                 itemKeys: [
                   for (final item in items)
                     switch (item) {
-                      DateItem(:final date) => ('day', date),
+                      DateItem(:final date) => (
+                        'day',
+                        date,
+                        days.update(date, (count) => count + 1, ifAbsent: () => 0),
+                      ),
                       MessageItem(:final message) => (
                         'message',
                         message,

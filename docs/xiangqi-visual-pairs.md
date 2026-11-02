@@ -64,3 +64,9 @@ gh workflow run test.yml --repo HenTaku321/lichess-mobile-zh \
 
 目前真实 driver 仅私信 normal/draft，其他角色／状态仍明确未实现；不能声称全页面已视觉配对。
 相关红绿证据见 `docs/plans/2026-11-02-xiangqi-pagination-socket-visual-pairs.md`。
+
+最终检查点候选 `042796732d6a48e1be927440e970d338c8da8b61` / Actions `41461365086`：
+私信normal、system主题的48环境全部通过，实际字缩放1/2及DPI1/2已断言；消息区、输入框与气泡
+角色像素差为0，四角色几何差为0，appbar维持预登记协议能力差异。**不包含其余25主题、其它状态
+或任何主观／原生通过结论**。同候选普通Tests `41460927161` 已全流程通过；修正旧字号夹具后
+出现的12项在线／题目侧栏溢出已转绿，单侧矩阵仍不能作为完整配对。

@@ -208,6 +208,7 @@ jobs:
             test/model/message/xiangqi_conversation_controller_test.dart \
             test/view/message/xiangqi_conversation_screen_test.dart \
             test/widgets/anchored_list_view_test.dart \
+            test/widgets/game_surface_layout_test.dart \
             test/model/xiangqi/xiangqi_page_test.dart \
             test/model/xiangqi/xiangqi_pagination_test.dart \
             test/model/xiangqi/social/xiangqi_social_test.dart \

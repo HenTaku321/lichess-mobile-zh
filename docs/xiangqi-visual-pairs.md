@@ -11,6 +11,9 @@
 
 ## 全乘积而非抽样
 
+旧 DesktopSceneApp 曾在缩放 MediaQuery 外调用 buildAppWindow，导致正文的字缩放被覆盖回1；
+首批追加的实际环境断言抓到了这一点。现在正确传播上下文；旧单侧矩阵的200%文字覆盖不计有效。
+
 `test/visual/xiangqi_pair_registry.json` 从 49 个实际入口角色登记状态、适用偏好与有意差异。
 编译的 `visualCatalogue()` 提供依赖里的完整枚举值与持久化投影，不硬编码主题或棋子子集。
 每个适用状态使用三尺寸 × 两语言 × 两主题 × 两字缩放 × 两真实 DPI，共 48 个环境。

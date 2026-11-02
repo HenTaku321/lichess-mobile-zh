@@ -112,7 +112,12 @@ class const DesktopSceneApp({
     ),
     builder: (context, child) => MediaQuery(
       data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(textScale)),
-      child: RepaintBoundary(key: captureKey, child: buildAppWindow(context, child)),
+      // buildAppWindow reads MediaQuery to subtract the title bar. Build it below the scaled query:
+      // using this outer builder's context copied textScale=1 back over every desktop page.
+      child: Builder(
+        builder: (context) =>
+            RepaintBoundary(key: captureKey, child: buildAppWindow(context, child)),
+      ),
     ),
     home: home,
   );

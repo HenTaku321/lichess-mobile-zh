@@ -69,8 +69,8 @@ void main() {
             home: Scaffold(
               body: RatingPrefAware(
                 isActiveGameOfCurrentUser: activeGame,
-                child: const Text('visible rating'),
                 orElse: const Text('hidden rating'),
+                child: const Text('visible rating'),
               ),
             ),
           ),

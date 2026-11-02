@@ -23,6 +23,42 @@ Map<String, Object?> envelope(List<Object?> items, int page, {String field = 'it
 void main() {
   TestLichessBinding.ensureInitialized();
 
+  testWidgets(
+    'a failed previous ranking page retries that page without replacing the current one',
+    (tester) async {
+      final pages = <int>[];
+      int? failPage;
+      await remote.pumpRemote(
+        tester,
+        const XiangqiTournamentScreen(id: 'AbCdEf', name: 'Event'),
+        MockClient((request) async {
+          if (request.url.path.endsWith('/leaders')) {
+            final page = int.parse(request.url.queryParameters['page'] ?? '1');
+            pages.add(page);
+            if (page == failPage) return remote.jsonReply({}, 503);
+            return remote.jsonReply(envelope([], page, field: 'participants'));
+          }
+          if (request.url.path.contains('/participants/')) return remote.jsonReply(<Object?>[]);
+          return remote.jsonReply(tournaments.tournament());
+        }),
+      );
+      await tester.tap(find.byIcon(Icons.chevron_right));
+      await remote.settleRemote(tester);
+      failPage = 1;
+      await tester.tap(find.byIcon(Icons.chevron_left));
+      await remote.settleRemote(tester);
+      expect(pages, [1, 2, 1]);
+      final retry = find.byType(XiangqiRetryTile);
+      expect(retry, findsOneWidget);
+      failPage = null;
+      final context = tester.element(find.byType(XiangqiTournamentScreen));
+      await tester.tap(find.descendant(of: retry, matching: find.byTooltip(context.l10n.retry)));
+      await remote.settleRemote(tester);
+      expect(pages, [1, 2, 1, 1]);
+      expect(retry, findsNothing);
+    },
+  );
+
   testWidgets('a partial refresh retry resumes at the failed page instead of rereading page one', (
     tester,
   ) async {

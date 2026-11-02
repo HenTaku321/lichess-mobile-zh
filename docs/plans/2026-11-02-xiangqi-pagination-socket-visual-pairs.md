@@ -88,3 +88,6 @@
   Expected [1, 2, 1, 2, 2] / Actual [1, 2, 1, 2, 1, 2]，证明成功前缀被重复读取。
 - 私信分页、明确 sender 归属、无 ID 回显定向同步、分页刷新续读已加入实现，等待 Actions 绿。
   不凭同文替换服务器时间，不编造 message ID，不把本地 NoAck emission 当成送达回执。
+- `3498ec23b` / Actions `41432983002`：analyze 通过；私信／Socket JSON 94 success、
+  目录 JSON 20 success，两份 done.success=true。前三个私信负向断言、局部续读与资料 [1, 2] 均转绿。
+  该记录只证明已完成的专项，不是完整视觉或整个计划验收。

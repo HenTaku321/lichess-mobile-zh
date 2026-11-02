@@ -12,6 +12,8 @@
 // what keeps a backend's identity off the screen, so it is tested here rather than left to the
 // screen to imply.
 
+import 'dart:convert';
+
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -27,8 +29,10 @@ import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/view/message/contacts_screen.dart';
 import 'package:lichess_mobile/src/view/message/conversation_screen.dart';
 import 'package:lichess_mobile/src/view/message/xiangqi_conversation_screen.dart';
+import 'package:lichess_mobile/src/widgets/haptic_refresh_indicator.dart';
 import 'package:lichess_mobile/src/widgets/platform_search_bar.dart';
 import 'package:lichess_mobile/src/widgets/rich_link_text.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_refresh.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../binding.dart';
@@ -91,23 +95,27 @@ Future<fx.FakeXiangqiChannelFactory> pumpScreen(
   WidgetTester tester, {
   bool pushRoute = false,
   bool holdXiangqi = false,
+  MockClient? client,
+  String? initialChatsFrame,
 }) async {
   final factory = fx.FakeXiangqiChannelFactory();
   final token = fx.xiangqiTestToken(fx.xiangqiTestViewerId);
   final storage = fx.FakeXiangqiAuthStorage(fx.xiangqiTestSession(token));
 
-  final mockClient = MockClient((request) {
-    if (request.url.path == '/inbox') {
-      return mockResponse(lichessInboxJson, 200);
-    }
-    if (request.url.path == '/inbox/search') {
-      return mockResponse(
-        '''{"contacts":[{"user":{"name":"chabrot","id":"chabrot"},"lastMsg":{"text":"a lichess message","user":"chabrot","date":1621533013388,"read":true}}],"friends":[],"users":[]}''',
-        200,
-      );
-    }
-    return mockResponse('', 404);
-  });
+  final mockClient =
+      client ??
+      MockClient((request) {
+        if (request.url.path == '/inbox') {
+          return mockResponse(lichessInboxJson, 200);
+        }
+        if (request.url.path == '/inbox/search') {
+          return mockResponse(
+            '''{"contacts":[{"user":{"name":"chabrot","id":"chabrot"},"lastMsg":{"text":"a lichess message","user":"chabrot","date":1621533013388,"read":true}}],"friends":[],"users":[]}''',
+            200,
+          );
+        }
+        return mockResponse('', 404);
+      });
 
   await tester.pumpWidget(
     await makeTestProviderScopeApp(
@@ -166,7 +174,7 @@ Future<fx.FakeXiangqiChannelFactory> pumpScreen(
     reason: 'the chat list is expected to be asked for once the socket is open',
   );
   if (!holdXiangqi) {
-    channel.fromServer(xiangqiChatsFrame);
+    channel.fromServer(initialChatsFrame ?? xiangqiChatsFrame);
     await tester.pumpAndSettle();
   } else {
     for (var pump = 0; pump < 20; pump++) {
@@ -179,6 +187,72 @@ Future<fx.FakeXiangqiChannelFactory> pumpScreen(
 
 void main() {
   TestLichessBinding.ensureInitialized();
+
+  testWidgets('desktop contacts expose the same explicit refresh affordance as other lists', (
+    tester,
+  ) async {
+    await pumpScreen(tester);
+    expect(find.byType(DesktopRefreshButton), findsOneWidget);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.linux));
+
+  testWidgets('inserting rows from one contacts source preserves the visible other-source anchor', (
+    tester,
+  ) async {
+    var refreshed = false;
+    final rows = [
+      for (var index = 0; index < 40; index++)
+        {
+          ...xiangqiChatRow,
+          'chat_id': 'anchor-chat-$index',
+          'user_id': 200001 + index,
+          'username': 'Peer $index',
+        },
+    ];
+    final frame = fx.xiangqiEventFrame(kXiangqiInboxChatsEvent, {
+      'data': {'items': rows, 'has_next_page': false, 'total_pages': 1},
+    });
+    final factory = await pumpScreen(
+      tester,
+      initialChatsFrame: frame,
+      client: MockClient((request) {
+        if (request.url.path != '/inbox') return mockResponse('', 404);
+        if (!refreshed) return mockResponse(lichessInboxJson, 200);
+        final body = jsonDecode(lichessInboxJson) as Map<String, dynamic>;
+        body['contacts'] = [
+          for (var index = 0; index < 2; index++)
+            {
+              'user': {'name': 'New contact $index', 'id': 'new-contact-$index'},
+              'lastMsg': {
+                'text': index == 0
+                    ? 'Short message'
+                    : 'A longer message that wraps across several lines ' * 3,
+                'user': 'new-contact-$index',
+                'date': 1621533013388,
+                'read': true,
+              },
+            },
+          ...(body['contacts']! as List<dynamic>),
+        ];
+        return mockResponse(jsonEncode(body), 200);
+      }),
+    );
+    final anchor = find.text('Peer 8');
+    await tester.scrollUntilVisible(anchor, 200);
+    await tester.ensureVisible(anchor);
+    await tester.pumpAndSettle();
+    final before = tester.getTopLeft(anchor).dy;
+    refreshed = true;
+    final refresh = tester
+        .widget<HapticRefreshIndicator>(find.byType(HapticRefreshIndicator))
+        .onRefresh();
+    await tester.pump();
+    await tester.pump();
+    factory.channel.fromServer(frame);
+    await refresh;
+    await tester.pumpAndSettle();
+    expect(anchor, findsOneWidget);
+    expect(tester.getTopLeft(anchor).dy, closeTo(before, 1));
+  }, variant: TargetPlatformVariant.only(TargetPlatform.linux));
 
   testWidgets('a healthy contacts source is visible while the other source is still loading', (
     tester,

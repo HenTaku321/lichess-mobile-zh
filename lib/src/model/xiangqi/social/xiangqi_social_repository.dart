@@ -157,7 +157,7 @@ final xiangqiNotificationsControllerProvider =
       XiangqiPagedState<XiangqiNotification>
     >(XiangqiNotificationsController.new, name: 'XiangqiNotificationsControllerProvider');
 
-class XiangqiNotificationsController extends XiangqiPagedController<XiangqiNotification> {
+class XiangqiNotificationsController() extends XiangqiPagedController<XiangqiNotification> {
   late XiangqiNotificationsRepository _repository;
 
   @override
@@ -274,9 +274,8 @@ final xiangqiSocialRepositoryProvider = Provider<XiangqiSocialRepository>((Ref r
 /// Returns whether the server said it had. The answer is the server's own spelling of the event —
 /// see [kXiangqiMarkAllReadSuccessEvent] — and a request that is not answered is a failure rather
 /// than a success this app assumes.
-Future<bool> markAllXiangqiNotificationsRead(WidgetRef ref) async {
-  return ref.read(xiangqiNotificationsRepositoryProvider).markAllRead();
-}
+Future<bool> markAllXiangqiNotificationsRead(WidgetRef ref) =>
+    ref.read(xiangqiNotificationsRepositoryProvider).markAllRead();
 
 /// Reads [path] over the xiangqi.com client, with no session required.
 ///

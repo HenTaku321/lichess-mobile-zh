@@ -41,7 +41,7 @@ Future<String> read(QueueHarness harness, {Object? key, bool ack = false}) => ha
   event: 'request',
   data: const {},
   response: 'reply',
-  decode: (data) => data as String,
+  decode: (data) => data! as String,
   key: key,
   ack: ack,
 );
@@ -91,7 +91,7 @@ void main() {
       data: const {},
       response: 'reply',
       prepare: () => blocked.future,
-      decode: (data) => data as String,
+      decode: (data) => data! as String,
     );
     await expectLater(first, throwsA(isA<TimeoutException>()));
     final next = read(harness);
@@ -155,7 +155,7 @@ void main() {
       event: 'request',
       data: const {},
       response: 'reply',
-      decode: (data) => data as String,
+      decode: (data) => data! as String,
       isCurrent: () => current,
     );
     final failed = expectLater(answer, throwsA(isA<XiangqiSocketException>()));

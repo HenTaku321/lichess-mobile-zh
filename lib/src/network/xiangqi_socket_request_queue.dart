@@ -9,16 +9,12 @@ import 'package:lichess_mobile/src/network/xiangqi_socket.dart';
 /// Reply-bearing reads are serialised. All emissions share a second, serial pacing gate, so
 /// fire-and-forget commands can run during a read without sending a burst. A failed read retires
 /// the client and its broadcast stream, not just the underlying WebSocket channel.
-class XiangqiSocketRequestQueue {
-  XiangqiSocketRequestQueue({
-    required XiangqiSocketClient socket,
-    this.timeout = const Duration(seconds: 20),
-    this.spacing = Duration.zero,
-  }) : _fork = socket.fork;
-
-  final Duration timeout;
-  final Duration spacing;
-  final XiangqiSocketClient Function() _fork;
+class XiangqiSocketRequestQueue({
+  required final XiangqiSocketClient _socket,
+  final Duration timeout = const Duration(seconds: 20),
+  final Duration spacing = Duration.zero,
+}) {
+  XiangqiSocketClient _fork() => _socket.fork();
   final Queue<_SocketRead<dynamic>> _queue = Queue();
   final Set<_SocketRead<dynamic>> _reads = {};
   final Map<Object, _SocketRead<dynamic>> _pending = {};

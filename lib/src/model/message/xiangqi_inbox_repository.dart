@@ -55,8 +55,8 @@ import 'package:lichess_mobile/src/model/common/id.dart';
 import 'package:lichess_mobile/src/model/message/message.dart';
 import 'package:lichess_mobile/src/model/user/user.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
-import 'package:lichess_mobile/src/model/xiangqi/xiangqi_page.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_link.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_page.dart';
 import 'package:lichess_mobile/src/network/xiangqi_http.dart'
     show XiangqiAuthStorage, kXiangqiMinRequestSpacing, xiangqiAuthStorageProvider;
 import 'package:lichess_mobile/src/network/xiangqi_session_store.dart';
@@ -499,11 +499,12 @@ class XiangqiInboxRepository({
 
 XiangqiPage<Contact> xiangqiContactsPageFromPayload(Object? payload, {required int requestedPage}) {
   final envelope = _asMap(_unwrap(payload));
-  if (envelope == null || envelope['items'] is! List) {
+  final rows = envelope?['items'];
+  if (envelope == null || rows is! List) {
     throw const FormatException('Invalid xiangqi.com inbox page envelope.');
   }
   final items = xiangqiContactsFromChats(payload);
-  if ((envelope['items'] as List).isNotEmpty && items.isEmpty) {
+  if (rows.isNotEmpty && items.isEmpty) {
     throw const FormatException('The xiangqi.com inbox page contains no readable contacts.');
   }
   return XiangqiPage.fromMetadata(items: items, requestedPage: requestedPage, metadata: envelope);
@@ -511,11 +512,12 @@ XiangqiPage<Contact> xiangqiContactsPageFromPayload(Object? payload, {required i
 
 XiangqiPage<Message> xiangqiMessagesPageFromPayload(Object? payload, {required int requestedPage}) {
   final envelope = _asMap(_unwrap(payload));
-  if (envelope == null || envelope['items'] is! List) {
+  final rows = envelope?['items'];
+  if (envelope == null || rows is! List) {
     throw const FormatException('Invalid xiangqi.com message page envelope.');
   }
   final items = xiangqiMessagesFromPayload(payload);
-  if ((envelope['items'] as List).isNotEmpty && items.isEmpty) {
+  if (rows.isNotEmpty && items.isEmpty) {
     throw const FormatException('The xiangqi.com message page contains no readable messages.');
   }
   return XiangqiPage.fromMetadata(items: items, requestedPage: requestedPage, metadata: envelope);

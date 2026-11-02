@@ -4,32 +4,44 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 ///
 /// Each protocol locates and parses its own items first. Missing metadata remains unknown, and an
 /// explicit next-page cursor is the only authority for asking for more.
-class XiangqiPage<T> {
-  XiangqiPage({
-    required this.items,
-    required this.currentPage,
-    this.nextPage,
-    this.previousPage,
-    this.totalPages,
+class XiangqiPage<T>._({
+  required final IList<T> items,
+  required final int currentPage,
+  final int? nextPage,
+  final int? previousPage,
+  final int? totalPages,
+}) {
+  factory({
+    required IList<T> items,
+    required int currentPage,
+    int? nextPage,
+    int? previousPage,
+    int? totalPages,
   }) {
     if (currentPage < 1) throw RangeError.range(currentPage, 1, null, 'currentPage');
-    if (totalPages != null && totalPages! < 0) {
+    if (totalPages != null && totalPages < 0) {
       throw const FormatException('Negative xiangqi.com page count.');
     }
     if (nextPage != null &&
-        (nextPage! <= currentPage || (totalPages != null && nextPage! > totalPages!))) {
+        (nextPage <= currentPage || (totalPages != null && nextPage > totalPages))) {
       throw const FormatException('Invalid xiangqi.com next-page cursor.');
     }
-    if (previousPage != null && (previousPage! < 1 || previousPage! >= currentPage)) {
+    if (previousPage != null && (previousPage < 1 || previousPage >= currentPage)) {
       throw const FormatException('Invalid xiangqi.com previous-page cursor.');
     }
-    if (items.isNotEmpty &&
-        (totalPages == 0 || (totalPages != null && currentPage > totalPages!))) {
+    if (items.isNotEmpty && (totalPages == 0 || (totalPages != null && currentPage > totalPages))) {
       throw const FormatException('Items outside the declared xiangqi.com page range.');
     }
+    return XiangqiPage<T>._(
+      items: items,
+      currentPage: currentPage,
+      nextPage: nextPage,
+      previousPage: previousPage,
+      totalPages: totalPages,
+    );
   }
 
-  factory XiangqiPage.fromMetadata({
+  factory fromMetadata({
     required IList<T> items,
     required int requestedPage,
     required Map<String, Object?> metadata,
@@ -60,12 +72,6 @@ class XiangqiPage<T> {
       totalPages: integer('total_pages'),
     );
   }
-
-  final IList<T> items;
-  final int currentPage;
-  final int? nextPage;
-  final int? previousPage;
-  final int? totalPages;
 
   XiangqiPage<T> withItems(IList<T> items) => XiangqiPage(
     items: items,

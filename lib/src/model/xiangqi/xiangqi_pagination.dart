@@ -28,7 +28,7 @@ class const XiangqiPagedState<T>({
 /// Subclasses watch their repository in build and provide a direct read, not a cached provider's
 /// already completed future. Account/query rebuilds invalidate every older operation. Token
 /// revisions do not rebuild this controller.
-abstract class XiangqiPagedController<T> extends AsyncNotifier<XiangqiPagedState<T>> {
+abstract class XiangqiPagedController<T>() extends AsyncNotifier<XiangqiPagedState<T>> {
   final Map<int, XiangqiPage<T>> _pages = {};
   int _generation = 0;
   Future<void>? _more;
@@ -120,7 +120,7 @@ abstract class XiangqiPagedController<T> extends AsyncNotifier<XiangqiPagedState
         page.totalPages != null &&
         page.totalPages! > 0 &&
         page.currentPage > page.totalPages!) {
-      return loadPage(page.totalPages!);
+      return await loadPage(page.totalPages!);
     }
     return page;
   }

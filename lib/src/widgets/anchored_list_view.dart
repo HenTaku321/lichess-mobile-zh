@@ -1,4 +1,3 @@
-import 'package:flutter/rendering.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// Keeps the same visible row at the same logical-pixel offset when asynchronous sources insert
@@ -84,9 +83,10 @@ class _AnchoredListViewState() extends State<AnchoredListView> {
     final delta = row.localToGlobal(Offset.zero, ancestor: viewport).dy - anchor.visualOffset;
     if (delta.abs() < 0.01) return;
     final position = _controller.position;
-    final target = (_controller.offset + (widget.reverse ? -delta : delta))
-        .clamp(position.minScrollExtent, position.maxScrollExtent)
-        .toDouble();
+    final target = (_controller.offset + (widget.reverse ? -delta : delta)).clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
     if ((target - _controller.offset).abs() >= 0.01) _controller.jumpTo(target);
   }
 

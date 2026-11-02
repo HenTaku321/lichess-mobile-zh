@@ -1,6 +1,29 @@
 name: Tests
 
 on:
+  # A newly added dispatch-only workflow is not registered by GitHub until it reaches the default
+  # branch. This already registered entry forwards an explicit manual batch to the independent
+  # reusable visual workflow; ordinary pushes never render its full matrix or create packages.
+  workflow_dispatch:
+    inputs:
+      candidate:
+        description: Exact SHA for a manual visual batch (does not run normal unit-test jobs)
+        required: true
+        type: string
+      offset:
+        required: true
+        default: '0'
+        type: string
+      limit:
+        required: true
+        default: '48'
+        type: string
+      role:
+        required: false
+        type: string
+      state:
+        required: false
+        type: string
   push:
     paths:
       - 'lib/**'
@@ -39,14 +62,24 @@ on:
 # Cancel superseded PR runs so only the latest pushed commit is actually tested.
 # Pushes to main are never cancelled.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Declare default permissions as read only.
 permissions: read-all
 
 jobs:
+  manual-visual-batch:
+    if: github.event_name == 'workflow_dispatch'
+    uses: ./.github/workflows/xiangqi-parity-visuals.yml
+    with:
+      candidate: ${{ inputs.candidate }}
+      offset: ${{ inputs.offset }}
+      limit: ${{ inputs.limit }}
+      role: ${{ inputs.role }}
+      state: ${{ inputs.state }}
   unit-test:
+    if: github.event_name != 'workflow_dispatch'
     name: Unit tests on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     # A hung widget test otherwise occupies a runner until the 6 hour default.
@@ -120,7 +153,22 @@ jobs:
 
       - name: Analyze project source
         id: analyze
-        run: flutter analyze
+        run: |
+          mkdir -p out/analyze
+          set +e
+          flutter analyze > out/analyze/diagnostics.txt 2>&1
+          status=$?
+          cat out/analyze/diagnostics.txt
+          exit "$status"
+
+      - name: Export small analyzer diagnostics on failure
+        if: ${{ !cancelled() && steps.analyze.outcome == 'failure' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: xiangqi-analyze-${{ github.sha }}
+          path: out/analyze
+          retention-days: 7
+          if-no-files-found: error
 
       - name: Validate full visual-pair planning and evidence contract
         id: visual_contract

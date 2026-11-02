@@ -384,7 +384,8 @@ Future<Map<String, Object?>> difference(
         for (var side = 0; side < 2; side++) {
           final capture = side == 0 ? left : right;
           final crop = crops[side];
-          final px = crop.x + x, py = crop.y + y;
+          final px = crop.x + x;
+          final py = crop.y + y;
           values.add(
             x < crop.width &&
                     y < crop.height &&

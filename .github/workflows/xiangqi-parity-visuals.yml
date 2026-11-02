@@ -1,6 +1,23 @@
 name: Xiangqi full visual pairs (manual batch)
 
 on:
+  workflow_call:
+    inputs:
+      candidate:
+        required: true
+        type: string
+      offset:
+        required: true
+        type: string
+      limit:
+        required: true
+        type: string
+      role:
+        required: false
+        type: string
+      state:
+        required: false
+        type: string
   workflow_dispatch:
     inputs:
       candidate:

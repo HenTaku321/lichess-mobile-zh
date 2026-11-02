@@ -1,5 +1,4 @@
-import 'package:chessground/chessground.dart'
-    show DragTargetKind, PieceSet, PieceShiftMethod, ShapeColor;
+import 'package:chessground/chessground.dart' show DragTargetKind, PieceSet, PieceShiftMethod;
 import 'package:lichess_mobile/src/model/account/account_preferences.dart';
 import 'package:lichess_mobile/src/model/analysis/analysis_preferences.dart';
 import 'package:lichess_mobile/src/model/engine/evaluation_preferences.dart';
@@ -8,6 +7,7 @@ import 'package:lichess_mobile/src/model/puzzle/puzzle_preferences.dart';
 import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
 import 'package:lichess_mobile/src/model/settings/general_preferences.dart';
 import 'package:lichess_mobile/src/model/settings/preferences_storage.dart';
+import 'package:lichess_mobile/src/utils/color_palette.dart' show ShapeColor;
 
 /// Enumerates the actual compiled enum values and their persistence projection, not a hand-written
 /// subset that would silently discard new board/piece/sound choices after a dependency change.

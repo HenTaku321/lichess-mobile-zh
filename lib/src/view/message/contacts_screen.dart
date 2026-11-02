@@ -132,7 +132,7 @@ class _ContactsScreenState() extends ConsumerState<ContactsScreen> {
       identity: (_accountIdentity, searchQuery),
       onRefresh: () async {
         if (searchQuery.isNotEmpty && me != null) {
-          await ref.refresh(messageSearchResultsProvider.future);
+          await ref.refresh(messageSearchResultsProvider.future).then<void>((_) {});
         } else {
           await ref.read(contactsControllerProvider.notifier).refresh();
         }

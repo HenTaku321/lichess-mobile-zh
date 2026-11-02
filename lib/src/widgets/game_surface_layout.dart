@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/constants.dart';
 import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
 import 'package:lichess_mobile/src/utils/screen.dart';
+import 'package:lichess_mobile/src/widgets/game_table_column.dart';
 import 'package:lichess_mobile/src/widgets/move_list.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -88,24 +89,24 @@ class const GameSurfaceLayout({
                 ],
                 const SizedBox(width: 16),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      top,
-                      if (showMoves && !zenMode)
-                        Expanded(
-                          child: Padding(
+                  child: GameTableColumn(
+                    topTable: top,
+                    bottomTable: bottom,
+                    moves: showMoves && !zenMode
+                        ? Padding(
                             padding: const EdgeInsets.only(top: 16),
                             child: moveListBuilder!(MoveListType.stacked),
+                          )
+                        : null,
+                    minimumMoveHeight: showMoves && !zenMode
+                        ? 48 * math.max(1.0, MediaQuery.textScalerOf(context).scale(16) / 16)
+                        : 0,
+                    actions: userActionsBar == null
+                        ? null
+                        : Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: userActionsBar,
                           ),
-                        )
-                      else
-                        const Spacer(),
-                      if (userActionsBar != null)
-                        Padding(padding: const EdgeInsets.only(bottom: 16), child: userActionsBar),
-                      bottom,
-                    ],
                   ),
                 ),
               ],

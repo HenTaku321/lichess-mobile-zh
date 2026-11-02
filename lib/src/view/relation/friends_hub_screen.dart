@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lichess_mobile/src/model/account/account_preferences.dart';
 import 'package:lichess_mobile/src/model/auth/auth_controller.dart';
 import 'package:lichess_mobile/src/model/relation/online_friends.dart';
 import 'package:lichess_mobile/src/model/relation/relation_repository.dart';
@@ -154,6 +155,7 @@ class const _XiangqiFriends({required final XiangqiSession? session, required fi
     }
 
     final friends = ref.watch(xiangqiFriendsProvider((currentSession.name, null)));
+    final showRatings = ref.watch(ratingsVisibleProvider(false));
     final requests = ref.watch(xiangqiFriendRequestsProvider);
     return Column(
       children: [
@@ -171,7 +173,7 @@ class const _XiangqiFriends({required final XiangqiSession? session, required fi
                     ListTile(
                       dense: true,
                       title: Text(friend.player.name),
-                      subtitle: friend.player.rating == null
+                      subtitle: !showRatings || friend.player.rating == null
                           ? null
                           : Text('${friend.player.rating}'),
                     ),

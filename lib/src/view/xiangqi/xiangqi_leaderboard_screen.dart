@@ -1,5 +1,6 @@
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lichess_mobile/src/model/account/account_preferences.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/profile/xiangqi_profile.dart';
 import 'package:lichess_mobile/src/model/xiangqi/profile/xiangqi_profile_repository.dart';
@@ -180,9 +181,9 @@ class _XiangqiLeaderboardScreenState() extends ConsumerState<XiangqiLeaderboardS
 }
 
 /// One row of a board: the rank, who it is, and the rating they hold it with.
-class const _LeaderRow({required final XiangqiLeaderboardEntry entry}) extends StatelessWidget {
+class const _LeaderRow({required final XiangqiLeaderboardEntry entry}) extends ConsumerWidget {
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final player = entry.player;
     return ListTile(
       leading: SizedBox(
@@ -214,11 +215,13 @@ class const _LeaderRow({required final XiangqiLeaderboardEntry entry}) extends S
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      trailing: Text(
-        '${entry.rating}',
-        style: TextTheme.of(context).titleMedium
-            ?.copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
-      ),
+      trailing: ref.watch(ratingsVisibleProvider(false))
+          ? Text(
+              '${entry.rating}',
+              style: TextTheme.of(context).titleMedium
+                  ?.copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
+            )
+          : null,
       onTap: () => Navigator.of(
         context,
         rootNavigator: true,

@@ -1,5 +1,6 @@
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lichess_mobile/src/model/account/account_preferences.dart';
 import 'package:lichess_mobile/src/model/common/perf.dart';
 import 'package:lichess_mobile/src/model/user/leaderboard.dart';
 import 'package:lichess_mobile/src/model/user/user_repository_providers.dart';
@@ -154,9 +155,9 @@ class const _LichessLeaderboard({
 class const _XiangqiLeaderboards({
   required final AsyncValue<IList<(XiangqiRatingType, XiangqiLeaderboard)>> state,
   required final bool expanded,
-}) extends StatelessWidget {
+}) extends ConsumerWidget {
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return state.when(
       data: (boards) => Column(
         children: [
@@ -174,7 +175,9 @@ class const _XiangqiLeaderboards({
                         child: Text('${entry.rank}', textAlign: TextAlign.end),
                       ),
                       title: Text(entry.player.name, overflow: TextOverflow.ellipsis),
-                      trailing: Text('${entry.rating}'),
+                      trailing: ref.watch(ratingsVisibleProvider(false))
+                          ? Text('${entry.rating}')
+                          : null,
                     ),
                 ],
               ),

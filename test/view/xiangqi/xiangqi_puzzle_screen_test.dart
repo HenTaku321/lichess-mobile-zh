@@ -17,10 +17,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:lichess_mobile/src/model/engine/engine.dart';
 import 'package:lichess_mobile/src/model/puzzle/puzzle_preferences.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_session.dart';
 import 'package:lichess_mobile/src/model/xiangqi/puzzle/xiangqi_puzzle.dart';
 import 'package:lichess_mobile/src/model/xiangqi/puzzle/xiangqi_puzzle_controller.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_rules.dart' as rules;
 import 'package:lichess_mobile/src/network/http.dart';
@@ -126,13 +128,18 @@ Future<void> pumpPuzzleScreen(
   required PuzzleServer server,
   Object? session = _defaultSession,
   bool failOnOverflow = false,
+  Engine? engine,
+  Map<String, Object>? defaultPreferences,
 }) async {
   await tester.pumpWidget(
     await makeTestProviderScopeApp(
       tester,
       home: const XiangqiPuzzleScreen(),
       failOnOverflow: failOnOverflow,
+      defaultPreferences: defaultPreferences,
       overrides: {
+        if (engine != null)
+          xiangqiEngineProvider: xiangqiEngineProvider.overrideWith((ref) => engine),
         xiangqiAuthStorageProvider: xiangqiAuthStorageProvider.overrideWithValue(
           FakeXiangqiAuthStorage(
             identical(session, _defaultSession) ? xiangqiTestSession : session as XiangqiSession?,
@@ -236,9 +243,9 @@ void main() {
       await playTheLine(tester);
       expect(attemptState(tester).phase, XiangqiPuzzlePhase.recorded);
       expect(board(tester).position, attemptState(tester).position);
-      expect(barButton(tester, CupertinoIcons.arrow_right).onTap, isNotNull);
+      expect(barButton(tester, CupertinoIcons.play_arrow_solid).onTap, isNotNull);
       server.failNextSearch = false;
-      await tester.tap(find.byIcon(CupertinoIcons.arrow_right));
+      await tester.tap(find.byIcon(CupertinoIcons.play_arrow_solid));
       await settle(tester);
       expect(board(tester).position, rules.play(xiangqiTestLine.before, xiangqiTestLine.blunder));
     });

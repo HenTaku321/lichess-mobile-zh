@@ -21,6 +21,19 @@ final showRatingsPrefProvider = FutureProvider<ShowRatings>((Ref ref) async {
   return prefs.showRatings;
 });
 
+/// Rating visibility is also needed for nullable subtitle/trailing slots, where returning an empty
+/// widget would keep a two-line tile or reserve a gap. Use the same rules as RatingPrefAware.
+final ratingsVisibleProvider = Provider.autoDispose.family<bool, bool>((
+  ref,
+  isActiveGameOfCurrentUser,
+) {
+  return switch (ref.watch(showRatingsPrefProvider)) {
+    AsyncData(value: ShowRatings.yes) => true,
+    AsyncData(value: ShowRatings.exceptInGame) => !isActiveGameOfCurrentUser,
+    _ => false,
+  };
+}, name: 'RatingsVisibleProvider');
+
 /// A provider that tells if the user wants clock sounds.
 final clockSoundProvider = FutureProvider<bool>((Ref ref) async {
   final prefs = await ref.watch(accountPreferencesProvider.future);

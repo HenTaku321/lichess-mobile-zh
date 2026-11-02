@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lichess_mobile/src/model/account/account_preferences.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_online_game_controller.dart'
     show
@@ -215,9 +216,10 @@ class const _Header({required final XiangqiUserProfile profile}) extends Statele
 }
 
 /// The four ratings, as one section.
-class const _Ratings({required final XiangqiUserProfile profile}) extends StatelessWidget {
+class const _Ratings({required final XiangqiUserProfile profile}) extends ConsumerWidget {
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final showRatings = ref.watch(ratingsVisibleProvider(false));
     final ratings = XiangqiRatings(
       bullet: profile.bulletRating,
       rapid: profile.rapidRating,
@@ -231,11 +233,13 @@ class const _Ratings({required final XiangqiUserProfile profile}) extends Statel
           ListTile(
             leading: Icon(_speedIcon(speed)),
             title: Text(_speedLabel(context, speed)),
-            trailing: Text(
-              ratings.of(speed)?.toString() ?? '—',
-              style: TextTheme.of(context).titleMedium
-                  ?.copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
-            ),
+            trailing: showRatings
+                ? Text(
+                    ratings.of(speed)?.toString() ?? '—',
+                    style: TextTheme.of(context).titleMedium
+                        ?.copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
+                  )
+                : null,
           ),
       ],
     );
@@ -255,6 +259,7 @@ class const _SpeedRecord({
 }) extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final showRatings = ref.watch(ratingsVisibleProvider(false));
     final record = speed.isGame
         ? ref
               .watch(xiangqiGameStatsProvider((username, speed)))
@@ -270,8 +275,8 @@ class const _SpeedRecord({
         hasLeading: true,
         header: Text(_speedLabel(context, speed)),
         children: [
-          for (final line in record.value ?? const <String>[])
-            ListTile(dense: true, title: Text(line)),
+          for (final (line, isRating) in record.value ?? const <(String, bool)>[])
+            if (!isRating || showRatings) ListTile(dense: true, title: Text(line)),
           if (record.isLoading) const ListTile(dense: true, title: Text('…')),
           if (record.hasError)
             ListTile(
@@ -295,22 +300,25 @@ class const _SpeedRecord({
   }
 
   /// The lines a game record is written as.
-  List<String> _gameLines(BuildContext context, XiangqiGameStats stats) => [
-    context.l10n.nbWins(stats.wins),
-    context.l10n.nbLosses(stats.losses),
-    context.l10n.nbDraws(stats.draws),
-    '${context.l10n.winRate} ${stats.winRate.round()}%',
-    '${context.l10n.gamesPlayed} ${stats.totalGames}',
+  List<(String, bool)> _gameLines(BuildContext context, XiangqiGameStats stats) => [
+    for (final line in [
+      context.l10n.nbWins(stats.wins),
+      context.l10n.nbLosses(stats.losses),
+      context.l10n.nbDraws(stats.draws),
+      '${context.l10n.winRate} ${stats.winRate.round()}%',
+      '${context.l10n.gamesPlayed} ${stats.totalGames}',
+    ])
+      (line, false),
     if (stats.highestRating != null)
-      '${context.l10n.mobileXiangqiHighestRating} ${stats.highestRating}',
+      ('${context.l10n.mobileXiangqiHighestRating} ${stats.highestRating}', true),
   ];
 
   /// The lines a puzzle record is written as.
-  List<String> _puzzleLines(BuildContext context, XiangqiPuzzleStats stats) => [
-    context.l10n.mobileXiangqiPuzzlesAttempted('${stats.attempted}'),
-    context.l10n.mobileXiangqiPuzzlesSuccessRate('${stats.successRate.round()}%'),
+  List<(String, bool)> _puzzleLines(BuildContext context, XiangqiPuzzleStats stats) => [
+    (context.l10n.mobileXiangqiPuzzlesAttempted('${stats.attempted}'), false),
+    (context.l10n.mobileXiangqiPuzzlesSuccessRate('${stats.successRate.round()}%'), false),
     if (stats.highestRating != null)
-      '${context.l10n.mobileXiangqiHighestRating} ${stats.highestRating}',
+      ('${context.l10n.mobileXiangqiHighestRating} ${stats.highestRating}', true),
   ];
 }
 

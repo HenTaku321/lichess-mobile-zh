@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lichess_mobile/src/model/account/account_preferences.dart';
 import 'package:lichess_mobile/src/model/message/xiangqi_inbox_repository.dart'
     show xiangqiLightUser;
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
@@ -212,10 +213,11 @@ class _FriendRowState() extends ConsumerState<_FriendRow> {
   @override
   Widget build(BuildContext context) {
     final player = widget.friend.player;
+    final showRatings = ref.watch(ratingsVisibleProvider(false));
     return ListTile(
       leading: UserAvatar(xiangqiLightUser(player.id, player.name), radius: 16),
       title: Text(player.name, overflow: TextOverflow.ellipsis),
-      subtitle: player.rating == null ? null : Text('${player.rating}'),
+      subtitle: !showRatings || player.rating == null ? null : Text('${player.rating}'),
       onTap: () => Navigator.of(
         context,
         rootNavigator: true,
@@ -246,11 +248,12 @@ class _RequestRowState() extends ConsumerState<_RequestRow> {
   @override
   Widget build(BuildContext context) {
     final player = widget.request.player;
+    final showRatings = ref.watch(ratingsVisibleProvider(false));
     final enabled = !_busy && int.tryParse(player.id) != null;
     return ListTile(
       leading: UserAvatar(xiangqiLightUser(player.id, player.name), radius: 16),
       title: Text(player.name, overflow: TextOverflow.ellipsis),
-      subtitle: player.rating == null ? null : Text('${player.rating}'),
+      subtitle: !showRatings || player.rating == null ? null : Text('${player.rating}'),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [

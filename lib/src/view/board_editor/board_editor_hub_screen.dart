@@ -58,11 +58,15 @@ class const BoardEditorHubScreen({super.key}) extends ConsumerWidget {
             preview: SizedBox(
               width: 87,
               height: 96,
-              child: XiangqiBoard(
-                position: XiangqiPosition.initial(),
-                showCoordinates: boardPrefs.coordinates,
-                showBorder: boardPrefs.showBorder,
-                style: XiangqiBoardStyle.fromChessboardColorScheme(boardPrefs.boardTheme.colors),
+              child: BrightnessHueFilter(
+                brightness: boardPrefs.brightness,
+                hue: boardPrefs.hue,
+                child: XiangqiBoard(
+                  position: XiangqiPosition.initial(),
+                  showCoordinates: false,
+                  showBorder: boardPrefs.showBorder,
+                  style: XiangqiBoardStyle.fromChessboardColorScheme(boardPrefs.boardTheme.colors),
+                ),
               ),
             ),
             onTap: () => Navigator.of(

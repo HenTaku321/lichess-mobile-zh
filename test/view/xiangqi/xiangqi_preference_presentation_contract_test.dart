@@ -9,9 +9,11 @@ import 'package:lichess_mobile/src/model/account/account_preferences.dart';
 import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
 import 'package:lichess_mobile/src/model/settings/preferences_storage.dart';
 import 'package:lichess_mobile/src/model/xiangqi/puzzle/xiangqi_puzzle_repository.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_analysis_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/view/analysis/analysis_hub_screen.dart';
 import 'package:lichess_mobile/src/view/board_editor/board_editor_hub_screen.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_analysis_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_saved_screen.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
@@ -23,9 +25,10 @@ import '../../model/xiangqi/online/xiangqi_online_game_fixture.dart' as fx;
 import '../../model/xiangqi/puzzle/xiangqi_puzzle_fixture.dart';
 import '../../test_provider_scope.dart';
 import '../account/account_menu_test.dart' as account;
+import 'xiangqi_analysis_screen_test.dart' as analysisFixture;
 import 'xiangqi_leaderboard_screen_test.dart' as leaderboard;
-import 'xiangqi_profile_screen_test.dart' as profile;
 import 'xiangqi_online_game_screen_test.dart' as online;
+import 'xiangqi_profile_screen_test.dart' as profile;
 import 'xiangqi_puzzle_screen_test.dart' as puzzle;
 import 'xiangqi_saved_friends_parity_test.dart' as saved;
 import 'xiangqi_watch_screen_test.dart' as watch;
@@ -233,7 +236,13 @@ void main() {
   testWidgets(
     'a completed puzzle exposes analysis directly and a matching continue-training action',
     (tester) async {
-      await puzzle.pumpPuzzleScreen(tester, server: puzzle.PuzzleServer());
+      final (:engine, transport: _) = analysisFixture.fakeXiangqiEngine();
+      await puzzle.pumpPuzzleScreen(
+        tester,
+        server: puzzle.PuzzleServer(),
+        engine: engine,
+        defaultPreferences: analysisFixture.evaluationPreferences(isEnabled: false),
+      );
       expect(
         tester
             .widgetList<BottomBarButton>(find.byType(BottomBarButton))
@@ -241,12 +250,29 @@ void main() {
         isNot(contains('Analysis')),
       );
       await puzzle.playTheLine(tester);
+      final completed = puzzle.attemptState(tester);
       final buttons = tester.widgetList<BottomBarButton>(find.byType(BottomBarButton)).toList();
       expect(buttons.map((button) => button.label), contains('Analysis'));
       expect(buttons.where((button) => button.label == 'Get a hint'), isEmpty);
       final continueTraining = buttons.singleWhere((button) => button.label == 'Continue training');
       expect(continueTraining.onTap, isNotNull);
       expect(continueTraining.icon, CupertinoIcons.play_arrow_solid);
+      await tester.tap(find.bySemanticsLabel('Analysis'));
+      await puzzle.settle(tester);
+      expect(find.byType(XiangqiAnalysisScreen), findsOneWidget);
+      final analysis = ProviderScope.containerOf(
+        tester.element(
+          find.descendant(
+            of: find.byType(XiangqiAnalysisScreen),
+            matching: find.byType(XiangqiBoard),
+          ),
+        ),
+      ).read(xiangqiAnalysisControllerProvider);
+      expect(analysis.moves, completed.moves);
+      expect(analysis.positions, completed.positions);
+      Navigator.of(tester.element(find.byType(XiangqiAnalysisScreen))).pop();
+      await puzzle.settle(tester);
+      expect(puzzle.attemptState(tester).position, completed.position);
     },
   );
 }

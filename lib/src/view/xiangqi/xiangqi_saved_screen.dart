@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lichess_mobile/src/model/account/account_preferences.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/saved/xiangqi_saved.dart';
 import 'package:lichess_mobile/src/model/xiangqi/saved/xiangqi_saved_repository.dart';
@@ -384,6 +385,7 @@ class const _Puzzles({
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final puzzles = ref.watch(xiangqiSavedPuzzlesProvider(username));
+    final showRatings = ref.watch(ratingsVisibleProvider(false));
     final generation = ref.watch(xiangqiAccountGenerationProvider);
     return XiangqiRetainedData(
       identity: (username, generation),
@@ -412,12 +414,14 @@ class const _Puzzles({
                               .push(XiangqiPuzzleScreen.buildRoute(puzzleId: puzzle.id));
                         },
                   title: Text(puzzle.id, maxLines: 1, overflow: TextOverflow.ellipsis),
-                  subtitle: Text(
-                    [
-                      if (puzzle.rating != null) '${puzzle.rating}',
-                      if (puzzle.createdOn != null) puzzle.createdOn!,
-                    ].join(' · '),
-                  ),
+                  subtitle: (showRatings && puzzle.rating != null) || puzzle.createdOn != null
+                      ? Text(
+                          [
+                            if (showRatings && puzzle.rating != null) '${puzzle.rating}',
+                            if (puzzle.createdOn != null) puzzle.createdOn!,
+                          ].join(' · '),
+                        )
+                      : null,
                 ),
           ],
         ),

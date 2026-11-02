@@ -2,6 +2,7 @@ import 'package:auto_size_text/auto_size_text.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_riverpod/experimental/mutation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lichess_mobile/src/model/account/account_preferences.dart';
 import 'package:lichess_mobile/src/model/account/account_repository.dart';
 import 'package:lichess_mobile/src/model/auth/auth_controller.dart';
 import 'package:lichess_mobile/src/model/common/perf.dart';
@@ -377,15 +378,20 @@ class _AccountMenuScreenState()
   /// The perf labels are the lichess ones (`Perf.shortLabel`), reused rather than re-typed: they
   /// name the same four speeds, and the account row is not the place to say them differently.
   Widget? _xiangqiUserSubtitle(BuildContext context, AsyncValue<XiangqiUserProfile> profile) {
+    final showRatings = ref.watch(ratingsVisibleProvider(false));
     final value = profile.value;
     if (value == null) return null;
 
     final l10n = context.l10n;
     final ratings = [
-      if (value.bulletRating != null) '${Perf.bullet.shortLabel(l10n)} ${value.bulletRating}',
-      if (value.rapidRating != null) '${Perf.rapid.shortLabel(l10n)} ${value.rapidRating}',
-      if (value.dailyRating != null) '${Perf.correspondence.shortLabel(l10n)} ${value.dailyRating}',
-      if (value.puzzleRating != null) '${Perf.puzzle.shortLabel(l10n)} ${value.puzzleRating}',
+      if (showRatings && value.bulletRating != null)
+        '${Perf.bullet.shortLabel(l10n)} ${value.bulletRating}',
+      if (showRatings && value.rapidRating != null)
+        '${Perf.rapid.shortLabel(l10n)} ${value.rapidRating}',
+      if (showRatings && value.dailyRating != null)
+        '${Perf.correspondence.shortLabel(l10n)} ${value.dailyRating}',
+      if (showRatings && value.puzzleRating != null)
+        '${Perf.puzzle.shortLabel(l10n)} ${value.puzzleRating}',
     ];
     final status = [
       if (value.isOnline) l10n.online else l10n.offline,

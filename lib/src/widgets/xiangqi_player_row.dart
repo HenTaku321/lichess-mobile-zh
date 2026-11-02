@@ -3,6 +3,7 @@ import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
+import 'package:lichess_mobile/src/view/account/rating_pref_aware.dart';
 import 'package:lichess_mobile/src/widgets/player_table.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_avatar.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
@@ -56,19 +57,22 @@ class const XiangqiPlayerRow({
                   compact: compact,
                   clockPosition: effectiveClockPosition,
                   afterName: [
-                    if (rating != null) ...[
-                      const SizedBox(width: 4),
+                    if (rating != null)
                       Flexible(
-                        child: Text(
-                          rating!,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: compact ? 11 : 14,
-                            color: textShade(context, 0.7),
+                        child: RatingPrefAware(
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 4),
+                            child: Text(
+                              rating!,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: compact ? 11 : 14,
+                                color: textShade(context, 0.7),
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                    ],
                     if (isMe) ...[
                       const SizedBox(width: 4),
                       Icon(Icons.person, size: 16, color: textShade(context, 0.5)),

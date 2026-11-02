@@ -21,12 +21,6 @@ class const RatingPrefAware({
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final showRatingAsync = ref.watch(showRatingsPrefProvider);
-
-    return switch (showRatingAsync) {
-      AsyncData(value: ShowRatings.yes) => child,
-      AsyncData(value: ShowRatings.exceptInGame) => isActiveGameOfCurrentUser ? orElse : child,
-      _ => orElse,
-    };
+    return ref.watch(ratingsVisibleProvider(isActiveGameOfCurrentUser)) ? child : orElse;
   }
 }

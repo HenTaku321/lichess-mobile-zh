@@ -4,6 +4,7 @@ import 'package:chessground/chessground.dart' show BrightnessHueFilter;
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lichess_mobile/src/model/account/account_preferences.dart';
 import 'package:lichess_mobile/src/model/puzzle/puzzle_preferences.dart';
 import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
@@ -440,12 +441,19 @@ class _PuzzleBodyState() extends ConsumerState<_PuzzleBody> {
                   icon: Icons.menu,
                   onTap: _loadingNext ? null : _showMenu,
                 ),
-              BottomBarButton(
-                label: context.l10n.getAHint,
-                onTap: state.canHint ? _hint : null,
-                icon: CupertinoIcons.lightbulb,
-                highlighted: state.hint != null,
-              ),
+              if (canReplay)
+                BottomBarButton(
+                  label: context.l10n.analysis,
+                  icon: Icons.biotech,
+                  onTap: _loadingNext || _analysisOpen ? null : _openAnalysis,
+                ),
+              if (!canReplay)
+                BottomBarButton(
+                  label: context.l10n.getAHint,
+                  onTap: state.canHint ? _hint : null,
+                  icon: CupertinoIcons.lightbulb,
+                  highlighted: state.hint != null,
+                ),
               if (state.phase == XiangqiPuzzlePhase.unrecorded)
                 BottomBarButton(
                   label: context.l10n.retry,
@@ -467,9 +475,12 @@ class _PuzzleBodyState() extends ConsumerState<_PuzzleBody> {
                 ),
               ],
               BottomBarButton(
-                label: context.l10n.puzzleNextPuzzle,
+                label: canReplay
+                    ? context.l10n.puzzleContinueTraining
+                    : context.l10n.puzzleNextPuzzle,
                 onTap: state.isLineComplete && !_loadingNext ? () => unawaited(nextPuzzle()) : null,
-                icon: CupertinoIcons.arrow_right,
+                icon: canReplay ? CupertinoIcons.play_arrow_solid : CupertinoIcons.arrow_right,
+                highlighted: canReplay,
               ),
             ],
           ),
@@ -577,10 +588,15 @@ class _PuzzleBodyState() extends ConsumerState<_PuzzleBody> {
 }
 
 /// What the solver is being asked for, and what is left of the day's puzzles.
-class const _PuzzleFacts({required final XiangqiPuzzle puzzle}) extends StatelessWidget {
+class const _PuzzleFacts({required final XiangqiPuzzle puzzle}) extends ConsumerWidget {
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final passRate = puzzle.passRate;
+    final details = [
+      if (ref.watch(ratingsVisibleProvider(false))) context.l10n.puzzleRatingX('${puzzle.rating}'),
+      // Pass rate is an outcome statistic, not a player/puzzle rating.
+      if (passRate != null) '${passRate.round()}%',
+    ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -591,15 +607,11 @@ class const _PuzzleFacts({required final XiangqiPuzzle puzzle}) extends Stateles
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        Text(
-          [
-            context.l10n.puzzleRatingX('${puzzle.rating}'),
-            // The share of attempts that got it right, which is the one number that says how hard
-            // the puzzle is without saying anything about this solver.
-            if (passRate != null) '${passRate.round()}%',
-          ].join(' · '),
-          style: TextTheme.of(context).bodyMedium?.copyWith(color: textShade(context, 0.7)),
-        ),
+        if (details.isNotEmpty)
+          Text(
+            details.join(' · '),
+            style: TextTheme.of(context).bodyMedium?.copyWith(color: textShade(context, 0.7)),
+          ),
         const _QuotaLine(),
       ],
     );

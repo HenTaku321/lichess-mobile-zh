@@ -5,6 +5,7 @@ import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
+import 'package:lichess_mobile/src/view/account/rating_pref_aware.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_online_game_screen.dart';
 import 'package:lichess_mobile/src/widgets/misc.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_avatar.dart';
@@ -172,13 +173,16 @@ class const _SeatLine({
                   ),
                 ),
               ),
-              if (player.rating != null) ...[
-                const SizedBox(width: 4.0),
-                Text(
-                  '${player.rating}',
-                  style: TextStyle(fontSize: 14, color: textShade(context, 0.7)),
+              if (player.rating != null)
+                RatingPrefAware(
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 4),
+                    child: Text(
+                      '${player.rating}',
+                      style: TextStyle(fontSize: 14, color: textShade(context, 0.7)),
+                    ),
+                  ),
                 ),
-              ],
               if (player.isBot) ...[
                 const SizedBox(width: 5.0),
                 Text(

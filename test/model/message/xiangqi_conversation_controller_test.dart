@@ -57,7 +57,11 @@ makeControllerHarness() async {
   await pumpEventQueue();
   return (
     container: container,
-    inbox: fixture.XiangqiInboxHarness(repository: repository, factory: factory),
+    inbox: fixture.XiangqiInboxHarness(
+      repository: repository,
+      factory: factory,
+      sharedSocket: container.read(xiangqiSocketProvider),
+    ),
   );
 }
 

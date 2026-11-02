@@ -83,3 +83,10 @@
   `chat_presentation.dart`，国象和象棋均接入，发送/分页/输入状态与协议仍各自负责。
   房间草稿只保留在按账号/房间分类的内存 provider，退出房间照常关闭 socket；token
   续期保留，退出/换号清空。聊天室仅真实可见非游客名字提供资料入口，待绿验证。
+- `5e8d427c6` / `41376216960` success：交互 170、桌面/消息/聊天室 112、lifecycle 271、
+  截图/几何 1032、全量 3178 通过。新房间返回、跨房间草稿、token 续期及换号、隐藏
+  名字边界已验证；尚未把这些结果当成主观视觉/原生验收。
+- 追加真实国象私信 controller 的气泡分组、时间戳留位和只读输入回归，以及嵌套
+  Navigator 的父路由覆盖边界。`9edeefe2e` 的待运行 run 被 concurrency 自动取代；
+  `dbee8a32c` / `41377468533` 被新 Flutter SDK 的 unnecessary-unawaited lint 阻挡，
+  移除对标记了 @awaitNotRequired 的 Navigator.push 的多余包装，尚未得到行为结果。

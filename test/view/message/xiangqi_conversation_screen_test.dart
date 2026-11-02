@@ -1,3 +1,4 @@
+import 'package:clock/clock.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -94,6 +95,49 @@ Future<ProviderContainer> pumpConversation(
 
 void main() {
   TestLichessBinding.ensureInitialized();
+
+  testWidgets('two locally emitted identical messages do not collide as server identities', (
+    tester,
+  ) async {
+    final container = await pumpConversation(tester);
+    final controller = container.read(
+      xiangqiConversationControllerProvider((
+        chatId: fixture.xiangqiFirstChatId,
+        peerId: fixture.xiangqiFirstPeerId,
+        peer: xiangqiLightUser(fixture.xiangqiFirstPeerId, fixture.xiangqiFirstPeerName),
+      )).notifier,
+    );
+    await withClock(Clock.fixed(DateTime(2026, 11, 2)), () async {
+      expect(await controller.sendMessage('The same local text'), isTrue);
+      expect(await controller.sendMessage('The same local text'), isTrue);
+    });
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(
+      find.byWidgetPredicate(
+        (widget) => widget is RichLinkText && widget.text == 'The same local text',
+      ),
+      findsNWidgets(2),
+    );
+  });
+
+  testWidgets('repeated day sections in a server page do not reuse a global row identity', (
+    tester,
+  ) async {
+    await pumpConversation(
+      tester,
+      firstPage: fixture.xiangqiPagePayload([
+        fixture.xiangqiMessageRow('First day', createdOn: '2024-05-06T09:00:00'),
+        fixture.xiangqiMessageRow('Another day', createdOn: '2024-05-05T09:00:00'),
+        fixture.xiangqiMessageRow('Repeated day', createdOn: '2024-05-06T08:00:00'),
+      ]),
+    );
+    expect(tester.takeException(), isNull);
+    expect(
+      find.byWidgetPredicate((widget) => widget is RichLinkText && widget.text == 'Repeated day'),
+      findsOneWidget,
+    );
+  });
 
   testWidgets('a peer push preserves the older message currently being read', (tester) async {
     final factory = fx.FakeXiangqiChannelFactory();

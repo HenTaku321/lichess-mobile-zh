@@ -28,7 +28,7 @@
 //    (`kXiangqiMinRequestSpacing` documents it for REST). The socket client deliberately has no
 //    spacing of its own — its contract is "emit sends immediately", and the online-game controller
 //    shares it and does not want a hidden delay on a move — so the gap lives here, at the call
-//    site, in [_emitThrottled].
+//    site, in [XiangqiSocketRequestQueue].
 //
 // 4. **`chat.agreement` must never be sent.** On a guest connection it silently mutes the whole
 //    session: no error, no disconnect, and everything after it is dropped
@@ -45,7 +45,6 @@
 // existed.
 
 import 'dart:async';
-import 'dart:collection';
 
 import 'package:clock/clock.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
@@ -56,11 +55,13 @@ import 'package:lichess_mobile/src/model/common/id.dart';
 import 'package:lichess_mobile/src/model/message/message.dart';
 import 'package:lichess_mobile/src/model/user/user.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_page.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_link.dart';
 import 'package:lichess_mobile/src/network/xiangqi_http.dart'
     show XiangqiAuthStorage, kXiangqiMinRequestSpacing, xiangqiAuthStorageProvider;
 import 'package:lichess_mobile/src/network/xiangqi_session_store.dart';
 import 'package:lichess_mobile/src/network/xiangqi_socket.dart';
+import 'package:lichess_mobile/src/network/xiangqi_socket_request_queue.dart';
 import 'package:logging/logging.dart';
 
 part 'xiangqi_inbox_repository.freezed.dart';
@@ -354,12 +355,10 @@ class XiangqiConversationController(final XiangqiConversationKey key)
   }
 }
 
-/// The xiangqi.com private-message protocol, over the shared socket.
+/// The xiangqi.com inbox, with an owned, replaceable transport and a serial no-ID read queue.
 ///
-/// One of these per app, not one per screen: the "at most one `inbox.chat.user` in flight" rule is
-/// a property of the connection, so the queue that enforces it has to outlive any one conversation.
-/// The socket itself is **not** owned here and is never closed — it is the account's shared
-/// connection for inbox and notifications. Online games use independent transports.
+/// The root socket supplies session acquisition only. Closing or resetting this repository never
+/// touches notifications, games, reviews, or the root socket.
 class XiangqiInboxRepository({
   required final XiangqiSocketClient _socket,
   required final XiangqiAuthStorage _storage,
@@ -367,256 +366,160 @@ class XiangqiInboxRepository({
   final Duration _spacing = kXiangqiMinRequestSpacing,
   final Duration _responseTimeout = kXiangqiInboxResponseTimeout,
 }) {
-  /// The socket's events, under one subscription for the life of this repository.
+  late final _requests = XiangqiSocketRequestQueue(
+    socket: _socket,
+    spacing: _spacing,
+    timeout: _responseTimeout,
+  );
   StreamSubscription<XiangqiSocketEvent>? _subscription;
-
-  /// The one `inbox.join` on its way, if any. A second caller shares it rather than emitting again.
-  Completer<IList<Contact>>? _pendingChats;
-
-  /// The `inbox.chat.user` requests, oldest first. Only the head may be in flight.
-  final Queue<_PendingMessages> _messageQueue = Queue();
-
-  /// The queued request for each conversation, so a rebuild does not ask for the same page twice.
-  ///
-  /// A conversation controller can be rebuilt while its first load is still in flight (the app's
-  /// auth state is loaded asynchronously). A duplicate `inbox.chat.user` would take a second turn in
-  /// the queue and wait for a second response the server has no reason to send. Sharing the pending
-  /// future lets both builds read the one answer, while different chat ids remain serialised below.
-  final Map<String, _PendingMessages> _pendingMessages = {};
-  bool _pumping = false;
-
-  /// The messages the server pushed, for whichever conversation is open to hear them.
-  final StreamController<Message> _incoming = StreamController<Message>.broadcast();
-
-  /// When the last inbox emit went out, for the spacing in [_emitThrottled].
-  DateTime? _lastEmitAt;
-
+  final _incoming = StreamController<Message>.broadcast();
   bool _disposed = false;
 
-  /// The parsed `inbox.chat.user.msg.success` frames, as they arrive.
-  ///
-  /// One stream for every conversation: the frame names neither the chat nor the peer, so a
-  /// listener has to know which conversation it is looking at and filter on the sender itself.
   Stream<Message> get incomingMessages => _incoming.stream;
+  Stream<void> get connectionResets => _requests.resets;
 
-  /// The whole chat list, from `inbox.join`.
-  ///
-  /// Returns the rows as [Contact]s so that the merged list can hold them beside the lichess ones.
-  Future<IList<Contact>> loadChats() {
+  Future<IList<Contact>> loadChats() async => (await loadChatsPage(1)).items;
+
+  Future<XiangqiPage<Contact>> loadChatsPage(int page) {
     if (_disposed) return Future.error(const XiangqiInboxException('This repository is disposed.'));
-    final existing = _pendingChats;
-    if (existing != null) return existing.future;
-    final completer = Completer<IList<Contact>>();
-    _pendingChats = completer;
-    unawaited(_runLoadChats(completer));
-    return completer.future;
+    if (page < 1) return Future.error(RangeError.range(page, 1, null, 'page'));
+    _ensureListening();
+    int? generation;
+    return _requests.read(
+      event: kXiangqiInboxJoinEvent,
+      data: {'page': page},
+      response: kXiangqiInboxChatsEvent,
+      decode: (payload) => xiangqiContactsPageFromPayload(payload, requestedPage: page),
+      key: ('chats', sessionStore?.accountGeneration, page),
+      prepare: () async {
+        await sessionStore?.ready;
+        generation = sessionStore?.accountGeneration;
+      },
+      isCurrent: () =>
+          !_disposed && (generation == null || generation == sessionStore?.accountGeneration),
+    );
   }
 
-  Future<void> _runLoadChats(Completer<IList<Contact>> completer) async {
-    try {
-      await _ensureListening();
-      await _emitThrottled(kXiangqiInboxJoinEvent, const {'page': 1});
-      await completer.future.timeout(_responseTimeout);
-    } on Object catch (error, stackTrace) {
-      if (!completer.isCompleted) completer.completeError(error, stackTrace);
-    } finally {
-      if (identical(_pendingChats, completer)) _pendingChats = null;
-    }
+  Future<IList<Message>> loadMessages(String chatId) async =>
+      (await loadMessagesPage(chatId, 1)).items;
+
+  Future<XiangqiPage<Message>> loadMessagesPage(String chatId, int page) {
+    if (_disposed) return Future.error(const XiangqiInboxException('This repository is disposed.'));
+    if (page < 1) return Future.error(RangeError.range(page, 1, null, 'page'));
+    _ensureListening();
+    int? generation;
+    return _requests.read(
+      event: kXiangqiInboxChatUserEvent,
+      data: {'chat_id': chatId, 'page': page},
+      response: kXiangqiInboxUserMessagesEvent,
+      decode: (payload) => xiangqiMessagesPageFromPayload(payload, requestedPage: page),
+      key: ('messages', sessionStore?.accountGeneration, chatId, page),
+      prepare: () async {
+        await sessionStore?.ready;
+        generation = sessionStore?.accountGeneration;
+      },
+      isCurrent: () =>
+          !_disposed && (generation == null || generation == sessionStore?.accountGeneration),
+    );
   }
 
-  /// One page of [chatId]'s messages.
-  ///
-  /// Serialised against every other conversation's fetch — see the file header, fact 1. A caller
-  /// that asks while another is in flight is queued behind it and answered by the response to its
-  /// own emit, never by the one in flight.
-  Future<IList<Message>> loadMessages(String chatId) {
-    if (_disposed) {
-      return Future.error(const XiangqiInboxException('This repository is disposed.'));
-    }
-    final existing = _pendingMessages[chatId];
-    if (existing != null) return existing.completer.future;
-    final completer = Completer<IList<Message>>();
-    final pending = _PendingMessages(chatId, completer);
-    _pendingMessages[chatId] = pending;
-    _messageQueue.add(pending);
-    unawaited(_pumpMessages());
-    return completer.future;
-  }
-
-  Future<void> _pumpMessages() async {
-    if (_pumping) return;
-    _pumping = true;
-    try {
-      while (_messageQueue.isNotEmpty && !_disposed) {
-        final head = _messageQueue.first;
-        try {
-          await _ensureListening();
-          await _emitThrottled(kXiangqiInboxChatUserEvent, {'chat_id': head.chatId});
-          await head.completer.future.timeout(_responseTimeout);
-        } on Object catch (error, stackTrace) {
-          if (!head.completer.isCompleted) head.completer.completeError(error, stackTrace);
-        } finally {
-          if (_messageQueue.isNotEmpty && identical(_messageQueue.first, head)) {
-            _messageQueue.removeFirst();
-          }
-          if (identical(_pendingMessages[head.chatId], head)) {
-            _pendingMessages.remove(head.chatId);
-          }
-        }
-      }
-    } finally {
-      _pumping = false;
-    }
-  }
-
-  /// Sends [text] to a xiangqi.com user, creating the conversation if [chatId] is empty.
-  ///
-  /// `sender_id` is sent because the server's own client sends it (capture entry 42), and it is
-  /// taken from the stored session rather than passed in: this device's identity is the session's,
-  /// and a caller must not be able to send as anyone else. A guest's session id is not a number, so
-  /// the id is written back as whatever it is — the payload carries no identity the token does not
-  /// already carry.
+  /// No ACK or delivery receipt is invented. The return value only confirms local emission.
   Future<void> sendMessage({
     required String chatId,
     required int peerId,
     required String peerName,
     required String text,
-  }) async {
-    final session = await (sessionStore?.read() ?? _storage.read());
-    if (session == null) {
-      throw const XiangqiInboxException('No xiangqi.com session to send with.');
-    }
-    await _ensureListening();
-    await _emitThrottled(kXiangqiInboxNewMessageEvent, {
-      'sender_id': _xiangqiJsonId(session.userId),
+  }) {
+    int? generation;
+    final payload = <String, Object?>{
       'receiver_username': peerName,
       'receiver_id': peerId,
       'message': text,
-      // An empty chat id means "there is no conversation yet", and the server wants a literal null
-      // for that — the capture shows `"chat_id": null` on the first message to a stranger (entry
-      // 42), and the conversation is created by that send.
       'chat_id': chatId.isEmpty ? null : chatId,
+    };
+    _ensureListening();
+    return _requests.sendNoAck(
+      kXiangqiInboxNewMessageEvent,
+      data: payload,
+      prepare: () async {
+        final session = await (sessionStore?.read() ?? _storage.read());
+        if (session == null) {
+          throw const XiangqiInboxException('No xiangqi.com session to send with.');
+        }
+        generation = sessionStore?.accountGeneration;
+        payload['sender_id'] = _xiangqiJsonId(session.userId);
+      },
+      isCurrent: () =>
+          !_disposed && (generation == null || generation == sessionStore?.accountGeneration),
+    );
+  }
+
+  Future<void> markRead(String chatId) {
+    _ensureListening();
+    int? generation;
+    return _requests.sendNoAck(
+      kXiangqiInboxMarkReadEvent,
+      data: {'chat_id': chatId},
+      prepare: () async {
+        await sessionStore?.ready;
+        generation = sessionStore?.accountGeneration;
+      },
+      isCurrent: () =>
+          !_disposed && (generation == null || generation == sessionStore?.accountGeneration),
+    );
+  }
+
+  Future<void> leave() {
+    if (_disposed || !_requests.isConnected) return Future<void>.value();
+    final generation = sessionStore?.accountGeneration;
+    return _requests.sendNoAck(
+      kXiangqiInboxLeaveEvent,
+      data: const {'chat_id': null},
+      isCurrent: () => !_disposed && generation == sessionStore?.accountGeneration,
+    );
+  }
+
+  void _ensureListening() {
+    _subscription ??= _requests.events.listen((event) {
+      if (_disposed || event.name != kXiangqiInboxMessageSentEvent) return;
+      final message = xiangqiMessageFromPayload(_unwrap(event.data));
+      if (message != null && !_incoming.isClosed) _incoming.add(message);
     });
   }
 
-  /// Tells the server the conversation has been read. There is no answer to wait for.
-  Future<void> markRead(String chatId) async {
-    await _ensureListening();
-    await _emitThrottled(kXiangqiInboxMarkReadEvent, {'chat_id': chatId});
-  }
-
-  /// Leaves the inbox. Best effort, and only useful while the socket is up.
-  Future<void> leave() async {
-    if (_disposed || !_socket.isConnected) return;
-    await _emitThrottled(kXiangqiInboxLeaveEvent, const {'chat_id': null});
-  }
-
-  /// The socket stream, subscribed once, and the handshake awaited.
-  ///
-  /// The socket's event stream survives its own reconnects — it is one broadcast controller for the
-  /// client's life — so this subscription does, and it never has to be re-made.
-  Future<void> _ensureListening() {
-    _subscription ??= _socket.stream.listen(_onEvent);
-    return _socket.connect();
-  }
-
-  void _onEvent(XiangqiSocketEvent event) {
-    if (_disposed) return;
-    switch (event.name) {
-      case kXiangqiInboxChatsEvent:
-        final completer = _pendingChats;
-        if (completer == null || completer.isCompleted) return;
-        try {
-          completer.complete(xiangqiContactsFromChats(event.data));
-        } on Object catch (error, stackTrace) {
-          completer.completeError(error, stackTrace);
-        }
-      case kXiangqiInboxUserMessagesEvent:
-        // Matched to the head of the queue, which is the only request that could have been in
-        // flight when this arrived — the response names no conversation. An orphan is dropped: it
-        // belongs to a conversation this client cannot name, and attaching it to the wrong one would
-        // show one peer's messages under another's name.
-        final head = _messageQueue.isEmpty ? null : _messageQueue.first;
-        if (head == null || head.completer.isCompleted) {
-          _logger.warning('An inbox page arrived with no request queued for it; dropped.');
-          return;
-        }
-        try {
-          head.completer.complete(xiangqiMessagesFromPayload(event.data));
-        } on Object catch (error, stackTrace) {
-          head.completer.completeError(error, stackTrace);
-        }
-      case kXiangqiInboxMessageSentEvent:
-        final message = xiangqiMessageFromPayload(_unwrap(event.data));
-        if (message != null && !_incoming.isClosed) _incoming.add(message);
-      case kXiangqiInboxNewChatEvent:
-        // A conversation that did not exist before this frame. It carries a whole chat row, and the
-        // row is deliberately not turned into one here: the chat list is read afresh when the
-        // conversation screen pops, so there is nothing for a live insert to correct, and holding a
-        // live list here would mean this repository owning state that is not its own.
-        break;
-      default:
-        break;
-    }
-  }
-
-  /// Emits [event], holding it back until at least [_spacing] has passed since the last emit.
-  ///
-  /// The gap has to be here rather than in the socket client: that client's contract is that an
-  /// emit sends immediately, and the online-game controller — which shares it — must not get a
-  /// silent delay on its moves. The inbox, by contrast, is where the burst happens: a chat list is
-  /// followed by one `inbox.chat.user` per conversation, and the server drops whatever arrives
-  /// inside the window without saying so.
-  Future<void> _emitThrottled(String event, Object? data) async {
-    final generation = sessionStore?.generation;
-    final last = _lastEmitAt;
-    if (last != null) {
-      final wait = _spacing - clock.now().difference(last);
-      if (wait > Duration.zero) await Future<void>.delayed(wait);
-    }
-    if (_disposed || generation != sessionStore?.generation) {
-      throw const XiangqiInboxException('The xiangqi.com session changed before sending.');
-    }
-    _lastEmitAt = clock.now();
-    _socket.emitNoAck(event, data: data);
-  }
-
-  /// Drops the subscription, tells the server this client left, and fails anything still waiting.
-  ///
-  /// The socket is deliberately left alone: it is shared with account notifications.
   void dispose() {
     if (_disposed) return;
     _disposed = true;
     unawaited(_subscription?.cancel());
     _subscription = null;
-
-    // Best effort and unthrottled: one frame at teardown, not a burst.
-    if (_socket.isConnected) {
-      try {
-        _socket.emitNoAck(kXiangqiInboxLeaveEvent, data: const {'chat_id': null});
-      } on Object catch (_) {
-        // The socket can go down between the check and the send; there is nobody left to tell.
-      }
-    }
-
-    final pendingChats = _pendingChats;
-    _pendingChats = null;
-    if (pendingChats != null && !pendingChats.isCompleted) {
-      pendingChats.completeError(const XiangqiInboxException('The repository was disposed.'));
-    }
-    while (_messageQueue.isNotEmpty) {
-      final head = _messageQueue.removeFirst();
-      if (!head.completer.isCompleted) {
-        head.completer.completeError(const XiangqiInboxException('The repository was disposed.'));
-      }
-    }
-    _pendingMessages.clear();
-    _incoming.close();
+    _requests.dispose(lastEvent: kXiangqiInboxLeaveEvent, lastData: const {'chat_id': null});
+    unawaited(_incoming.close());
   }
 }
 
-/// One queued `inbox.chat.user`, with the conversation it was asked about.
-class _PendingMessages(final String chatId, final Completer<IList<Message>> completer);
+XiangqiPage<Contact> xiangqiContactsPageFromPayload(Object? payload, {required int requestedPage}) {
+  final envelope = _asMap(_unwrap(payload));
+  if (envelope == null || envelope['items'] is! List) {
+    throw const FormatException('Invalid xiangqi.com inbox page envelope.');
+  }
+  final items = xiangqiContactsFromChats(payload);
+  if ((envelope['items'] as List).isNotEmpty && items.isEmpty) {
+    throw const FormatException('The xiangqi.com inbox page contains no readable contacts.');
+  }
+  return XiangqiPage.fromMetadata(items: items, requestedPage: requestedPage, metadata: envelope);
+}
+
+XiangqiPage<Message> xiangqiMessagesPageFromPayload(Object? payload, {required int requestedPage}) {
+  final envelope = _asMap(_unwrap(payload));
+  if (envelope == null || envelope['items'] is! List) {
+    throw const FormatException('Invalid xiangqi.com message page envelope.');
+  }
+  final items = xiangqiMessagesFromPayload(payload);
+  if ((envelope['items'] as List).isNotEmpty && items.isEmpty) {
+    throw const FormatException('The xiangqi.com message page contains no readable messages.');
+  }
+  return XiangqiPage.fromMetadata(items: items, requestedPage: requestedPage, metadata: envelope);
+}
 
 /// The chat list of an `inbox.chats` payload, as [Contact]s.
 ///
@@ -776,8 +679,8 @@ int? _asInt(Object? value) => value is int
 /// The xiangqi.com inbox: one repository for the app.
 ///
 /// Not `autoDispose`: the serialising queue inside it is a property of the socket connection, and a
-/// queue that went away with the contacts screen would let two screens ask at once. The socket it
-/// uses is the app's, read from [xiangqiSocketProvider] and never closed here.
+/// queue that went away with the contacts screen would let two screens ask at once. It owns its
+/// forked transport; the root [xiangqiSocketProvider] supplies session acquisition only.
 final xiangqiInboxRepositoryProvider = Provider<XiangqiInboxRepository>((Ref ref) {
   ref.watch(xiangqiAccountGenerationProvider);
   final sessions = ref.read(xiangqiSessionStoreProvider);

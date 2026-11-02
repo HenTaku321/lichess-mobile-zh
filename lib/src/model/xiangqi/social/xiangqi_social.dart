@@ -1,6 +1,7 @@
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_live_game.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_page.dart';
 
 part 'xiangqi_social.freezed.dart';
 
@@ -131,6 +132,37 @@ XiangqiNotifications xiangqiNotificationsFromJson(Object? json) {
     totalPages: _int(envelope?['total_pages']) ?? 0,
     nextPage: _int(envelope?['next_page_num']),
   );
+}
+
+/// A strict page reader for the notification protocol's own nested envelope.
+XiangqiPage<XiangqiNotification> xiangqiNotificationsPageFromJson(
+  Object? json, {
+  required int requestedPage,
+}) {
+  final first = json is List && json.isNotEmpty ? json.first : json;
+  final outer = _map(first);
+  final data = _map(outer?['data']) ?? outer;
+  final envelope = _map(data?['notifications']);
+  if (envelope == null || envelope['items'] is! List) {
+    throw const FormatException('Invalid xiangqi.com notification page envelope.');
+  }
+  final items = xiangqiNotificationsFromJson(first).items;
+  if ((envelope['items'] as List).isNotEmpty && items.isEmpty) {
+    throw const FormatException('The xiangqi.com notification page contains no readable entries.');
+  }
+  return XiangqiPage.fromMetadata(items: items, requestedPage: requestedPage, metadata: envelope);
+}
+
+XiangqiPage<XiangqiFriend> xiangqiFriendsPageFromJson(Object? json, {required int requestedPage}) {
+  final envelope = _map(json);
+  if (envelope == null || envelope['items'] is! List) {
+    throw const FormatException('Invalid xiangqi.com friend page envelope.');
+  }
+  final items = xiangqiFriendsFromJson(json).friends;
+  if ((envelope['items'] as List).isNotEmpty && items.isEmpty) {
+    throw const FormatException('The xiangqi.com friend page contains no readable entries.');
+  }
+  return XiangqiPage.fromMetadata(items: items, requestedPage: requestedPage, metadata: envelope);
 }
 
 /// A page of friends, read from a `friends/<username>` body.

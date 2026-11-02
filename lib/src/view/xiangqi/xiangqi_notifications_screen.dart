@@ -45,13 +45,14 @@ class _XiangqiNotificationsScreenState() extends ConsumerState<XiangqiNotificati
     ref.listen(xiangqiAccountGenerationProvider, (_, _) {
       if (mounted) setState(() => _marking = false);
     });
-    final notifications = ref.watch(xiangqiNotificationsProvider);
+    final notifications = ref.watch(xiangqiNotificationsControllerProvider);
 
     final identity = ref.watch(xiangqiAccountGenerationProvider);
     return XiangqiRefreshScope(
       identity: identity,
-      onRefresh: () =>
-          _marking ? Future<void>.value() : ref.refresh(xiangqiNotificationsProvider.future),
+      onRefresh: () => _marking
+          ? Future<void>.value()
+          : ref.read(xiangqiNotificationsControllerProvider.notifier).refresh(),
       builder: (context, refresh, busy) => XiangqiRetainedData(
         identity: identity,
         value: notifications,
@@ -59,20 +60,31 @@ class _XiangqiNotificationsScreenState() extends ConsumerState<XiangqiNotificati
           appBar: AppBar(
             title: AppBarTitleText('${context.l10n.mobileXiangqi} · ${context.l10n.notifications}'),
             actions: [
-              DesktopRefreshButton(onRefresh: refresh, busy: busy || _marking),
+              DesktopRefreshButton(
+                onRefresh: refresh,
+                busy: busy || _marking || (notifications.value?.refreshing ?? false),
+              ),
               IconButton(
                 tooltip: context.l10n.mobileXiangqiNotificationsMarkAllRead,
                 icon: const Icon(Icons.done_all),
                 // Nothing to mark when there is nothing unread, and nothing to mark while a mark is
                 // already on its way.
-                onPressed: busy || _marking || (notifications.value?.unreadCount ?? 0) == 0
+                onPressed:
+                    busy ||
+                        _marking ||
+                        (notifications.value?.busy ?? false) ||
+                        (notifications.value?.items.where((item) => !item.isRead).length ?? 0) == 0
                     ? null
                     : _markAllRead,
               ),
             ],
           ),
           body: notifications.when(
-            data: (notifications) => notifications.items.isEmpty
+            data: (notifications) =>
+                notifications.items.isEmpty &&
+                    notifications.nextPage == null &&
+                    notifications.refreshError == null &&
+                    notifications.moreError == null
                 ? XiangqiRefreshableEmpty(
                     onRefresh: refresh,
                     child: const Padding(padding: Styles.bodySectionPadding, child: _Empty()),
@@ -82,12 +94,36 @@ class _XiangqiNotificationsScreenState() extends ConsumerState<XiangqiNotificati
                     child: ListView(
                       physics: const AlwaysScrollableScrollPhysics(),
                       children: [
-                        ListSection(
-                          hasLeading: true,
-                          children: [
-                            for (final notification in notifications.items)
-                              _NotificationRow(notification: notification),
-                          ],
+                        if (notifications.items.isEmpty)
+                          const Padding(padding: Styles.bodySectionPadding, child: _Empty()),
+                        if (notifications.items.isNotEmpty)
+                          ListSection(
+                            hasLeading: true,
+                            children: [
+                              for (final notification in notifications.items)
+                                _NotificationRow(notification: notification),
+                            ],
+                          ),
+                        if (notifications.refreshError != null)
+                          XiangqiRetryTile(onRetry: busy ? null : () => unawaited(refresh())),
+                        XiangqiPaginationFooter(
+                          hasMore: notifications.nextPage != null,
+                          loading: notifications.loadingMore,
+                          failed: notifications.moreError != null,
+                          onMore: notifications.refreshing || _marking
+                              ? null
+                              : () => unawaited(
+                                  ref
+                                      .read(xiangqiNotificationsControllerProvider.notifier)
+                                      .getMore(),
+                                ),
+                          onRetry: notifications.refreshing || _marking
+                              ? null
+                              : () => unawaited(
+                                  ref
+                                      .read(xiangqiNotificationsControllerProvider.notifier)
+                                      .getMore(),
+                                ),
                         ),
                       ],
                     ),
@@ -124,9 +160,11 @@ class _XiangqiNotificationsScreenState() extends ConsumerState<XiangqiNotificati
     final generation = ref.read(xiangqiAccountGenerationProvider);
     setState(() => _marking = true);
     try {
-      await markAllXiangqiNotificationsRead(ref);
+      final marked = await ref.read(xiangqiNotificationsControllerProvider.notifier).markAllRead();
       if (!mounted || generation != ref.read(xiangqiAccountGenerationProvider)) return;
-      ref.invalidate(xiangqiNotificationsProvider);
+      if (!marked) {
+        showSnackBar(context, context.l10n.mobileSomethingWentWrong, type: SnackBarType.error);
+      }
     } catch (_) {
       if (!mounted || generation != ref.read(xiangqiAccountGenerationProvider)) return;
       showSnackBar(context, context.l10n.mobileSomethingWentWrong, type: SnackBarType.error);

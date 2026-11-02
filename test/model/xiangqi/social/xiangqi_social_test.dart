@@ -66,6 +66,42 @@ Map<String, Object?> user(String name) => {
 
 void main() {
   group('notifications', () {
+    test('the strict page reader preserves the requested second-page metadata', () {
+      final result = xiangqiNotificationsPageFromJson({
+        'data': {
+          'notifications': {
+            'items': [notification(id: 2)],
+            'total_pages': 2,
+            'next_page_num': null,
+            'prev_page_num': 1,
+            'has_next_page': false,
+          },
+        },
+      }, requestedPage: 2);
+      expect(result.currentPage, 2);
+      expect(result.previousPage, 1);
+      expect(result.nextPage, isNull);
+      expect(result.items.single.id, 2);
+    });
+
+    for (final json in <Object?>[
+      null,
+      'nope',
+      const {},
+      const {
+        'data': {
+          'notifications': {'total_pages': 1},
+        },
+      },
+    ]) {
+      test('a malformed live page $json is not accepted as an empty result', () {
+        expect(
+          () => xiangqiNotificationsPageFromJson(json, requestedPage: 1),
+          throwsFormatException,
+        );
+      });
+    }
+
     test('are read out of the two envelopes they arrive in', () {
       // The frame's payload is `{data: {notifications: {...}}}`: two levels, and both are real.
       final notifications = xiangqiNotificationsFromJson(payload(items: [notification()]));

@@ -148,3 +148,46 @@ class const XiangqiRetryTile({required final VoidCallback? onRetry}) extends Sta
     ),
   );
 }
+
+/// The same affordance for an explicit next page and a failed next-page retry.
+class const XiangqiPaginationFooter({
+  required final bool hasMore,
+  final bool loading = false,
+  final bool failed = false,
+  final VoidCallback? onMore,
+  final VoidCallback? onRetry,
+}) extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    if (!hasMore && !failed && !loading) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (failed) Text(context.l10n.mobileSomethingWentWrong, textAlign: TextAlign.center),
+          TextButton(
+            onPressed: loading
+                ? null
+                : failed
+                ? onRetry
+                : onMore,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (loading) ...[
+                  const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator.adaptive(strokeWidth: 2),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                Text(failed ? context.l10n.retry : context.l10n.mobileLoadMore),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

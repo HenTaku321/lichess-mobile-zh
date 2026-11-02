@@ -6,15 +6,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' show Client, Request, Response;
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/social/xiangqi_social.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_page.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_pagination.dart';
 import 'package:lichess_mobile/src/network/connectivity.dart';
 import 'package:lichess_mobile/src/network/http.dart' show ServerException;
 import 'package:lichess_mobile/src/network/xiangqi_http.dart';
 import 'package:lichess_mobile/src/network/xiangqi_session_store.dart';
 import 'package:lichess_mobile/src/network/xiangqi_socket.dart';
+import 'package:lichess_mobile/src/network/xiangqi_socket_request_queue.dart';
 import 'package:lichess_mobile/src/network/xiangqi_uri.dart';
-import 'package:logging/logging.dart';
-
-final _logger = Logger('XiangqiSocial');
 
 /// The event a client sends to be given its notifications.
 const String kXiangqiNotificationsEvent = 'get.notifications';
@@ -69,19 +69,122 @@ class const XiangqiSocialException(final XiangqiSocialFailure reason) implements
 /// measured on 2026-10-16, a guest's `get.notifications` was answered by the server **disconnecting
 /// the namespace** (`41/xiangqi,`) rather than by a message. See `xiangqi-com-re/docs/social.md`.
 final xiangqiNotificationsProvider = FutureProvider.autoDispose<XiangqiNotifications>((ref) async {
-  ref.watch(xiangqiAccountGenerationProvider);
-  await ref.watch(xiangqiSessionReadyProvider.future);
-  if (!ref.watch(isXiangqiLoggedInProvider)) {
-    throw const XiangqiSocialException(XiangqiSocialFailure.noSession);
-  }
-  final socket = await _socketOf(ref);
-  final answer = socket.stream
-      .firstWhere((event) => event.name == kXiangqiNotificationsSuccessEvent)
-      .timeout(kXiangqiSocialTimeout);
-  await socket.emit(kXiangqiNotificationsEvent, data: const {}, timeout: kXiangqiSocialTimeout);
-  final frame = await answer;
-  return xiangqiNotificationsFromJson(_unwrap(frame.data));
+  final page = await ref.watch(xiangqiNotificationsControllerProvider.future);
+  return XiangqiNotifications(
+    items: page.items,
+    totalPages: page.totalPages ?? 0,
+    nextPage: page.nextPage,
+  );
 }, name: 'XiangqiNotificationsProvider');
+
+class XiangqiNotificationsRepository({
+  required final XiangqiSocketClient _socket,
+  required final XiangqiSessionStore _sessions,
+  required final bool Function() _online,
+}) {
+  late final _requests = XiangqiSocketRequestQueue(socket: _socket, timeout: kXiangqiSocialTimeout);
+  bool _disposed = false;
+
+  Stream<void> get connectionResets => _requests.resets;
+
+  Future<void> _prepare() async {
+    if (_disposed) throw const XiangqiSocialException(.failed);
+    if (!_online()) throw const XiangqiSocialException(.offline);
+    final session = await _sessions.read();
+    if (_disposed || session == null || session.isGuest) {
+      throw const XiangqiSocialException(.noSession);
+    }
+  }
+
+  Future<XiangqiPage<XiangqiNotification>> loadPage(int page) {
+    if (page < 1) return Future.error(RangeError.range(page, 1, null, 'page'));
+    int? generation;
+    return _requests.read(
+      event: kXiangqiNotificationsEvent,
+      data: {'page': page},
+      response: kXiangqiNotificationsSuccessEvent,
+      ack: true,
+      key: ('notifications', _sessions.accountGeneration, page),
+      prepare: () async {
+        await _prepare();
+        generation = _sessions.accountGeneration;
+      },
+      isCurrent: () =>
+          !_disposed && (generation == null || generation == _sessions.accountGeneration),
+      decode: (data) => xiangqiNotificationsPageFromJson(data, requestedPage: page),
+    );
+  }
+
+  Future<bool> markAllRead() {
+    int? generation;
+    return _requests.read(
+      event: kXiangqiMarkAllReadEvent,
+      data: const {},
+      response: kXiangqiMarkAllReadSuccessEvent,
+      ack: true,
+      key: ('mark-all-read', _sessions.accountGeneration),
+      prepare: () async {
+        await _prepare();
+        generation = _sessions.accountGeneration;
+      },
+      isCurrent: () =>
+          !_disposed && (generation == null || generation == _sessions.accountGeneration),
+      decode: (_) => true,
+    );
+  }
+
+  void dispose() {
+    if (_disposed) return;
+    _disposed = true;
+    _requests.dispose();
+  }
+}
+
+final xiangqiNotificationsRepositoryProvider = Provider<XiangqiNotificationsRepository>((ref) {
+  ref.watch(xiangqiAccountGenerationProvider);
+  final repository = XiangqiNotificationsRepository(
+    socket: ref.read(xiangqiSocketProvider),
+    sessions: ref.read(xiangqiSessionStoreProvider),
+    online: () => ref.read(isDeviceOnlineProvider),
+  );
+  ref.onDispose(repository.dispose);
+  return repository;
+}, name: 'XiangqiNotificationsRepositoryProvider');
+
+final xiangqiNotificationsControllerProvider =
+    AsyncNotifierProvider.autoDispose<
+      XiangqiNotificationsController,
+      XiangqiPagedState<XiangqiNotification>
+    >(XiangqiNotificationsController.new, name: 'XiangqiNotificationsControllerProvider');
+
+class XiangqiNotificationsController extends XiangqiPagedController<XiangqiNotification> {
+  late XiangqiNotificationsRepository _repository;
+
+  @override
+  Future<XiangqiPagedState<XiangqiNotification>> build() {
+    _repository = ref.watch(xiangqiNotificationsRepositoryProvider);
+    final resets = _repository.connectionResets.listen((_) {
+      if (ref.mounted && state.hasValue && !state.requireValue.busy) unawaited(refresh());
+    });
+    ref.onDispose(() => unawaited(resets.cancel()));
+    return super.build();
+  }
+
+  @override
+  Future<XiangqiPage<XiangqiNotification>> loadPage(int page) => _repository.loadPage(page);
+
+  @override
+  Object itemKey(XiangqiNotification item) => item.id;
+
+  Future<bool> markAllRead() async {
+    final generation = ref.read(xiangqiAccountGenerationProvider);
+    final marked = await _repository.markAllRead();
+    if (!ref.mounted || generation != ref.read(xiangqiAccountGenerationProvider)) return false;
+    updateItems((item) => item.copyWith(isRead: true));
+    unawaited(refresh());
+    return marked;
+  }
+}
 
 /// The account's friends, from `GET /api/friends/<username>`.
 ///
@@ -172,56 +275,8 @@ final xiangqiSocialRepositoryProvider = Provider<XiangqiSocialRepository>((Ref r
 /// see [kXiangqiMarkAllReadSuccessEvent] — and a request that is not answered is a failure rather
 /// than a success this app assumes.
 Future<bool> markAllXiangqiNotificationsRead(WidgetRef ref) async {
-  if (!ref.read(isXiangqiLoggedInProvider)) {
-    throw const XiangqiSocialException(XiangqiSocialFailure.noSession);
-  }
-  final socket = await _connect(
-    online: ref.read(isDeviceOnlineProvider),
-    socket: ref.read(xiangqiSocketProvider),
-  );
-  final answer = socket.stream
-      .firstWhere((event) => event.name == kXiangqiMarkAllReadSuccessEvent)
-      .timeout(kXiangqiSocialTimeout);
-  await socket.emit(kXiangqiMarkAllReadEvent, data: const {}, timeout: kXiangqiSocialTimeout);
-  await answer;
-  return true;
+  return ref.read(xiangqiNotificationsRepositoryProvider).markAllRead();
 }
-
-/// The connected socket, or a [XiangqiSocialException] saying why there is none.
-///
-/// **No session check here**, and that is not an oversight: the socket opens a guest session of its
-/// own when there is none — see `xiangqiSocketProvider` — so "is there a token" is its question and
-/// not this one's. What the two callers that need a *real* account do is ask
-/// [isXiangqiLoggedInProvider] first and throw [XiangqiSocialFailure.noSession] themselves, which is
-/// the only place that reason is true.
-///
-/// The two things it does need are passed in rather than read from a container, because there are
-/// two kinds of container here: a provider's own `Ref` and a widget's `WidgetRef` are different
-/// types with the same `read`, and the one function that opens the socket is worth more than the two
-/// it would take to open it from both.
-Future<XiangqiSocketClient> _connect({
-  required bool online,
-  required XiangqiSocketClient socket,
-}) async {
-  if (!online) throw const XiangqiSocialException(XiangqiSocialFailure.offline);
-  try {
-    await socket.connect();
-  } catch (error, stackTrace) {
-    _logger.warning('The xiangqi.com socket would not open.', error, stackTrace);
-    throw const XiangqiSocialException(XiangqiSocialFailure.failed);
-  }
-  return socket;
-}
-
-/// The connected socket a provider asks with.
-///
-/// **`watch`, not `read`, for the session and the network.** Both are things that arrive after the
-/// first build — the session is restored from storage a microtask later — and a provider that read
-/// them once would settle into "no session" and stay there for the life of the screen. The socket
-/// itself is read, because it is a client rather than a state: the same one is handed back whenever
-/// it is asked for, and watching it would subscribe to nothing.
-Future<XiangqiSocketClient> _socketOf(Ref ref) =>
-    _connect(online: ref.watch(isDeviceOnlineProvider), socket: ref.read(xiangqiSocketProvider));
 
 /// Reads [path] over the xiangqi.com client, with no session required.
 ///
@@ -231,7 +286,7 @@ Future<XiangqiSocketClient> _socketOf(Ref ref) =>
 /// [xiangqiNotificationsProvider]) check for one themselves, and say which of the two things is
 /// missing when it is.
 ///
-/// `watch` and not `read` for the network, for the reason [_socketOf] gives.
+/// Watch network and account identity so a public lookup can recover after connectivity changes.
 Future<Object?> _getJson(Ref ref, String path, Map<String, String> query) async {
   ref.watch(xiangqiAccountGenerationProvider);
   if (!ref.watch(isDeviceOnlineProvider)) {
@@ -251,11 +306,4 @@ Future<Object?> _getJson(Ref ref, String path, Map<String, String> query) async 
   } catch (_) {
     throw FormatException('xiangqi.com answered $path with something that is not JSON.');
   }
-}
-
-/// The payload a socket event carries, unwrapped from the two envelopes it arrives in.
-Object? _unwrap(Object? data) {
-  final first = data is List && data.isNotEmpty ? data.first : data;
-  final map = first is Map<String, dynamic> ? first : null;
-  return map?['data'] ?? first;
 }

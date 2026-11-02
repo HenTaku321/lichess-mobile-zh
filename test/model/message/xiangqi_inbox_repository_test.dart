@@ -379,7 +379,10 @@ void main() {
       final first = harness.repository.loadMessages(xiangqiFirstChatId);
       await completeHandshake(harness);
       expect(harness.events, [kXiangqiInboxChatUserEvent]);
-      expect(harness.payloadOf(kXiangqiInboxChatUserEvent), {'chat_id': xiangqiFirstChatId});
+      expect(harness.payloadOf(kXiangqiInboxChatUserEvent), {
+        'chat_id': xiangqiFirstChatId,
+        'page': 1,
+      });
 
       final second = harness.repository.loadMessages(xiangqiSecondChatId);
       await pumpEventQueue();
@@ -393,8 +396,11 @@ void main() {
 
       // Only now, with the first answered, does the second go out.
       expect(harness.events, [kXiangqiInboxChatUserEvent, kXiangqiInboxChatUserEvent]);
-      expect(harness.payloadOf(kXiangqiInboxChatUserEvent), {'chat_id': xiangqiFirstChatId});
-      expect(harness.emits.last.data, {'chat_id': xiangqiSecondChatId});
+      expect(harness.payloadOf(kXiangqiInboxChatUserEvent), {
+        'chat_id': xiangqiFirstChatId,
+        'page': 1,
+      });
+      expect(harness.emits.last.data, {'chat_id': xiangqiSecondChatId, 'page': 1});
 
       harness.channel.fromServer(
         xiangqiMessagesFrame([xiangqiMessageRow('哈哈哈', senderId: 200002)]),
@@ -426,6 +432,7 @@ void main() {
       await completeHandshake(harness);
 
       harness.channel.fromServer(xiangqiMessagesFrame([xiangqiMessageRow('orphan')]));
+      harness.channel.fromServer(xiangqiChatsFrame([xiangqiFirstChatRow]));
       await pumpEventQueue();
 
       final messages = harness.repository.loadMessages(xiangqiFirstChatId);
@@ -523,7 +530,7 @@ void main() {
       await expectLater(messages, throwsA(isA<TimeoutException>()));
     });
 
-    test('leaves the inbox when it is disposed, and never closes the shared socket', () async {
+    test('leaves the inbox and closes its owned transport when disposed', () async {
       final harness = await makeHarness();
       harness.repository.loadChats().ignore();
       await completeHandshake(harness);
@@ -532,9 +539,8 @@ void main() {
       await pumpEventQueue();
 
       expect(harness.events, [kXiangqiInboxJoinEvent, kXiangqiInboxLeaveEvent]);
-      // The socket is shared with the online-game controller, so a disposed inbox must not take it
-      // down with it.
-      expect(harness.channel.closed, isFalse);
+      expect(harness.channel.closed, isTrue);
+      expect(harness.sharedSocket.isDisposed, isFalse);
     });
   });
 }

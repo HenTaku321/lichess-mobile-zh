@@ -21,6 +21,7 @@ import 'package:lichess_mobile/src/model/message/message_repository.dart';
 import 'package:lichess_mobile/src/model/message/xiangqi_inbox_repository.dart';
 import 'package:lichess_mobile/src/network/http.dart';
 import 'package:lichess_mobile/src/network/xiangqi_http.dart' show xiangqiAuthStorageProvider;
+import 'package:lichess_mobile/src/network/xiangqi_session_store.dart';
 import 'package:lichess_mobile/src/network/xiangqi_socket.dart';
 import 'package:lichess_mobile/src/view/message/contacts_screen.dart';
 import 'package:lichess_mobile/src/view/message/conversation_screen.dart';
@@ -172,6 +173,39 @@ void main() {
   TestLichessBinding.ensureInitialized();
 
   group('ContactsScreen merged list', () {
+    testWidgets('an account change clears the query and cancels the previous debounced search', (
+      tester,
+    ) async {
+      await pumpScreen(tester);
+      final container = ProviderScope.containerOf(tester.element(find.byType(ContactsScreen)));
+      await tester.enterText(find.byType(TextField), 'chab');
+      await container
+          .read(xiangqiSessionStoreProvider)
+          .write(
+            fx.xiangqiTestSession(fx.xiangqiTestToken('900001'), userId: '900001', isGuest: false),
+          );
+      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pump();
+      expect(tester.widget<PlatformSearchBar>(find.byType(PlatformSearchBar)).controller!.text, '');
+      expect(container.read(messageSearchQueryProvider), '');
+    });
+
+    testWidgets('renewing the same account token preserves its query', (tester) async {
+      await pumpScreen(tester);
+      final container = ProviderScope.containerOf(tester.element(find.byType(ContactsScreen)));
+      await tester.enterText(find.byType(TextField), 'chab');
+      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pumpAndSettle();
+      final store = container.read(xiangqiSessionStoreProvider);
+      await store.write(store.current!.copyWith(accessToken: 'renewed-token'));
+      await tester.pump();
+      expect(
+        tester.widget<PlatformSearchBar>(find.byType(PlatformSearchBar)).controller!.text,
+        'chab',
+      );
+      expect(container.read(messageSearchQueryProvider), 'chab');
+    });
+
     testWidgets('a rapid second click does not push a duplicate conversation route', (
       tester,
     ) async {

@@ -25,7 +25,9 @@ import 'package:lichess_mobile/src/network/xiangqi_socket.dart';
 import 'package:lichess_mobile/src/view/message/contacts_screen.dart';
 import 'package:lichess_mobile/src/view/message/conversation_screen.dart';
 import 'package:lichess_mobile/src/view/message/xiangqi_conversation_screen.dart';
+import 'package:lichess_mobile/src/widgets/platform_search_bar.dart';
 import 'package:lichess_mobile/src/widgets/rich_link_text.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../binding.dart';
 import '../../model/auth/fake_auth_storage.dart';
@@ -83,7 +85,10 @@ final xiangqiChatsFrame = fx.xiangqiEventFrame(kXiangqiInboxChatsEvent, {
 /// that same socket because its spacing has to be zero here — the chat list is the only request this
 /// screen makes, and a test that waited out the real 1.5 s window would be testing the clock rather
 /// than the list.
-Future<fx.FakeXiangqiChannelFactory> pumpScreen(WidgetTester tester) async {
+Future<fx.FakeXiangqiChannelFactory> pumpScreen(
+  WidgetTester tester, {
+  bool pushRoute = false,
+}) async {
   final factory = fx.FakeXiangqiChannelFactory();
   final token = fx.xiangqiTestToken(fx.xiangqiTestViewerId);
   final storage = fx.FakeXiangqiAuthStorage(fx.xiangqiTestSession(token));
@@ -92,13 +97,26 @@ Future<fx.FakeXiangqiChannelFactory> pumpScreen(WidgetTester tester) async {
     if (request.url.path == '/inbox') {
       return mockResponse(lichessInboxJson, 200);
     }
+    if (request.url.path == '/inbox/search') {
+      return mockResponse(
+        '''{"contacts":[{"user":{"name":"chabrot","id":"chabrot"},"lastMsg":{"text":"a lichess message","user":"chabrot","date":1621533013388,"read":true}}],"friends":[],"users":[]}''',
+        200,
+      );
+    }
     return mockResponse('', 404);
   });
 
   await tester.pumpWidget(
     await makeTestProviderScopeApp(
       tester,
-      home: const ContactsScreen(),
+      home: pushRoute
+          ? Builder(
+              builder: (context) => TextButton(
+                onPressed: () => Navigator.of(context).push(ContactsScreen.buildRoute()),
+                child: const Text('Open inbox'),
+              ),
+            )
+          : const ContactsScreen(),
       authUser: fakeAuthUser,
       overrides: {
         httpClientFactoryProvider: httpClientFactoryProvider.overrideWith(
@@ -122,6 +140,12 @@ Future<fx.FakeXiangqiChannelFactory> pumpScreen(WidgetTester tester) async {
       },
     ),
   );
+
+  if (pushRoute) {
+    await tester.tap(find.text('Open inbox'));
+    await tester.pump();
+    await tester.pump();
+  }
 
   // The chat list is asked for by the first read of the provider, which is the socket's own
   // handshake's cue; the server's half of it is pushed here.
@@ -148,6 +172,65 @@ void main() {
   TestLichessBinding.ensureInitialized();
 
   group('ContactsScreen merged list', () {
+    testWidgets('a rapid second click does not push a duplicate conversation route', (
+      tester,
+    ) async {
+      final factory = await pumpScreen(tester);
+      await tester.tap(find.text(xiangqiPeerName));
+      await tester.tap(find.text(xiangqiPeerName));
+      await pumpUntil(tester, () => factory.channel.hasSentEvent(kXiangqiInboxChatUserEvent));
+      factory.channel.fromServer(
+        fx.xiangqiEventFrame(kXiangqiInboxUserMessagesEvent, {
+          'data': {
+            'has_next_page': false,
+            'items': <Object?>[],
+            'next_page_num': null,
+            'prev_page_num': null,
+            'total_pages': 1,
+          },
+        }),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(XiangqiConversationScreen, skipOffstage: false), findsOneWidget);
+    });
+
+    testWidgets('returning from a conversation preserves the current search query', (tester) async {
+      await pumpScreen(tester);
+      await tester.enterText(find.byType(TextField), 'chab');
+      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pumpAndSettle();
+      expect(find.byType(ContactTile), findsOneWidget);
+      await tester.tap(find.text('chabrot'));
+      await tester.pumpAndSettle();
+      Navigator.of(tester.element(find.byType(ConversationScreen))).pop();
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<PlatformSearchBar>(find.byType(PlatformSearchBar)).controller!.text,
+        'chab',
+      );
+      expect(find.byType(ContactTile), findsOneWidget);
+    });
+
+    testWidgets('a removed contacts route is not refreshed when its conversation later closes', (
+      tester,
+    ) async {
+      await pumpScreen(tester, pushRoute: true);
+      final contactsContext = tester.element(find.byType(ContactsScreen));
+      final contactsRoute = ModalRoute.of(contactsContext)!;
+      final navigator = Navigator.of(contactsContext);
+      final search = tester.widget<PlatformSearchBar>(find.byType(PlatformSearchBar));
+      await tester.tap(find.text('chabrot'));
+      await tester.pumpAndSettle();
+      navigator.removeRoute(contactsRoute);
+      await tester.pump();
+      navigator.pop();
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.text('Open inbox'), findsOneWidget);
+      expect(() => search.controller!.addListener(() {}), throwsFlutterError);
+      expect(() => search.focusNode!.addListener(() {}), throwsFlutterError);
+    });
+
     testWidgets('draws both backends rows from one list, lichess first as the merge orders them', (
       tester,
     ) async {

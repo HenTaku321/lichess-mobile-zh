@@ -9,6 +9,7 @@ import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_hint.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_move.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position_validation.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_rules.dart' as rules;
 
 import '../../test_container.dart';
@@ -98,6 +99,57 @@ void main() {
   // between tests if it were left where the last one put it.
   setUp(clearSavedXiangqiAnalysis);
   tearDown(clearSavedXiangqiAnalysis);
+
+  group('arbitrary position safety', () {
+    for (final (fen, error) in [
+      ('9/9/9/9/9/9/9/9/9/4K4 w - - 0 1', XiangqiPositionError.generals),
+      ('3kk4/9/9/9/9/9/9/9/9/4K4 w - - 0 1', XiangqiPositionError.generals),
+      ('3k5/9/9/9/9/9/9/9/CCC6/4K4 w - - 0 1', XiangqiPositionError.material),
+      ('3k5/9/9/9/9/9/9/9/3A5/4K4 w - - 0 1', XiangqiPositionError.placement),
+      ('4k4/9/9/9/9/9/9/9/9/4K4 w - - 0 1', XiangqiPositionError.facingGenerals),
+      ('3k5/9/9/9/9/9/9/9/3R5/4K4 w - - 0 1', XiangqiPositionError.inactiveSideInCheck),
+    ]) {
+      test(
+        'an ordinary analysis refuses unsafe $error before sending a FEN to the engine',
+        () async {
+          final harness = await makeHarness();
+          harness.transport.takeCommands();
+          harness.notifier.setFen(fen);
+          harness.notifier.startEngine();
+          await pumpEventQueue();
+          harness.transport.emit('readyok');
+          await pumpEventQueue();
+          expect(
+            harness.transport.takeCommands().where((command) => command.startsWith('position fen')),
+            isEmpty,
+          );
+          expect(harness.state.isEngineRunning, isFalse);
+          expect(harness.notifier.positionError, error);
+          expect(harness.notifier.canAnalysePosition, isFalse);
+          expect(harness.notifier.canContinueGame, isFalse);
+        },
+      );
+    }
+
+    test(
+      'replacing an actively analysed position with an invalid diagram stops the search',
+      () async {
+        final harness = await makeAnalysingHarness();
+        harness.transport.takeCommands();
+        const invalidFen = '9/9/9/9/9/9/9/9/9/4K4 w - - 0 1';
+        harness.notifier.setFen(invalidFen);
+        await pumpEventQueue();
+        harness.transport.emit('bestmove h2e2');
+        harness.transport.emit('readyok');
+        await pumpEventQueue();
+        expect(
+          harness.transport.takeCommands().where((command) => command.contains(invalidFen)),
+          isEmpty,
+        );
+        expect(harness.state.isEngineRunning, isFalse);
+      },
+    );
+  });
 
   group('the state it starts from', () {
     test('a fresh analysis is the starting position with nothing on it', () async {

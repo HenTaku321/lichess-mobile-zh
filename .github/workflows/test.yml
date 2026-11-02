@@ -125,6 +125,15 @@ jobs:
       # - name: Run riverpod lint
       #   run: dart run custom_lint
 
+      - name: Run xiangqi systematic audit regressions
+        id: systematic_audit
+        run: >-
+          flutter test --no-pub --reporter expanded
+          test/view/xiangqi/xiangqi_board_editor_screen_test.dart
+          test/model/xiangqi/xiangqi_analysis_controller_test.dart
+          test/view/message/contacts_screen_test.dart
+          test/view/account/account_menu_test.dart
+
       - name: Run xiangqi interaction regressions
         run: >-
           flutter test --no-pub --reporter expanded

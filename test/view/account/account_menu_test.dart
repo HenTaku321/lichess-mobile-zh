@@ -23,6 +23,7 @@ import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_session.dart';
 import 'package:lichess_mobile/src/network/http.dart';
 import 'package:lichess_mobile/src/network/xiangqi_http.dart';
 import 'package:lichess_mobile/src/view/account/account_menu.dart';
+import 'package:lichess_mobile/src/view/more/more_tab_screen.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../binding.dart';
@@ -128,6 +129,38 @@ MockClient pendingAccountClient(Completer<http.Response> response) => MockClient
 
 void main() {
   TestLichessBinding.ensureInitialized();
+
+  for (final home in [const AccountMenuScreen(), const MoreTabScreen()]) {
+    for (final isGuest in [false, true]) {
+      testWidgets(
+        '${home.runtimeType}: inbox is available to a xiangqi-only real account, not a guest ($isGuest)',
+        (tester) async {
+          await tester.pumpWidget(
+            await makeTestProviderScopeApp(
+              tester,
+              home: home,
+              surfaceSize: const Size(1280, 1800),
+              overrides: {
+                xiangqiAuthStorageProvider: xiangqiAuthStorageProvider.overrideWith(
+                  (ref) => fx.FakeXiangqiAuthStorage(xiangqiSession(isGuest: isGuest)),
+                ),
+                httpClientFactoryProvider: httpClientFactoryProvider.overrideWith(
+                  (ref) => FakeHttpClientFactory(
+                    () => MockClient((request) => Future.value(utf8Response('', 404))),
+                  ),
+                ),
+              },
+            ),
+          );
+          await tester.pump();
+          await tester.pump();
+          final inbox = find.widgetWithText(ListTile, 'Inbox');
+          expect(inbox, isGuest ? findsNothing : findsOneWidget);
+          if (!isGuest) expect(tester.widget<ListTile>(inbox).onTap, isNotNull);
+        },
+      );
+    }
+  }
 
   group('xiangqi identity row', () {
     testWidgets('with no session the row is the way in', (tester) async {

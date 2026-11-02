@@ -9,6 +9,7 @@ import 'package:lichess_mobile/src/model/xiangqi/xiangqi_analysis_controller.dar
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_board_editor_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_analysis_actions.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_analysis_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_board_editor_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_game_screen.dart';
@@ -326,8 +327,9 @@ void main() {
       expect(find.text('Clear board'), findsOneWidget);
     });
 
-    testWidgets('the analysis exit is dead while the board is empty, and live as soon as it is '
-        'not', (tester) async {
+    testWidgets('analysis stays disabled until both generals form a locally valid position', (
+      tester,
+    ) async {
       final container = await pumpEditor(tester);
 
       await tapMenuItem(tester, 'Clear board');
@@ -337,7 +339,15 @@ void main() {
       await tester.pump();
       await tapSquare(tester, 'e0');
 
+      expect(barButton(tester, 'analysis-board-button').onTap, isNull);
+      expect(find.text('Exactly one general is required on each side.'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('piece-button-black-king')));
+      await tester.pump();
+      await tapSquare(tester, 'd9');
+
       expect(barButton(tester, 'analysis-board-button').onTap, isNotNull);
+      expect(find.text('Exactly one general is required on each side.'), findsNothing);
 
       await tester.tap(find.byKey(const Key('analysis-board-button')));
       // Navigation can finish while the real engine-loading chip keeps spinning.
@@ -364,6 +374,63 @@ void main() {
         editorState(container).fen,
       );
       expect(board(tester).position.toFen(), editorState(container).fen);
+    });
+
+    for (final (name, fen, message) in [
+      (
+        'missing general',
+        '9/9/9/9/9/9/9/9/9/4K4 w - - 0 1',
+        'Exactly one general is required on each side.',
+      ),
+      (
+        'facing generals',
+        '4k4/9/9/9/9/9/9/9/9/4K4 w - - 0 1',
+        'The generals cannot face each other without a piece between them.',
+      ),
+      (
+        'unreachable advisor',
+        '3k5/9/9/9/9/9/9/9/3A5/4K4 w - - 0 1',
+        'A piece is on a square it cannot occupy in a game.',
+      ),
+    ]) {
+      testWidgets('an editor with $name keeps its diagram but blocks game and engine exits', (
+        tester,
+      ) async {
+        final container = await pumpEditor(tester, initialFen: fen);
+        expect(editorState(container, fen).fen, fen);
+        expect(barButton(tester, 'analysis-board-button').onTap, isNull);
+        expect(find.text(message), findsOneWidget);
+        await tester.tap(find.bySemanticsLabel('Menu'));
+        await tester.pumpAndSettle();
+        expect(find.text('Continue from here'), findsNothing);
+        expect(find.text('Clear board'), findsOneWidget);
+        expect(find.text('Starting position'), findsOneWidget);
+      });
+    }
+
+    testWidgets('the shared continue menu also rejects an invalid diagram from another caller', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        await makeTestProviderScopeApp(
+          tester,
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => TextButton(
+                onPressed: () => showXiangqiContinueFromHereMenu(
+                  context,
+                  XiangqiPosition.fromFen('9/9/9/9/9/9/9/9/9/4K4 w - - 0 1'),
+                ),
+                child: const Text('Continue'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Continue'));
+      await tester.pumpAndSettle();
+      expect(find.text('Play against computer'), findsNothing);
+      expect(find.text('Over the board'), findsNothing);
     });
 
     testWidgets('continue from here offers a game against the computer and one over the board', (

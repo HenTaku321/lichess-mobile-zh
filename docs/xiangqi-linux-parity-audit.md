@@ -113,9 +113,9 @@
 | B2 | P0 / G（已列用例） | Contacts 的两次 `await Navigator.push` 后无 mounted/身份 guard；dispose 不释放 controller/focus | 联系人推对话、移除父路由、返回；无已卸载 ref 访问；换号后旧回调不改新状态 |
 | B3 | P1 / G（单账号/游客） | account_menu inbox 条件只含国象 user/account；More inbox 位于 `if (user != null)` | 只登录象棋正式账号，两处入口可打开合并联系人；游客不冒充正式；儿童限制源码共用，完整儿童矩阵仍待补 |
 | B4 | P1 / G（查询/重入） | Contacts 无导航 gate，`_refreshAfterConversation` 无条件清查询/focus | 注册行回调两次仅一页；同账号返回保留搜索，换号取消旧 debounce，token续期不清；滚动锚点不在本次 G 范围 |
-| B5 | P1 / S（旧R撤回） | PlayerRow、Watch、题目、好友、排行榜、资料、保存和账号 subtitle 的评级直接 Text | 共用 test scope 强制 showRatings=yes，之前评分 R 不能证明真实偏好链；新增 real 模式和原始渲染负向对照后重跑 |
+| B5 | P1 / R（real 模式） | PlayerRow、Watch、题目、好友、排行榜、资料、保存和账号 subtitle 的评级直接 Text | 固定yes的旧R撤回；d98abc297的原始渲染JSON证实8个评分UI失败；当前真实no显示已通过对应断言，实战对手仍显示2011为有效R |
 | B6 | P1 / R（坐标） | Analysis/Editor Hub 象棋预览未完整映射亮度/hue，坐标与国象缩略图相反 | 两个 Hub 坐标违约已复现；无坐标/交互及亮度/hue最终检查待绿；长宽比差异明确保留 |
-| B7 | P1 / S（真实标签重跑） | 题目完成栏只在菜单给分析、残留 disabled Hint，Next 图标另起契约 | 当前已加直接入口，但测试硬编码 Analysis 不等于实际 l10n.analysis（Analysis board）；改取真实标签后，原始/当前渲染重跑 |
+| B7 | P1 / G（指定交接） | 题目完成栏只在菜单给分析、残留 disabled Hint，Next 图标另起契约 | 改取真实l10n标签后：原始渲染缺入口R，当前菜单/直接分析/继续图标/完整历史交接与返回已通过；主观视觉仍待验收 |
 | B8 | P0/P1 / S | Inbox 固定第1页并丢信封；messages 无 page；待办仅 chatId；超时后旧同通道帧可能匹配下一请求 | 两页请求不合并为一个；A 超时 B 排队 A 迟到，B 不接 A；对局独立连接不被断开 |
 | B9 | P1 / S | Friends provider 固定 `page:1`，模型已有 nextPage，页面无更多 | 筛选第2页/尾页/失败原页重试；换号清私有内容，搜索重置页但不丢申请分区 |
 | B10 | P1 / S | 合并 contacts 任一来源异常时静默移除该来源内容；搜索/首次失败 raw 英文异常；Linux 无显式刷新 | 一来源失败保另一来源，并给可重试提示；不伪装为空、泄露异常或强行显示后台品牌 |
@@ -138,13 +138,16 @@
 | 静态检查 / `bc842f51d` / Actions `41388581094` | analyze发现 accountProvider 的内容本身为 nullable User，以及一处测试 import 排序；行为步骤未执行 | P/N/U未验证 | 不算行为红；已改为非空且 id 属于当前账号才开放，修正 import，仍须重跑 |
 | 静态检查 / `ae4f3cae7` / Actions `41390983202` | 仅测试 import alias `analysisFixture` 违反 snake_case lint；行为步骤未执行 | P/N/U未验证 | 已改 `analysis_fixture`；不能据此宣称任何行为绿 |
 | 行为 / `47eab2a81` / Actions `41391940598` | analyze通过；编辑器/模型/联系人/账号专项86通过；桌面118、生命周期275、旧截图1032通过；呈现3通过10失败 | P/N/U未验证 | B1–B4指定用例 G；调查呈现失败确认固定 yes 夹具和硬编码标签陷阱，不把它们算当前UI失败 |
+| real偏好 / `d98abc297` / Actions `41394310063` | analyze与86专项通过；原始渲染JSON含8个评分、1个完成入口UI失败及实战缺口；当前呈现10通过3失败 | P/N/U未验证 | 原始JSON细节在print事件、结果是error，收集器误拒；当前失败为实战对手2011、rank=1查询匹配页码、最高分测试未等完新增请求；已分别修正 |
 
 代码已加入 B1 的入口/公共菜单/模型安全边界、B2/B4 的 mounted+身份保护与释放、B3 的统一收件箱权限判断。
 编辑器/联系人/单账号入口指定用例已有同 SHA 绿；评分策略已共用并接入数字/元数据槽，最高评分携带角色而非预过滤文本，
 避免刷新/失败缓存恢复时泄露评分。两个 Hub 缩略图已关闭坐标并应用亮度/hue；题目完成栏已提供直接分析、
 去除提示并使用继续训练图标，增加直接分析交接/返回回归。评分 real 模式、真实 l10n 标签及原始渲染负向对照
 位于 `test/view/xiangqi/xiangqi_preference_presentation_contract_test.dart` 和
-`scripts/verify-xiangqi-rating-negative-control.sh`；所有评分和完成栏结论要重跑，实战例外仍待有效红再接入。
+`scripts/verify-xiangqi-rating-negative-control.sh`。原始渲染负向对照只在Actions临时恢复8个页面，
+每次改偏好先验证真实投影；收集器同时要求对应UI断言与观战正向对照，不接受泛泛异常。
+实战例外已按整个对局角色接入双方玩家行，国象RatingPrefAware三个偏好/两种角色共6项对照已补；待同SHA完整绿。
 新增 PageStorageKey 也不等于所有返回锚点已经验收；B8–B17 未在此批宣称完成。
 
 ## 分页协议边界

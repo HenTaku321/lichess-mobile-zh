@@ -22,6 +22,9 @@ class const XiangqiPlayerRow({
   final bool isBot = false,
   final bool thinking = false,
   final bool isMe = false,
+
+  /// Both players' ratings follow the current device's game role, not this row's seat.
+  final bool isActiveGameOfCurrentUser = false,
   final bool isToMove = true,
   final String? status,
   final Widget? detail,
@@ -36,7 +39,8 @@ class const XiangqiPlayerRow({
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final playerName = name ?? side.label(context.l10n);
-    final showRatings = rating != null && ref.watch(ratingsVisibleProvider(false));
+    final showRatings =
+        rating != null && ref.watch(ratingsVisibleProvider(isActiveGameOfCurrentUser));
     final effectiveClockPosition =
         clockPosition ?? ref.watch(boardPreferencesProvider).clockPosition;
 

@@ -12,6 +12,7 @@ import 'package:lichess_mobile/src/model/xiangqi/puzzle/xiangqi_puzzle_repositor
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_analysis_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
+import 'package:lichess_mobile/src/view/account/rating_pref_aware.dart';
 import 'package:lichess_mobile/src/view/analysis/analysis_hub_screen.dart';
 import 'package:lichess_mobile/src/view/board_editor/board_editor_hub_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_analysis_screen.dart';
@@ -55,6 +56,34 @@ Future<void> changeRatings(
 
 void main() {
   TestLichessBinding.ensureInitialized();
+
+  for (final activeGame in [false, true]) {
+    for (final preference in ShowRatings.values) {
+      testWidgets('shared rating rule preserves chess visibility ($activeGame, $preference)', (
+        tester,
+      ) async {
+        await tester.pumpWidget(
+          await makeTestProviderScopeApp(
+            tester,
+            useRealRatingPreferences: true,
+            home: Scaffold(
+              body: RatingPrefAware(
+                isActiveGameOfCurrentUser: activeGame,
+                child: const Text('visible rating'),
+                orElse: const Text('hidden rating'),
+              ),
+            ),
+          ),
+        );
+        await changeRatings(tester, preference);
+        final visible =
+            preference == ShowRatings.yes ||
+            (preference == ShowRatings.exceptInGame && !activeGame);
+        expect(find.text('visible rating'), visible ? findsOneWidget : findsNothing);
+        expect(find.text('hidden rating'), visible ? findsNothing : findsOneWidget);
+      });
+    }
+  }
 
   testWidgets('a xiangqi player row reacts to the same rating preference as the chess row', (
     tester,
@@ -111,7 +140,9 @@ void main() {
         if (playing) {
           await online.playTheGame(tester, factory);
           await online.receive(tester, factory, fx.xiangqiEndFrame());
-          expect(find.text('${fx.xiangqiTestBlackRating}'), findsOneWidget);
+          final finishedRating = online.playerRow(tester, XiangqiSide.black).player.rating;
+          expect(finishedRating, isNotNull);
+          expect(find.text('$finishedRating'), findsOneWidget);
         }
       },
     );
@@ -133,7 +164,13 @@ void main() {
     await changeRatings(tester, ShowRatings.no);
     expect(find.text('4660'), findsNothing);
     expect(find.text('Rated leader'), findsOneWidget);
-    expect(find.text('1'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.ancestor(of: find.text('Rated leader'), matching: find.byType(ListTile)),
+        matching: find.text('1'),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('the account subtitle hides ratings, not its online and country status', (
@@ -179,8 +216,10 @@ void main() {
       useRealRatingPreferences: true,
     );
     await profile.scrollDown(tester);
+    await profile.drain(tester);
     expect(find.textContaining('Highest rating'), findsWidgets);
     await changeRatings(tester, ShowRatings.no);
+    await profile.drain(tester);
     expect(find.textContaining('Highest rating'), findsNothing);
   });
 

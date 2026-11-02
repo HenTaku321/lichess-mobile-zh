@@ -368,6 +368,7 @@ class _XiangqiOnlineGameScreenState() extends ConsumerState<XiangqiOnlineGameScr
           timeLeft: state.timeLeftFor(topSide, _now),
           isTurn: !state.isFinished && state.turn == topSide,
           isMe: mySide == topSide,
+          isActiveGameOfCurrentUser: mySide != null && !state.isFinished,
           style: boardStyle,
         ),
         bottomTable: Column(
@@ -380,6 +381,7 @@ class _XiangqiOnlineGameScreenState() extends ConsumerState<XiangqiOnlineGameScr
               timeLeft: state.timeLeftFor(orientation, _now),
               isTurn: !state.isFinished && state.turn == orientation,
               isMe: mySide == orientation,
+              isActiveGameOfCurrentUser: mySide != null && !state.isFinished,
               style: boardStyle,
             ),
             // Watching, and why nothing is happening: a spectator is not told when a game ends any
@@ -607,6 +609,9 @@ class const XiangqiOnlinePlayerRow({
   /// Whether this seat is the one this device is in.
   required final bool isMe,
 
+  /// Whether this device plays the still-active game; applies to both seats equally.
+  required final bool isActiveGameOfCurrentUser,
+
   /// The board's own colours, so that the two avatars match the pieces they stand for.
   required final XiangqiBoardStyle style,
 
@@ -628,6 +633,7 @@ class const XiangqiOnlinePlayerRow({
       name: name,
       rating: player.rating?.toString(),
       isMe: isMe,
+      isActiveGameOfCurrentUser: isActiveGameOfCurrentUser,
       isToMove: isTurn,
       clock: seconds == null
           ? null

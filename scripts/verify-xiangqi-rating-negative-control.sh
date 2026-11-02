@@ -67,6 +67,10 @@ for line in Path(sys.argv[1]).read_text().splitlines():
         tests[event['test']['id']] = event['test']['name']
     elif event.get('type') == 'error':
         errors.setdefault(event['testID'], []).append(str(event['error']))
+    elif event.get('type') == 'print':
+        # Flutter's widget binding prints the detailed TestFailure, then emits a generic error
+        # event. Accept neither that generic event nor an arbitrary runtime error on its own.
+        errors.setdefault(event['testID'], []).append(str(event['message']))
     elif event.get('type') == 'testDone':
         results[event['testID']] = event['result']
 
@@ -86,7 +90,7 @@ for prefix, assertion in required.items():
     if len(matching) != 1:
         raise SystemExit(f'Missing or ambiguous negative-control test: {prefix}')
     key = matching[0]
-    if results.get(key) != 'failure' or not any(assertion in error for error in errors.get(key, [])):
+    if results.get(key) not in ('failure', 'error') or not any(assertion in error for error in errors.get(key, [])):
         raise SystemExit(f'Not the expected UI assertion (including fixture/compile errors): {tests[key]}')
 
 spectators = [key for key, name in tests.items() if 'except-in-game follows' in name and '(false)' in name]

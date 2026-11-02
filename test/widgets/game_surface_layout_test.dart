@@ -1,10 +1,64 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lichess_mobile/src/widgets/game_surface_layout.dart';
+import 'package:lichess_mobile/src/widgets/game_table_column.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../test_provider_scope.dart';
 
 void main() {
+  testWidgets('a table clock repaint does not rewind an already scrolled player table', (
+    tester,
+  ) async {
+    late StateSetter update;
+    await tester.pumpWidget(
+      await makeTestProviderScopeApp(
+        tester,
+        surfaceSize: const Size(480, 480),
+        failOnOverflow: true,
+        home: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: 200,
+              height: 180,
+              child: StatefulBuilder(
+                builder: (context, setState) {
+                  update = setState;
+                  return GameTableColumn(
+                    topTable: const SizedBox(
+                      height: 300,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [Text('First table line'), Text('Last table line')],
+                      ),
+                    ),
+                    bottomTable: const SizedBox(height: 150),
+                    actions: const SizedBox(height: 56),
+                    minimumMoveHeight: 0,
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final topScroll = find
+        .ancestor(of: find.text('Last table line'), matching: find.byType(Scrollable))
+        .first;
+    await tester.drag(topScroll, const Offset(0, -250));
+    await tester.pumpAndSettle();
+    final before = tester.getTopLeft(find.text('Last table line')).dy;
+    expect(
+      tester.getRect(topScroll).overlaps(tester.getRect(find.text('Last table line'))),
+      isTrue,
+    );
+    update(() {});
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(find.text('Last table line')).dy, closeTo(before, 1));
+    expect(tester.takeException(), isNull);
+  });
+
   for (final moves in [false, true]) {
     testWidgets('tall landscape tables remain readable without clipping actions (moves: $moves)', (
       tester,

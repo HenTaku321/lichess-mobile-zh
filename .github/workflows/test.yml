@@ -125,6 +125,25 @@ jobs:
       # - name: Run riverpod lint
       #   run: dart run custom_lint
 
+      - name: Run pagination and socket isolation regressions
+        id: pagination_socket
+        timeout-minutes: 6
+        run: |
+          mkdir -p out/pagination-socket
+          flutter test --no-pub --reporter json \
+            test/model/message/xiangqi_inbox_repository_test.dart \
+            test/view/xiangqi/xiangqi_notifications_screen_test.dart \
+            > out/pagination-socket/tests.jsonl
+
+      - name: Export pagination and socket regression evidence
+        if: ${{ !cancelled() && steps.pagination_socket.outcome != 'skipped' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: xiangqi-pagination-socket-${{ github.sha }}
+          path: out/pagination-socket
+          retention-days: 7
+          if-no-files-found: error
+
       - name: Run xiangqi systematic audit regressions
         id: systematic_audit
         run: >-

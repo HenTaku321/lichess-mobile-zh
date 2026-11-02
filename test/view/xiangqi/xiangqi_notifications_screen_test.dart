@@ -17,6 +17,7 @@ import 'package:lichess_mobile/l10n/l10n.dart';
 import 'package:lichess_mobile/src/network/http.dart';
 import 'package:lichess_mobile/src/network/xiangqi_http.dart' show xiangqiAuthStorageProvider;
 import 'package:lichess_mobile/src/network/xiangqi_socket.dart';
+import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_leaderboard_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_lessons_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_notifications_screen.dart';
@@ -51,18 +52,22 @@ Map<String, Object?> notification({
 };
 
 /// The `get.notifications.success` frame for [items].
-String notificationsFrame(List<Map<String, Object?>> items) =>
-    fx.xiangqiEventFrame('get.notifications.success', {
-      'data': {
-        'notifications': {
-          'items': items,
-          'total_pages': 1,
-          'has_next_page': false,
-          'next_page_num': null,
-          'prev_page_num': null,
-        },
-      },
-    });
+String notificationsFrame(
+  List<Map<String, Object?>> items, {
+  int totalPages = 1,
+  int? nextPage,
+  int? previousPage,
+}) => fx.xiangqiEventFrame('get.notifications.success', {
+  'data': {
+    'notifications': {
+      'items': items,
+      'total_pages': totalPages,
+      'has_next_page': nextPage != null,
+      'next_page_num': nextPage,
+      'prev_page_num': previousPage,
+    },
+  },
+});
 
 /// Pumps until nothing more is coming.
 ///
@@ -162,6 +167,52 @@ void main() {
   TestLichessBinding.ensureInitialized();
 
   group('XiangqiNotificationsScreen', () {
+    testWidgets('notifications do not connect the shared socket', (tester) async {
+      final factory = await pumpNotifications(tester);
+      factory.channel.fromServer(notificationsFrame([notification()]));
+      await settle(tester);
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(XiangqiNotificationsScreen)),
+      );
+      expect(
+        container.read(xiangqiSocketProvider).isConnected,
+        isFalse,
+        reason: 'notifications must own an independent transport',
+      );
+    });
+
+    testWidgets('loads the next notification page and retains the first page', (tester) async {
+      final factory = await pumpNotifications(tester);
+      factory.channel.fromServer(
+        notificationsFrame([notification(title: 'First page')], totalPages: 2, nextPage: 2),
+      );
+      await settle(tester);
+      final context = tester.element(find.byType(XiangqiNotificationsScreen));
+      final more = find.text(context.l10n.mobileLoadMore);
+      expect(more, findsOneWidget, reason: 'the server next-page cursor must be reachable');
+
+      await tester.tap(more);
+      await settle(tester);
+      expect(find.text('First page'), findsOneWidget);
+      expect(
+        factory.channel.sent.whereType<String>().any(
+          (frame) => frame.contains('get.notifications') && frame.contains('"page":2'),
+        ),
+        isTrue,
+      );
+      factory.channel.fromServer(
+        notificationsFrame(
+          [notification(id: 2, title: 'Second page')],
+          totalPages: 2,
+          previousPage: 1,
+        ),
+      );
+      await settle(tester);
+      expect(find.text('First page'), findsOneWidget);
+      expect(find.text('Second page'), findsOneWidget);
+      expect(more, findsNothing);
+    });
+
     for (final url in ['/leaders', '/leaders/puzzle/CN']) {
       testWidgets('notification $url opens the native leaderboard once and returns to the list', (
         tester,

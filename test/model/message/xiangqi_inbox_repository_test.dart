@@ -113,6 +113,7 @@ typedef SentEmit = ({String event, Object? data});
 class XiangqiInboxHarness({
   required final XiangqiInboxRepository repository,
   required final fx.FakeXiangqiChannelFactory factory,
+  required final XiangqiSocketClient sharedSocket,
 }) {
   fx.FakeXiangqiChannel get channel => factory.channel;
 
@@ -164,7 +165,7 @@ Future<XiangqiInboxHarness> makeHarness({
   );
   addTearDown(repository.dispose);
 
-  return XiangqiInboxHarness(repository: repository, factory: factory);
+  return XiangqiInboxHarness(repository: repository, factory: factory, sharedSocket: socket);
 }
 
 /// Pushes the two frames that complete the socket handshake.
@@ -280,6 +281,83 @@ void main() {
   });
 
   group('XiangqiInboxRepository', () {
+    test('owns an inbox transport without taking over or closing the shared connection', () async {
+      final harness = await makeHarness();
+      final sharedReady = harness.sharedSocket.connect();
+      await completeHandshake(harness);
+      await sharedReady;
+      final sharedChannel = harness.channel;
+
+      final chats = harness.repository.loadChats();
+      chats.ignore();
+      await pumpEventQueue();
+      expect(
+        harness.factory.channels,
+        hasLength(2),
+        reason: 'the inbox must create its own transport instead of borrowing the shared socket',
+      );
+      final inboxChannel = harness.channel;
+      inboxChannel.fromServer(fx.openFrame);
+      inboxChannel.fromServer(fx.connectAckFrame);
+      await pumpEventQueue();
+      inboxChannel.fromServer(xiangqiChatsFrame([xiangqiFirstChatRow]));
+      await chats;
+
+      harness.repository.dispose();
+      await pumpEventQueue();
+      expect(inboxChannel.closed, isTrue);
+      expect(sharedChannel.closed, isFalse);
+      expect(harness.sharedSocket.isConnected, isTrue);
+    });
+
+    test('a timed out read replaces its transport before the next conversation is sent', () async {
+      final harness = await makeHarness(responseTimeout: const Duration(milliseconds: 300));
+      final first = harness.repository.loadMessages(xiangqiFirstChatId);
+      final expired = expectLater(first, throwsA(isA<TimeoutException>()));
+      await completeHandshake(harness);
+      final oldChannel = harness.channel;
+      await expired;
+
+      final second = harness.repository.loadMessages(xiangqiSecondChatId);
+      second.ignore();
+      await pumpEventQueue();
+      expect(
+        oldChannel.closed,
+        isTrue,
+        reason: 'a late no-ID reply must not share a transport with the next request',
+      );
+      expect(harness.factory.channels, hasLength(2));
+      final newChannel = harness.channel;
+      oldChannel.fromServer(xiangqiMessagesFrame([xiangqiMessageRow('late first conversation')]));
+      newChannel.fromServer(fx.openFrame);
+      newChannel.fromServer(fx.connectAckFrame);
+      await pumpEventQueue();
+      newChannel.fromServer(
+        xiangqiMessagesFrame([xiangqiMessageRow('second conversation', senderId: 200002)]),
+      );
+      expect((await second).single.text, 'second conversation');
+    });
+
+    test('concurrent non-reply emits still observe the minimum spacing', () async {
+      final harness = await makeHarness(spacing: const Duration(milliseconds: 150));
+      harness.repository.loadChats().ignore();
+      await completeHandshake(harness);
+
+      final first = harness.repository.markRead(xiangqiFirstChatId);
+      final second = harness.repository.markRead(xiangqiSecondChatId);
+      await Future<void>.delayed(const Duration(milliseconds: 210));
+      expect(harness.events, [
+        kXiangqiInboxJoinEvent,
+        kXiangqiInboxMarkReadEvent,
+      ], reason: 'concurrent senders must not wake up together and send inside the spacing window');
+      await Future.wait([first, second]);
+      expect(harness.events, [
+        kXiangqiInboxJoinEvent,
+        kXiangqiInboxMarkReadEvent,
+        kXiangqiInboxMarkReadEvent,
+      ]);
+    });
+
     test('asks for the chat list with inbox.join and resolves on the event', () async {
       final harness = await makeHarness();
       final chats = harness.repository.loadChats();

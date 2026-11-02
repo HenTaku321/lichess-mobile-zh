@@ -24,6 +24,7 @@ def runtime(root, font_dir):
     return {
         "flutter": flutter, "fonts": fonts, "python": platform.python_version(),
         "runnerImage": os.environ.get("ImageVersion"), "os": platform.system(),
+        "workflowSha": os.environ.get("GITHUB_WORKFLOW_SHA"),
         "lockfile": hashlib.sha256((root / "pubspec.lock").read_bytes()).hexdigest(),
     }
 

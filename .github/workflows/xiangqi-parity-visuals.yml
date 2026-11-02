@@ -164,7 +164,7 @@ jobs:
         run: |
           mkdir -p out/visual-pairs
           flutter test --no-pub --concurrency 1 --reporter json \
-            test/visual/xiangqi_visual_pairs_test.dart > out/render-tests.jsonl
+            test/visual/xiangqi_visual_pairs_test.dart > out/render-tests-${{ matrix.shard }}.jsonl
       - name: Export originals, differences and controller/input metadata
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -172,7 +172,7 @@ jobs:
           name: xiangqi-visual-pairs-${{ github.run_id }}-${{ matrix.shard }}
           path: |
             out/visual-pairs
-            out/render-tests.jsonl
+            out/render-tests-${{ matrix.shard }}.jsonl
             out/renderer.json
           retention-days: 90
           if-no-files-found: error

@@ -349,7 +349,50 @@ def evaluate_case(case, report, root, now):
 
 
 def render_case_succeeded(events, case_id):
-    return False
+    names = {}
+    results = {}
+    errors = set()
+    finished = False
+    for event in events:
+        if event.get('type') == 'testStart':
+            test = event['test']
+            match = re.search(r'\bpair ([0-9a-f]{64})(?:\s|$)', test['name'])
+            if match:
+                names[test['id']] = match[1]
+        elif event.get('type') == 'testDone':
+            results[event['testID']] = event
+        elif event.get('type') == 'error':
+            errors.add(event.get('testID'))
+        elif event.get('type') == 'done':
+            finished = True
+    matched = [test for test, name in names.items() if name == case_id]
+    if not finished or len(matched) != 1 or matched[0] in errors:
+        return False
+    result = results.get(matched[0], {})
+    return result.get('result') == 'success' and result.get('skipped') is False and not result.get('hidden', False)
+
+
+def render_results(evidence_root):
+    files = list(evidence_root.parent.glob('render-tests-*.jsonl'))
+    accepted = set()
+    seen = set()
+    for path in files:
+        if path.stat().st_size > 16 * 1024 * 1024:
+            raise ValueError('Renderer result stream is oversized')
+        events = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+        cases = []
+        for event in events:
+            if event.get('type') == 'testStart':
+                match = re.search(r'\bpair ([0-9a-f]{64})(?:\s|$)', event['test']['name'])
+                if match:
+                    cases.append(match[1])
+        for case in cases:
+            if case in seen:
+                raise ValueError('Duplicate case execution across renderer shards')
+            seen.add(case)
+            if render_case_succeeded(events, case):
+                accepted.add(case)
+    return accepted
 
 
 def write_json(path, value):
@@ -401,6 +444,12 @@ def main():
         plan_dir = Path(args.plan)
         manifest = json.loads((plan_dir / "manifest.json").read_text())
         now = datetime.now(timezone.utc).isoformat()
+        try:
+            rendered = render_results(Path(args.evidence))
+            render_error = 'The real renderer did not complete this case successfully'
+        except (OSError, ValueError, KeyError, TypeError) as error:
+            rendered = set()
+            render_error = str(error)
         records = []
         for shard in sorted(plan_dir.glob("shard-*.json")):
             for case in json.loads(shard.read_text())["cases"]:
@@ -410,8 +459,10 @@ def main():
                     report = json.loads(path.read_text()) if path.is_file() else {}
                 except (OSError, ValueError):
                     report = {}
-                records.append({"index": case["index"], "caseId": case["caseId"],
-                                **evaluate_case(case, report, root, now)})
+                verdict = evaluate_case(case, report, root, now)
+                if verdict['status'] not in ('not_run', 'blocked') and case['caseId'] not in rendered:
+                    verdict = {'status': 'invalid', 'reason': render_error}
+                records.append({"index": case["index"], "caseId": case["caseId"], **verdict})
         counts = {status: sum(record["status"] == status for record in records)
                   for status in ("passed", "failed", "invalid", "not_run", "blocked")}
         summary = {**manifest, "batch": counts,

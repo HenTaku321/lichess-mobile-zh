@@ -33,6 +33,9 @@ void main() {
         if (request.url.path.endsWith('/friend-requests')) {
           return remote.jsonReply({'friend_requests': <Object?>[]});
         }
+        if (!request.url.path.startsWith('/api/friends/')) {
+          return remote.jsonReply({});
+        }
         final page = int.parse(request.url.queryParameters['page'] ?? '1');
         pages.add(page);
         return remote.jsonReply(envelope([], page));

@@ -4,6 +4,7 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_page.dart';
+import 'package:lichess_mobile/src/network/xiangqi_session_store.dart';
 import 'package:logging/logging.dart';
 
 final _logger = Logger('XiangqiPagination');
@@ -40,7 +41,6 @@ abstract class XiangqiPagedController<T>() extends AsyncNotifier<XiangqiPagedSta
 
   @override
   Future<XiangqiPagedState<T>> build() async {
-    ref.watch(xiangqiAccountGenerationProvider);
     final generation = ++_generation;
     _pages.clear();
     _more = null;
@@ -49,6 +49,9 @@ abstract class XiangqiPagedController<T>() extends AsyncNotifier<XiangqiPagedSta
       _generation++;
       _pages.clear();
     });
+    await ref.watch(xiangqiSessionReadyProvider.future);
+    if (!_current(generation)) throw StateError('Page load cancelled.');
+    ref.watch(xiangqiAccountGenerationProvider);
     final page = await loadPage(1);
     if (!_current(generation)) throw StateError('Page load cancelled.');
     _pages[page.currentPage] = page;

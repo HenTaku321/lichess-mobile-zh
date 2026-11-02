@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_session.dart';
 import 'package:lichess_mobile/src/network/xiangqi_session_store.dart';
+import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_chat_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_profile_screen.dart';
 import 'package:material_ui/material_ui.dart';
@@ -38,6 +39,27 @@ String currentDraft(WidgetTester tester) =>
 
 void main() {
   TestLichessBinding.ensureInitialized();
+
+  testWidgets('the public-room composer uses the same prompt as the chess chat', (tester) async {
+    final factory = await chat.pumpHub(tester);
+    await openLoadedRoom(tester, factory, 'English');
+    final field = tester.widget<TextField>(find.byType(TextField));
+    final context = tester.element(find.byType(XiangqiChatRoomScreen));
+    expect(field.decoration?.hintText, context.l10n.talkInChat);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'public-room messages use the chess chat list padding rather than an extra bottom gap',
+    (tester) async {
+      final factory = await chat.pumpHub(tester);
+      await openLoadedRoom(tester, factory, 'English');
+      final messages = tester.widget<ListView>(find.byType(ListView));
+      expect(messages.reverse, isTrue);
+      expect(messages.padding?.resolve(TextDirection.ltr).bottom, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'returning to the same public room restores its unsent draft without keeping the old socket',

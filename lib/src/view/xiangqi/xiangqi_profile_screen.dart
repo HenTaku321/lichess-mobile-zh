@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/account/account_preferences.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
@@ -71,7 +73,7 @@ class const XiangqiProfileScreen({required final String username, super.key})
           for (final speed in XiangqiRatingType.values.where((speed) => speed.isGame))
             ref.listenManual(xiangqiGameStatsProvider((username, speed)), (_, _) {}),
           ref.listenManual(xiangqiPuzzleStatsProvider(username), (_, _) {}),
-          ref.listenManual(xiangqiGameHistoryProvider((username, 1)), (_, _) {}),
+          ref.listenManual(xiangqiGameHistoryControllerProvider(username), (_, _) {}),
         ];
         try {
           await Future.wait<Object?>([
@@ -79,7 +81,7 @@ class const XiangqiProfileScreen({required final String username, super.key})
             for (final speed in XiangqiRatingType.values.where((speed) => speed.isGame))
               ref.refresh(xiangqiGameStatsProvider((username, speed)).future),
             ref.refresh(xiangqiPuzzleStatsProvider(username).future),
-            ref.refresh(xiangqiGameHistoryProvider((username, 1)).future),
+            ref.read(xiangqiGameHistoryControllerProvider(username).notifier).refresh(),
           ]);
         } finally {
           for (final subscription in subscriptions) {
@@ -322,12 +324,7 @@ class const _SpeedRecord({
   ];
 }
 
-/// The first page of the account's games.
-///
-/// The first page and no more: the endpoint paginates and this screen does not, because a list that
-/// only ever grew would be a list nobody could get to the end of. A game that is over opens its
-/// review; one still being played is a row with no way in, since watching it is the watch list's
-/// business and not a profile's.
+/// The account's paginated record, retained while a review route covers this profile.
 class const _RecentGames({
   required final String username,
   required final XiangqiRefresh onRefresh,
@@ -335,7 +332,7 @@ class const _RecentGames({
 }) extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final history = ref.watch(xiangqiGameHistoryProvider((username, 1)));
+    final history = ref.watch(xiangqiGameHistoryControllerProvider(username));
     return XiangqiRetainedData(
       identity: (username, ref.watch(xiangqiAccountGenerationProvider)),
       value: history,
@@ -344,10 +341,33 @@ class const _RecentGames({
           hasLeading: true,
           header: Text(context.l10n.games),
           children: [
-            if (history.games.isEmpty)
+            if (history.items.isEmpty)
               ListTile(dense: true, title: Text(context.l10n.mobileXiangqiNoGames))
             else
-              for (final game in history.games) _GameRow(game: game),
+              for (final game in history.items) _GameRow(game: game),
+            if (history.refreshError != null)
+              XiangqiRetryTile(
+                onRetry: busy
+                    ? null
+                    : () => unawaited(
+                        ref.read(xiangqiGameHistoryControllerProvider(username).notifier).refresh(),
+                      ),
+              ),
+            XiangqiPaginationFooter(
+              hasMore: history.nextPage != null,
+              loading: history.loadingMore,
+              failed: history.moreError != null,
+              onMore: busy
+                  ? null
+                  : () => unawaited(
+                      ref.read(xiangqiGameHistoryControllerProvider(username).notifier).getMore(),
+                    ),
+              onRetry: busy
+                  ? null
+                  : () => unawaited(
+                      ref.read(xiangqiGameHistoryControllerProvider(username).notifier).getMore(),
+                    ),
+            ),
           ],
         ),
         loading: () => ListSection.loading(itemsNumber: 3, header: true, hasLeading: true),
@@ -366,8 +386,9 @@ class const _RecentGames({
                 onPressed: busy
                     ? null
                     : () => onRefresh(
-                        request: () =>
-                            ref.refresh(xiangqiGameHistoryProvider((username, 1)).future),
+                        request: () => ref
+                            .read(xiangqiGameHistoryControllerProvider(username).notifier)
+                            .refresh(),
                       ),
               ),
             ),

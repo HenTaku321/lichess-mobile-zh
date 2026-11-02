@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:lichess_mobile/src/model/auth/auth_controller.dart';
 import 'package:lichess_mobile/src/model/common/id.dart';
+import 'package:lichess_mobile/src/model/message/contacts_controller.dart';
 import 'package:lichess_mobile/src/model/message/message.dart';
 import 'package:lichess_mobile/src/model/message/message_repository.dart';
 import 'package:lichess_mobile/src/model/user/user.dart';
@@ -17,6 +20,7 @@ import 'package:lichess_mobile/src/widgets/haptic_refresh_indicator.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:lichess_mobile/src/widgets/platform_search_bar.dart';
 import 'package:lichess_mobile/src/widgets/user.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_refresh.dart';
 import 'package:material_ui/material_ui.dart';
 
 final messageSearchQueryProvider = StateProvider.autoDispose<String>((ref) => '');
@@ -96,7 +100,7 @@ class _ContactsScreenState() extends ConsumerState<ContactsScreen> {
       if (mounted) _openingConversation = false;
     }
     if (!mounted || identity != _accountIdentity) return;
-    ref.invalidate(contactsProvider);
+    await ref.read(contactsControllerProvider.notifier).refresh();
     // Returning updates unread rows, not the user's search, selection or scroll position.
     focusNode.unfocus();
   }
@@ -118,8 +122,10 @@ class _ContactsScreenState() extends ConsumerState<ContactsScreen> {
       _clearSearchForNewAccount();
     });
     final searchQuery = ref.watch(messageSearchQueryProvider);
-    final searchResultsAsync = ref.watch(messageSearchResultsProvider);
     final me = ref.watch(authControllerProvider)?.user;
+    final searchResultsAsync = me == null || searchQuery.isEmpty
+        ? null
+        : ref.watch(messageSearchResultsProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -144,7 +150,7 @@ class _ContactsScreenState() extends ConsumerState<ContactsScreen> {
         ),
       ),
       body: searchQuery.isNotEmpty && me != null
-          ? searchResultsAsync.when(
+          ? searchResultsAsync!.when(
               data: (result) => ListView(
                 key: PageStorageKey(('message-search', _accountIdentity, searchQuery)),
                 children: [
@@ -162,8 +168,11 @@ class _ContactsScreenState() extends ConsumerState<ContactsScreen> {
               error: (e, st) => Center(child: Text('Error: $e')),
             )
           : HapticRefreshIndicator(
-              onRefresh: () => ref.refresh(contactsProvider.future),
-              child: ContactsListView(openConvo: pushConversationScreen),
+              onRefresh: () => ref.read(contactsControllerProvider.notifier).refresh(),
+              child: ContactsListView(
+                openConvo: pushConversationScreen,
+                localQuery: me == null ? searchQuery : '',
+              ),
             ),
     );
   }
@@ -179,40 +188,83 @@ class const _SearchCategoryTitle(final String title) extends StatelessWidget {
   }
 }
 
-class const ContactsListView({required final void Function(Contact contact) openConvo, super.key})
-    extends ConsumerWidget {
+class const ContactsListView({
+  required final void Function(Contact contact) openConvo,
+  final String localQuery = '',
+  super.key,
+}) extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final contactsAsync = ref.watch(contactsProvider);
-
-    switch (contactsAsync) {
-      case AsyncData(:final value):
-        final contacts = value.contacts;
-        return ListView.separated(
-          key: PageStorageKey((
-            'message-contacts',
-            ref.watch(authControllerProvider)?.user.id,
-            ref.watch(xiangqiAccountGenerationProvider),
-          )),
-          separatorBuilder: (context, index) => Theme.of(context).platform == TargetPlatform.iOS
-              ? const PlatformDivider(
-                  height: 1,
-                  cupertinoHasLeading: true,
-                  cupertinoLeadingIndent: 56,
+    final current = ref.watch(contactsControllerProvider);
+    final value = current.data;
+    if (value != null && (value.contacts.isNotEmpty || !current.loading)) {
+      final query = localQuery.trim().toLowerCase();
+      final contacts = query.isEmpty
+          ? value.contacts
+          : value.contacts
+                .where(
+                  (contact) =>
+                      contact.user.name.toLowerCase().contains(query) ||
+                      contact.lastMessage.text.toLowerCase().contains(query),
                 )
-              : const SizedBox.shrink(),
-          itemCount: contacts.length,
-          itemBuilder: (context, index) {
-            final contact = contacts[index];
-            return ContactTile(contact, value.me, openConvo: openConvo);
-          },
-        );
-      case AsyncError(:final error, :final stackTrace):
-        debugPrint('Error loading contacts: $error, $stackTrace');
-        return Center(child: Text('Could not load contacts: $error'));
-      case _:
-        return const Center(child: CircularProgressIndicator());
+                .toIList();
+      final footer = <Widget>[
+        if (current.hasError)
+          XiangqiRetryTile(
+            onRetry: current.refreshing
+                ? null
+                : () => unawaited(
+                    ref.read(contactsControllerProvider.notifier).refresh(failedOnly: true),
+                  ),
+          ),
+        if (current.loading)
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: Center(child: CircularProgressIndicator.adaptive()),
+          ),
+        XiangqiPaginationFooter(
+          hasMore: current.xiangqi?.nextPage != null,
+          loading: current.xiangqi?.loadingMore ?? false,
+          failed: current.xiangqi?.moreError != null,
+          onMore: current.refreshing
+              ? null
+              : () => unawaited(ref.read(contactsControllerProvider.notifier).getMore()),
+          onRetry: current.refreshing
+              ? null
+              : () => unawaited(ref.read(contactsControllerProvider.notifier).getMore()),
+        ),
+      ];
+      return ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(),
+        key: PageStorageKey((
+          'message-contacts',
+          ref.watch(authControllerProvider)?.user.id,
+          ref.watch(xiangqiAccountGenerationProvider),
+        )),
+        separatorBuilder: (context, index) => Theme.of(context).platform == TargetPlatform.iOS
+            ? const PlatformDivider(
+                height: 1,
+                cupertinoHasLeading: true,
+                cupertinoLeadingIndent: 56,
+              )
+            : const SizedBox.shrink(),
+        itemCount: contacts.length + footer.length,
+        itemBuilder: (context, index) {
+          if (index >= contacts.length) return footer[index - contacts.length];
+          final contact = contacts[index];
+          return ContactTile(
+            contact,
+            value.me,
+            key: ValueKey((contact.user.id, contact.xiangqi?.chatId)),
+            openConvo: openConvo,
+          );
+        },
+      );
     }
+    if (current.loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    return Center(child: Text(context.l10n.mobileXiangqiSignIn));
   }
 }
 

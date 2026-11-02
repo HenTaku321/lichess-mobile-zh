@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/account/account_preferences.dart';
 import 'package:lichess_mobile/src/model/message/xiangqi_inbox_repository.dart'
@@ -74,14 +76,15 @@ class _XiangqiFriendsScreenState() extends ConsumerState<XiangqiFriendsScreen> {
       );
     }
 
-    final friends = ref.watch(xiangqiFriendsProvider((username, _search.isEmpty ? null : _search)));
+    final friendKey = (username, _search.isEmpty ? null : _search);
+    final friends = ref.watch(xiangqiFriendsControllerProvider(friendKey));
     final requests = ref.watch(xiangqiFriendRequestsProvider);
 
     final generation = ref.watch(xiangqiAccountGenerationProvider);
     return XiangqiRefreshScope(
       identity: (username, _search, generation),
       onRefresh: () => Future.wait<Object?>([
-        ref.refresh(xiangqiFriendsProvider((username, _search.isEmpty ? null : _search)).future),
+        ref.read(xiangqiFriendsControllerProvider(friendKey).notifier).refresh(),
         ref.refresh(xiangqiFriendRequestsProvider.future),
       ]),
       builder: (context, refresh, busy) => XiangqiRetainedData(
@@ -120,7 +123,15 @@ class _XiangqiFriendsScreenState() extends ConsumerState<XiangqiFriendsScreen> {
                       ],
                       AsyncData(:final value) => [
                         for (final request in value)
-                          _RequestRow(request: request, username: username),
+                          _RequestRow(
+                            request: request,
+                            username: username,
+                            onFriendsChanged: () => unawaited(
+                              ref
+                                  .read(xiangqiFriendsControllerProvider(friendKey).notifier)
+                                  .refresh(),
+                            ),
+                          ),
                       ],
                       AsyncError() => [
                         ListTile(
@@ -145,12 +156,20 @@ class _XiangqiFriendsScreenState() extends ConsumerState<XiangqiFriendsScreen> {
                     hasLeading: true,
                     header: Text(context.l10n.friends),
                     children: switch (friends) {
-                      AsyncData(:final value) when value.friends.isEmpty => [
+                      AsyncData(:final value) when value.items.isEmpty => [
                         ListTile(dense: true, title: Text(context.l10n.mobileXiangqiFriendsEmpty)),
                       ],
                       AsyncData(:final value) => [
-                        for (final friend in value.friends)
-                          _FriendRow(friend: friend, username: username),
+                        for (final friend in value.items)
+                          _FriendRow(
+                            friend: friend,
+                            username: username,
+                            onFriendsChanged: () => unawaited(
+                              ref
+                                  .read(xiangqiFriendsControllerProvider(friendKey).notifier)
+                                  .refresh(),
+                            ),
+                          ),
                       ],
                       AsyncError() => [
                         ListTile(
@@ -162,18 +181,44 @@ class _XiangqiFriendsScreenState() extends ConsumerState<XiangqiFriendsScreen> {
                             onPressed: busy
                                 ? null
                                 : () => refresh(
-                                    request: () => ref.refresh(
-                                      xiangqiFriendsProvider((
-                                        username,
-                                        _search.isEmpty ? null : _search,
-                                      )).future,
-                                    ),
+                                    request: () => ref
+                                        .read(xiangqiFriendsControllerProvider(friendKey).notifier)
+                                        .refresh(),
                                   ),
                           ),
                         ),
                       ],
                       _ => [const ListTile(dense: true, title: Text('…'))],
                     },
+                  ),
+                  if (friends.value?.refreshError != null)
+                    XiangqiRetryTile(
+                      onRetry: busy
+                          ? null
+                          : () => unawaited(
+                              ref
+                                  .read(xiangqiFriendsControllerProvider(friendKey).notifier)
+                                  .refresh(),
+                            ),
+                    ),
+                  XiangqiPaginationFooter(
+                    hasMore: friends.value?.nextPage != null,
+                    loading: friends.value?.loadingMore ?? false,
+                    failed: friends.value?.moreError != null,
+                    onMore: busy
+                        ? null
+                        : () => unawaited(
+                            ref
+                                .read(xiangqiFriendsControllerProvider(friendKey).notifier)
+                                .getMore(),
+                          ),
+                    onRetry: busy
+                        ? null
+                        : () => unawaited(
+                            ref
+                                .read(xiangqiFriendsControllerProvider(friendKey).notifier)
+                                .getMore(),
+                          ),
                   ),
                 ],
               ),
@@ -186,8 +231,11 @@ class _XiangqiFriendsScreenState() extends ConsumerState<XiangqiFriendsScreen> {
 }
 
 /// One friend: who it is, and the way to stop being one.
-class const _FriendRow({required final XiangqiFriend friend, required final String username})
-    extends ConsumerStatefulWidget {
+class const _FriendRow({
+  required final XiangqiFriend friend,
+  required final String username,
+  final VoidCallback? onFriendsChanged,
+}) extends ConsumerStatefulWidget {
   @override
   ConsumerState<_FriendRow> createState() => _FriendRowState();
 }
@@ -203,7 +251,10 @@ class _FriendRowState() extends ConsumerState<_FriendRow> {
         context,
         ref,
         () => ref.read(xiangqiSocialRepositoryProvider).unfriend(widget.friend.player.name),
-        onDone: () => ref.invalidate(xiangqiFriendsProvider),
+        onDone: () {
+          ref.invalidate(xiangqiFriendsProvider);
+          widget.onFriendsChanged?.call();
+        },
       );
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -237,6 +288,7 @@ class _FriendRowState() extends ConsumerState<_FriendRow> {
 class const _RequestRow({
   required final XiangqiFriendRequest request,
   required final String username,
+  final VoidCallback? onFriendsChanged,
 }) extends ConsumerStatefulWidget {
   @override
   ConsumerState<_RequestRow> createState() => _RequestRowState();
@@ -289,6 +341,7 @@ class _RequestRowState() extends ConsumerState<_RequestRow> {
         onDone: () {
           ref.invalidate(xiangqiFriendRequestsProvider);
           ref.invalidate(xiangqiFriendsProvider);
+          widget.onFriendsChanged?.call();
         },
       );
     } finally {

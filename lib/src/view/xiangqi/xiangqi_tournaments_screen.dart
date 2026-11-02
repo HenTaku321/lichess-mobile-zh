@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
@@ -154,10 +156,7 @@ class _XiangqiTournamentScreenState() extends ConsumerState<XiangqiTournamentScr
   @override
   Widget build(BuildContext context) {
     final tournament = ref.watch(xiangqiTournamentProvider(widget.id));
-    // The first page of the standings and no more: a tournament's table is long, and a list that
-    // only ever grew would be a list nobody could get to the end of. The page is not a setting —
-    // there is nowhere on this screen to change it — so it is not state.
-    final leaders = ref.watch(xiangqiTournamentLeadersProvider((widget.id, 1)));
+    final leaders = ref.watch(xiangqiTournamentStandingsControllerProvider(widget.id));
     final participants = ref.watch(xiangqiTournamentParticipantsProvider(widget.id));
 
     final identity = (widget.id, ref.watch(xiangqiAccountGenerationProvider));
@@ -165,7 +164,7 @@ class _XiangqiTournamentScreenState() extends ConsumerState<XiangqiTournamentScr
       identity: identity,
       onRefresh: () => Future.wait<Object?>([
         ref.refresh(xiangqiTournamentProvider(widget.id).future),
-        ref.refresh(xiangqiTournamentLeadersProvider((widget.id, 1)).future),
+        ref.read(xiangqiTournamentStandingsControllerProvider(widget.id).notifier).refresh(),
         ref.refresh(xiangqiTournamentParticipantsProvider(widget.id).future),
       ]),
       builder: (context, refresh, busy) => XiangqiRetainedData(
@@ -243,6 +242,61 @@ class _XiangqiTournamentScreenState() extends ConsumerState<XiangqiTournamentScr
                             )
                           else
                             for (final entry in leaders.items) _StandingRow(entry: entry),
+                          if (leaders.refreshError != null || leaders.moreError != null)
+                            XiangqiRetryTile(
+                              onRetry: busy
+                                  ? null
+                                  : () => unawaited(
+                                      ref
+                                          .read(
+                                            xiangqiTournamentStandingsControllerProvider(widget.id)
+                                                .notifier,
+                                          )
+                                          .refresh(),
+                                    ),
+                            ),
+                          Row(
+                            children: [
+                              IconButton(
+                                tooltip: context.l10n.mobilePreviousPage,
+                                icon: const Icon(Icons.chevron_left),
+                                onPressed: busy || leaders.busy || leaders.previousPage == null
+                                    ? null
+                                    : () => unawaited(
+                                        ref
+                                            .read(
+                                              xiangqiTournamentStandingsControllerProvider(
+                                                widget.id,
+                                              ).notifier,
+                                            )
+                                            .goToPage(leaders.previousPage!),
+                                      ),
+                              ),
+                              Expanded(
+                                child: Text(
+                                  leaders.totalPages == null || leaders.totalPages == 0
+                                      ? '${leaders.currentPage}'
+                                      : '${leaders.currentPage} / ${leaders.totalPages}',
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                              IconButton(
+                                tooltip: context.l10n.studyNext,
+                                icon: const Icon(Icons.chevron_right),
+                                onPressed: busy || leaders.busy || leaders.nextPage == null
+                                    ? null
+                                    : () => unawaited(
+                                        ref
+                                            .read(
+                                              xiangqiTournamentStandingsControllerProvider(
+                                                widget.id,
+                                              ).notifier,
+                                            )
+                                            .goToPage(leaders.nextPage!),
+                                      ),
+                              ),
+                            ],
+                          ),
                         ],
                       ),
                       loading: () =>
@@ -260,9 +314,12 @@ class _XiangqiTournamentScreenState() extends ConsumerState<XiangqiTournamentScr
                               onPressed: busy
                                   ? null
                                   : () => refresh(
-                                      request: () => ref.refresh(
-                                        xiangqiTournamentLeadersProvider((widget.id, 1)).future,
-                                      ),
+                                      request: () => ref
+                                          .read(
+                                            xiangqiTournamentStandingsControllerProvider(widget.id)
+                                                .notifier,
+                                          )
+                                          .refresh(),
                                     ),
                             ),
                           ),

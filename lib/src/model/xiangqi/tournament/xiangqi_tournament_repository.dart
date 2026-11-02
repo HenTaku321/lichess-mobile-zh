@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/xiangqi/tournament/xiangqi_tournament.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_page.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_pagination.dart';
 import 'package:lichess_mobile/src/network/connectivity.dart';
 import 'package:lichess_mobile/src/network/http.dart' show ServerException;
 import 'package:lichess_mobile/src/network/xiangqi_http.dart';
@@ -53,6 +55,32 @@ final xiangqiTournamentLeadersProvider = FutureProvider.autoDispose
       );
     }, name: 'XiangqiTournamentLeadersProvider');
 
+final xiangqiTournamentStandingsControllerProvider = AsyncNotifierProvider.autoDispose
+    .family<
+      XiangqiTournamentStandingsController,
+      XiangqiPagedState<XiangqiTournamentParticipant>,
+      String
+    >(
+      XiangqiTournamentStandingsController.new,
+      name: 'XiangqiTournamentStandingsControllerProvider',
+    );
+
+class XiangqiTournamentStandingsController(final String id)
+    extends XiangqiPagedController<XiangqiTournamentParticipant> {
+  @override
+  bool get appendPages => false;
+
+  @override
+  Future<XiangqiPage<XiangqiTournamentParticipant>> loadPage(int page) async =>
+      xiangqiTournamentLeadersPageFromJson(
+        await _getJson(ref, 'tournament/$id/leaders', {'page': '$page'}, watchConnectivity: false),
+        requestedPage: page,
+      );
+
+  @override
+  Object itemKey(XiangqiTournamentParticipant item) => item.player.id;
+}
+
 /// A tournament's participants, from `GET /api/tournament/<id>/participants/invited`.
 ///
 /// **A bare array**, not a page — measured that way. The `joined` list is the same shape and is not
@@ -74,8 +102,16 @@ final xiangqiTournamentParticipantsProvider = FutureProvider.autoDispose
 /// Offline is still an [Error] rather than an empty answer, for the reason every other xiangqi
 /// provider gives — `lichessProviderRetry` never retries an [Error], so being offline is settled at
 /// once instead of six times over with a back-off in between.
-Future<Object?> _getJson(Ref ref, String path, Map<String, String> query) async {
-  if (!ref.watch(isDeviceOnlineProvider)) {
+Future<Object?> _getJson(
+  Ref ref,
+  String path,
+  Map<String, String> query, {
+  bool watchConnectivity = true,
+}) async {
+  final online = watchConnectivity
+      ? ref.watch(isDeviceOnlineProvider)
+      : ref.read(isDeviceOnlineProvider);
+  if (!online) {
     throw StateError('The device is offline; not asking xiangqi.com for $path.');
   }
 

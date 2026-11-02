@@ -184,6 +184,12 @@ void main() {
     tester,
   ) async {
     final factory = await pumpScreen(tester, holdXiangqi: true);
+    final container = ProviderScope.containerOf(tester.element(find.byType(ContactsScreen)));
+    await pumpUntil(
+      tester,
+      () => container.read(lichessContactsProvider).hasValue,
+      reason: 'the HTTP source must settle before checking independent rendering',
+    );
     expect(find.text('chabrot'), findsOneWidget);
     factory.channel.fromServer(xiangqiChatsFrame);
     await tester.pumpAndSettle();
@@ -194,7 +200,14 @@ void main() {
     tester,
   ) async {
     final factory = await pumpScreen(tester, holdXiangqi: true);
+    final container = ProviderScope.containerOf(tester.element(find.byType(ContactsScreen)));
+    await pumpUntil(
+      tester,
+      () => container.read(lichessContactsProvider).hasValue,
+      reason: 'the healthy HTTP source must settle before the socket is disconnected',
+    );
     factory.channel.fromServer('41/xiangqi,');
+    await tester.pump(const Duration(seconds: 21));
     for (var pump = 0; pump < 20; pump++) {
       await tester.pump();
     }

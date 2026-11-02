@@ -3,6 +3,7 @@ import 'dart:io' show HttpDate;
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_live_game.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_page.dart';
 
 part 'xiangqi_tournament.freezed.dart';
 
@@ -122,6 +123,22 @@ XiangqiTournament? xiangqiTournamentFromJson(Object? json) {
 ///
 /// The list key is **`participants`** and not the `items` every other page on the site uses —
 /// measured on 2026-10-16. See `xiangqi-com-re/docs/tournament.md`.
+XiangqiPage<XiangqiTournamentParticipant> xiangqiTournamentLeadersPageFromJson(
+  Object? json, {
+  required int requestedPage,
+}) {
+  final envelope = _map(json);
+  final rows = envelope?['participants'];
+  if (envelope == null || rows is! List) {
+    throw const FormatException('Invalid xiangqi.com standings page envelope.');
+  }
+  final items = xiangqiTournamentLeadersFromJson(json).items;
+  if (rows.isNotEmpty && items.isEmpty) {
+    throw const FormatException('The xiangqi.com standings page contains no readable entries.');
+  }
+  return XiangqiPage.fromMetadata(items: items, requestedPage: requestedPage, metadata: envelope);
+}
+
 XiangqiMasterPageLike<XiangqiTournamentParticipant> xiangqiTournamentLeadersFromJson(Object? json) {
   final map = _map(json);
   return (

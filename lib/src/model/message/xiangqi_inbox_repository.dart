@@ -57,6 +57,7 @@ import 'package:lichess_mobile/src/model/user/user.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_link.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_page.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_pagination.dart';
 import 'package:lichess_mobile/src/network/xiangqi_http.dart'
     show XiangqiAuthStorage, kXiangqiMinRequestSpacing, xiangqiAuthStorageProvider;
 import 'package:lichess_mobile/src/network/xiangqi_session_store.dart';
@@ -711,6 +712,30 @@ final xiangqiContactsProvider = FutureProvider.autoDispose<IList<Contact>>((ref)
   final contacts = await repository.loadChats();
   return contacts;
 }, name: 'XiangqiContactsProvider');
+
+final xiangqiContactsControllerProvider =
+    AsyncNotifierProvider.autoDispose<XiangqiContactsController, XiangqiPagedState<Contact>>(
+      XiangqiContactsController.new,
+      name: 'XiangqiContactsControllerProvider',
+    );
+
+class XiangqiContactsController() extends XiangqiPagedController<Contact> {
+  late XiangqiInboxRepository _repository;
+
+  @override
+  Future<XiangqiPagedState<Contact>> build() async {
+    await ref.watch(xiangqiSessionReadyProvider.future);
+    if (!ref.mounted) throw StateError('Contacts load cancelled.');
+    _repository = ref.watch(xiangqiInboxRepositoryProvider);
+    return await super.build();
+  }
+
+  @override
+  Future<XiangqiPage<Contact>> loadPage(int page) => _repository.loadChatsPage(page);
+
+  @override
+  Object itemKey(Contact item) => (item.xiangqi?.chatId, item.user.id);
+}
 
 /// The signed-in xiangqi.com account as a [LightUser], or null when there is no session.
 ///

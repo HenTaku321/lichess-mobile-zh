@@ -4,6 +4,8 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/xiangqi/profile/xiangqi_profile.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_page.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_pagination.dart';
 import 'package:lichess_mobile/src/network/connectivity.dart';
 import 'package:lichess_mobile/src/network/http.dart' show ServerException;
 import 'package:lichess_mobile/src/network/xiangqi_http.dart';
@@ -74,6 +76,25 @@ final xiangqiGameHistoryProvider = FutureProvider.autoDispose
       );
     }, name: 'XiangqiGameHistoryProvider');
 
+final xiangqiGameHistoryControllerProvider = AsyncNotifierProvider.autoDispose
+    .family<XiangqiGameHistoryController, XiangqiPagedState<XiangqiGameSummary>, String>(
+      XiangqiGameHistoryController.new,
+      name: 'XiangqiGameHistoryControllerProvider',
+    );
+
+class XiangqiGameHistoryController(final String username)
+    extends XiangqiPagedController<XiangqiGameSummary> {
+  @override
+  Future<XiangqiPage<XiangqiGameSummary>> loadPage(int page) async =>
+      xiangqiGameHistoryPageFromJson(
+        await _getJson(ref, 'users/games/$username', {'page': '$page'}, watchConnectivity: false),
+        requestedPage: page,
+      );
+
+  @override
+  Object itemKey(XiangqiGameSummary item) => item.id;
+}
+
 /// The country table, from `GET /api/users/countries`.
 ///
 /// Kept for the whole session rather than per screen: it is a static list of two hundred-odd rows
@@ -122,8 +143,16 @@ Map<String, dynamic> _asMap(Object? value) =>
 /// Offline is still an [Error] rather than an empty answer, for the reason every other xiangqi
 /// provider gives — `lichessProviderRetry` never retries an [Error], so being offline is settled at
 /// once instead of six times over with a back-off in between.
-Future<Object?> _getJson(Ref ref, String path, Map<String, String> query) async {
-  if (!ref.watch(isDeviceOnlineProvider)) {
+Future<Object?> _getJson(
+  Ref ref,
+  String path,
+  Map<String, String> query, {
+  bool watchConnectivity = true,
+}) async {
+  final online = watchConnectivity
+      ? ref.watch(isDeviceOnlineProvider)
+      : ref.read(isDeviceOnlineProvider);
+  if (!online) {
     throw StateError('The device is offline; not asking xiangqi.com for $path.');
   }
 

@@ -1,6 +1,7 @@
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_live_game.dart';
+import 'package:lichess_mobile/src/model/xiangqi/xiangqi_page.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 
 part 'xiangqi_profile.freezed.dart';
@@ -250,6 +251,22 @@ XiangqiLeaderboard xiangqiLeaderboardFromJson(Object? json) {
 const int kXiangqiLeaderboardPageSize = 15;
 
 /// A page of an account's game history, read from a `users/games/<username>` body.
+XiangqiPage<XiangqiGameSummary> xiangqiGameHistoryPageFromJson(
+  Object? json, {
+  required int requestedPage,
+}) {
+  final envelope = json is Map<String, dynamic> ? json : null;
+  final rows = envelope?['items'];
+  if (envelope == null || rows is! List) {
+    throw const FormatException('Invalid xiangqi.com game-history page envelope.');
+  }
+  final items = xiangqiGameHistoryFromJson(json).games;
+  if (rows.isNotEmpty && items.isEmpty) {
+    throw const FormatException('The xiangqi.com history page contains no readable games.');
+  }
+  return XiangqiPage.fromMetadata(items: items, requestedPage: requestedPage, metadata: envelope);
+}
+
 XiangqiGameHistory xiangqiGameHistoryFromJson(Object? json) {
   if (json is! Map<String, dynamic>) {
     return const XiangqiGameHistory(games: IListConst([]), totalPages: 0);

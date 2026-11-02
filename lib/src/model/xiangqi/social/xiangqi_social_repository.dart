@@ -202,6 +202,31 @@ final xiangqiFriendsProvider = FutureProvider.autoDispose
       );
     }, name: 'XiangqiFriendsProvider');
 
+final xiangqiFriendsControllerProvider = AsyncNotifierProvider.autoDispose
+    .family<
+      XiangqiFriendsController,
+      XiangqiPagedState<XiangqiFriend>,
+      (String username, String? search)
+    >(XiangqiFriendsController.new, name: 'XiangqiFriendsControllerProvider');
+
+class XiangqiFriendsController(final (String username, String? search) key)
+    extends XiangqiPagedController<XiangqiFriend> {
+  @override
+  Future<XiangqiPage<XiangqiFriend>> loadPage(int page) async {
+    final (username, search) = key;
+    return xiangqiFriendsPageFromJson(
+      await _getJson(ref, 'friends/$username', {
+        'page': '$page',
+        'search': ?search,
+      }, watchConnectivity: false),
+      requestedPage: page,
+    );
+  }
+
+  @override
+  Object itemKey(XiangqiFriend item) => item.player.id;
+}
+
 /// The friend requests waiting to be answered, from `GET /api/friends/friend-requests`.
 ///
 /// The envelope is `{friend_requests: [...]}` and not the `{items: [...]}` the friend list uses —
@@ -290,9 +315,17 @@ Future<bool> markAllXiangqiNotificationsRead(WidgetRef ref) =>
 /// missing when it is.
 ///
 /// Watch network and account identity so a public lookup can recover after connectivity changes.
-Future<Object?> _getJson(Ref ref, String path, Map<String, String> query) async {
-  ref.watch(xiangqiAccountGenerationProvider);
-  if (!ref.watch(isDeviceOnlineProvider)) {
+Future<Object?> _getJson(
+  Ref ref,
+  String path,
+  Map<String, String> query, {
+  bool watchConnectivity = true,
+}) async {
+  if (watchConnectivity) ref.watch(xiangqiAccountGenerationProvider);
+  final online = watchConnectivity
+      ? ref.watch(isDeviceOnlineProvider)
+      : ref.read(isDeviceOnlineProvider);
+  if (!online) {
     throw const XiangqiSocialException(XiangqiSocialFailure.offline);
   }
 

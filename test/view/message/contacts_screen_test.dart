@@ -210,8 +210,13 @@ void main() {
       tester,
     ) async {
       final factory = await pumpScreen(tester);
-      await tester.tap(find.text(xiangqiPeerName));
-      await tester.tap(find.text(xiangqiPeerName));
+      // Exercise reentrant activation of the actual row callback before the next frame disables
+      // the covered route. A pair of pointer/keyboard activations must not create two pages.
+      final tile = tester.widget<ListTile>(
+        find.ancestor(of: find.text(xiangqiPeerName), matching: find.byType(ListTile)),
+      );
+      tile.onTap!();
+      tile.onTap!();
       await pumpUntil(tester, () => factory.channel.hasSentEvent(kXiangqiInboxChatUserEvent));
       factory.channel.fromServer(
         fx.xiangqiEventFrame(kXiangqiInboxUserMessagesEvent, {

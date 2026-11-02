@@ -53,7 +53,7 @@ void main() {
     expect(retry, findsOneWidget);
     fail = false;
     await tester.ensureVisible(retry);
-    await tester.tap(find.descendant(of: retry, matching: find.text(context.l10n.retry)));
+    await tester.tap(find.descendant(of: retry, matching: find.byTooltip(context.l10n.retry)));
     await remote.settleRemote(tester);
     expect(pages, [1, 2, 1, 2, 2]);
     expect(retry, findsNothing);

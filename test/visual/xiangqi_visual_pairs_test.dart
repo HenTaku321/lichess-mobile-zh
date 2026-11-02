@@ -261,7 +261,8 @@ Future<_Capture> captureSide(
   expect(find.byType(ChatMessageList), findsOneWidget);
   expect(find.byType(ChatComposerInput), findsOneWidget);
   final pageContext = tester.element(find.byType(ChatMessageList));
-  expect(Localizations.localeOf(pageContext).toLanguageTag(), environment['locale']);
+  final resolvedLocale = Localizations.localeOf(pageContext).toLanguageTag();
+  expect(resolvedLocale, specification['expectedResolvedLocale']);
   expect(MediaQuery.textScalerOf(pageContext).scale(10) / 10, environment['textScale']);
   expect(Theme.of(pageContext).brightness.name, environment['mode']);
   expect(tester.view.physicalSize, size * dpi);
@@ -335,6 +336,7 @@ Future<_Capture> captureSide(
       return _Capture(
         {
           'environment': {...environment, 'dpi': tester.view.devicePixelRatio},
+          'resolvedLocale': resolvedLocale,
           'physicalSize': [image.width, image.height],
           'stage': specification['state'],
           'realRatingPreferences': true,

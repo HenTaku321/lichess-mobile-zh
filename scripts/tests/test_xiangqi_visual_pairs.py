@@ -64,6 +64,7 @@ def evidence(root):
         report['sides'][side] = {
             'stage': case['state'], 'realRatingPreferences': True, 'environment': case['configuration']['environment'],
             'physicalSize': [4, 4], 'preferences': {}, 'driverProof': [{'tap': 'open'}],
+            'resolvedLocale': 'en-GB',
             'controllerProof': {'page': 1}, 'requests': [], 'original': save(f'{side}.png', png(4, 4)),
             'roles': {'toolbar': {'rect': [0, 0, 2, 2]}},
         }

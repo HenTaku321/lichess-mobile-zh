@@ -1,4 +1,6 @@
 import 'package:chessground/chessground.dart' show DragTargetKind, PieceSet, PieceShiftMethod;
+import 'package:flutter/widgets.dart' show Locale, basicLocaleListResolution;
+import 'package:lichess_mobile/l10n/l10n.dart';
 import 'package:lichess_mobile/src/model/account/account_preferences.dart';
 import 'package:lichess_mobile/src/model/analysis/analysis_preferences.dart';
 import 'package:lichess_mobile/src/model/engine/evaluation_preferences.dart';
@@ -11,6 +13,12 @@ import 'package:lichess_mobile/src/model/settings/preferences_storage.dart';
 /// Enumerates the actual compiled enum values and their persistence projection, not a hand-written
 /// subset that would silently discard new board/piece/sound choices after a dependency change.
 Map<String, Object?> visualCatalogue() => {
+  'localeResolution': {
+    for (final locale in const [Locale('en', 'GB'), Locale('zh', 'CN')])
+      locale.toLanguageTag(): basicLocaleListResolution([
+        locale,
+      ], AppLocalizations.supportedLocales).toLanguageTag(),
+  },
   'axes': {
     'boardTheme': [
       for (final value in BoardTheme.values)

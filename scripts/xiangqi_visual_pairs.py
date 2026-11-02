@@ -28,6 +28,8 @@ def resolve_registry(registry, catalogue=None):
     if value.get("schema") != 1:
         raise ValueError("Unknown registry schema")
     catalogue = catalogue or {}
+    if 'localeResolution' in catalogue:
+        value['localeResolution'] = catalogue['localeResolution']
     axes = value.get("axes", {})
     for name, choices in axes.items():
         if isinstance(choices, str) and choices.startswith("@"):
@@ -114,6 +116,7 @@ def case_at(registry, ordinal):
         return {
             "index": str(ordinal), "role": role["id"], "state": state["id"], "driver": state["driver"],
             "sources": role["sources"], "configuration": configuration,
+            "expectedResolvedLocale": value.get('localeResolution', {}).get(configuration['environment']['locale'], configuration['environment']['locale']),
             "requiredRoles": state["requiredRoles"], "pixelRoles": state["pixelRoles"],
             "allowedDifferences": state["allowedDifferences"],
             "differenceDefinitions": {key: registry.get("differences", {}).get(key, {}) for key in state["allowedDifferences"]},
@@ -317,6 +320,8 @@ def evaluate_case(case, report, root, now):
                 raise ValueError("Wrong phase/fixed test rating override")
             if result["environment"] != environment or result["physicalSize"] != physical:
                 raise ValueError("Environment/text scale/DPI projection mismatch")
+            if result.get('resolvedLocale') != case.get('expectedResolvedLocale', environment['locale']):
+                raise ValueError('Requested language does not match the actual app locale catalogue')
             if not result.get("driverProof") or not result.get("controllerProof"):
                 raise ValueError("Missing real input/controller evidence")
             if not isinstance(result.get("requests"), list):

@@ -117,3 +117,6 @@
 - `d57c2b005` / Actions `41443591331`：analyze 通过；私信／Socket JSON 104 success、
   目录 JSON 27 success，两份 done.success=true；四个排行榜／数据库负向断言均转绿。
   图像从原图重算的19项控制已通过；新增渲染完成关联为预期单项红，已接实际 JSON 结果校验，待绿。
+- 手动 `54b7e0bbf` / Actions `41444712056` 停在真实环境断言：请求 en-GB，AppLocalizations
+  实际支持 en（zh-CN 同理解析成 zh），不能将这次夹具错误算气泡几何红。现由编译的 locale
+  目录和 Flutter 实际 locale resolution 推导期待值，仍保留原48环境、真实语言／DPI断言。

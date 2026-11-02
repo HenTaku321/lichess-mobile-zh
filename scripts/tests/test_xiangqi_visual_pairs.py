@@ -209,5 +209,26 @@ class EvidenceTests(unittest.TestCase):
         self.assertEqual(self.verdict()['status'], 'invalid')
 
 
+class RenderResultTests(unittest.TestCase):
+    def events(self, result='success', skipped=False):
+        return [
+            {'type': 'testStart', 'test': {'id': 3, 'name': 'pair ' + 'a' * 64 + ' (variant: TargetPlatform.linux)'}},
+            {'type': 'testDone', 'testID': 3, 'result': result, 'skipped': skipped, 'hidden': False},
+            {'type': 'done', 'success': result == 'success'},
+        ]
+
+    def test_the_successful_real_render_has_positive_control(self):
+        self.assertTrue(pairs.render_case_succeeded(self.events(), 'a' * 64))
+
+    def test_skipped_or_failed_fixture_results_never_count_as_pair_success(self):
+        for result, skipped in [('success', True), ('error', False), ('failure', False)]:
+            with self.subTest(result=result, skipped=skipped):
+                self.assertFalse(pairs.render_case_succeeded(self.events(result, skipped), 'a' * 64))
+
+    def test_a_different_case_or_missing_completion_is_not_success(self):
+        self.assertFalse(pairs.render_case_succeeded(self.events(), 'b' * 64))
+        self.assertFalse(pairs.render_case_succeeded(self.events()[:-2], 'a' * 64))
+
+
 if __name__ == "__main__":
     unittest.main()

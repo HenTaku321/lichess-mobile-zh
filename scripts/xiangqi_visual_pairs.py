@@ -348,6 +348,10 @@ def evaluate_case(case, report, root, now):
         return {"status": "invalid", "reason": str(error)}
 
 
+def render_case_succeeded(events, case_id):
+    return False
+
+
 def write_json(path, value):
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".partial")

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
+import 'package:lichess_mobile/src/network/xiangqi_session_store.dart';
 import 'package:logging/logging.dart';
 
 final _logger = Logger('XiangqiPageSelection');

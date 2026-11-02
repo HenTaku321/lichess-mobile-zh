@@ -66,6 +66,81 @@ makeControllerHarness() async {
 }
 
 void main() {
+  test('an unrelated sender cannot consume a pending own message with the same text', () async {
+    final harness = await makeControllerHarness();
+    final container = harness.container;
+    final provider = xiangqiConversationControllerProvider(conversation);
+    final listener = container.listen(provider, (_, _) {});
+    addTearDown(listener.close);
+    await fixture.completeHandshake(harness.inbox);
+    harness.inbox.channel.fromServer(fixture.xiangqiMessagesFrame([]));
+    await container.read(provider.future);
+    expect(await container.read(provider.notifier).sendMessage('Same text'), isTrue);
+    final optimistic = container.read(provider).requireValue.convo.messages.single;
+
+    harness.inbox.channel.fromServer(
+      fx.xiangqiEventFrame(kXiangqiInboxMessageSentEvent, {
+        'data': fixture.xiangqiMessageRow('Same text', senderId: 200009),
+      }),
+    );
+    await pumpEventQueue();
+    expect(container.read(provider).requireValue.convo.messages.single, optimistic);
+    expect(
+      container.read(provider).requireValue.convo.messages.single.userId,
+      xiangqiUserId(fixture.xiangqiAccountId),
+    );
+  });
+
+  test('an ambiguous same-text own echo resyncs both chats without guessing either row', () async {
+    final harness = await makeControllerHarness();
+    final container = harness.container;
+    final first = xiangqiConversationControllerProvider(conversation);
+    final firstListener = container.listen(first, (_, _) {});
+    addTearDown(firstListener.close);
+    await fixture.completeHandshake(harness.inbox);
+    harness.inbox.channel.fromServer(fixture.xiangqiMessagesFrame([]));
+    await container.read(first.future);
+
+    final secondKey = (
+      chatId: fixture.xiangqiSecondChatId,
+      peerId: 200002,
+      peer: xiangqiLightUser(200002, 'riverbend'),
+    );
+    final second = xiangqiConversationControllerProvider(secondKey);
+    final secondListener = container.listen(second, (_, _) {});
+    addTearDown(secondListener.close);
+    await pumpEventQueue();
+    harness.inbox.channel.fromServer(fixture.xiangqiMessagesFrame([]));
+    await container.read(second.future);
+    expect(await container.read(first.notifier).sendMessage('Same text'), isTrue);
+    expect(await container.read(second.notifier).sendMessage('Same text'), isTrue);
+    final firstOptimistic = container.read(first).requireValue.convo.messages.single;
+    final secondOptimistic = container.read(second).requireValue.convo.messages.single;
+
+    harness.inbox.channel.fromServer(
+      fx.xiangqiEventFrame(kXiangqiInboxMessageSentEvent, {
+        'data': fixture.xiangqiMessageRow('Same text'),
+      }),
+    );
+    await pumpEventQueue();
+    expect(container.read(first).requireValue.convo.messages.single, firstOptimistic);
+    expect(container.read(second).requireValue.convo.messages.single, secondOptimistic);
+    expect(
+      harness.inbox.emits.where((emit) => emit.event == kXiangqiInboxChatUserEvent),
+      hasLength(3),
+      reason: 'the first targeted resync must start instead of guessing from the text',
+    );
+    harness.inbox.channel.fromServer(fixture.xiangqiMessagesFrame([]));
+    await pumpEventQueue();
+    expect(
+      harness.inbox.emits.where((emit) => emit.event == kXiangqiInboxChatUserEvent),
+      hasLength(4),
+      reason: 'both ambiguous conversations must be read through the serial no-ID queue',
+    );
+    harness.inbox.channel.fromServer(fixture.xiangqiMessagesFrame([]));
+    await pumpEventQueue();
+  });
+
   test('a lichess identity change shares history from the unchanged xiangqi session', () async {
     final harness = await makeControllerHarness();
     final container = harness.container;

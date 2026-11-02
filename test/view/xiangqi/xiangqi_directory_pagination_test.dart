@@ -4,6 +4,7 @@ import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_friends_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_profile_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_tournaments_screen.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_refresh.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../binding.dart';
@@ -21,6 +22,42 @@ Map<String, Object?> envelope(List<Object?> items, int page, {String field = 'it
 
 void main() {
   TestLichessBinding.ensureInitialized();
+
+  testWidgets('a partial refresh retry resumes at the failed page instead of rereading page one', (
+    tester,
+  ) async {
+    final pages = <int>[];
+    var fail = false;
+    await remote.pumpRemote(
+      tester,
+      const XiangqiFriendsScreen(),
+      MockClient((request) async {
+        if (request.url.path.endsWith('/friend-requests')) {
+          return remote.jsonReply({'friend_requests': <Object?>[]});
+        }
+        if (!request.url.path.startsWith('/api/friends/')) return remote.jsonReply({});
+        final page = int.parse(request.url.queryParameters['page'] ?? '1');
+        pages.add(page);
+        if (page == 2 && fail) return remote.jsonReply({}, 503);
+        return remote.jsonReply(envelope([], page));
+      }),
+    );
+    final context = tester.element(find.byType(XiangqiFriendsScreen));
+    await tester.tap(find.text(context.l10n.mobileLoadMore));
+    await remote.settleRemote(tester);
+    fail = true;
+    await tester.tap(find.byType(DesktopRefreshButton));
+    await remote.settleRemote(tester);
+    expect(pages, [1, 2, 1, 2]);
+    final retry = find.byType(XiangqiRetryTile);
+    expect(retry, findsOneWidget);
+    fail = false;
+    await tester.ensureVisible(retry);
+    await tester.tap(find.descendant(of: retry, matching: find.text(context.l10n.retry)));
+    await remote.settleRemote(tester);
+    expect(pages, [1, 2, 1, 2, 2]);
+    expect(retry, findsNothing);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.linux));
 
   testWidgets('friends expose the confirmed next-page cursor even for an empty current page', (
     tester,

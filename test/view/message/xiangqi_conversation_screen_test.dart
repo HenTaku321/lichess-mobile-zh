@@ -8,6 +8,7 @@ import 'package:lichess_mobile/src/network/socket.dart' show webSocketChannelFac
 import 'package:lichess_mobile/src/network/xiangqi_http.dart';
 import 'package:lichess_mobile/src/network/xiangqi_session_store.dart';
 import 'package:lichess_mobile/src/network/xiangqi_socket.dart';
+import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/view/message/xiangqi_conversation_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_profile_screen.dart';
 import 'package:lichess_mobile/src/widgets/rich_link_text.dart';
@@ -26,8 +27,10 @@ Future<ProviderContainer> pumpConversation(
   WidgetTester tester, {
   MockClient? httpClient,
   bool hiddenUsername = false,
+  fx.FakeXiangqiChannelFactory? channelFactory,
+  Map<String, Object?>? firstPage,
 }) async {
-  final factory = fx.FakeXiangqiChannelFactory();
+  final factory = channelFactory ?? fx.FakeXiangqiChannelFactory();
   final contact = xiangqiContactsFromChats(
     fixture.xiangqiPagePayload([
       {...fixture.xiangqiFirstChatRow, 'hidden_username': hiddenUsername},
@@ -78,9 +81,11 @@ Future<ProviderContainer> pumpConversation(
     reason: 'the open conversation is expected to ask for its first page',
   );
   channel.fromServer(
-    fixture.xiangqiMessagesFrame([
-      fixture.xiangqiMessageRow('Hello', senderId: fixture.xiangqiFirstPeerId),
-    ]),
+    firstPage == null
+        ? fixture.xiangqiMessagesFrame([
+            fixture.xiangqiMessageRow('Hello', senderId: fixture.xiangqiFirstPeerId),
+          ])
+        : fx.xiangqiEventFrame(kXiangqiInboxUserMessagesEvent, firstPage),
   );
   await tester.pumpAndSettle();
   return ProviderScope.containerOf(tester.element(find.byType(XiangqiConversationScreen)));
@@ -88,6 +93,59 @@ Future<ProviderContainer> pumpConversation(
 
 void main() {
   TestLichessBinding.ensureInitialized();
+
+  testWidgets('older PM pages are reachable without replacing messages or the focused draft', (
+    tester,
+  ) async {
+    final factory = fx.FakeXiangqiChannelFactory();
+    await pumpConversation(
+      tester,
+      channelFactory: factory,
+      firstPage: {
+        'data': {
+          ...fixture.xiangqiPagePayload([
+                fixture.xiangqiMessageRow('Newest', senderId: fixture.xiangqiFirstPeerId),
+              ])['data']!
+              as Map<String, Object?>,
+          'has_next_page': true,
+          'next_page_num': 2,
+          'total_pages': 2,
+        },
+      },
+    );
+    await tester.enterText(find.byType(TextField), 'Unsent draft');
+    final field = tester.widget<TextField>(find.byType(TextField));
+    final focused = FocusManager.instance.primaryFocus;
+    final context = tester.element(find.byType(XiangqiConversationScreen));
+    final more = find.text(context.l10n.mobileLoadMore);
+    expect(more, findsOneWidget);
+    await tester.tap(more);
+    await tester.pump();
+    expect(factory.channel.sent.last.toString(), contains('"page":2'));
+    factory.channel.fromServer(
+      fx.xiangqiEventFrame(kXiangqiInboxUserMessagesEvent, {
+        'data': {
+          ...fixture.xiangqiPagePayload([
+                fixture.xiangqiMessageRow(
+                  'Older',
+                  senderId: fixture.xiangqiFirstPeerId,
+                  createdOn: '2024-05-05T08:41:19.333333',
+                ),
+              ])['data']!
+              as Map<String, Object?>,
+          'prev_page_num': 1,
+          'total_pages': 2,
+        },
+      }),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byWidgetPredicate((w) => w is RichLinkText && w.text == 'Newest'), findsOneWidget);
+    expect(find.byWidgetPredicate((w) => w is RichLinkText && w.text == 'Older'), findsOneWidget);
+    expect(tester.widget<TextField>(find.byType(TextField)).controller, same(field.controller));
+    expect(field.controller!.text, 'Unsent draft');
+    expect(FocusManager.instance.primaryFocus, same(focused));
+    expect(more, findsNothing);
+  });
 
   testWidgets('a hidden inbox username remains readable but never becomes a profile target', (
     tester,

@@ -133,6 +133,7 @@ jobs:
           flutter test --no-pub --reporter json \
             test/model/message/xiangqi_inbox_repository_test.dart \
             test/model/message/xiangqi_conversation_controller_test.dart \
+            test/view/message/xiangqi_conversation_screen_test.dart \
             test/model/xiangqi/xiangqi_page_test.dart \
             test/model/xiangqi/social/xiangqi_social_test.dart \
             test/network/xiangqi_socket_request_queue_test.dart \

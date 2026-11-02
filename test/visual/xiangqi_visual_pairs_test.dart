@@ -260,6 +260,12 @@ Future<_Capture> captureSide(
   }
   expect(find.byType(ChatMessageList), findsOneWidget);
   expect(find.byType(ChatComposerInput), findsOneWidget);
+  final pageContext = tester.element(find.byType(ChatMessageList));
+  expect(Localizations.localeOf(pageContext).toLanguageTag(), environment['locale']);
+  expect(MediaQuery.textScalerOf(pageContext).scale(10) / 10, environment['textScale']);
+  expect(Theme.of(pageContext).brightness.name, environment['mode']);
+  expect(tester.view.physicalSize, size * dpi);
+  expect(View.of(pageContext).devicePixelRatio, dpi);
   final container = ProviderScope.containerOf(tester.element(find.byType(DesktopSceneApp)));
   expect(await container.read(showRatingsPrefProvider.future), account.showRatings);
   final actualBoard = container.read(boardPreferencesProvider).toJson();

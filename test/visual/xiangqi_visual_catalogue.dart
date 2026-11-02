@@ -7,7 +7,6 @@ import 'package:lichess_mobile/src/model/puzzle/puzzle_preferences.dart';
 import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
 import 'package:lichess_mobile/src/model/settings/general_preferences.dart';
 import 'package:lichess_mobile/src/model/settings/preferences_storage.dart';
-import 'package:lichess_mobile/src/utils/color_palette.dart' show ShapeColor;
 
 /// Enumerates the actual compiled enum values and their persistence projection, not a hand-written
 /// subset that would silently discard new board/piece/sound choices after a dependency change.

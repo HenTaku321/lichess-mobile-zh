@@ -2,6 +2,12 @@
 
 ## 最近验证（2026-11-02）
 
+- 最新全页面清单/第一组根因实施见 `docs/xiangqi-linux-parity-audit.md` 和
+  `docs/plans/2026-11-02-xiangqi-linux-systematic-audit.md`，其余旧记录保留为历史。
+- `0a17d0f10` / Actions `41397178281` 全流程通过：安全/账号/联系人86、真实呈现19、原始渲染9项有效负向对照，
+  全量3223通过/1032跳过；旧截图1032另跑通过。完成栏、评分角色与非法图/导航边界已修指定用例。
+- 固定评分yes和硬编码标签导致的无效旧红已撤回，当前证据通过真实偏好和恢复原始渲染的对照确认。
+  分页/无ID隔离、全页面成组原图/DPI、Linux原生和用户主观验收仍待后续；没有安装或替换发布包。
 - 后文保留早期的静态整改记录；当前实施和逐批 Actions 证据以
   `docs/plans/2026-11-01-xiangqi-training-entry-acceptance.md` 为准。
 - `4bd6c07cf` / Actions `41380249454`：format/analyze、专项、全量 3184 项及既有

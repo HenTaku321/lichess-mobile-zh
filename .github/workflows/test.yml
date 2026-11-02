@@ -157,6 +157,26 @@ jobs:
           test/view/message/contacts_screen_test.dart
           test/view/account/account_menu_test.dart
 
+      - name: Run directory and contacts pagination regressions
+        id: directory_pagination
+        if: ${{ !cancelled() && steps.analyze.outcome == 'success' }}
+        timeout-minutes: 6
+        run: |
+          mkdir -p out/directory-pagination
+          flutter test --no-pub --reporter json \
+            test/view/message/contacts_screen_test.dart \
+            test/view/xiangqi/xiangqi_directory_pagination_test.dart \
+            > out/directory-pagination/tests.jsonl
+
+      - name: Export directory pagination evidence
+        if: ${{ !cancelled() && steps.directory_pagination.outcome != 'skipped' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: xiangqi-directory-pagination-${{ github.sha }}
+          path: out/directory-pagination
+          retention-days: 7
+          if-no-files-found: error
+
       - name: Verify real-rating negative control
         id: rating_negative_control
         if: ${{ !cancelled() && steps.analyze.outcome == 'success' }}

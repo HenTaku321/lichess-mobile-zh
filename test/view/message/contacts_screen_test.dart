@@ -23,6 +23,7 @@ import 'package:lichess_mobile/src/network/http.dart';
 import 'package:lichess_mobile/src/network/xiangqi_http.dart' show xiangqiAuthStorageProvider;
 import 'package:lichess_mobile/src/network/xiangqi_session_store.dart';
 import 'package:lichess_mobile/src/network/xiangqi_socket.dart';
+import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/view/message/contacts_screen.dart';
 import 'package:lichess_mobile/src/view/message/conversation_screen.dart';
 import 'package:lichess_mobile/src/view/message/xiangqi_conversation_screen.dart';
@@ -89,6 +90,7 @@ final xiangqiChatsFrame = fx.xiangqiEventFrame(kXiangqiInboxChatsEvent, {
 Future<fx.FakeXiangqiChannelFactory> pumpScreen(
   WidgetTester tester, {
   bool pushRoute = false,
+  bool holdXiangqi = false,
 }) async {
   final factory = fx.FakeXiangqiChannelFactory();
   final token = fx.xiangqiTestToken(fx.xiangqiTestViewerId);
@@ -163,14 +165,97 @@ Future<fx.FakeXiangqiChannelFactory> pumpScreen(
     () => channel.hasSentEvent(kXiangqiInboxJoinEvent),
     reason: 'the chat list is expected to be asked for once the socket is open',
   );
-  channel.fromServer(xiangqiChatsFrame);
-  await tester.pumpAndSettle();
+  if (!holdXiangqi) {
+    channel.fromServer(xiangqiChatsFrame);
+    await tester.pumpAndSettle();
+  } else {
+    for (var pump = 0; pump < 20; pump++) {
+      await tester.pump();
+    }
+  }
 
   return factory;
 }
 
 void main() {
   TestLichessBinding.ensureInitialized();
+
+  testWidgets('a healthy contacts source is visible while the other source is still loading', (
+    tester,
+  ) async {
+    final factory = await pumpScreen(tester, holdXiangqi: true);
+    expect(find.text('chabrot'), findsOneWidget);
+    factory.channel.fromServer(xiangqiChatsFrame);
+    await tester.pumpAndSettle();
+    expect(find.text(xiangqiPeerName), findsOneWidget);
+  });
+
+  testWidgets('a failed source is visible as a local retry without hiding healthy contacts', (
+    tester,
+  ) async {
+    final factory = await pumpScreen(tester, holdXiangqi: true);
+    factory.channel.fromServer('41/xiangqi,');
+    for (var pump = 0; pump < 20; pump++) {
+      await tester.pump();
+    }
+    final context = tester.element(find.byType(ContactsScreen));
+    expect(find.text('chabrot'), findsOneWidget);
+    expect(find.text(context.l10n.mobileSomethingWentWrong), findsAtLeastNWidgets(1));
+    expect(find.byTooltip(context.l10n.retry), findsAtLeastNWidgets(1));
+  });
+
+  testWidgets('the merged contacts list can append the second xiangqi page', (tester) async {
+    final factory = await pumpScreen(tester, holdXiangqi: true);
+    factory.channel.fromServer(
+      fx.xiangqiEventFrame(kXiangqiInboxChatsEvent, {
+        'data': {
+          'items': [xiangqiChatRow],
+          'total_pages': 2,
+          'next_page_num': 2,
+          'prev_page_num': null,
+          'has_next_page': true,
+        },
+      }),
+    );
+    await tester.pumpAndSettle();
+    final context = tester.element(find.byType(ContactsScreen));
+    final more = find.text(context.l10n.mobileLoadMore);
+    expect(more, findsOneWidget);
+    await tester.tap(more);
+    for (var pump = 0; pump < 20; pump++) {
+      await tester.pump();
+    }
+    expect(find.text('chabrot'), findsOneWidget);
+    expect(find.text(xiangqiPeerName), findsOneWidget);
+    expect(
+      factory.channel.sent.whereType<String>().any(
+        (frame) => frame.contains('inbox.join') && frame.contains('"page":2'),
+      ),
+      isTrue,
+    );
+    factory.channel.fromServer(
+      fx.xiangqiEventFrame(kXiangqiInboxChatsEvent, {
+        'data': {
+          'items': [
+            {
+              ...xiangqiChatRow,
+              'chat_id': 'second-chat',
+              'user_id': 200002,
+              'username': 'Second peer',
+            },
+          ],
+          'total_pages': 2,
+          'next_page_num': null,
+          'prev_page_num': 1,
+          'has_next_page': false,
+        },
+      }),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Second peer'), findsOneWidget);
+    expect(find.text(xiangqiPeerName), findsOneWidget);
+    expect(more, findsNothing);
+  });
 
   group('ContactsScreen merged list', () {
     testWidgets('an account change clears the query and cancels the previous debounced search', (

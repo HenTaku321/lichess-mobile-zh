@@ -94,6 +94,39 @@ Future<ProviderContainer> pumpConversation(
 void main() {
   TestLichessBinding.ensureInitialized();
 
+  testWidgets('a peer push preserves the older message currently being read', (tester) async {
+    final factory = fx.FakeXiangqiChannelFactory();
+    await pumpConversation(
+      tester,
+      channelFactory: factory,
+      firstPage: fixture.xiangqiPagePayload([
+        for (var index = 0; index < 40; index++)
+          fixture.xiangqiMessageRow(
+            'Message $index',
+            senderId: fixture.xiangqiFirstPeerId,
+            createdOn: '2024-05-06T09:12:${(39 - index).toString().padLeft(2, '0')}.123456',
+          ),
+      ]),
+    );
+    final anchor = find.byWidgetPredicate((w) => w is RichLinkText && w.text == 'Message 12');
+    await tester.scrollUntilVisible(anchor, 200);
+    await tester.ensureVisible(anchor);
+    await tester.pumpAndSettle();
+    final before = tester.getTopLeft(anchor).dy;
+    factory.channel.fromServer(
+      fx.xiangqiEventFrame(kXiangqiInboxMessageSentEvent, {
+        'data': fixture.xiangqiMessageRow(
+          'A newly arrived message with a different height. ' * 3,
+          senderId: fixture.xiangqiFirstPeerId,
+          createdOn: '2024-05-06T09:12:59.123456',
+        ),
+      }),
+    );
+    await tester.pumpAndSettle();
+    expect(anchor, findsOneWidget);
+    expect(tester.getTopLeft(anchor).dy, closeTo(before, 1));
+  });
+
   testWidgets('older PM pages are reachable without replacing messages or the focused draft', (
     tester,
   ) async {

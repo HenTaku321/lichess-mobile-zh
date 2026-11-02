@@ -122,11 +122,33 @@ jobs:
         id: analyze
         run: flutter analyze
 
+      - name: Validate full visual-pair planning and evidence contract
+        id: visual_contract
+        if: ${{ !cancelled() && steps.analyze.outcome == 'success' }}
+        run: |
+          mkdir -p out/visual-pair-contract
+          set +e
+          python3 -m unittest discover -s scripts/tests -p 'test_xiangqi_visual_pairs.py' \
+            > out/visual-pair-contract/tests.txt 2>&1
+          status=$?
+          cat out/visual-pair-contract/tests.txt
+          exit "$status"
+
+      - name: Export full visual-pair contract evidence
+        if: ${{ !cancelled() && steps.visual_contract.outcome != 'skipped' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: xiangqi-visual-contract-${{ github.sha }}
+          path: out/visual-pair-contract
+          retention-days: 7
+          if-no-files-found: error
+
       # - name: Run riverpod lint
       #   run: dart run custom_lint
 
       - name: Run pagination and socket isolation regressions
         id: pagination_socket
+        if: ${{ !cancelled() && steps.analyze.outcome == 'success' }}
         timeout-minutes: 6
         run: |
           mkdir -p out/pagination-socket

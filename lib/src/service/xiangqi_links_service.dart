@@ -52,11 +52,13 @@ class XiangqiLinksService(final Ref ref) {
       if (route != null) {
         await navigator.push(route);
       } else if (!await launchUrl(uri) && current()) {
+        if (!context.mounted) return;
         showSnackBar(context, context.l10n.mobileSomethingWentWrong, type: SnackBarType.error);
       }
     } on Object catch (error, stackTrace) {
       _logger.warning('Could not open a xiangqi content link', error, stackTrace);
       if (current()) {
+        if (!context.mounted) return;
         showSnackBar(context, context.l10n.mobileSomethingWentWrong, type: SnackBarType.error);
       }
     } finally {

@@ -15,24 +15,49 @@ class const GameTableColumn({
   final Widget? actions,
   final double minimumMoveHeight = 48,
   super.key,
-}) extends StatelessWidget {
+}) extends StatefulWidget {
+  @override
+  State<GameTableColumn> createState() => _GameTableColumnState();
+}
+
+class _GameTableColumnState() extends State<GameTableColumn> {
+  final _topController = ScrollController();
+  final _bottomController = ScrollController();
+
+  @override
+  void dispose() {
+    _topController.dispose();
+    _bottomController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) => _TableColumnLayout(
-    minimumMoveHeight: minimumMoveHeight,
+    minimumMoveHeight: widget.minimumMoveHeight,
+    topController: _topController,
+    bottomController: _bottomController,
     children: [
-      SingleChildScrollView(primary: false, child: topTable),
-      moves ?? const SizedBox.shrink(),
-      actions ?? const SizedBox.shrink(),
-      SingleChildScrollView(primary: false, child: bottomTable),
+      SingleChildScrollView(controller: _topController, primary: false, child: widget.topTable),
+      widget.moves ?? const SizedBox.shrink(),
+      widget.actions ?? const SizedBox.shrink(),
+      SingleChildScrollView(
+        controller: _bottomController,
+        primary: false,
+        child: widget.bottomTable,
+      ),
     ],
   );
 }
 
-class const _TableColumnLayout({required final double minimumMoveHeight, required super.children})
-    extends MultiChildRenderObjectWidget {
+class const _TableColumnLayout({
+  required final double minimumMoveHeight,
+  required final ScrollController topController,
+  required final ScrollController bottomController,
+  required super.children,
+}) extends MultiChildRenderObjectWidget {
   @override
   RenderObject createRenderObject(BuildContext context) =>
-      _RenderGameTableColumn(minimumMoveHeight);
+      _RenderGameTableColumn(minimumMoveHeight, topController, bottomController);
 
   @override
   void updateRenderObject(BuildContext context, covariant _RenderGameTableColumn renderObject) {
@@ -40,8 +65,11 @@ class const _TableColumnLayout({required final double minimumMoveHeight, require
   }
 }
 
-class _RenderGameTableColumn(double minimumMoveHeight)
-    extends RenderBox
+class _RenderGameTableColumn(
+  double minimumMoveHeight,
+  final ScrollController topController,
+  final ScrollController bottomController,
+) extends RenderBox
     with
         ContainerRenderObjectMixin<RenderBox, _TableParentData>,
         RenderBoxContainerDefaultsMixin<RenderBox, _TableParentData> {
@@ -75,6 +103,8 @@ class _RenderGameTableColumn(double minimumMoveHeight)
     final moves = children[1];
     final actions = children[2];
     final bottom = children[3];
+    final topPixels = topController.hasClients ? topController.offset : 0.0;
+    final bottomPixels = bottomController.hasClients ? bottomController.offset : 0.0;
     final natural = BoxConstraints.tightFor(width: size.width);
     top.layout(natural, parentUsesSize: true);
     bottom.layout(natural, parentUsesSize: true);
@@ -86,6 +116,15 @@ class _RenderGameTableColumn(double minimumMoveHeight)
       final topHeight = naturalTableHeight == 0
           ? 0.0
           : tableBudget * top.size.height / naturalTableHeight;
+      // Natural-height measurement temporarily makes a scroll viewport content-sized. Restore its
+      // old offset before bounded layout using a correction, not a jumpTo notification/gesture.
+      // That final layout still clamps correctly when the content genuinely becomes shorter.
+      if (topController.hasClients) {
+        topController.position.correctBy(topPixels - topController.offset);
+      }
+      if (bottomController.hasClients) {
+        bottomController.position.correctBy(bottomPixels - bottomController.offset);
+      }
       top.layout(
         BoxConstraints.tightFor(width: size.width, height: topHeight),
         parentUsesSize: true,

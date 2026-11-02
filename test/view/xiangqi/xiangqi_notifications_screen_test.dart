@@ -128,12 +128,23 @@ Future<fx.FakeXiangqiChannelFactory> pumpNotifications(
   // The client opens its channel from a chain of microtasks — the session restore, the token read,
   // the factory call, the connect frame — and a pump is what lets one of them run. Nothing in the
   // chain is a timer, so a generous number of pumps sees the whole of it.
-  for (var pump = 0; pump < 30 && factory.channels.isEmpty; pump++) {
+  final handshaken = <fx.FakeXiangqiChannel>{};
+  for (var pump = 0; pump < 80; pump++) {
     await tester.pump();
+    for (final channel in factory.channels.toList()) {
+      if (!channel.closed && channel.sentConnect && handshaken.add(channel)) {
+        channel.fromServer(fx.openFrame);
+        channel.fromServer(fx.connectAckFrame);
+      }
+    }
+    if (factory.channels.isNotEmpty && factory.channel.hasSentEvent('get.notifications')) break;
   }
   expect(factory.channels, isNotEmpty, reason: 'the screen is expected to open a socket');
-  factory.channel.fromServer(fx.openFrame);
-  factory.channel.fromServer(fx.connectAckFrame);
+  expect(
+    factory.channel.hasSentEvent('get.notifications'),
+    isTrue,
+    reason: 'the live channel must have sent its page request before the fixture replies',
+  );
   await settle(tester);
   return factory;
 }
@@ -171,6 +182,7 @@ void main() {
       final factory = await pumpNotifications(tester);
       factory.channel.fromServer(notificationsFrame([notification()]));
       await settle(tester);
+      expect(find.text('A title'), findsOneWidget);
       final container = ProviderScope.containerOf(
         tester.element(find.byType(XiangqiNotificationsScreen)),
       );

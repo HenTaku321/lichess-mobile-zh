@@ -161,13 +161,17 @@ class XiangqiNotificationsController() extends XiangqiPagedController<XiangqiNot
   late XiangqiNotificationsRepository _repository;
 
   @override
-  Future<XiangqiPagedState<XiangqiNotification>> build() {
+  Future<XiangqiPagedState<XiangqiNotification>> build() async {
+    // The restored account boundary must settle before its repository is selected. Otherwise a
+    // cold-start generation-zero repository can start a handshake and be replaced immediately.
+    await ref.watch(xiangqiSessionReadyProvider.future);
+    if (!ref.mounted) throw StateError('Notification load cancelled.');
     _repository = ref.watch(xiangqiNotificationsRepositoryProvider);
     final resets = _repository.connectionResets.listen((_) {
       if (ref.mounted && state.hasValue && !state.requireValue.busy) unawaited(refresh());
     });
     ref.onDispose(() => unawaited(resets.cancel()));
-    return super.build();
+    return await super.build();
   }
 
   @override

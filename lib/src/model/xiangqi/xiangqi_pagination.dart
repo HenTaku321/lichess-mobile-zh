@@ -34,6 +34,7 @@ abstract class XiangqiPagedController<T>() extends AsyncNotifier<XiangqiPagedSta
   int _generation = 0;
   Future<void>? _more;
   Future<void>? _refresh;
+  _RefreshContinuation<T>? _failedRefresh;
 
   bool get appendPages => true;
   Future<XiangqiPage<T>> loadPage(int page);
@@ -45,6 +46,7 @@ abstract class XiangqiPagedController<T>() extends AsyncNotifier<XiangqiPagedSta
     _pages.clear();
     _more = null;
     _refresh = null;
+    _failedRefresh = null;
     ref.onDispose(() {
       _generation++;
       _pages.clear();
@@ -104,6 +106,7 @@ abstract class XiangqiPagedController<T>() extends AsyncNotifier<XiangqiPagedSta
     }
     if (page < 1) return Future.error(RangeError.range(page, 1, null, 'page'));
     final generation = _generation;
+    _failedRefresh = null;
     final future = _loadMore(generation, page);
     _more = future;
     unawaited(
@@ -147,13 +150,33 @@ abstract class XiangqiPagedController<T>() extends AsyncNotifier<XiangqiPagedSta
   Future<void> refresh() {
     if (_refresh case final active?) return active;
     if (state.isLoading) return Future<void>.value();
-    final generation = ++_generation;
-    _more = null;
     final hasPages = _pages.isNotEmpty;
     final count = hasPages && appendPages ? _pages.length : 1;
     final start = hasPages && !appendPages ? _pages.values.last.currentPage : 1;
+    return _beginReload(start, count, hasPages);
+  }
+
+  /// A local failure retries only its unfinished read range. Successful earlier reads stay in
+  /// staging until the entire refresh succeeds; the visible old range is never partially replaced.
+  Future<void> retryRefresh() {
+    if (_refresh case final active?) return active;
+    if (state.isLoading) return Future<void>.value();
+    final failed = _failedRefresh;
+    if (failed == null) return refresh();
+    return _beginReload(failed.nextPage, failed.remaining, failed.hasPages, staged: failed.staged);
+  }
+
+  Future<void> _beginReload(
+    int start,
+    int count,
+    bool hasPages, {
+    Map<int, XiangqiPage<T>>? staged,
+  }) {
+    final generation = ++_generation;
+    _more = null;
+    _failedRefresh = null;
     state = hasPages ? AsyncData(_snapshot(refreshing: true)) : const AsyncLoading();
-    final future = _reload(generation, start, count, hasPages);
+    final future = _reload(generation, start, count, hasPages, staged: staged);
     _refresh = future;
     unawaited(
       future.then<void>((_) {
@@ -163,14 +186,22 @@ abstract class XiangqiPagedController<T>() extends AsyncNotifier<XiangqiPagedSta
     return future;
   }
 
-  Future<void> _reload(int generation, int start, int count, bool hasPages) async {
-    final fresh = <int, XiangqiPage<T>>{};
+  Future<void> _reload(
+    int generation,
+    int start,
+    int count,
+    bool hasPages, {
+    Map<int, XiangqiPage<T>>? staged,
+  }) async {
+    final fresh = <int, XiangqiPage<T>>{...?staged};
     var number = start;
+    var completed = 0;
     try {
       for (var index = 0; index < count; index++) {
         final page = await _readAvailablePage(number);
         if (!_current(generation)) return;
         fresh[page.currentPage] = page;
+        completed++;
         if (!appendPages || page.nextPage == null) break;
         number = page.nextPage!;
       }
@@ -181,6 +212,7 @@ abstract class XiangqiPagedController<T>() extends AsyncNotifier<XiangqiPagedSta
     } on Object catch (error, stackTrace) {
       if (!_current(generation)) return;
       _logger.warning('Could not refresh xiangqi.com pages.', error, stackTrace);
+      _failedRefresh = _RefreshContinuation(number, count - completed, hasPages, fresh);
       state = hasPages ? AsyncData(_snapshot(refreshError: error)) : AsyncError(error, stackTrace);
     }
   }
@@ -189,6 +221,9 @@ abstract class XiangqiPagedController<T>() extends AsyncNotifier<XiangqiPagedSta
   void updateItems(T Function(T item) transform) {
     if (!ref.mounted || _pages.isEmpty || !state.hasValue) return;
     final previous = state.requireValue;
+    // A confirmed mutation makes an older staged read obsolete. A later retry must read afresh,
+    // rather than restoring pre-mutation data from the abandoned refresh prefix.
+    _failedRefresh = null;
     for (final number in _pages.keys.toList()) {
       final page = _pages[number]!;
       _pages[number] = page.withItems(page.items.map(transform).toIList());
@@ -203,3 +238,10 @@ abstract class XiangqiPagedController<T>() extends AsyncNotifier<XiangqiPagedSta
     );
   }
 }
+
+class _RefreshContinuation<T>(
+  final int nextPage,
+  final int remaining,
+  final bool hasPages,
+  final Map<int, XiangqiPage<T>> staged,
+);

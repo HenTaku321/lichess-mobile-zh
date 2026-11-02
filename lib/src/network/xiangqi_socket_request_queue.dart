@@ -71,7 +71,8 @@ class XiangqiSocketRequestQueue({
     Object? data,
     bool Function()? isCurrent,
     Future<void> Function()? prepare,
-  }) => _send(event, data, isCurrent: isCurrent, prepare: prepare);
+    void Function()? onEmitted,
+  }) => _send(event, data, isCurrent: isCurrent, prepare: prepare, onEmitted: onEmitted);
 
   Future<void> _pump() async {
     if (_pumping) return;
@@ -101,6 +102,7 @@ class XiangqiSocketRequestQueue({
     _SocketRead<dynamic>? request,
     bool Function()? isCurrent,
     Future<void> Function()? prepare,
+    void Function()? onEmitted,
   }) {
     if (_disposed) return Future.error(const XiangqiSocketException('Request queue disposed.'));
     final send = _SocketSend(isCurrent);
@@ -148,6 +150,7 @@ class XiangqiSocketRequestQueue({
         } else {
           socket.emitNoAck(event, data: data);
         }
+        onEmitted?.call();
         if (!send.result.isCompleted) send.result.complete();
       } on Object catch (error, stackTrace) {
         if (!send.result.isCompleted) send.result.completeError(error, stackTrace);

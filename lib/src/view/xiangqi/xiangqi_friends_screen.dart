@@ -198,7 +198,7 @@ class _XiangqiFriendsScreenState() extends ConsumerState<XiangqiFriendsScreen> {
                           : () => unawaited(
                               ref
                                   .read(xiangqiFriendsControllerProvider(friendKey).notifier)
-                                  .refresh(),
+                                  .retryRefresh(),
                             ),
                     ),
                   XiangqiPaginationFooter(

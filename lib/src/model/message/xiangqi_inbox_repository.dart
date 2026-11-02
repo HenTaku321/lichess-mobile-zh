@@ -46,11 +46,9 @@
 
 import 'dart:async';
 
-import 'package:clock/clock.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:lichess_mobile/src/model/auth/auth_controller.dart';
 import 'package:lichess_mobile/src/model/common/id.dart';
 import 'package:lichess_mobile/src/model/message/message.dart';
 import 'package:lichess_mobile/src/model/user/user.dart';
@@ -64,6 +62,8 @@ import 'package:lichess_mobile/src/network/xiangqi_session_store.dart';
 import 'package:lichess_mobile/src/network/xiangqi_socket.dart';
 import 'package:lichess_mobile/src/network/xiangqi_socket_request_queue.dart';
 import 'package:logging/logging.dart';
+
+export 'package:lichess_mobile/src/model/message/xiangqi_conversation_controller.dart';
 
 part 'xiangqi_inbox_repository.freezed.dart';
 
@@ -157,7 +157,12 @@ sealed class const XiangqiChat._() with _$XiangqiChat {
 /// conversation screens reading one shape.
 @freezed
 sealed class const XiangqiConversationState._() with _$XiangqiConversationState {
-  const factory({required Convo convo, required LightUser me}) = _XiangqiConversationState;
+  const factory({
+    required Convo convo,
+    required LightUser me,
+    required UserId selfId,
+    required XiangqiPagedState<Message> pagination,
+  }) = _XiangqiConversationState;
 }
 
 /// The identity of one xiangqi.com conversation: enough to fetch it, to send to it and to name it.
@@ -167,193 +172,10 @@ sealed class const XiangqiConversationState._() with _$XiangqiConversationState 
 /// builds there is no list left to ask.
 typedef XiangqiConversationKey = ({String chatId, int peerId, LightUser peer});
 
-/// One conversation's messages, on xiangqi.com.
-final xiangqiConversationControllerProvider = AsyncNotifierProvider.autoDispose
-    .family<XiangqiConversationController, XiangqiConversationState, XiangqiConversationKey>(
-      XiangqiConversationController.new,
-      name: 'XiangqiConversationControllerProvider',
-    );
-
-/// One conversation on xiangqi.com, open in the conversation screen.
-///
-/// The conversation is read once, when the screen opens, and then kept up to date by the messages
-/// the server pushes into it. There is no paging: the page-1 frame carries the newest page and the
-/// screen has nowhere to scroll back through yet, so asking for page 2 would be a request with no
-/// control behind it.
-class XiangqiConversationController(final XiangqiConversationKey key)
-    extends AsyncNotifier<XiangqiConversationState> {
-  /// This device's own id **on xiangqi.com**, namespaced.
-  ///
-  /// Kept apart from the state's `me` on purpose. `me` is the app-level identity and follows the
-  /// project's scalar rule (a lichess account when there is one); this is the id a message's
-  /// `sender_id` is written in, which is a xiangqi id and could never be a lichess one. Comparing
-  /// a message against `me` would mark every message as the peer's.
-  ///
-  /// Re-assigned on every [build] rather than once: the notifier is rebuilt whenever a provider it
-  /// watches changes — `authControllerProvider` alone changes once, when its own load lands — and a
-  /// `late final` would throw on the second build. Both readers run only on a built state, so it is
-  /// never read before it is set.
-  UserId? _myId;
-  int _generation = 0;
-  bool _sending = false;
-
-  /// The texts this device has sent that the server has not echoed back yet.
-  ///
-  /// The echo of a send arrives under the same event as a peer's message, and without this the
-  /// screen would show the sent message twice — once from the optimistic insert below and once from
-  /// the echo.
-  final List<String> _pendingEchoes = [];
-
-  @override
-  Future<XiangqiConversationState> build() async {
-    final generation = ++_generation;
-    _sending = false;
-    _pendingEchoes.clear();
-    ref.onDispose(() => _generation++);
-    ref.watch(xiangqiAccountGenerationProvider);
-    final lichessMe = ref.watch(authControllerProvider)?.user;
-    final repo = ref.watch(xiangqiInboxRepositoryProvider);
-    final session = await ref.read(xiangqiSessionStoreProvider).read();
-    if (!ref.mounted || generation != _generation) throw StateError('Conversation load cancelled.');
-    if (session == null) {
-      throw const XiangqiInboxException('No xiangqi.com session to open a conversation with.');
-    }
-    final xiangqiMe = xiangqiLightUser(session.userId, session.name);
-    _myId = xiangqiMe.id;
-    final messages = await repo.loadMessages(key.chatId);
-    if (!ref.mounted || generation != _generation) throw StateError('Conversation load cancelled.');
-
-    // Best effort: the server keeps the unread count, and the chat list is refreshed when this
-    // screen pops, so a marker that never lands is corrected by the next `inbox.join` rather than
-    // kept wrong here.
-    unawaited(repo.markRead(key.chatId).catchError((Object _) {}));
-
-    final incoming = repo.incomingMessages.listen((message) {
-      if (!ref.mounted || generation != _generation) return;
-      _onIncomingMessage(message);
-    });
-    ref.onDispose(() {
-      unawaited(incoming.cancel());
-    });
-
-    return XiangqiConversationState(
-      // The app's identity of record for this conversation, by the project's scalar rule: the
-      // lichess account when there is one, the xiangqi one only when there is not. It is the
-      // identity the app knows this user by, not the identity its messages are stamped with — which
-      // is [_myId] — so which side a bubble sits on is decided against the peer, not against this.
-      me: lichessMe ?? xiangqiMe,
-      convo: Convo(
-        user: key.peer,
-        messages: messages,
-        // No observed xiangqi counterpart to lichess's in/out relation flags. Null is the honest
-        // reading, and the app has no control that reads them.
-        relations: (inward: null, outward: null),
-        // Sending to a non-friend is allowed on xiangqi.com — the capture opens a conversation with
-        // a stranger and sends to it (entry 42) — so the composer is always offered. This is a
-        // product judgement from that one measured send, not a field the server ever sends.
-        postable: true,
-      ),
-    );
-  }
-
-  /// Whether a message was sent by this device.
-  ///
-  /// Decided against the peer, not against `me`: a xiangqi `sender_id` is a xiangqi id, and `me`
-  /// may be a lichess account, so the only id the two sides of this conversation share is the
-  /// peer's. A 1:1 conversation has exactly two participants, so "not the peer" is "this device".
-  bool _isMine(Message message) => message.userId != xiangqiUserId(key.peerId);
-
-  /// Sends [text] to the peer, showing it at once.
-  ///
-  /// The message is inserted optimistically and the server's own echo replaces it when it arrives:
-  /// the echo carries the server's timestamp, but waiting for it would leave the input standing
-  /// silent for as long as the round trip takes.
-  Future<bool> sendMessage(String text) async {
-    final trimmed = text.trim();
-    if (trimmed.isEmpty || !state.hasValue || _sending) return false;
-    final current = state.requireValue;
-    final myId = _myId;
-    if (myId == null) return false;
-    final generation = _generation;
-    _sending = true;
-    final repo = ref.read(xiangqiInboxRepositoryProvider);
-    final optimistic = Message(userId: myId, text: trimmed, date: clock.now());
-
-    _pendingEchoes.add(trimmed);
-    state = AsyncData(
-      current.copyWith(
-        convo: current.convo.copyWith(messages: current.convo.messages.insert(0, optimistic)),
-      ),
-    );
-
-    try {
-      await repo.sendMessage(
-        chatId: key.chatId,
-        peerId: key.peerId,
-        peerName: key.peer.name,
-        text: trimmed,
-      );
-      return ref.mounted && generation == _generation;
-    } on Object catch (error, stackTrace) {
-      _logger.warning(
-        'Could not send to ${key.peer.name} (chat ${key.chatId}).',
-        error,
-        stackTrace,
-      );
-      if (!ref.mounted || generation != _generation) return false;
-      _pendingEchoes.remove(trimmed);
-      if (!state.hasValue) return false;
-      final latest = state.requireValue;
-      // The row is rolled back by identity, not by position: a message from the peer can land at
-      // the front while this send is in flight, and dropping whatever is first would drop theirs.
-      if (latest.convo.messages.contains(optimistic)) {
-        state = AsyncData(
-          latest.copyWith(
-            convo: latest.convo.copyWith(messages: latest.convo.messages.remove(optimistic)),
-          ),
-        );
-      }
-      return false;
-    } finally {
-      if (generation == _generation) _sending = false;
-    }
-  }
-
-  /// Reads a message the server pushed at this socket.
-  ///
-  /// Only the peer's messages are inserted. This device's own sends come back as an echo under the
-  /// same event name, and [sendMessage] has already shown them.
-  void _onIncomingMessage(Message message) {
-    if (!state.hasValue) return;
-    if (_isMine(message)) {
-      // Our own echo, under a timestamp the server chose. It replaces the optimistic row's local
-      // clock reading rather than joining it. Only a text this session actually sent is consumed:
-      // an echo for something sent elsewhere must not overwrite a history row sharing its text.
-      if (!_pendingEchoes.remove(message.text)) return;
-      final myId = _myId;
-      final current = state.requireValue;
-      final index = current.convo.messages.indexWhere(
-        (m) => m.userId == myId && m.text == message.text,
-      );
-      if (index == -1) return;
-      state = AsyncData(
-        current.copyWith(
-          convo: current.convo.copyWith(messages: current.convo.messages.replace(index, message)),
-        ),
-      );
-      return;
-    }
-
-    final current = state.requireValue;
-    state = AsyncData(
-      current.copyWith(
-        convo: current.convo.copyWith(messages: current.convo.messages.insert(0, message)),
-      ),
-    );
-    unawaited(
-      ref.read(xiangqiInboxRepositoryProvider).markRead(key.chatId).catchError((Object _) {}),
-    );
-  }
+/// A sender-checked update for one registered conversation. A missing message requests a fresh
+/// read, never a guessed echo replacement. No server message identifier or receipt is fabricated.
+class const XiangqiInboxUpdate({required final String chatId, final Message? message}) {
+  bool get needsRefresh => message == null;
 }
 
 /// The xiangqi.com inbox, with an owned, replaceable transport and a serial no-ID read queue.
@@ -374,10 +196,40 @@ class XiangqiInboxRepository({
   );
   StreamSubscription<XiangqiSocketEvent>? _subscription;
   final _incoming = StreamController<Message>.broadcast();
+  final _updates = StreamController<XiangqiInboxUpdate>.broadcast();
+  final Map<String, ({UserId self, UserId peer, int listeners})> _participants = {};
+  final List<({String chatId, UserId self, String text})> _localSends = [];
   bool _disposed = false;
 
   Stream<Message> get incomingMessages => _incoming.stream;
   Stream<void> get connectionResets => _requests.resets;
+
+  Stream<XiangqiInboxUpdate> conversationUpdates(XiangqiConversationKey key, UserId self) async* {
+    final peer = xiangqiUserId(key.peerId);
+    final existing = _participants[key.chatId];
+    if (existing != null && (existing.self != self || existing.peer != peer)) {
+      throw const XiangqiInboxException('Conflicting conversation participants.');
+    }
+    _participants[key.chatId] = (self: self, peer: peer, listeners: (existing?.listeners ?? 0) + 1);
+    _ensureListening();
+    try {
+      await for (final update in _updates.stream) {
+        if (update.chatId == key.chatId) yield update;
+      }
+    } finally {
+      final current = _participants[key.chatId];
+      if (current != null && current.listeners > 1) {
+        _participants[key.chatId] = (
+          self: current.self,
+          peer: current.peer,
+          listeners: current.listeners - 1,
+        );
+      } else {
+        _participants.remove(key.chatId);
+        _localSends.removeWhere((send) => send.chatId == key.chatId);
+      }
+    }
+  }
 
   Future<IList<Contact>> loadChats() async => (await loadChatsPage(1)).items;
 
@@ -430,6 +282,7 @@ class XiangqiInboxRepository({
     required int peerId,
     required String peerName,
     required String text,
+    void Function()? onEmitted,
   }) {
     int? generation;
     final payload = <String, Object?>{
@@ -452,6 +305,15 @@ class XiangqiInboxRepository({
       },
       isCurrent: () =>
           !_disposed && (generation == null || generation == sessionStore?.accountGeneration),
+      onEmitted: () {
+        if (_participants.containsKey(chatId)) {
+          _localSends.add((chatId: chatId, self: xiangqiUserId(payload['sender_id']), text: text));
+          // Lost echoes must not retain unbounded context. An echo without retained context only
+          // causes fresh reads of the registered conversations; it can never overwrite a row.
+          if (_localSends.length > 256) _localSends.removeAt(0);
+        }
+        onEmitted?.call();
+      },
     );
   }
 
@@ -483,9 +345,71 @@ class XiangqiInboxRepository({
   void _ensureListening() {
     _subscription ??= _requests.events.listen((event) {
       if (_disposed || event.name != kXiangqiInboxMessageSentEvent) return;
-      final message = xiangqiMessageFromPayload(_unwrap(event.data));
-      if (message != null && !_incoming.isClosed) _incoming.add(message);
+      final payload = _asMap(_unwrap(event.data));
+      final message = xiangqiMessageFromPayload(payload);
+      if (message == null) return;
+      if (!_incoming.isClosed) _incoming.add(message);
+      _routeUpdate(message, payload!);
     });
+  }
+
+  void _routeUpdate(Message message, Map<String, Object?> payload) {
+    final chatId = _asString(payload['chat_id']);
+    final receiver = _asInt(payload['receiver_id']);
+    if (payload['receiver_id'] != null && receiver == null) return;
+    final receiverId = receiver == null ? null : xiangqiUserId(receiver);
+    if (chatId != null && chatId.isNotEmpty) {
+      final participants = _participants[chatId];
+      if (participants == null) return;
+      final own = message.userId == participants.self;
+      if ((!own && message.userId != participants.peer) ||
+          (receiverId != null && receiverId != (own ? participants.peer : participants.self))) {
+        return;
+      }
+      if (own) {
+        _localSends.removeWhere((send) => send.chatId == chatId && send.text == message.text);
+      }
+      _updates.add(XiangqiInboxUpdate(chatId: chatId, message: own ? null : message));
+      return;
+    }
+
+    final peers = _participants.entries
+        .where(
+          (entry) =>
+              message.userId == entry.value.peer &&
+              message.userId != entry.value.self &&
+              (receiverId == null || receiverId == entry.value.self),
+        )
+        .toList();
+    for (final peer in peers) {
+      _updates.add(
+        XiangqiInboxUpdate(chatId: peer.key, message: peers.length == 1 ? message : null),
+      );
+    }
+    final matching = _localSends
+        .where(
+          (send) =>
+              send.self == message.userId &&
+              send.text == message.text &&
+              (receiverId == null || _participants[send.chatId]?.peer == receiverId),
+        )
+        .toList();
+    final chats = matching.isNotEmpty
+        ? matching.map((send) => send.chatId).toSet()
+        : _participants.entries
+              .where(
+                (entry) =>
+                    entry.value.self == message.userId &&
+                    (receiverId == null || entry.value.peer == receiverId),
+              )
+              .map((entry) => entry.key)
+              .toSet();
+    _localSends.removeWhere(matching.contains);
+    // Even a unique local text match is not a server identity. Read the candidate chat(s) through
+    // the no-ID queue; a same-text send in another conversation must never consume its row.
+    for (final chat in chats) {
+      _updates.add(XiangqiInboxUpdate(chatId: chat));
+    }
   }
 
   void dispose() {
@@ -495,6 +419,9 @@ class XiangqiInboxRepository({
     _subscription = null;
     _requests.dispose(lastEvent: kXiangqiInboxLeaveEvent, lastData: const {'chat_id': null});
     unawaited(_incoming.close());
+    unawaited(_updates.close());
+    _participants.clear();
+    _localSends.clear();
   }
 }
 
@@ -673,11 +600,8 @@ String? _asString(Object? value) => value is String ? value : null;
 
 /// [value] as an int, or null. JSON gives a whole number back as an `int`, but one written with a
 /// point comes back as a `double` and is taken as one too.
-int? _asInt(Object? value) => value is int
-    ? value
-    : value is num
-    ? value.toInt()
-    : null;
+int? _asInt(Object? value) =>
+    value is num && value.isFinite && value == value.toInt() ? value.toInt() : null;
 
 /// The xiangqi.com inbox: one repository for the app.
 ///

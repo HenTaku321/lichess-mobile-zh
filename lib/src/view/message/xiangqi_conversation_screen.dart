@@ -18,9 +18,12 @@
 // `UserAvatar` only fetches a remote image for a lichess flair, and it is a shared widget that this
 // wave must not change. The initials are the honest fallback, and the same one the chat list uses.
 
+import 'dart:async';
+
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:lichess_mobile/src/model/common/id.dart';
 import 'package:lichess_mobile/src/model/message/message.dart';
 import 'package:lichess_mobile/src/model/message/xiangqi_inbox_repository.dart';
 import 'package:lichess_mobile/src/model/user/user.dart';
@@ -67,7 +70,8 @@ class const XiangqiConversationScreen({
     final links = ref.read(xiangqiLinksServiceProvider);
     return XiangqiRefreshScope(
       identity: (conversation, account),
-      onRefresh: () => ref.refresh(xiangqiConversationControllerProvider(conversation).future),
+      onRefresh: () =>
+          ref.read(xiangqiConversationControllerProvider(conversation).notifier).refresh(),
       builder: (context, refresh, busy) => PlatformScaffold(
         appBar: PlatformAppBar(
           titleSpacing: 0,
@@ -102,16 +106,64 @@ class const _Body({
       builder: (context, stateAsync) {
         switch (stateAsync) {
           case AsyncData(:final value):
-            final items = _buildItems(value.convo.messages, conversation.peerId);
+            final items = _buildItems(value.convo.messages, value.selfId);
             return Column(
               children: [
                 Expanded(
                   child: ChatMessageList(
-                    itemCount: items.length,
+                    itemCount: items.length + 1,
                     itemBuilder: (context, index) {
+                      if (index == items.length) {
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (value.pagination.refreshError != null)
+                              XiangqiRetryTile(
+                                onRetry: busy
+                                    ? null
+                                    : () => unawaited(
+                                        ref
+                                            .read(
+                                              xiangqiConversationControllerProvider(conversation)
+                                                  .notifier,
+                                            )
+                                            .retryRefresh(),
+                                      ),
+                              ),
+                            XiangqiPaginationFooter(
+                              hasMore: value.pagination.nextPage != null,
+                              loading: value.pagination.loadingMore,
+                              failed: value.pagination.moreError != null,
+                              onMore: busy
+                                  ? null
+                                  : () => unawaited(
+                                      ref
+                                          .read(
+                                            xiangqiConversationControllerProvider(conversation)
+                                                .notifier,
+                                          )
+                                          .getMore(),
+                                    ),
+                              onRetry: busy
+                                  ? null
+                                  : () => unawaited(
+                                      ref
+                                          .read(
+                                            xiangqiConversationControllerProvider(conversation)
+                                                .notifier,
+                                          )
+                                          .getMore(),
+                                    ),
+                            ),
+                          ],
+                        );
+                      }
                       final item = items[index];
                       return switch (item) {
-                        _DateItem(:final date) => ChatDaySeparator(date: date),
+                        _DateItem(:final date) => ChatDaySeparator(
+                          key: ValueKey(('day', date)),
+                          date: date,
+                        ),
                         _MessageItem(
                           :final message,
                           :final isMe,
@@ -119,6 +171,7 @@ class const _Body({
                           :final groupIndex,
                         ) =>
                           _MessageBubble(
+                            key: ValueKey(('message', message)),
                             message: message,
                             isMe: isMe,
                             groupLength: groupLength,
@@ -129,7 +182,7 @@ class const _Body({
                   ),
                 ),
                 _MessageInput(
-                  key: ValueKey(ref.watch(xiangqiAccountGenerationProvider)),
+                  key: ValueKey((conversation, ref.watch(xiangqiAccountGenerationProvider))),
                   conversation: conversation,
                 ),
               ],
@@ -157,12 +210,9 @@ class const _Body({
 
   /// The messages, with a day separator before each day's run of them.
   ///
-  /// Which side a message sits on is decided against the peer: a xiangqi conversation has exactly
-  /// two participants and a message's sender is one of them, so "not the peer" is "this device".
-  /// The peer's id is the only participant id this screen is guaranteed to know — the app-level
-  /// identity in the state may be a lichess account, whose id a xiangqi `sender_id` can never equal.
-  List<_DisplayItem> _buildItems(IList<Message> messages, int peerId) {
-    final peerUserId = xiangqiUserId(peerId);
+  /// Bubble alignment uses the actual Xiangqi sender, not the app's scalar Lichess identity and
+  /// never the assumption that every unknown sender must be this device.
+  List<_DisplayItem> _buildItems(IList<Message> messages, UserId selfId) {
     final items = <_DisplayItem>[];
     DateTime? currentDay;
     final dayMessages = <Message>[];
@@ -179,7 +229,7 @@ class const _Body({
           items.add(
             _MessageItem(
               message,
-              isMe: message.userId != peerUserId,
+              isMe: message.userId == selfId,
               groupLength: end - start,
               groupIndex: index - start,
             ),
@@ -223,6 +273,7 @@ class const _MessageBubble({
   required final bool isMe,
   required final int groupLength,
   required final int groupIndex,
+  super.key,
 }) extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {

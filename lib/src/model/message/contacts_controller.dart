@@ -107,7 +107,8 @@ class ContactsController() extends Notifier<ContactsListState> {
       );
     }
     if (current.hasXiangqi && (!failedOnly || current.xiangqiError != null)) {
-      requests.add(ref.read(xiangqiContactsControllerProvider.notifier).refresh());
+      final pager = ref.read(xiangqiContactsControllerProvider.notifier);
+      requests.add(failedOnly ? pager.retryRefresh() : pager.refresh());
     }
     final future = Future.wait(requests).then<void>((_) {});
     _refresh = future;

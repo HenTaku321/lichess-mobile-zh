@@ -353,7 +353,9 @@ class const _RecentGames({
                 onRetry: busy
                     ? null
                     : () => unawaited(
-                        ref.read(xiangqiGameHistoryControllerProvider(username).notifier).refresh(),
+                        ref
+                            .read(xiangqiGameHistoryControllerProvider(username).notifier)
+                            .retryRefresh(),
                       ),
               ),
             XiangqiPaginationFooter(

@@ -107,7 +107,15 @@ class _XiangqiNotificationsScreenState() extends ConsumerState<XiangqiNotificati
                             ],
                           ),
                         if (notifications.refreshError != null)
-                          XiangqiRetryTile(onRetry: busy ? null : () => unawaited(refresh())),
+                          XiangqiRetryTile(
+                            onRetry: busy
+                                ? null
+                                : () => unawaited(
+                                    ref
+                                        .read(xiangqiNotificationsControllerProvider.notifier)
+                                        .retryRefresh(),
+                                  ),
+                          ),
                         XiangqiPaginationFooter(
                           hasMore: notifications.nextPage != null,
                           loading: notifications.loadingMore,

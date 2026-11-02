@@ -6,10 +6,11 @@ import 'package:material_ui/material_ui.dart';
 import '../test_provider_scope.dart';
 
 void main() {
-  testWidgets('a table clock repaint does not rewind an already scrolled player table', (
+  testWidgets('a sidebar relayout does not rewind an already scrolled player table', (
     tester,
   ) async {
     late StateSetter update;
+    var revision = 0;
     await tester.pumpWidget(
       await makeTestProviderScopeApp(
         tester,
@@ -33,7 +34,7 @@ void main() {
                     ),
                     bottomTable: const SizedBox(height: 150),
                     actions: const SizedBox(height: 56),
-                    minimumMoveHeight: 0,
+                    minimumMoveHeight: revision.isEven ? 0 : 1,
                   );
                 },
               ),
@@ -53,7 +54,7 @@ void main() {
       tester.getRect(topScroll).overlaps(tester.getRect(find.text('Last table line'))),
       isTrue,
     );
-    update(() {});
+    update(() => revision++);
     await tester.pumpAndSettle();
     expect(tester.getTopLeft(find.text('Last table line')).dy, closeTo(before, 1));
     expect(tester.takeException(), isNull);

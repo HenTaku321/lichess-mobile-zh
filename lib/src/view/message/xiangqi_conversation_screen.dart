@@ -112,6 +112,14 @@ class const _Body({
                 Expanded(
                   child: ChatMessageList(
                     itemCount: items.length + 1,
+                    itemKeys: [
+                      for (final item in items)
+                        switch (item) {
+                          _DateItem(:final date) => ('day', date),
+                          _MessageItem(:final message) => ('message', message),
+                        },
+                      'history-footer',
+                    ].toIList(),
                     itemBuilder: (context, index) {
                       if (index == items.length) {
                         return Column(

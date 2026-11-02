@@ -1,0 +1,194 @@
+name: Xiangqi full visual pairs (manual batch)
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate:
+        description: Exact 40-character source SHA, not a moving branch
+        required: true
+        type: string
+      offset:
+        description: Decimal offset within the optional role/state scope
+        required: true
+        default: '0'
+        type: string
+      limit:
+        description: Pairs in this batch (1..1024); no automatic following batch
+        required: true
+        default: '48'
+        type: string
+      role:
+        description: Optional registered role (empty means the full registry)
+        required: false
+        type: string
+      state:
+        description: Optional state (empty means every registered applicable state)
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: xiangqi-visual-${{ inputs.candidate }}
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - name: Validate manual resource bounds
+        env:
+          CANDIDATE: ${{ inputs.candidate }}
+          OFFSET: ${{ inputs.offset }}
+          LIMIT: ${{ inputs.limit }}
+        run: |
+          python3 - <<'PY'
+          import os, re
+          if not re.fullmatch(r'[0-9a-f]{40}', os.environ['CANDIDATE']):
+              raise SystemExit('Candidate must be an exact full SHA')
+          if not re.fullmatch(r'[0-9]+', os.environ['OFFSET']):
+              raise SystemExit('Offset must be a nonnegative decimal integer')
+          if not re.fullmatch(r'[0-9]+', os.environ['LIMIT']) or not 1 <= int(os.environ['LIMIT']) <= 1024:
+              raise SystemExit('A batch has 1..1024 pairs, no automatic next batch')
+          PY
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ inputs.candidate }}
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          cache: true
+          flutter-version-file: pubspec.yaml
+      - name: Prepare compiled enum catalogue (Actions only)
+        env:
+          XIANGQI_VISUAL_CATALOGUE: out/visual-plan/catalogue.json
+        run: |
+          sudo apt-get -y install libsqlite3-0 libsqlite3-dev
+          flutter pub get
+          dart run build_runner build
+          npm ci --no-audit --no-fund --prefix scripts
+          ./scripts/gen-translations.sh
+          ./scripts/fetch-pikafish-nnue.sh
+          flutter test --no-pub test/visual/xiangqi_visual_registry_test.dart
+          python3 -m unittest discover -s scripts/tests -p 'test_xiangqi_visual_pairs.py'
+      - name: Fetch pinned rendering fonts
+        run: ./scripts/fetch-desktop-test-fonts.sh out/visual-fonts
+      - name: Bind renderer and enumerate this batch lazily
+        id: plan
+        env:
+          CANDIDATE: ${{ inputs.candidate }}
+          OFFSET: ${{ inputs.offset }}
+          LIMIT: ${{ inputs.limit }}
+          ROLE: ${{ inputs.role }}
+          STATE: ${{ inputs.state }}
+          XIANGQI_VISUAL_FONT_DIR: out/visual-fonts
+        run: |
+          test "$(git rev-parse HEAD)" = "$CANDIDATE"
+          python3 scripts/xiangqi_visual_runtime.py --out out/visual-plan/runtime.json
+          options=()
+          if [[ -n "$ROLE" ]]; then options+=(--role "$ROLE"); fi
+          if [[ -n "$STATE" ]]; then options+=(--state "$STATE"); fi
+          python3 scripts/xiangqi_visual_pairs.py plan \
+            --registry test/visual/xiangqi_pair_registry.json \
+            --catalogue out/visual-plan/catalogue.json --runtime out/visual-plan/runtime.json \
+            --sha "$CANDIDATE" --offset "$OFFSET" --limit "$LIMIT" \
+            --out out/visual-plan --github-output "$GITHUB_OUTPUT" "${options[@]}"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: xiangqi-visual-plan-${{ github.run_id }}
+          path: out/visual-plan
+          retention-days: 90
+          if-no-files-found: error
+
+  render:
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ inputs.candidate }}
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          cache: true
+          flutter-version-file: pubspec.yaml
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: xiangqi-visual-plan-${{ github.run_id }}
+          path: out/visual-plan
+      - name: Prepare rendering boundaries
+        run: |
+          sudo apt-get -y install libsqlite3-0 libsqlite3-dev
+          flutter pub get
+          dart run build_runner build
+          npm ci --no-audit --no-fund --prefix scripts
+          ./scripts/gen-translations.sh
+          ./scripts/fetch-pikafish-nnue.sh
+          ./scripts/fetch-desktop-test-fonts.sh out/visual-fonts
+      - name: Confirm fixed renderer dependencies
+        env:
+          XIANGQI_VISUAL_FONT_DIR: out/visual-fonts
+        run: python3 scripts/xiangqi_visual_runtime.py --out out/renderer.json --verify out/visual-plan/runtime.json
+      - name: Render both actual pages and role difference images
+        env:
+          XIANGQI_PAIR_PLAN: out/visual-plan/shard-${{ matrix.shard }}.json
+          XIANGQI_PAIR_OUTPUT: out/visual-pairs
+          XIANGQI_VISUAL_FONT_DIR: out/visual-fonts
+        run: |
+          mkdir -p out/visual-pairs
+          flutter test --no-pub --concurrency 1 --reporter json \
+            test/visual/xiangqi_visual_pairs_test.dart > out/render-tests.jsonl
+      - name: Export originals, differences and controller/input metadata
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: xiangqi-visual-pairs-${{ github.run_id }}-${{ matrix.shard }}
+          path: |
+            out/visual-pairs
+            out/render-tests.jsonl
+            out/renderer.json
+          retention-days: 90
+          if-no-files-found: error
+
+  coverage:
+    needs: [plan, render]
+    if: ${{ always() && needs.plan.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ inputs.candidate }}
+          persist-credentials: false
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: xiangqi-visual-plan-${{ github.run_id }}
+          path: out/visual-plan
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          pattern: xiangqi-visual-pairs-${{ github.run_id }}-*
+          path: out/evidence
+          merge-multiple: true
+      - name: Fail closed on missing, stale, skipped or mismatched pair evidence
+        run: |
+          python3 scripts/xiangqi_visual_pairs.py verify \
+            --plan out/visual-plan --evidence out/evidence/visual-pairs \
+            --out out/coverage.json
+      - name: Export small coverage index (not installation packages)
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: xiangqi-visual-coverage-${{ github.run_id }}
+          path: out/coverage.json
+          retention-days: 90
+          if-no-files-found: error

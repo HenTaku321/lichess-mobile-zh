@@ -16,6 +16,7 @@ import 'package:lichess_mobile/src/utils/navigation.dart';
 import 'package:lichess_mobile/src/utils/rate_limit.dart';
 import 'package:lichess_mobile/src/view/message/conversation_screen.dart';
 import 'package:lichess_mobile/src/view/message/xiangqi_conversation_screen.dart';
+import 'package:lichess_mobile/src/widgets/anchored_list_view.dart';
 import 'package:lichess_mobile/src/widgets/haptic_refresh_indicator.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:lichess_mobile/src/widgets/platform_search_bar.dart';
@@ -127,53 +128,66 @@ class _ContactsScreenState() extends ConsumerState<ContactsScreen> {
         ? null
         : ref.watch(messageSearchResultsProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(context.l10n.inbox),
-        bottom: PreferredSize(
-          preferredSize: Size.fromHeight(
-            Theme.of(context).platform == TargetPlatform.iOS ? 52.0 : kToolbarHeight,
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: PlatformSearchBar(
-              controller: controller,
-              focusNode: focusNode,
-              hintText: context.l10n.searchOrStartNewDiscussion,
-              onChanged: (value) {
-                onChangedDebouncer.call(() {
-                  ref.read(messageSearchQueryProvider.notifier).state = value;
-                });
-              },
+    return XiangqiRefreshScope(
+      identity: (_accountIdentity, searchQuery),
+      onRefresh: () async {
+        if (searchQuery.isNotEmpty && me != null) {
+          await ref.refresh(messageSearchResultsProvider.future);
+        } else {
+          await ref.read(contactsControllerProvider.notifier).refresh();
+        }
+      },
+      builder: (context, refresh, busy) => Scaffold(
+        appBar: AppBar(
+          title: Text(context.l10n.inbox),
+          actions: [DesktopRefreshButton(onRefresh: refresh, busy: busy)],
+          bottom: PreferredSize(
+            preferredSize: Size.fromHeight(
+              Theme.of(context).platform == TargetPlatform.iOS ? 52.0 : kToolbarHeight,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: PlatformSearchBar(
+                controller: controller,
+                focusNode: focusNode,
+                hintText: context.l10n.searchOrStartNewDiscussion,
+                onChanged: (value) {
+                  onChangedDebouncer.call(() {
+                    ref.read(messageSearchQueryProvider.notifier).state = value;
+                  });
+                },
+              ),
             ),
           ),
         ),
+        body: searchQuery.isNotEmpty && me != null
+            ? searchResultsAsync!.when(
+                data: (result) => ListView(
+                  key: PageStorageKey(('message-search', _accountIdentity, searchQuery)),
+                  children: [
+                    if (result.contacts.isNotEmpty) _SearchCategoryTitle(context.l10n.discussions),
+                    ...result.contacts.map(
+                      (contact) => ContactTile(contact, me, openConvo: pushConversationScreen),
+                    ),
+                    if (result.friends.isNotEmpty) _SearchCategoryTitle(context.l10n.friends),
+                    ...result.friends.map(
+                      (user) => UserTile(user, openConvo: pushUserConversation),
+                    ),
+                    if (result.users.isNotEmpty) _SearchCategoryTitle(context.l10n.players),
+                    ...result.users.map((user) => UserTile(user, openConvo: pushUserConversation)),
+                  ],
+                ),
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, st) => Center(child: Text('Error: $e')),
+              )
+            : HapticRefreshIndicator(
+                onRefresh: refresh,
+                child: ContactsListView(
+                  openConvo: pushConversationScreen,
+                  localQuery: me == null ? searchQuery : '',
+                ),
+              ),
       ),
-      body: searchQuery.isNotEmpty && me != null
-          ? searchResultsAsync!.when(
-              data: (result) => ListView(
-                key: PageStorageKey(('message-search', _accountIdentity, searchQuery)),
-                children: [
-                  if (result.contacts.isNotEmpty) _SearchCategoryTitle(context.l10n.discussions),
-                  ...result.contacts.map(
-                    (contact) => ContactTile(contact, me, openConvo: pushConversationScreen),
-                  ),
-                  if (result.friends.isNotEmpty) _SearchCategoryTitle(context.l10n.friends),
-                  ...result.friends.map((user) => UserTile(user, openConvo: pushUserConversation)),
-                  if (result.users.isNotEmpty) _SearchCategoryTitle(context.l10n.players),
-                  ...result.users.map((user) => UserTile(user, openConvo: pushUserConversation)),
-                ],
-              ),
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, st) => Center(child: Text('Error: $e')),
-            )
-          : HapticRefreshIndicator(
-              onRefresh: () => ref.read(contactsControllerProvider.notifier).refresh(),
-              child: ContactsListView(
-                openConvo: pushConversationScreen,
-                localQuery: me == null ? searchQuery : '',
-              ),
-            ),
     );
   }
 }
@@ -234,7 +248,7 @@ class const ContactsListView({
               : () => unawaited(ref.read(contactsControllerProvider.notifier).getMore()),
         ),
       ];
-      return ListView.separated(
+      return AnchoredListView(
         physics: const AlwaysScrollableScrollPhysics(),
         key: PageStorageKey((
           'message-contacts',
@@ -249,6 +263,9 @@ class const ContactsListView({
               )
             : const SizedBox.shrink(),
         itemCount: contacts.length + footer.length,
+        itemKey: (index) => index < contacts.length
+            ? (contacts[index].user.id, contacts[index].xiangqi?.chatId)
+            : ('contacts-footer', index - contacts.length),
         itemBuilder: (context, index) {
           if (index >= contacts.length) return footer[index - contacts.length];
           final contact = contacts[index];

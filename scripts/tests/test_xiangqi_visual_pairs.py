@@ -1,6 +1,7 @@
 """Runs only on Actions; matrices are never expanded to a million-element list."""
 import copy
 import sys
+import json
 import unittest
 from pathlib import Path
 
@@ -114,6 +115,16 @@ class MatrixTests(unittest.TestCase):
     def test_an_absent_pair_report_never_counts_as_passed(self):
         verdict = pairs.evaluate_case({}, {}, Path("/nonexistent"), "2026-11-02T00:00:00Z")
         self.assertEqual(verdict["status"], "invalid")
+
+    def test_production_registry_keeps_locked_environment_filters_and_all_entry_roles(self):
+        path = Path(__file__).resolve().parents[2] / "test/visual/xiangqi_pair_registry.json"
+        value = json.loads(path.read_text())
+        self.assertEqual(value["environment"], registry()["environment"])
+        self.assertEqual(value["axes"]["board.brightness"], registry()["axes"]["board.brightness"])
+        self.assertEqual(value["axes"]["board.hue"], registry()["axes"]["board.hue"])
+        self.assertEqual(len(value["roles"]), 49)
+        self.assertEqual(len({role["id"] for role in value["roles"]}), 49)
+        self.assertTrue(all(value["nonVisualAcceptance"][kind] == "not-run" for kind in value["nonVisualAcceptance"]))
 
 
 if __name__ == "__main__":

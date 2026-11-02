@@ -132,6 +132,9 @@ jobs:
             > out/visual-pair-contract/tests.txt 2>&1
           status=$?
           cat out/visual-pair-contract/tests.txt
+          if [[ "$status" = 0 ]]; then
+            flutter test --no-pub --reporter expanded test/visual/xiangqi_visual_registry_test.dart
+          fi
           exit "$status"
 
       - name: Export full visual-pair contract evidence
@@ -156,6 +159,7 @@ jobs:
             test/model/message/xiangqi_inbox_repository_test.dart \
             test/model/message/xiangqi_conversation_controller_test.dart \
             test/view/message/xiangqi_conversation_screen_test.dart \
+            test/widgets/anchored_list_view_test.dart \
             test/model/xiangqi/xiangqi_page_test.dart \
             test/model/xiangqi/xiangqi_pagination_test.dart \
             test/model/xiangqi/social/xiangqi_social_test.dart \

@@ -35,6 +35,7 @@ abstract class XiangqiPagedController<T>() extends AsyncNotifier<XiangqiPagedSta
   Future<void>? _more;
   Future<void>? _refresh;
   _RefreshContinuation<T>? _failedRefresh;
+  int? _failedMorePage;
 
   bool get appendPages => true;
   Future<XiangqiPage<T>> loadPage(int page);
@@ -47,6 +48,7 @@ abstract class XiangqiPagedController<T>() extends AsyncNotifier<XiangqiPagedSta
     _more = null;
     _refresh = null;
     _failedRefresh = null;
+    _failedMorePage = null;
     ref.onDispose(() {
       _generation++;
       _pages.clear();
@@ -107,6 +109,7 @@ abstract class XiangqiPagedController<T>() extends AsyncNotifier<XiangqiPagedSta
     if (page < 1) return Future.error(RangeError.range(page, 1, null, 'page'));
     final generation = _generation;
     _failedRefresh = null;
+    _failedMorePage = null;
     final future = _loadMore(generation, page);
     _more = future;
     unawaited(
@@ -115,6 +118,13 @@ abstract class XiangqiPagedController<T>() extends AsyncNotifier<XiangqiPagedSta
       }),
     );
     return future;
+  }
+
+  /// Page selectors can fail while going backwards. Retrying the visible page or its next cursor
+  /// would be a different operation; remember the exact failed navigation target instead.
+  Future<void> retryMore() {
+    final failed = _failedMorePage;
+    return failed == null ? getMore() : goToPage(failed);
   }
 
   Future<XiangqiPage<T>> _readAvailablePage(int number) async {
@@ -143,6 +153,7 @@ abstract class XiangqiPagedController<T>() extends AsyncNotifier<XiangqiPagedSta
     } on Object catch (error, stackTrace) {
       if (!_current(generation)) return;
       _logger.warning('Could not load xiangqi.com page $number.', error, stackTrace);
+      _failedMorePage = number;
       state = AsyncData(_snapshot(refreshError: previousError, moreError: error));
     }
   }
@@ -175,6 +186,7 @@ abstract class XiangqiPagedController<T>() extends AsyncNotifier<XiangqiPagedSta
     final generation = ++_generation;
     _more = null;
     _failedRefresh = null;
+    _failedMorePage = null;
     state = hasPages ? AsyncData(_snapshot(refreshing: true)) : const AsyncLoading();
     final future = _reload(generation, start, count, hasPages, staged: staged);
     _refresh = future;

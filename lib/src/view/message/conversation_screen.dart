@@ -1,3 +1,4 @@
+import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:lichess_mobile/src/model/message/conversation_controller.dart';
@@ -123,11 +124,25 @@ class const _Body({required final LightUser user}) extends ConsumerWidget {
     switch (messageStateAsync) {
       case AsyncData(:final value):
         final items = buildDisplayItems(value);
+        final occurrences = <Message, int>{};
         return Column(
           children: [
             Expanded(
               child: ChatMessageList(
                 itemCount: items.length,
+                itemKeys: [
+                  for (final item in items)
+                    switch (item) {
+                      DateItem(:final date) => ('day', date),
+                      MessageItem(:final message) => (
+                        'message',
+                        message,
+                        occurrences.update(message, (count) => count + 1, ifAbsent: () => 0),
+                      ),
+                      GetMoreItem() => 'history-footer',
+                      ContactTypingItem() => 'typing',
+                    },
+                ].toIList(),
                 itemBuilder: (context, index) {
                   final item = items[index];
                   switch (item) {

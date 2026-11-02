@@ -1,6 +1,8 @@
+import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:intl/intl.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
+import 'package:lichess_mobile/src/widgets/anchored_list_view.dart';
 import 'package:lichess_mobile/src/widgets/rich_link_text.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -158,17 +160,26 @@ class const ChatDaySeparator({required final DateTime date, super.key}) extends 
 class const ChatMessageList({
   required final int itemCount,
   required final IndexedWidgetBuilder itemBuilder,
+  final IList<Object>? itemKeys,
   super.key,
 }) extends StatelessWidget {
   @override
   Widget build(BuildContext context) => GestureDetector(
     onTap: () => FocusScope.of(context).unfocus(),
-    child: ListView.builder(
-      padding: MediaQuery.paddingOf(context).copyWith(bottom: 0),
-      reverse: true,
-      itemCount: itemCount,
-      itemBuilder: itemBuilder,
-    ),
+    child: itemKeys == null
+        ? ListView.builder(
+            padding: MediaQuery.paddingOf(context).copyWith(bottom: 0),
+            reverse: true,
+            itemCount: itemCount,
+            itemBuilder: itemBuilder,
+          )
+        : AnchoredListView(
+            padding: MediaQuery.paddingOf(context).copyWith(bottom: 0),
+            reverse: true,
+            itemCount: itemCount,
+            itemKey: (index) => itemKeys![index],
+            itemBuilder: itemBuilder,
+          ),
   );
 }
 

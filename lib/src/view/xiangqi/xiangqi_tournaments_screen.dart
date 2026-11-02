@@ -246,14 +246,17 @@ class _XiangqiTournamentScreenState() extends ConsumerState<XiangqiTournamentScr
                             XiangqiRetryTile(
                               onRetry: busy
                                   ? null
-                                  : () => unawaited(
-                                      ref
-                                          .read(
-                                            xiangqiTournamentStandingsControllerProvider(widget.id)
-                                                .notifier,
-                                          )
-                                          .refresh(),
-                                    ),
+                                  : () {
+                                      final pager = ref.read(
+                                        xiangqiTournamentStandingsControllerProvider(widget.id)
+                                            .notifier,
+                                      );
+                                      unawaited(
+                                        leaders.moreError != null
+                                            ? pager.retryMore()
+                                            : pager.retryRefresh(),
+                                      );
+                                    },
                             ),
                           Row(
                             children: [

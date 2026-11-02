@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/rendering.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// A game's landscape tables keep their natural height when they fit. On a short or large-text
@@ -7,24 +8,28 @@ import 'package:material_ui/material_ui.dart';
 ///
 /// Measure the actual tables, not text-height estimates: they may contain clocks, multiline
 /// feedback, progress indicators or platform controls whose sizes change without a screen rebuild.
-class GameTableColumn({
-  required Widget topTable,
-  required Widget bottomTable,
-  Widget? moves,
-  Widget? actions,
+class const GameTableColumn({
+  required final Widget topTable,
+  required final Widget bottomTable,
+  final Widget? moves,
+  final Widget? actions,
   final double minimumMoveHeight = 48,
   super.key,
-}) extends MultiChildRenderObjectWidget {
-  this
-    : super(
-        children: [
-          SingleChildScrollView(primary: false, child: topTable),
-          moves ?? const SizedBox.shrink(),
-          actions ?? const SizedBox.shrink(),
-          SingleChildScrollView(primary: false, child: bottomTable),
-        ],
-      );
+}) extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => _TableColumnLayout(
+    minimumMoveHeight: minimumMoveHeight,
+    children: [
+      SingleChildScrollView(primary: false, child: topTable),
+      moves ?? const SizedBox.shrink(),
+      actions ?? const SizedBox.shrink(),
+      SingleChildScrollView(primary: false, child: bottomTable),
+    ],
+  );
+}
 
+class const _TableColumnLayout({required final double minimumMoveHeight, required super.children})
+    extends MultiChildRenderObjectWidget {
   @override
   RenderObject createRenderObject(BuildContext context) =>
       _RenderGameTableColumn(minimumMoveHeight);
@@ -41,6 +46,8 @@ class _RenderGameTableColumn(double minimumMoveHeight)
         ContainerRenderObjectMixin<RenderBox, ContainerBoxParentData<RenderBox>>,
         RenderBoxContainerDefaultsMixin<RenderBox, ContainerBoxParentData<RenderBox>> {
   double _minimumMoveHeight = minimumMoveHeight;
+
+  double get minimumMoveHeight => _minimumMoveHeight;
 
   set minimumMoveHeight(double value) {
     if (_minimumMoveHeight == value) return;

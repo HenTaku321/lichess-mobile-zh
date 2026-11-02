@@ -136,6 +136,7 @@
 | 身份红 / `cb0401302` / Actions `41385947642` | analyze通过；账号变更后旧 debounced query 仍为 `chab`；同账号 token续期保持查询的正向对照 | P/N/U未验证 | 身份边界真实失败，不能将 token轮换等同换号 |
 | 呈现红 / `518a61024` / Actions `41386918242` | analyze通过；同一行回调重入推两页；实际偏好写 `no` 后多页面仍显示评分；Hub仍有坐标；题目完成缺直接分析 | P/N/U未验证 | 可做最小整改；所有新回归的绿和实战例外仍待跑 |
 | 静态检查 / `bc842f51d` / Actions `41388581094` | analyze发现 accountProvider 的内容本身为 nullable User，以及一处测试 import 排序；行为步骤未执行 | P/N/U未验证 | 不算行为红；已改为非空且 id 属于当前账号才开放，修正 import，仍须重跑 |
+| 静态检查 / `ae4f3cae7` / Actions `41390983202` | 仅测试 import alias `analysisFixture` 违反 snake_case lint；行为步骤未执行 | P/N/U未验证 | 已改 `analysis_fixture`；不能据此宣称任何行为绿 |
 
 代码已加入 B1 的入口/公共菜单/模型安全边界、B2/B4 的 mounted+身份保护与释放、B3 的统一收件箱权限判断。
 这些源码改动尚未拿到同 SHA 绿；评分策略已共用并接入数字/元数据槽，最高评分携带角色而非预过滤文本，

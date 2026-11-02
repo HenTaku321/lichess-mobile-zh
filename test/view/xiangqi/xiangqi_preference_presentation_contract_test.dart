@@ -25,7 +25,7 @@ import '../../model/xiangqi/online/xiangqi_online_game_fixture.dart' as fx;
 import '../../model/xiangqi/puzzle/xiangqi_puzzle_fixture.dart';
 import '../../test_provider_scope.dart';
 import '../account/account_menu_test.dart' as account;
-import 'xiangqi_analysis_screen_test.dart' as analysisFixture;
+import 'xiangqi_analysis_screen_test.dart' as analysis_fixture;
 import 'xiangqi_leaderboard_screen_test.dart' as leaderboard;
 import 'xiangqi_online_game_screen_test.dart' as online;
 import 'xiangqi_profile_screen_test.dart' as profile;
@@ -236,12 +236,12 @@ void main() {
   testWidgets(
     'a completed puzzle exposes analysis directly and a matching continue-training action',
     (tester) async {
-      final (:engine, transport: _) = analysisFixture.fakeXiangqiEngine();
+      final (:engine, transport: _) = analysis_fixture.fakeXiangqiEngine();
       await puzzle.pumpPuzzleScreen(
         tester,
         server: puzzle.PuzzleServer(),
         engine: engine,
-        defaultPreferences: analysisFixture.evaluationPreferences(isEnabled: false),
+        defaultPreferences: analysis_fixture.evaluationPreferences(isEnabled: false),
       );
       expect(
         tester

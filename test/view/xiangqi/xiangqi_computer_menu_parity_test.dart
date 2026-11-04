@@ -10,6 +10,7 @@ import 'package:lichess_mobile/src/view/xiangqi/xiangqi_analysis_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_game_screen.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_difficulty_tile.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../binding.dart';
@@ -90,6 +91,33 @@ void main() {
       });
     }
   }
+
+  testWidgets('repeated settings activation does not leave a second sheet underneath', (
+    tester,
+  ) async {
+    await game.pumpGameScreen(tester, screen: screen, failOnOverflow: true);
+    final controller = game.containerOf(tester).read(xiangqiGameControllerProvider.notifier);
+    final generation = controller.generation;
+    final settings = tester.widget<IconButton>(
+      find.byWidgetPredicate((widget) => widget is IconButton && widget.tooltip == 'Settings'),
+    );
+    // Replay the actual callback twice before the next frame disables or obscures the button.
+    final activate = settings.onPressed!;
+    activate();
+    activate();
+    await tester.pumpAndSettle();
+    final difficulty = find.byType(XiangqiDifficultyTile);
+    expect(difficulty, findsOneWidget);
+    Navigator.of(tester.element(difficulty)).pop();
+    await tester.pumpAndSettle();
+    expect(find.byType(XiangqiDifficultyTile), findsNothing);
+    expect(
+      controller.generation,
+      generation,
+      reason: 'Inspecting settings must not replace the game.',
+    );
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('computer actions use the same menu, resign, takeback and hint order as chess', (
     tester,

@@ -28,7 +28,6 @@ import 'package:lichess_mobile/src/widgets/xiangqi_player_row.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../binding.dart';
-import '../test_helpers.dart';
 import '../test_provider_scope.dart';
 
 const foldedSurface = Size(564.7, 482.6);
@@ -44,7 +43,7 @@ void main() {
       if (!completed.isCompleted) completed.complete();
     });
     await tester.pumpWidget(
-      await makeTestWidget(
+      await makeTestProviderScopeApp(
         tester,
         home: Scaffold(
           body: ComputerGameBottomBar(

@@ -2,7 +2,34 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_action_sheet.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
+import 'package:lichess_mobile/src/widgets/misc.dart';
 import 'package:material_ui/material_ui.dart';
+
+/// The complete computer-game header is shared; board adapters supply the mode and settings.
+/// The body remains in its original session scope, so this shell never owns a game or an engine.
+class const ComputerGameScaffold({
+  required final bool practiceMode,
+  required final VoidCallback onSettings,
+  required final Widget body,
+  super.key,
+}) extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      title: AppBarTitleText(
+        practiceMode ? context.l10n.practiceWithComputer : context.l10n.playAgainstComputer,
+      ),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.settings),
+          tooltip: context.l10n.settingsSettings,
+          onPressed: onSettings,
+        ),
+      ],
+    ),
+    body: body,
+  );
+}
 
 /// Computer-game actions have one ordering and presentation. Each controller supplies nullable
 /// callbacks for its real capabilities, rather than the shell guessing rules or permissions.

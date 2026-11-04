@@ -34,7 +34,6 @@ import 'package:lichess_mobile/src/widgets/adaptive_choice_picker.dart';
 import 'package:lichess_mobile/src/widgets/clock.dart';
 import 'package:lichess_mobile/src/widgets/computer_game_actions.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
-import 'package:lichess_mobile/src/widgets/misc.dart';
 import 'package:lichess_mobile/src/widgets/practice_feedback_card.dart';
 import 'package:lichess_mobile/src/widgets/settings.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
@@ -110,30 +109,18 @@ class const XiangqiGameScreen({
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Scaffold(
-      // The game's own name, translated like every other: 象棋 is what the board calls itself, but
-      // the app speaks of it in the reader's language. See `mobileXiangqi`.
-      appBar: AppBar(
-        title: AppBarTitleText(context.l10n.mobileXiangqi),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            tooltip: context.l10n.settingsSettings,
-            onPressed: () {
-              final container = ProviderScope.containerOf(context);
-              showModalBottomSheet<void>(
-                context: context,
-                builder: (_) => UncontrolledProviderScope(
-                  container: container,
-                  child: _XiangqiGameSettingsSheet(
-                    onNewGame: () => _showNewGameSheet(context, ref),
-                  ),
-                ),
-              );
-            },
+    return ComputerGameScaffold(
+      practiceMode: ref.watch(xiangqiGameControllerProvider.select((state) => state.practiceMode)),
+      onSettings: () {
+        final container = ProviderScope.containerOf(context);
+        showModalBottomSheet<void>(
+          context: context,
+          builder: (_) => UncontrolledProviderScope(
+            container: container,
+            child: _XiangqiGameSettingsSheet(onNewGame: () => _showNewGameSheet(context, ref)),
           ),
-        ],
-      ),
+        );
+      },
       body: _Body(
         initialFen: initialFen,
         initialSide: initialSide,

@@ -41,7 +41,6 @@ import 'package:lichess_mobile/src/widgets/computer_game_actions.dart';
 import 'package:lichess_mobile/src/widgets/game_layout.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:lichess_mobile/src/widgets/material_diff.dart';
-import 'package:lichess_mobile/src/widgets/misc.dart';
 import 'package:lichess_mobile/src/widgets/non_linear_slider.dart';
 import 'package:lichess_mobile/src/widgets/player_table.dart';
 import 'package:lichess_mobile/src/widgets/practice_feedback_card.dart';
@@ -71,26 +70,14 @@ class const OfflineComputerGameScreen({
     final practiceMode = ref.watch(
       offlineComputerGameControllerProvider.select((s) => s.game.practiceMode),
     );
-    final title = practiceMode
-        ? context.l10n.practiceWithComputer
-        : context.l10n.playAgainstComputer;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: AppBarTitleText(title),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            tooltip: context.l10n.settingsSettings,
-            onPressed: () {
-              showModalBottomSheet<void>(
-                context: context,
-                builder: (_) => const _OfflineComputerGameSettingsSheet(),
-              );
-            },
-          ),
-        ],
-      ),
+    return ComputerGameScaffold(
+      practiceMode: practiceMode,
+      onSettings: () {
+        showModalBottomSheet<void>(
+          context: context,
+          builder: (_) => const _OfflineComputerGameSettingsSheet(),
+        );
+      },
       body: _Body(initialVariant: initialVariant, initialFen: initialFen),
     );
   }

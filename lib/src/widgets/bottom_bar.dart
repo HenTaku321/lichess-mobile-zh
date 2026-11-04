@@ -72,6 +72,7 @@ class const BottomBarButton({
   required final VoidCallback? onTap,
   final String? badgeLabel,
   final bool highlighted = false,
+  final bool busy = false,
   final bool showLabel = false,
   final bool showTooltip = true,
   final bool blink = false,
@@ -90,7 +91,7 @@ class const BottomBarButton({
     final labelFontSize = TextTheme.of(context).bodySmall?.fontSize;
 
     final child = Opacity(
-      opacity: enabled ? 1.0 : 0.4,
+      opacity: enabled || busy ? 1.0 : 0.4,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -103,7 +104,12 @@ class const BottomBarButton({
             ),
             isLabelVisible: badgeLabel != null,
             label: (badgeLabel != null) ? Text(badgeLabel!) : null,
-            child: Icon(icon, color: highlighted ? primary : null),
+            child: busy
+                ? SizedBox.square(
+                    dimension: IconTheme.of(context).size ?? 24,
+                    child: const CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Icon(icon, color: highlighted ? primary : null),
           ),
           if (showLabel)
             Padding(

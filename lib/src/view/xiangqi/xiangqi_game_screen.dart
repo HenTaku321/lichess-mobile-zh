@@ -682,9 +682,9 @@ class _BodyState() extends ConsumerState<_Body> {
     }
   }
 
-  void _showGameMenu() {
+  Future<void> _showGameMenu() {
     final game = ref.read(xiangqiGameControllerProvider);
-    showComputerGameMenu(
+    return showComputerGameMenu(
       context,
       onFlipBoard: () => ref.read(_isBoardFlippedProvider.notifier).toggle(),
       onAnalysis: () => unawaited(_openAnalysis()),
@@ -745,14 +745,14 @@ class _BodyState() extends ConsumerState<_Body> {
         !analysisState.isBusy;
   }
 
-  void _requestHint(XiangqiGameState gameState) {
+  Future<void> _requestHint(XiangqiGameState gameState) {
     _hintPosition = gameState.position;
     _hintGeneration = ref.read(xiangqiGameControllerProvider.notifier).generation;
-    unawaited(ref.read(xiangqiEngineAnalysisProvider.notifier).requestHint(gameState.position));
+    return ref.read(xiangqiEngineAnalysisProvider.notifier).requestHint(gameState.position);
   }
 
-  void _confirmResign() {
-    showAdaptiveDialog<void>(
+  Future<void> _confirmResign() {
+    return showAdaptiveDialog<void>(
       context: context,
       builder: (context) => YesNoDialog(
         title: Text(context.l10n.resign),

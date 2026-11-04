@@ -340,8 +340,8 @@ class const _BottomBar({required final VoidCallback onNewGame}) extends Consumer
     );
   }
 
-  void _showResignDialog(BuildContext context, WidgetRef ref) {
-    showAdaptiveDialog<void>(
+  Future<void> _showResignDialog(BuildContext context, WidgetRef ref) {
+    return showAdaptiveDialog<void>(
       context: context,
       builder: (context) => YesNoDialog(
         title: Text(context.l10n.resign),

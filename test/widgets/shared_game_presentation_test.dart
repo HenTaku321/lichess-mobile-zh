@@ -17,6 +17,7 @@ import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
 import 'package:lichess_mobile/src/model/settings/preferences_storage.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_hint.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
+import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/view/engine/engine_gauge.dart';
 import 'package:lichess_mobile/src/view/game/game_player.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
@@ -39,6 +40,7 @@ void main() {
   testWidgets('pending computer hint cannot be activated twice before it settles', (tester) async {
     final completed = Completer<void>();
     var calls = 0;
+    late StateSetter rebuild;
     addTearDown(() {
       if (!completed.isCompleted) completed.complete();
     });
@@ -46,11 +48,16 @@ void main() {
       await makeTestProviderScopeApp(
         tester,
         home: Scaffold(
-          body: ComputerGameBottomBar(
-            onMenu: () {},
-            onHint: () async {
-              calls++;
-              await completed.future;
+          body: StatefulBuilder(
+            builder: (context, setState) {
+              rebuild = setState;
+              return ComputerGameBottomBar(
+                onMenu: () {},
+                onHint: () async {
+                  calls++;
+                  await completed.future;
+                },
+              );
             },
           ),
         ),
@@ -65,12 +72,73 @@ void main() {
     await tester.pump();
     expect(calls, 1, reason: 'One pending request owns the action until completion.');
     expect(tester.widget<BottomBarButton>(hint).enabled, isFalse);
+    expect(tester.widget<BottomBarButton>(hint).busy, isTrue);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    rebuild(() {});
+    await tester.pump();
+    await tester.tap(hint, warnIfMissed: false);
+    expect(calls, 1, reason: 'A new callback instance must not reset the pending action.');
     completed.complete();
     await tester.pump();
     expect(tester.widget<BottomBarButton>(hint).enabled, isTrue);
     await tester.tap(hint);
     await tester.pump();
     expect(calls, 2);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('failed computer actions show a localized error and become retryable', (
+    tester,
+  ) async {
+    final completed = Completer<void>();
+    var calls = 0;
+    await tester.pumpWidget(
+      await makeTestProviderScopeApp(
+        tester,
+        home: Scaffold(
+          body: ComputerGameBottomBar(
+            onMenu: () {},
+            onHint: () async {
+              if (++calls == 1) await completed.future;
+            },
+          ),
+        ),
+      ),
+    );
+    final hint = find.byWidgetPredicate(
+      (widget) => widget is BottomBarButton && widget.label == 'Get a hint',
+    );
+    await tester.tap(hint);
+    await tester.pump();
+    completed.completeError(StateError('internal request failure'));
+    await tester.pump();
+    final context = tester.element(find.byType(ComputerGameBottomBar));
+    expect(find.text(context.l10n.mobileSomethingWentWrong), findsOneWidget);
+    expect(find.text('internal request failure'), findsNothing);
+    expect(tester.widget<BottomBarButton>(hint).enabled, isTrue);
+    await tester.tap(hint);
+    await tester.pump();
+    expect(calls, 2);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a pending computer action can finish after its page is disposed', (tester) async {
+    final completed = Completer<void>();
+    await tester.pumpWidget(
+      await makeTestProviderScopeApp(
+        tester,
+        home: Scaffold(
+          body: ComputerGameBottomBar(onMenu: () {}, onHint: () => completed.future),
+        ),
+      ),
+    );
+    await tester.tap(
+      find.byWidgetPredicate((widget) => widget is BottomBarButton && widget.label == 'Get a hint'),
+    );
+    await tester.pump();
+    await tester.pumpWidget(const SizedBox.shrink());
+    completed.complete();
+    await tester.pump();
     expect(tester.takeException(), isNull);
   });
 

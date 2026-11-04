@@ -5,6 +5,7 @@ import 'package:lichess_mobile/src/model/common/time_increment.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_clock.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
+import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_analysis_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_game_screen.dart';
 import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
@@ -54,6 +55,41 @@ Future<void> openAnalysis(WidgetTester tester) async {
 
 void main() {
   TestLichessBinding.ensureInitialized();
+
+  for (final locale in [const Locale('en'), const Locale('zh')]) {
+    for (final practiceMode in [false, true]) {
+      testWidgets('computer title reflects the actual mode: $locale / practice=$practiceMode', (
+        tester,
+      ) async {
+        await game.pumpGameScreen(
+          tester,
+          locale: locale,
+          screen: XiangqiGameScreen(
+            initialSide: .red,
+            initialDifficulty: .level4,
+            initialTimeIncrement: const TimeIncrement.infinite(),
+            initialPracticeMode: practiceMode,
+          ),
+          failOnOverflow: true,
+        );
+        final appBar = find.byType(AppBar);
+        final context = tester.element(appBar);
+        final title = practiceMode
+            ? context.l10n.practiceWithComputer
+            : context.l10n.playAgainstComputer;
+        expect(
+          game.containerOf(tester).read(xiangqiGameControllerProvider).practiceMode,
+          practiceMode,
+        );
+        expect(find.descendant(of: appBar, matching: find.text(title)), findsOneWidget);
+        expect(
+          find.descendant(of: appBar, matching: find.byTooltip(context.l10n.settingsSettings)),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
 
   testWidgets('computer actions use the same menu, resign, takeback and hint order as chess', (
     tester,

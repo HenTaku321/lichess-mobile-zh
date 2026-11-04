@@ -311,6 +311,25 @@ jobs:
           test/view/message/conversation_presentation_test.dart
           test/service/xiangqi_links_service_test.dart
 
+      - name: Run full-flow computer presentation regressions
+        id: computer-presentation
+        if: ${{ !cancelled() && steps.analyze.outcome == 'success' }}
+        run: |
+          mkdir -p out/computer-presentation
+          flutter test --no-pub --reporter json \
+            test/view/xiangqi/xiangqi_computer_menu_parity_test.dart \
+            test/view/offline_computer/offline_computer_game_screen_test.dart \
+            > out/computer-presentation/tests.jsonl
+
+      - name: Upload full-flow computer presentation evidence
+        if: ${{ always() && steps.computer-presentation.outcome != 'skipped' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: xiangqi-computer-presentation-${{ github.sha }}
+          path: out/computer-presentation
+          retention-days: 90
+          if-no-files-found: ignore
+
       - name: Run xiangqi lifecycle regressions
         id: lifecycle
         if: ${{ !cancelled() && steps.analyze.outcome == 'success' }}

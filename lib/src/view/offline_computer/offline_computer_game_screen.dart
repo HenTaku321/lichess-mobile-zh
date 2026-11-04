@@ -73,7 +73,7 @@ class const OfflineComputerGameScreen({
     return ComputerGameScaffold(
       practiceMode: practiceMode,
       onSettings: () {
-        showModalBottomSheet<void>(
+        return showModalBottomSheet<void>(
           context: context,
           builder: (_) => const _OfflineComputerGameSettingsSheet(),
         );

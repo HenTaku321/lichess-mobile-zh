@@ -113,7 +113,7 @@ class const XiangqiGameScreen({
       practiceMode: ref.watch(xiangqiGameControllerProvider.select((state) => state.practiceMode)),
       onSettings: () {
         final container = ProviderScope.containerOf(context);
-        showModalBottomSheet<void>(
+        return showModalBottomSheet<void>(
           context: context,
           builder: (_) => UncontrolledProviderScope(
             container: container,

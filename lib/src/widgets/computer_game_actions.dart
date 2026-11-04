@@ -10,7 +10,7 @@ import 'package:material_ui/material_ui.dart';
 /// The body remains in its original session scope, so this shell never owns a game or an engine.
 class const ComputerGameScaffold({
   required final bool practiceMode,
-  required final VoidCallback onSettings,
+  required final GameActionCallback onSettings,
   required final Widget body,
   super.key,
 }) extends StatelessWidget {
@@ -21,10 +21,15 @@ class const ComputerGameScaffold({
         practiceMode ? context.l10n.practiceWithComputer : context.l10n.playAgainstComputer,
       ),
       actions: [
-        IconButton(
-          icon: const Icon(Icons.settings),
-          tooltip: context.l10n.settingsSettings,
-          onPressed: onSettings,
+        GameActionButton(
+          key: const ValueKey('computer-settings'),
+          iconOnly: true,
+          action: GameActionSpec(
+            id: 'settings',
+            label: (context) => context.l10n.settingsSettings,
+            icon: Icons.settings,
+            onInvoke: onSettings,
+          ),
         ),
       ],
     ),

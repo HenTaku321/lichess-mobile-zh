@@ -25,8 +25,11 @@ class const GameActionSpec({
 
 /// Guards activation before the next frame and preserves that guard across controller rebuilds.
 /// This owns presentation only: cancellation and stale result checks belong to the controller.
-class const GameActionButton({required final GameActionSpec action, super.key})
-    extends StatefulWidget {
+class const GameActionButton({
+  required final GameActionSpec action,
+  final bool iconOnly = false,
+  super.key,
+}) extends StatefulWidget {
   @override
   State<GameActionButton> createState() => _GameActionButtonState();
 }
@@ -78,15 +81,29 @@ class _GameActionButtonState() extends State<GameActionButton> {
     // A popup leaves its parent mounted but obscured. Keep the request locked without running
     // an indeterminate animation underneath that popup (or scheduling background frames).
     final visible = ModalRoute.isCurrentOf(context) ?? true;
+    final busy = visible && (action.busy || _pending);
+    final label = action.label(context);
+    final callback = enabled ? () => unawaited(_invoke()) : null;
     return Semantics(
       hint: enabled ? null : action.unavailableReason?.call(context),
-      child: BottomBarButton(
-        label: action.label(context),
-        icon: action.icon,
-        onTap: enabled ? () => unawaited(_invoke()) : null,
-        busy: visible && (action.busy || _pending),
-        highlighted: action.highlighted,
-      ),
+      child: widget.iconOnly
+          ? IconButton(
+              icon: busy
+                  ? SizedBox.square(
+                      dimension: IconTheme.of(context).size ?? 24,
+                      child: const CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(action.icon),
+              tooltip: label,
+              onPressed: callback,
+            )
+          : BottomBarButton(
+              label: label,
+              icon: action.icon,
+              onTap: callback,
+              busy: busy,
+              highlighted: action.highlighted,
+            ),
     );
   }
 }

@@ -121,6 +121,12 @@ void main() {
     Navigator.of(tester.element(difficulty)).pop();
     await tester.pumpAndSettle();
     expect(find.byType(XiangqiDifficultyTile), findsNothing);
+    activate();
+    await tester.pumpAndSettle();
+    expect(find.byType(XiangqiDifficultyTile), findsOneWidget);
+    Navigator.of(tester.element(find.byType(XiangqiDifficultyTile))).pop();
+    await tester.pumpAndSettle();
+    expect(find.byType(XiangqiDifficultyTile), findsNothing);
     expect(
       controller.generation,
       generation,

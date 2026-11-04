@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:chessground/chessground.dart' show Chessboard;
@@ -18,6 +19,8 @@ import 'package:lichess_mobile/src/model/xiangqi/xiangqi_hint.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/view/engine/engine_gauge.dart';
 import 'package:lichess_mobile/src/view/game/game_player.dart';
+import 'package:lichess_mobile/src/widgets/bottom_bar.dart';
+import 'package:lichess_mobile/src/widgets/computer_game_actions.dart';
 import 'package:lichess_mobile/src/widgets/game_layout.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_game_layout.dart';
@@ -32,6 +35,46 @@ const xiangqiBoardKey = Key('xiangqi-board-surface');
 
 void main() {
   TestLichessBinding.ensureInitialized();
+
+  testWidgets('pending computer hint cannot be activated twice before it settles', (tester) async {
+    final completed = Completer<void>();
+    var calls = 0;
+    addTearDown(() {
+      if (!completed.isCompleted) completed.complete();
+    });
+    await tester.pumpWidget(
+      await makeTestProviderScope(
+        tester,
+        child: MaterialApp(
+          home: Scaffold(
+            body: ComputerGameBottomBar(
+              onMenu: () {},
+              onHint: () async {
+                calls++;
+                await completed.future;
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+    final hint = find.byWidgetPredicate(
+      (widget) => widget is BottomBarButton && widget.label == 'Get a hint',
+    );
+    expect(hint, findsOneWidget);
+    await tester.tap(hint);
+    await tester.tap(hint);
+    await tester.pump();
+    expect(calls, 1, reason: 'One pending request owns the action until completion.');
+    expect(tester.widget<BottomBarButton>(hint).enabled, isFalse);
+    completed.complete();
+    await tester.pump();
+    expect(tester.widget<BottomBarButton>(hint).enabled, isTrue);
+    await tester.tap(hint);
+    await tester.pump();
+    expect(calls, 2);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('both game shells reserve the same compact-landscape side-panel width', (
     tester,

@@ -319,6 +319,7 @@ jobs:
           flutter test --no-pub --reporter json \
             test/view/xiangqi/xiangqi_computer_menu_parity_test.dart \
             test/view/offline_computer/offline_computer_game_screen_test.dart \
+            test/widgets/shared_game_presentation_test.dart \
             > out/computer-presentation/tests.jsonl
 
       - name: Upload full-flow computer presentation evidence

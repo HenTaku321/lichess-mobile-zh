@@ -75,13 +75,16 @@ class _GameActionButtonState() extends State<GameActionButton> {
   Widget build(BuildContext context) {
     final action = widget.action;
     final enabled = action.enabled && !_pending;
+    // A popup leaves its parent mounted but obscured. Keep the request locked without running
+    // an indeterminate animation underneath that popup (or scheduling background frames).
+    final visible = ModalRoute.isCurrentOf(context) ?? true;
     return Semantics(
       hint: enabled ? null : action.unavailableReason?.call(context),
       child: BottomBarButton(
         label: action.label(context),
         icon: action.icon,
         onTap: enabled ? () => unawaited(_invoke()) : null,
-        busy: action.busy || _pending,
+        busy: visible && (action.busy || _pending),
         highlighted: action.highlighted,
       ),
     );

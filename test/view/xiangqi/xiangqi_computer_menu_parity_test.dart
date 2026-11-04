@@ -1,4 +1,5 @@
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lichess_mobile/src/model/common/time_increment.dart';
@@ -56,6 +57,15 @@ Future<void> openAnalysis(WidgetTester tester) async {
 
 void main() {
   TestLichessBinding.ensureInitialized();
+  setUp(() {
+    const channel = 'dev.flutter.pigeon.wakelock_plus_platform_interface.WakelockPlusApi.toggle';
+    final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMessageHandler(
+      channel,
+      (_) async => const StandardMessageCodec().encodeMessage(<Object?>[null]),
+    );
+    addTearDown(() => messenger.setMockMessageHandler(channel, null));
+  });
 
   for (final locale in [const Locale('en'), const Locale('zh')]) {
     for (final practiceMode in [false, true]) {

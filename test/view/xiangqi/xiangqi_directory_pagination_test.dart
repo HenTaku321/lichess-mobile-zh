@@ -27,6 +27,91 @@ Map<String, Object?> envelope(List<Object?> items, int page, {String field = 'it
 void main() {
   TestLichessBinding.ensureInitialized();
 
+  for (final malformed in [false, true]) {
+    testWidgets(
+      'master games keep the selected page after a failed next page: malformed=$malformed',
+      (tester) async {
+        final pages = <int>[];
+        var failSecond = true;
+        var statsRequests = 0;
+        await remote.pumpRemote(
+          tester,
+          const XiangqiMasterPlayerScreen(playerId: 1, playerName: 'Master'),
+          MockClient((request) async {
+            if (request.url.path.endsWith('/stats')) {
+              statsRequests++;
+              return remote.jsonReply({'name': 'Master', 'title': 'Known title', 'wins': 12});
+            }
+            if (!request.url.path.endsWith('/players/1/games')) return remote.jsonReply({});
+            final page = int.parse(request.url.queryParameters['page'] ?? '1');
+            pages.add(page);
+            if (page == 2 && failSecond) {
+              return malformed
+                  ? remote.jsonReply({'items': 'not a page', 'total_pages': 2})
+                  : remote.jsonReply({}, 503);
+            }
+            return remote.jsonReply(
+              database.page(
+                [
+                  {...database.row(slug: 'game-$page'), 'red_player': 'Page $page'},
+                ],
+                nextPage: page == 1 ? 2 : null,
+                totalPages: 2,
+              ),
+            );
+          }),
+        );
+        await tester.ensureVisible(find.byIcon(Icons.chevron_right));
+        await tester.tap(find.byIcon(Icons.chevron_right));
+        await remote.settleRemote(tester);
+        expect(find.text('Page 1 — B Player'), findsOneWidget);
+        expect(find.text('Known title'), findsOneWidget);
+        expect(pages, [1, 2]);
+        expect(statsRequests, 1);
+        final retry = find.byType(XiangqiRetryTile);
+        expect(retry, findsOneWidget);
+        final context = tester.element(find.byType(XiangqiMasterPlayerScreen));
+        failSecond = false;
+        await tester.ensureVisible(retry);
+        await tester.tap(find.descendant(of: retry, matching: find.byTooltip(context.l10n.retry)));
+        await remote.settleRemote(tester);
+        expect(pages, [1, 2, 2]);
+        expect(find.text('Page 2 — B Player'), findsOneWidget);
+        expect(find.text('Page 1 — B Player'), findsNothing);
+        expect(statsRequests, 1, reason: 'Retrying games must not reload healthy statistics.');
+      },
+    );
+  }
+
+  testWidgets('master games follow the advertised next-page cursor instead of guessing it', (
+    tester,
+  ) async {
+    final pages = <int>[];
+    await remote.pumpRemote(
+      tester,
+      const XiangqiMasterPlayerScreen(playerId: 1, playerName: 'Master'),
+      MockClient((request) async {
+        if (!request.url.path.endsWith('/players/1/games')) return remote.jsonReply({});
+        final page = int.parse(request.url.queryParameters['page'] ?? '1');
+        pages.add(page);
+        return remote.jsonReply(
+          database.page(
+            [
+              {...database.row(slug: 'game-$page'), 'red_player': 'Page $page'},
+            ],
+            nextPage: page == 1 ? 3 : null,
+            totalPages: 3,
+          ),
+        );
+      }),
+    );
+    await tester.ensureVisible(find.byIcon(Icons.chevron_right));
+    await tester.tap(find.byIcon(Icons.chevron_right));
+    await remote.settleRemote(tester);
+    expect(pages, [1, 3]);
+    expect(find.text('Page 3 — B Player'), findsOneWidget);
+  });
+
   for (final ranking in [false, true]) {
     testWidgets('page navigation failure keeps the last selected result (ranking: $ranking)', (
       tester,

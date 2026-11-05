@@ -105,12 +105,7 @@ Future<T?> showCupertinoActionSheet<T>({
               (action) => Builder(
                 builder: (context) {
                   return CupertinoActionSheetAction(
-                    onPressed: () {
-                      if (action.dismissOnPress) {
-                        Navigator.of(context).pop();
-                      }
-                      action.onPressed();
-                    },
+                    onPressed: () => _activateSheetAction(context, action),
                     isDestructiveAction: action.isDestructiveAction,
                     isDefaultAction: action.isDefaultAction,
                     child: action.makeLabel(context),
@@ -122,7 +117,9 @@ Future<T?> showCupertinoActionSheet<T>({
         cancelButton: CupertinoActionSheetAction(
           isDefaultAction: true,
           onPressed: () {
-            Navigator.of(context).pop();
+            if (context.mounted && (ModalRoute.of(context)?.isCurrent ?? false)) {
+              Navigator.of(context).pop();
+            }
           },
           child: Text(context.l10n.cancel),
         ),
@@ -164,12 +161,7 @@ Future<T?> showMaterialActionSheet<T>({
                       top: Radius.circular(index == 0 ? 28 : 0),
                       bottom: Radius.circular(index == actions.length - 1 ? 28 : 0),
                     ),
-                    onTap: () {
-                      if (action.dismissOnPress) {
-                        Navigator.of(context).pop();
-                      }
-                      action.onPressed();
-                    },
+                    onTap: () => _activateSheetAction(context, action),
                     child: Padding(
                       padding: const EdgeInsets.all(16.0),
                       child: Row(
@@ -203,6 +195,14 @@ Future<T?> showMaterialActionSheet<T>({
       );
     },
   );
+}
+
+/// A closing popup stays mounted during its reverse animation. Its queued gestures must not
+/// dismiss the route below it or invoke another action after a selection/cancellation.
+void _activateSheetAction(BuildContext context, BottomSheetAction action) {
+  if (!context.mounted || !(ModalRoute.of(context)?.isCurrent ?? false)) return;
+  if (action.dismissOnPress) Navigator.of(context).pop();
+  action.onPressed();
 }
 
 /// The Actions model that will use on the ActionSheet.

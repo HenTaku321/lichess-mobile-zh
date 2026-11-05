@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_action_sheet.dart';
@@ -87,20 +89,66 @@ class const ComputerGameBottomBar({
 Future<void> showComputerGameMenu(
   BuildContext context, {
   required VoidCallback onFlipBoard,
-  required VoidCallback onNewGame,
+  required FutureOr<void> Function() onNewGame,
   VoidCallback? onAnalysis,
   VoidCallback? onResign,
-}) => showAdaptiveActionSheet<void>(
-  context: context,
-  actions: [
-    BottomSheetAction(makeLabel: (context) => Text(context.l10n.flipBoard), onPressed: onFlipBoard),
-    if (onAnalysis != null)
-      BottomSheetAction(makeLabel: (context) => Text(context.l10n.analysis), onPressed: onAnalysis),
-    if (onResign != null)
-      BottomSheetAction(makeLabel: (context) => Text(context.l10n.resign), onPressed: onResign),
-    BottomSheetAction(
-      makeLabel: (context) => Text(context.l10n.mobileNewGame),
-      onPressed: onNewGame,
-    ),
-  ],
-);
+}) async {
+  final operation = Completer<void>();
+  Future<void> run(FutureOr<void> Function() callback) async {
+    try {
+      await callback();
+      if (!operation.isCompleted) operation.complete();
+    } on Object catch (error, stackTrace) {
+      if (!operation.isCompleted) operation.completeError(error, stackTrace);
+    }
+  }
+
+  await showAdaptiveActionSheet<void>(
+    context: context,
+    actions: [
+      BottomSheetAction(
+        makeLabel: (context) => Text(context.l10n.flipBoard),
+        dismissOnPress: false,
+        onPressedAsync: () async {
+          if (context.mounted && (ModalRoute.of(context)?.isCurrent ?? false)) {
+            Navigator.of(context).pop();
+          }
+          await run(onFlipBoard);
+        },
+      ),
+      if (onAnalysis != null)
+        BottomSheetAction(
+          makeLabel: (context) => Text(context.l10n.analysis),
+          dismissOnPress: false,
+          onPressedAsync: () async {
+            if (context.mounted && (ModalRoute.of(context)?.isCurrent ?? false)) {
+              Navigator.of(context).pop();
+            }
+            await run(onAnalysis);
+          },
+        ),
+      if (onResign != null)
+        BottomSheetAction(
+          makeLabel: (context) => Text(context.l10n.resign),
+          dismissOnPress: false,
+          onPressedAsync: () async {
+            if (context.mounted && (ModalRoute.of(context)?.isCurrent ?? false)) {
+              Navigator.of(context).pop();
+            }
+            await run(onResign);
+          },
+        ),
+      BottomSheetAction(
+        makeLabel: (context) => Text(context.l10n.mobileNewGame),
+        dismissOnPress: false,
+        onPressedAsync: () async {
+          if (context.mounted && (ModalRoute.of(context)?.isCurrent ?? false)) {
+            Navigator.of(context).pop();
+          }
+          await run(onNewGame);
+        },
+      ),
+    ],
+  );
+  await operation.future;
+}

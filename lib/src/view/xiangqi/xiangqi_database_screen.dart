@@ -189,48 +189,39 @@ class const XiangqiMasterPlayerScreen({
   required final int playerId,
   required final String playerName,
   super.key,
-}) extends ConsumerStatefulWidget {
+}) extends ConsumerWidget {
   static Route<void> buildRoute(int playerId, String playerName) => buildScreenRoute(
     screen: XiangqiMasterPlayerScreen(playerId: playerId, playerName: playerName),
   );
 
   @override
-  ConsumerState<XiangqiMasterPlayerScreen> createState() => _XiangqiMasterPlayerScreenState();
-}
-
-class _XiangqiMasterPlayerScreenState() extends ConsumerState<XiangqiMasterPlayerScreen> {
-  int _page = 1;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final locale = xiangqiLocaleOf(Localizations.localeOf(context));
-    final stats = ref.watch(xiangqiMasterStatsProvider((id: widget.playerId, locale: locale)));
-    final games = ref.watch(
-      xiangqiMasterGamesProvider((playerId: widget.playerId, page: _page, locale: locale)),
-    );
-
-    final identity = (widget.playerId, _page, locale, ref.watch(xiangqiAccountGenerationProvider));
+    final stats = ref.watch(xiangqiMasterStatsProvider((id: playerId, locale: locale)));
+    final query = (playerId: playerId, locale: locale);
+    final provider = xiangqiMasterGamesControllerProvider(query);
+    final games = ref.watch(provider);
+    final identity = (playerId, locale, ref.watch(xiangqiAccountGenerationProvider));
     return XiangqiRefreshScope(
       identity: identity,
       onRefresh: () => Future.wait<Object?>([
-        ref.refresh(xiangqiMasterStatsProvider((id: widget.playerId, locale: locale)).future),
-        ref.refresh(
-          xiangqiMasterGamesProvider((playerId: widget.playerId, page: _page, locale: locale))
-              .future,
-        ),
+        ref.refresh(xiangqiMasterStatsProvider((id: playerId, locale: locale)).future),
+        ref.read(provider.notifier).refresh(),
       ]),
       builder: (context, refresh, busy) => XiangqiRetainedData(
-        identity: (widget.playerId, locale, ref.watch(xiangqiAccountGenerationProvider)),
+        identity: identity,
         value: stats,
         builder: (context, stats) => XiangqiRetainedData(
           identity: identity,
           value: games,
           builder: (context, games) => Scaffold(
             appBar: AppBar(
-              title: AppBarTitleText(widget.playerName),
+              title: AppBarTitleText(playerName),
               actions: [DesktopRefreshButton(onRefresh: refresh, busy: busy)],
             ),
             body: ListView(
+              key: PageStorageKey(('xiangqi-master-games', identity, games.value?.pageNumber ?? 1)),
+              physics: const AlwaysScrollableScrollPhysics(),
               children: [
                 if (stats.isLoading) ListSection.loading(itemsNumber: 2, hasLeading: true),
                 if (stats.hasError)
@@ -242,8 +233,7 @@ class _XiangqiMasterPlayerScreenState() extends ConsumerState<XiangqiMasterPlaye
                             ? null
                             : () => refresh(
                                 request: () => ref.refresh(
-                                  xiangqiMasterStatsProvider((id: widget.playerId, locale: locale))
-                                      .future,
+                                  xiangqiMasterStatsProvider((id: playerId, locale: locale)).future,
                                 ),
                               ),
                       ),
@@ -280,17 +270,24 @@ class _XiangqiMasterPlayerScreenState() extends ConsumerState<XiangqiMasterPlaye
                     ],
                   ),
                 games.when(
-                  data: (games) => ListSection(
+                  data: (selected) => ListSection(
                     hasLeading: true,
                     header: Text(context.l10n.mobileXiangqiDatabaseGames),
                     children: [
-                      if (games.items.isEmpty)
+                      if (selected.page.items.isEmpty)
                         ListTile(
                           dense: true,
                           title: Text(context.l10n.mobileXiangqiDatabaseGamesEmpty),
                         )
                       else
-                        for (final game in games.items) _GameRow(game: game),
+                        for (final game in selected.page.items) _GameRow(game: game),
+                      if (selected.busy) const LinearProgressIndicator(),
+                      if (selected.error != null)
+                        XiangqiRetryTile(
+                          onRetry: selected.busy || busy
+                              ? null
+                              : () => unawaited(ref.read(provider.notifier).retry()),
+                        ),
                     ],
                   ),
                   loading: () =>
@@ -300,26 +297,19 @@ class _XiangqiMasterPlayerScreenState() extends ConsumerState<XiangqiMasterPlaye
                     header: Text(context.l10n.mobileXiangqiDatabaseGames),
                     children: [
                       XiangqiRetryTile(
-                        onRetry: busy
-                            ? null
-                            : () => refresh(
-                                request: () => ref.refresh(
-                                  xiangqiMasterGamesProvider((
-                                    playerId: widget.playerId,
-                                    page: _page,
-                                    locale: locale,
-                                  )).future,
-                                ),
-                              ),
+                        onRetry: busy ? null : () => unawaited(ref.read(provider.notifier).retry()),
                       ),
                     ],
                   ),
                 ),
                 if (games.value != null)
                   _Pager(
-                    page: _page,
-                    hasNext: games.value!.hasNextPage,
-                    onChanged: (page) => setState(() => _page = page),
+                    page: games.requireValue.pageNumber,
+                    hasNext: games.requireValue.page.hasNextPage,
+                    nextPage: games.requireValue.page.nextPage,
+                    onChanged: busy || games.requireValue.busy
+                        ? null
+                        : (page) => unawaited(ref.read(provider.notifier).selectPage(page)),
                   ),
               ],
             ),

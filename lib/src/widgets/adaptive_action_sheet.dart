@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:collection/collection.dart';
@@ -202,7 +203,7 @@ Future<T?> showMaterialActionSheet<T>({
 void _activateSheetAction(BuildContext context, BottomSheetAction action) {
   if (!context.mounted || !(ModalRoute.of(context)?.isCurrent ?? false)) return;
   if (action.dismissOnPress) Navigator.of(context).pop();
-  action.onPressed();
+  unawaited(action.onPressedAsync?.call() ?? Future<void>.sync(action.onPressed!));
 }
 
 /// The Actions model that will use on the ActionSheet.
@@ -216,7 +217,10 @@ class BottomSheetAction({
   required final Widget Function(BuildContext context) makeLabel,
 
   /// The callback that is called when the action item is tapped. (required)
-  required final VoidCallback onPressed,
+  final VoidCallback? onPressed,
+
+  /// Async counterpart used by flows whose menu must remain pending until the operation ends.
+  final FutureOr<void> Function()? onPressedAsync,
 
   /// Whether the modal should be dismissed when an action is pressed.
   ///

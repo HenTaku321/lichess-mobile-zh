@@ -88,6 +88,36 @@ final xiangqiMasterGamesProvider = FutureProvider.autoDispose
       );
     }, name: 'XiangqiMasterGamesProvider');
 
+/// Retains the last successful games page while the selected target loads or fails.
+final xiangqiMasterGamesControllerProvider = AsyncNotifierProvider.autoDispose
+    .family<
+      XiangqiMasterGamesController,
+      XiangqiSelectedPage<XiangqiMasterPage<XiangqiMasterGameRow>>,
+      ({int playerId, String locale})
+    >(XiangqiMasterGamesController.new, name: 'XiangqiMasterGamesControllerProvider');
+
+class XiangqiMasterGamesController(final ({int playerId, String locale}) key)
+    extends XiangqiPageSelectionController<XiangqiMasterPage<XiangqiMasterGameRow>> {
+  @override
+  Future<XiangqiMasterPage<XiangqiMasterGameRow>> loadPage(int number) async {
+    final json = await _getJson(ref, 'master-games/players/${key.playerId}/games', {
+      'locale': key.locale,
+      'page': '$number',
+    }, watchConnectivity: false);
+    if (json is! Map<String, dynamic> || json['items'] is! List) {
+      throw const FormatException('Invalid xiangqi.com master games page envelope.');
+    }
+    final result = xiangqiMasterGamesFromJson(json);
+    XiangqiPage.fromMetadata(items: result.items, requestedPage: number, metadata: json);
+    return result;
+  }
+
+  @override
+  int? totalPages(XiangqiMasterPage<XiangqiMasterGameRow> page) => page.totalPages;
+  @override
+  bool isEmpty(XiangqiMasterPage<XiangqiMasterGameRow> page) => page.items.isEmpty;
+}
+
 /// One game out of the database, from `GET /api/master-games/games/<slug>`.
 final xiangqiMasterGameProvider = FutureProvider.autoDispose
     .family<XiangqiMasterGame, ({String slug, String locale})>((ref, key) async {

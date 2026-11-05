@@ -177,6 +177,59 @@ void main() {
     });
   }
 
+  testWidgets('computer menu stays pending until the selected operation actually completes', (
+    tester,
+  ) async {
+    final completed = Completer<void>();
+    var calls = 0;
+    var returned = false;
+    addTearDown(() {
+      if (!completed.isCompleted) completed.complete();
+    });
+    await tester.pumpWidget(
+      await makeTestProviderScopeApp(
+        tester,
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: ComputerGameBottomBar(
+              onMenu: () async {
+                await showComputerGameMenu(
+                  context,
+                  onFlipBoard: () {},
+                  onNewGame: () async {
+                    calls++;
+                    await completed.future;
+                  },
+                );
+                returned = true;
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byIcon(Icons.menu));
+    await tester.pumpAndSettle();
+    final context = tester.element(find.byType(ComputerGameBottomBar));
+    await tester.tap(find.text(context.l10n.mobileNewGame));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(calls, 1);
+    expect(
+      returned,
+      isFalse,
+      reason: 'Dismissing the menu does not complete its selected operation.',
+    );
+    final button = find.byWidgetPredicate(
+      (widget) => widget is BottomBarButton && widget.label == context.l10n.menu,
+    );
+    expect(tester.widget<BottomBarButton>(button).enabled, isFalse);
+    completed.complete();
+    await tester.pumpAndSettle();
+    expect(returned, isTrue);
+    expect(tester.widget<BottomBarButton>(button).enabled, isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('both game shells reserve the same compact-landscape side-panel width', (
     tester,
   ) async {

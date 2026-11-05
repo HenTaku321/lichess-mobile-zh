@@ -142,6 +142,41 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final cancelled in [false, true]) {
+    testWidgets('computer menu consumes a selection once: cancelled=$cancelled', (tester) async {
+      var flips = 0;
+      await tester.pumpWidget(
+        await makeTestProviderScopeApp(
+          tester,
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: TextButton(
+                onPressed: () =>
+                    showComputerGameMenu(context, onFlipBoard: () => flips++, onNewGame: () {}),
+                child: const Text('Open menu'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Open menu'));
+      await tester.pumpAndSettle();
+      final item = find.ancestor(of: find.text('Flip board'), matching: find.byType(InkWell));
+      final activate = tester.widget<InkWell>(item).onTap!;
+      if (cancelled) {
+        Navigator.of(tester.element(item)).pop();
+        await tester.pumpAndSettle();
+      }
+      // Simulate two queued activations of the real rendered menu item.
+      activate();
+      activate();
+      await tester.pumpAndSettle();
+      expect(flips, cancelled ? 0 : 1);
+      expect(find.text('Open menu'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('both game shells reserve the same compact-landscape side-panel width', (
     tester,
   ) async {

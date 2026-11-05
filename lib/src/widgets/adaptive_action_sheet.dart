@@ -203,7 +203,15 @@ Future<T?> showMaterialActionSheet<T>({
 void _activateSheetAction(BuildContext context, BottomSheetAction action) {
   if (!context.mounted || !(ModalRoute.of(context)?.isCurrent ?? false)) return;
   if (action.dismissOnPress) Navigator.of(context).pop();
-  unawaited(action.onPressedAsync?.call() ?? Future<void>.sync(action.onPressed!));
+  unawaited(
+    Future<void>.sync(() async {
+      if (action.onPressedAsync != null) {
+        await action.onPressedAsync!();
+      } else {
+        action.onPressed!();
+      }
+    }),
+  );
 }
 
 /// The Actions model that will use on the ActionSheet.
@@ -220,7 +228,7 @@ class BottomSheetAction({
   final VoidCallback? onPressed,
 
   /// Async counterpart used by flows whose menu must remain pending until the operation ends.
-  final FutureOr<void> Function()? onPressedAsync,
+  final Future<void> Function()? onPressedAsync,
 
   /// Whether the modal should be dismissed when an action is pressed.
   ///

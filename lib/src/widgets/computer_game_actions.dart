@@ -108,43 +108,27 @@ Future<void> showComputerGameMenu(
     actions: [
       BottomSheetAction(
         makeLabel: (context) => Text(context.l10n.flipBoard),
-        dismissOnPress: false,
         onPressedAsync: () async {
-          if (context.mounted && (ModalRoute.of(context)?.isCurrent ?? false)) {
-            Navigator.of(context).pop();
-          }
           await run(onFlipBoard);
         },
       ),
       if (onAnalysis != null)
         BottomSheetAction(
           makeLabel: (context) => Text(context.l10n.analysis),
-          dismissOnPress: false,
           onPressedAsync: () async {
-            if (context.mounted && (ModalRoute.of(context)?.isCurrent ?? false)) {
-              Navigator.of(context).pop();
-            }
             await run(onAnalysis);
           },
         ),
       if (onResign != null)
         BottomSheetAction(
           makeLabel: (context) => Text(context.l10n.resign),
-          dismissOnPress: false,
           onPressedAsync: () async {
-            if (context.mounted && (ModalRoute.of(context)?.isCurrent ?? false)) {
-              Navigator.of(context).pop();
-            }
             await run(onResign);
           },
         ),
       BottomSheetAction(
         makeLabel: (context) => Text(context.l10n.mobileNewGame),
-        dismissOnPress: false,
         onPressedAsync: () async {
-          if (context.mounted && (ModalRoute.of(context)?.isCurrent ?? false)) {
-            Navigator.of(context).pop();
-          }
           await run(onNewGame);
         },
       ),

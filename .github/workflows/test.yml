@@ -92,6 +92,52 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - run: python3 -m unittest discover -s scripts/tests -p 'test_xiangqi*.py'
 
+  chess-training-reference:
+    if: github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          path: candidate
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          path: reference
+          ref: a4e9c2c42c8423efdfdc69eb5b817a5c036f0273
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          cache: true
+          flutter-version-file: candidate/pubspec.yaml
+      - name: Measure the same chess puzzle on the fixed revision and candidate
+        run: |
+          set -euo pipefail
+          test "$(git -C reference rev-parse HEAD)" = a4e9c2c42c8423efdfdc69eb5b817a5c036f0273
+          sudo apt-get -y install libsqlite3-0 libsqlite3-dev
+          probe=test/view/puzzle/chess_layout_reference_test.dart
+          cp "candidate/$probe" "reference/$probe"
+          for tree in reference candidate; do
+            (
+              cd "$tree"
+              flutter pub get
+              dart run build_runner build
+              npm ci --no-audit --no-fund --prefix scripts
+              ./scripts/gen-translations.sh
+              ./scripts/fetch-pikafish-nnue.sh
+              export CHESS_LAYOUT_OUTPUT="$GITHUB_WORKSPACE/measurements/$tree"
+              if [[ "$tree" == candidate ]]; then export CHESS_LAYOUT_REFERENCE="$GITHUB_WORKSPACE/measurements/reference"; fi
+              flutter test --no-pub --reporter expanded "$probe"
+            )
+          done
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: ${{ !cancelled() }}
+        with:
+          name: chess-training-reference-${{ github.sha }}
+          path: measurements
+          if-no-files-found: error
+          retention-days: 30
+
   unit-test:
     if: github.event_name != 'workflow_dispatch'
     name: Unit tests on ${{ matrix.os }}

@@ -5,6 +5,7 @@ Indexes/counts are decimal strings at JSON boundaries, not rounded GitHub/Dart/J
 import argparse
 import copy
 import hashlib
+import itertools
 import json
 import math
 import re
@@ -113,38 +114,113 @@ def case_at(registry, ordinal):
         for kind, name, choices in reversed(axes):
             rank, index = divmod(rank, len(choices))
             configuration[kind][name] = choices[index]
-        return {
-            "index": str(ordinal), "role": role["id"], "state": state["id"], "driver": state["driver"],
-            "sources": role["sources"], "configuration": configuration,
-            "expectedResolvedLocale": registry.get('localeResolution', {}).get(configuration['environment']['locale'], configuration['environment']['locale']),
-            "requiredRoles": state["requiredRoles"], "pixelRoles": state["pixelRoles"],
-            "allowedDifferences": state["allowedDifferences"],
-            "differenceDefinitions": {key: registry.get("differences", {}).get(key, {}) for key in state["allowedDifferences"]},
-        }
+        return describe_case(registry, ordinal, role, state, configuration)
     raise ValueError("Case ordinal outside the complete matrix")
 
 
-def plan_batch(registry, offset, limit, role=None, state=None):
-    if any(not isinstance(n, int) or isinstance(n, bool) for n in (offset, limit)) or offset < 0 or not 1 <= limit <= 1024:
+def describe_case(registry, ordinal, role, state, configuration):
+    return {
+        "index": str(ordinal), "role": role["id"], "state": state["id"], "driver": state["driver"],
+        "sources": role["sources"], "configuration": configuration,
+        "expectedResolvedLocale": registry.get('localeResolution', {}).get(configuration['environment']['locale'], configuration['environment']['locale']),
+        "requiredRoles": state["requiredRoles"], "pixelRoles": state["pixelRoles"],
+        "allowedDifferences": state["allowedDifferences"],
+        "differenceDefinitions": {key: registry.get("differences", {}).get(key, {}) for key in state["allowedDifferences"]},
+    }
+
+
+def _bounded_selection(spans, offset, limit, role, state):
+    if type(offset) is not int or type(limit) is not int or offset < 0 or not 1 <= limit <= 1024:
         raise ValueError("Manual batches require a nonnegative offset and 1..1024 pairs")
-    selected = [(start, count) for start, count, entry, stage, _ in spans(registry)
-                if (role is None or entry["id"] == role) and (state is None or stage["id"] == state)]
-    total = sum(count for _, count in selected)
-    if offset + limit > total:
-        raise ValueError("Batch exceeds matrix scope; refusing to silently clamp")
-    indexes = []
-    skip = offset
-    for start, count in selected:
-        if skip >= count:
-            skip -= count
+    remaining = limit
+    for start, count, entry, stage, payload in spans:
+        if (role and entry['id'] != role) or (state and stage['id'] != state):
             continue
-        take = min(limit - len(indexes), count - skip)
-        indexes.extend(range(start + skip, start + skip + take))
-        skip = 0
-        if len(indexes) == limit:
-            break
-    return [{"shard": part // 64, "cases": [case_at(registry, index) for index in indexes[part:part + 64]]}
-            for part in range(0, limit, 64)]
+        if offset >= count:
+            offset -= count
+            continue
+        take = min(remaining, count - offset)
+        for local in range(offset, offset + take):
+            yield start + local, local, entry, stage, payload
+        remaining -= take
+        if remaining == 0:
+            return
+        offset = 0
+    raise ValueError("Batch exceeds matrix scope")
+
+
+def shards_for(cases):
+    return [{"shard": index // 64, "cases": cases[index:index + 64]} for index in range(0, len(cases), 64)]
+
+
+class AcceptanceSchedule:
+    """Default preferences in every environment, each value and declared pair at both extremes."""
+
+    def __init__(self, registry, defaults):
+        self.registry = resolve_registry(registry)
+        axes = self.registry['axes']
+        groups = self.registry.get('interactionGroups', [])
+        together = set()
+        for group in groups:
+            if len(group) < 2 or len(set(group)) != len(group) or not set(group).issubset(axes):
+                raise ValueError(f'Invalid interaction group {group}')
+            together.update(frozenset(pair) for pair in itertools.combinations(group, 2))
+        self.defaults = {}
+        alternatives = {}
+        for name, values in axes.items():
+            group, field = name.split('.', 1)
+            if field not in defaults.get(group, {}):
+                raise ValueError(f'Missing compiled default for {name}')
+            default = defaults[group][field]
+            # Numeric preference grids use decimal strings. Retain the registry spelling so the
+            # default row and an explicitly selected default represent one configuration.
+            matches = [v for v in values if equal_preference(v, default)]
+            self.defaults[name] = matches[0] if matches else default
+            alternatives[name] = [(name, v) for v in values if not equal_preference(v, default)]
+
+        env = self.registry['environment']
+        self.environments = [dict(zip(env, values)) for values in itertools.product(*env.values())]
+        self.extremes = [dict(size=size, locale=locale, mode=mode, textScale=scale, dpi=dpi)
+                         for size, locale, mode, scale, dpi in [([480, 480], 'zh-CN', 'dark', 2, 2),
+                                                                ([1920, 1080], 'en-GB', 'light', 1, 1)]]
+        if any(env not in self.environments for env in self.extremes):
+            raise ValueError('Release acceptance environments are missing')
+        templates = {}
+        self.spans = []
+        self.total = 0
+        for role in self.registry['roles']:
+            for state in role['states']:
+                names = tuple(state['axes'])
+                if names not in templates:
+                    deltas = [(choice,) for name in names for choice in alternatives[name]]
+                    for left, right in itertools.combinations(names, 2):
+                        if frozenset((left, right)) in together:
+                            deltas.extend(itertools.product(alternatives[left], alternatives[right]))
+                    templates[names] = deltas
+                deltas = templates[names]
+                count = len(self.environments) + len(deltas) * len(self.extremes)
+                self.spans.append((self.total, count, role, state, deltas))
+                self.total += count
+
+    def batch(self, offset, limit, role=None, state=None):
+        cases = []
+        for index, local, entry, stage, deltas in _bounded_selection(self.spans, offset, limit, role, state):
+            preferences = {name: self.defaults[name] for name in stage['axes']}
+            if local < len(self.environments):
+                environment = self.environments[local]
+            else:
+                row, corner = divmod(local - len(self.environments), len(self.extremes))
+                preferences.update(deltas[row])
+                environment = self.extremes[corner]
+            case = describe_case(self.registry, index, entry, stage,
+                                 {'environment': environment, 'preferences': preferences})
+            cases.append({**case, 'strategy': 'acceptance'})
+        return shards_for(cases)
+
+
+def plan_batch(registry, offset, limit, role=None, state=None):
+    selected = _bounded_selection(spans(registry), offset, limit, role, state)
+    return shards_for([case_at(registry, index) for index, *_ in selected])
 
 
 def fingerprint(source_sha, registry, runtime):
@@ -161,6 +237,8 @@ def timestamp(value):
 
 
 def equal_preference(expected, actual):
+    if type(expected) in (int, float) and type(actual) in (int, float):
+        return expected == actual
     if isinstance(expected, str) and isinstance(actual, (int, float)) and not isinstance(actual, bool):
         try:
             return Decimal(expected) == Decimal(str(actual))
@@ -413,6 +491,7 @@ def main():
     plan = commands.add_parser("plan")
     for name in ("registry", "catalogue", "runtime", "sha", "offset", "limit", "out"):
         plan.add_argument(f"--{name}", required=True)
+    plan.add_argument("--strategy", choices=["acceptance", "exhaustive"], default="acceptance")
     plan.add_argument("--role")
     plan.add_argument("--state")
     plan.add_argument("--github-output")
@@ -428,13 +507,22 @@ def main():
         runtime = {"catalogue": catalogue, "renderer": json.loads(Path(args.runtime).read_text())}
         context = {"sourceSha": args.sha, "registryHash": digest(raw),
                    "renderFingerprint": fingerprint(args.sha, registry, runtime)}
-        shards = plan_batch(registry, int(args.offset), int(args.limit), args.role, args.state)
+        scope = (int(args.offset), int(args.limit), args.role, args.state)
+        exhaustive_count = count_cases(registry)
+        total = exhaustive_count
+        if args.strategy == 'acceptance':
+            schedule = AcceptanceSchedule(registry, catalogue['defaults'])
+            total = schedule.total
+            shards = schedule.batch(*scope)
+        else:
+            shards = plan_batch(registry, *scope)
         for shard in shards:
             for case in shard["cases"]:
                 case.update(context)
                 case["caseId"] = digest(case)
             write_json(Path(args.out) / f"shard-{shard['shard']}.json", {**context, "cases": shard["cases"]})
-        summary = {**context, "totalPairs": str(count_cases(registry)), "requestedPairs": args.limit,
+        summary = {**context, "strategy": args.strategy, "totalPairs": str(total),
+                   "exhaustivePairs": str(exhaustive_count), "requestedPairs": args.limit,
                    "scope": {"role": args.role, "state": args.state, "offset": args.offset},
                    "shards": len(shards), "concurrency": 4, "shardMinutes": 30, "complete": False,
                    "nonVisualAcceptance": raw.get("nonVisualAcceptance", {})}

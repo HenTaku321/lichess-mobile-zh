@@ -54,6 +54,14 @@
     "puzzle.autoNext": [false, true],
     "puzzle.rated": [false, true]
   },
+  "interactionGroups": [
+    ["board.boardTheme", "board.pieceSet", "board.brightness", "board.hue"],
+    ["board.coordinates", "board.showBorder"],
+    ["board.pieceShiftMethod", "board.moveOnRelease", "board.magnifyDraggedPiece", "board.dragTargetKind"],
+    ["analysis.showEvaluationGauge", "analysis.showEngineLines", "analysis.showBestMoveArrow", "analysis.showAnnotations", "analysis.showPgnComments", "analysis.inlineNotation", "analysis.smallBoard", "analysis.enableServerAnalysis", "engineEvaluation.isEnabled", "engineEvaluation.numEvalLines"],
+    ["offlineComputerGame.practiceMode", "offlineComputerGame.hideEvaluation", "offlineComputerGame.hideBestMove", "offlineComputerGame.blindfoldMode", "engineEvaluation.isEnabled", "general.isSoundEnabled", "general.soundTheme", "general.masterVolume"],
+    ["puzzle.autoNext", "puzzle.rated", "general.isSoundEnabled"]
+  ],
   "profiles": {
     "common": ["board.boardTheme"],
     "directory": ["board.boardTheme", "account.showRatings"],

@@ -10,6 +10,11 @@ on:
         description: Exact SHA for a manual visual batch (does not run normal unit-test jobs)
         required: true
         type: string
+      strategy:
+        description: Select the release schedule or the full preference product
+        type: choice
+        default: acceptance
+        options: [acceptance, exhaustive]
       offset:
         required: true
         default: '0'
@@ -74,6 +79,7 @@ jobs:
     uses: ./.github/workflows/xiangqi-parity-visuals.yml
     with:
       candidate: ${{ inputs.candidate }}
+      strategy: ${{ inputs.strategy }}
       offset: ${{ inputs.offset }}
       limit: ${{ inputs.limit }}
       role: ${{ inputs.role }}

@@ -146,7 +146,10 @@ jobs:
         run: dart run scripts/pikafish_net_hash.dart --check
 
       - name: Exercise shared home and computer-game journeys
-        run: flutter test --no-pub --reporter expanded test/view/home/shared_game_journey_test.dart test/widgets/xiangqi_input_parity_test.dart
+        run: >-
+          flutter test --no-pub --reporter expanded
+          test/view/home/shared_game_journey_test.dart test/view/home/independent_sources_test.dart
+          test/widgets/xiangqi_input_parity_test.dart test/widgets/xiangqi_coordinate_paint_test.dart
 
       - name: Verify formatting
         run: |

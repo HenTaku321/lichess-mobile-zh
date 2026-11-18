@@ -164,6 +164,7 @@ jobs:
           flutter test --no-pub --reporter expanded
           test/view/home/shared_game_journey_test.dart test/view/home/independent_sources_test.dart
           test/view/home/home_tab_screen_test.dart test/view/puzzle/training_layout_test.dart
+          test/view/play/hub_recovery_test.dart
           test/widgets/xiangqi_input_parity_test.dart test/widgets/xiangqi_coordinate_paint_test.dart
 
       - name: Verify formatting

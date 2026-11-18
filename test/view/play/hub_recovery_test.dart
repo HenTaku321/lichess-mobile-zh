@@ -74,7 +74,7 @@ void main() {
         if (request.url.path != '/api/leaders/v2/list') return http.Response('{}', 200);
         final mode = request.url.queryParameters['mode']!;
         counts[mode] = (counts[mode] ?? 0) + 1;
-        if (mode == 'bullet' && counts[mode] == 1) return delayed.future;
+        if (mode == 'bullet' && counts[mode] == 1) return await delayed.future;
         final rows = mode == 'rapid' || mode == 'bullet'
             ? [ranks.row(name: '$mode player', rating: 1630)]
             : <Map<String, Object?>>[];

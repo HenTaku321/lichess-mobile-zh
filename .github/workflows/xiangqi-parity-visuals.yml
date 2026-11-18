@@ -183,6 +183,7 @@ jobs:
             out/visual-pairs
             out/render-tests-${{ matrix.shard }}.jsonl
             out/renderer.json
+            out/renderer.host.json
           retention-days: 90
           if-no-files-found: error
 

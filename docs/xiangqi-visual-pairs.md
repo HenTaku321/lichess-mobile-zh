@@ -7,19 +7,19 @@
 - 逻辑窗口尺寸、文字缩放和 `tester.view.devicePixelRatio` 独立设置；原图 `toImage(pixelRatio: dpi)`。
 - 每个配置保存双方原图、每个可比角色差异图、请求／真实操作／controller／几何元数据。
 - 几何阈值为 1 逻辑像素；共享像素角色要求零差异。有意差异必须先写入注册表，不能事后加遮罩。
-- 图片不能替代主观认可或原生声音／触觉。当前工具无法直接查看图片，不记录“已看过且一致”。
+- 主观视觉、原生声音和触觉由体验记录单独确认。
 
-## 全乘积而非抽样
+## 发布验收覆盖
 
 旧 DesktopSceneApp 曾在缩放 MediaQuery 外调用 buildAppWindow，导致正文的字缩放被覆盖回1；
 首批追加的实际环境断言抓到了这一点。现在正确传播上下文；旧单侧矩阵的200%文字覆盖不计有效。
 
 `test/visual/xiangqi_pair_registry.json` 从 49 个实际入口角色登记状态、适用偏好与有意差异。
 编译的 `visualCatalogue()` 提供依赖里的完整枚举值与持久化投影，不硬编码主题或棋子子集。
-每个适用状态使用三尺寸 × 两语言 × 两主题 × 两字缩放 × 两真实 DPI，共 48 个环境。
-亮度与色相按用户指定网格枚举；音量按界面 11 档。偏好全部相乘，不换成 pairwise 或抽样。
+发布采用 `acceptance`。每个状态先用默认偏好在 480×480、1280×720、1920×1080 上遍历中英、深浅、字号 100%／200%、真实 DPI 1／2，共 48 个环境。
+在 480×480 中文深色 200%／DPI 2 和 1920×1080 英文浅色 100%／DPI 1 两端，分别覆盖每项适用偏好的全部合法值。盘面配色、坐标／边框、拖动、分析显示、人机反馈、训练自动跳转六组内，再覆盖每两项适用偏好的所有组合。亮度与色相取登记网格，音量取界面的 11 档。
 
-`scripts/xiangqi_visual_pairs.py` 用整数积与混合进制按索引取配置，最多只展开本次 1024 对。
+`exhaustive` 可显式选择，仍按混合进制索引取完整乘积。在 `9148fa21b` 上，Actions 的编译目录给出发布范围 758,608 对、完整乘积 22,315,620,498,671,205,888 对。两种策略各自编号，每次最多展开 1,024 对。
 索引／总量在 JSON 中是十进制字符串，不能经过 JavaScript 或 Dart 的有限精度整数。
 登记总量包含未实现 driver 的配置：**登记不等于通过，也不等于其适用性已完成逐页审查。**
 未接 driver 返回 `not_run`；没有真实对应页面／协议证据返回 `blocked`，两者都不能通过 gate。
@@ -32,13 +32,13 @@
 ```sh
 gh workflow run test.yml --repo HenTaku321/lichess-mobile-zh \
   --ref fix/xiangqi-desktop-parity \
-  -f candidate=FULL_40_CHARACTER_SHA \
+  -f candidate=FULL_40_CHARACTER_SHA -f strategy=acceptance \
   -f role=private-conversation -f state=normal \
   -f offset=0 -f limit=48
 ```
 
 空 role/state 表示该轴所有登记范围，不是自动选“已支持的那一点”。offset 在选择范围内计数，
-输出 case index 始终为全注册表索引。越界、超过 1024 对或未解析的枚举会明确拒绝，不静默缩小。
+输出 case index 为所选策略的全注册表索引。越界、超过 1024 对或未解析的枚举会明确拒绝，不静默缩小。
 
 每分片最多 64 对、最多 16 片、并发 4、每片 30 分钟；每次只跑所请求批次，不自动继续。
 固定 source SHA、注册表和渲染依赖指纹；字体或 Flutter／依赖变化不能沿用旧证据。

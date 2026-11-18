@@ -16,6 +16,7 @@ import 'package:lichess_mobile/src/view/play/ongoing_games_screen.dart';
 import 'package:lichess_mobile/src/view/play/play_menu.dart';
 import 'package:lichess_mobile/src/view/watch/watch_tab_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_ongoing_game_preview.dart';
+import 'package:lichess_mobile/src/view/xiangqi/xiangqi_online_game_screen.dart';
 import 'package:lichess_mobile/src/widgets/server_outage_display.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
 import 'package:material_ui/material_ui.dart';
@@ -189,8 +190,16 @@ void main() {
       tester,
       () => tester.widget<XiangqiBoard>(board).position == fx.xiangqiTestPositions[1],
     );
-    await tester.pageBack();
-    await tester.pump(const Duration(milliseconds: 400));
+    // Socket frames can arrive before the opening transition has finished.
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump();
+    final back = find.descendant(
+      of: find.byType(XiangqiOnlineGameScreen),
+      matching: find.byType(BackButton),
+    );
+    await tester.tap(back.hitTestable());
+    await tester.pumpAndSettle();
+    expect(board, findsNothing);
     expect(game, findsOneWidget);
     await tester.pageBack();
     await tester.pumpAndSettle();

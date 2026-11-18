@@ -199,6 +199,29 @@ void main() {
     await tester.pump(const Duration(milliseconds: 201));
   });
 
+  testWidgets('a desktop player annotates a position using only the mouse', (tester) async {
+    final taps = <XiangqiSquare>[];
+    final board = XiangqiBoard(
+      position: XiangqiPosition.initial(),
+      enableShapeDrawings: true,
+      onTapSquare: taps.add,
+    );
+    final rect = await pumpBoard(tester, board);
+    final geometry = XiangqiBoardGeometry.fit(rect.size);
+    final origin = rect.topLeft + geometry.centerOf(from, .red);
+    final dest = rect.topLeft + geometry.centerOf(to, .red);
+    final mouse = await tester.startGesture(
+      origin,
+      kind: PointerDeviceKind.mouse,
+      buttons: kSecondaryMouseButton,
+    );
+    await mouse.moveTo(dest);
+    await mouse.up();
+    await tester.pump();
+    expect(painterOf(tester).shapes.map((shape) => (shape.from, shape.to)), [(from, to)]);
+    expect(taps, isEmpty);
+  });
+
   testWidgets('mouse drags use an unscaled piece and square target', (tester) async {
     final rect = await pumpBoard(
       tester,

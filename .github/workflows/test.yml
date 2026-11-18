@@ -145,6 +145,9 @@ jobs:
       - name: Check the network matches the vendored engine
         run: dart run scripts/pikafish_net_hash.dart --check
 
+      - name: Exercise shared home and computer-game journeys
+        run: flutter test --no-pub --reporter expanded test/view/home/shared_game_journey_test.dart test/widgets/xiangqi_input_parity_test.dart
+
       - name: Verify formatting
         run: |
           dart format --output=none --set-exit-if-changed $(find lib/src -name "*.dart" -not \( -name "*.*freezed.dart" -o -name "*.*g.dart" -o -name "*lichess_icons.dart" \) )

@@ -8,6 +8,7 @@ import 'package:lichess_mobile/src/model/account/ongoing_game.dart';
 import 'package:lichess_mobile/src/model/account/ongoing_game_entry.dart';
 import 'package:lichess_mobile/src/model/auth/auth_controller.dart';
 import 'package:lichess_mobile/src/model/common/id.dart';
+import 'package:lichess_mobile/src/model/correspondence/correspondence_game_storage.dart';
 import 'package:lichess_mobile/src/model/game/playable_game.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_open_game.dart';
@@ -202,3 +203,20 @@ final ongoingGamesProvider = AsyncNotifierProvider<OngoingGamesNotifier, IList<O
   OngoingGamesNotifier.new,
   name: 'OngoingGamesProvider',
 );
+
+/// Playable rows for the home previews and their full list. Each source publishes as soon as
+/// it settles. Only Lichess switches to its device cache during a Lichess outage.
+final availableOngoingGamesProvider = Provider.autoDispose<IList<OngoingGameEntry>>((ref) {
+  final status = ref.watch(lichessConnectionStatusProvider);
+  return <OngoingGameEntry>[
+    if (status == LichessConnectionStatus.online)
+      ...?ref.watch(lichessOngoingGamesProvider).value?.map(ChessOngoingGame.new)
+    else
+      ...?ref
+          .watch(offlineOngoingCorrespondenceGamesProvider)
+          .value
+          ?.map((saved) => StoredCorrespondenceEntry(saved.$1, saved.$2)),
+    if (status != LichessConnectionStatus.networkDown)
+      ...?ref.watch(xiangqiOngoingGamesSourceProvider).value?.map(XiangqiOngoingGame.new),
+  ].lock;
+}, name: 'AvailableOngoingGamesProvider');

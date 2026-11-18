@@ -9,6 +9,7 @@ import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
 import 'package:lichess_mobile/src/view/game/game_screen.dart';
 import 'package:lichess_mobile/src/view/game/game_screen_providers.dart';
+import 'package:lichess_mobile/src/view/game/offline_correspondence_games_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_ongoing_game_preview.dart';
 import 'package:lichess_mobile/src/widgets/board_preview.dart';
 import 'package:lichess_mobile/src/widgets/user.dart';
@@ -21,40 +22,33 @@ class const OngoingGamesScreen({super.key}) extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final ongoingGames = ref.watch(ongoingGamesProvider);
+    final games = ref.watch(availableOngoingGamesProvider);
     return Scaffold(
-      appBar: AppBar(
-        title: ongoingGames.maybeWhen(
-          data: (data) => Text(context.l10n.nbGamesInPlay(data.length)),
-          orElse: () => const SizedBox.shrink(),
-        ),
+      appBar: AppBar(title: Text(context.l10n.nbGamesInPlay(games.length))),
+      body: ListView(
+        children: [
+          const SizedBox(height: 8.0),
+          for (final game in games) OngoingEntryPreview(key: ValueKey(game.rowKey), entry: game),
+        ],
       ),
-      body: const _Body(),
     );
   }
 }
 
-class const _Body() extends ConsumerWidget {
+class const OngoingEntryPreview({
+  required final OngoingGameEntry entry,
+  final EdgeInsetsGeometry? padding,
+  super.key,
+}) extends StatelessWidget {
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final ongoingGames = ref.watch(ongoingGamesProvider);
-    return ongoingGames.maybeWhen(
-      data: (data) => ListView(
-        children: [
-          const SizedBox(height: 8.0),
-          // One row per entry, in the merged list's own order. The switch is on the sealed
-          // row type, which is the only thing that says which backend's game this is — not on
-          // [BackendSource], which is a model-layer concept and is never branched on here.
-          for (final entry in data)
-            switch (entry) {
-              ChessOngoingGame(:final game) => OngoingGamePreview(game: game),
-              XiangqiOngoingGame(:final game) => XiangqiOngoingGamePreview(game: game),
-            },
-        ],
-      ),
-      orElse: () => const SizedBox.shrink(),
-    );
-  }
+  Widget build(BuildContext context) => switch (entry) {
+    ChessOngoingGame(:final game) => OngoingGamePreview(game: game, padding: padding),
+    XiangqiOngoingGame(:final game) => XiangqiOngoingGamePreview(game: game, padding: padding),
+    StoredCorrespondenceEntry(:final game, :final lastModified) => OfflineCorrespondenceGamePreview(
+      game: game,
+      lastModified: lastModified,
+    ),
+  };
 }
 
 class const OngoingGamePreview({

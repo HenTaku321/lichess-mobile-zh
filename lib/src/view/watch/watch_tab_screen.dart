@@ -109,9 +109,7 @@ class _WatchScreenState() extends ConsumerState<WatchTabScreen> {
           LichessConnectionStatus.networkDown => const Center(
             child: Text('No internet connection.', style: Styles.noResultTextStyle),
           ),
-          // Nothing on this tab works without the server, so the outage message
-          // takes the whole screen. Pulling to refresh is the way out of it:
-          // the requests it makes update the server status on their own.
+          // The shared live-games page can still fetch games from xiangqi.com.
           LichessConnectionStatus.serverMaintenance ||
           LichessConnectionStatus.serverDown => HapticRefreshIndicator(
             edgeOffset: Theme.of(context).platform == TargetPlatform.iOS
@@ -120,7 +118,10 @@ class _WatchScreenState() extends ConsumerState<WatchTabScreen> {
             onRefresh: _refreshData,
             child: const CustomScrollView(
               physics: AlwaysScrollableScrollPhysics(),
-              slivers: [SliverFillRemaining(hasScrollBody: false, child: ServerOutageDisplay())],
+              slivers: [
+                SliverToBoxAdapter(child: _LiveGamesEntry()),
+                SliverFillRemaining(hasScrollBody: false, child: ServerOutageDisplay()),
+              ],
             ),
           ),
         },

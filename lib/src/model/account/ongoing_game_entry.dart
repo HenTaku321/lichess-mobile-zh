@@ -1,5 +1,6 @@
 import 'package:lichess_mobile/src/model/account/ongoing_game.dart';
 import 'package:lichess_mobile/src/model/backend/source.dart';
+import 'package:lichess_mobile/src/model/correspondence/offline_correspondence_game.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_open_game.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 
@@ -82,4 +83,37 @@ final class XiangqiOngoingGame(final XiangqiOpenGame game) extends OngoingGameEn
   /// not a shape that can arrive here today.
   @override
   bool get isRealTime => true;
+}
+
+/// A saved correspondence game opens the local move queue even when the other service is online.
+final class StoredCorrespondenceEntry(
+  final DateTime lastModified,
+  final OfflineCorrespondenceGame game,
+) extends OngoingGameEntry {
+  @override
+  BackendSource get source => BackendSource.lichess;
+  @override
+  String get rowKey => 'lichess:${game.fullId.value}';
+  @override
+  bool get isMyTurn => game.isMyTurn;
+  @override
+  int? get secondsLeft => game.myTimeLeft(lastModified)?.inSeconds;
+  @override
+  bool get isRealTime => false;
+
+  OngoingGame get preview => OngoingGame(
+    id: game.id,
+    fullId: game.fullId,
+    orientation: game.orientation,
+    fen: game.lastPosition.fen,
+    perf: game.perf,
+    speed: game.speed,
+    variant: game.variant,
+    opponent: game.opponent?.user,
+    isMyTurn: isMyTurn,
+    opponentRating: game.opponent?.rating,
+    opponentAiLevel: game.opponent?.aiLevel,
+    lastMove: game.lastMove,
+    secondsLeft: secondsLeft,
+  );
 }

@@ -56,7 +56,7 @@ class const PlayMenu({final bool showComputerGame = true}) extends ConsumerWidge
               title: Text(context.l10n.correspondence),
             ),
             ListTile(
-              enabled: connectionStatus == LichessConnectionStatus.online,
+              enabled: connectionStatus != LichessConnectionStatus.networkDown,
               onTap: () {
                 Navigator.of(context).popUntil((route) => route is! ModalBottomSheetRoute);
                 Navigator.of(context, rootNavigator: true).push(TournamentsHubScreen.buildRoute());

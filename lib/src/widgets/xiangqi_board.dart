@@ -1378,8 +1378,7 @@ class XiangqiBoardPainter({
   /// Each digit is [xiangqiFileDigit] for the side at the bottom, so it is that side's own way of
   /// naming the file, and the reversal between the two sides — red counts 一 from its right, black
   /// counts 1 from its own, and the board counts a to i from the left — is made there and nowhere
-  /// else. The digits are laid out in file order, left to right, so the whole line is read in file
-  /// order as printed on the board.
+  /// else. Each label follows the same file as the pieces when the board is turned.
   ///
   /// There is no matching axis down the sides. A traditional board numbers the files alone; the
   /// ranks have no convention to follow, and inventing one would have the app tell the player
@@ -1400,7 +1399,7 @@ class XiangqiBoardPainter({
         canvas,
         xiangqiFileDigit(orientation, file),
         textStyle,
-        Offset(geometry.pointAt(file, 0).dx, y),
+        Offset(geometry.centerOf(XiangqiSquare.at(file, 0), orientation).dx, y),
       );
     }
   }

@@ -34,6 +34,7 @@ import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
 import '../../binding.dart';
 import '../../model/xiangqi/puzzle/xiangqi_puzzle_fixture.dart';
 import '../../network/fake_http_client_factory.dart';
+import '../../test_helpers.dart' show kTestSurfaceSize;
 import '../../test_provider_scope.dart';
 
 /// A little over the client's own spacing between two requests to the host.
@@ -131,11 +132,13 @@ Future<void> pumpPuzzleScreen(
   Engine? engine,
   Map<String, Object>? defaultPreferences,
   bool useRealRatingPreferences = false,
+  Size surfaceSize = kTestSurfaceSize,
 }) async {
   await tester.pumpWidget(
     await makeTestProviderScopeApp(
       tester,
       home: const XiangqiPuzzleScreen(),
+      surfaceSize: surfaceSize,
       useRealRatingPreferences: useRealRatingPreferences,
       failOnOverflow: failOnOverflow,
       defaultPreferences: defaultPreferences,

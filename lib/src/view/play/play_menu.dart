@@ -14,7 +14,7 @@ import 'package:lichess_mobile/src/view/xiangqi/xiangqi_new_game_screen.dart';
 import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:material_ui/material_ui.dart';
 
-class const PlayMenu() extends ConsumerWidget {
+class const PlayMenu({final bool showComputerGame = true}) extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final connectionStatus = ref.watch(lichessConnectionStatusProvider);
@@ -64,14 +64,15 @@ class const PlayMenu() extends ConsumerWidget {
               leading: const Icon(LichessIcons.tournament_cup),
               title: Text(context.l10n.arenaArenaTournaments),
             ),
-            ListTile(
-              onTap: () {
-                Navigator.of(context).popUntil((route) => route is! ModalBottomSheetRoute);
-                Navigator.of(context, rootNavigator: true).push(ComputerGameScreen.buildRoute());
-              },
-              leading: const Icon(Icons.memory),
-              title: Text(context.l10n.playAgainstComputer),
-            ),
+            if (showComputerGame)
+              ListTile(
+                onTap: () {
+                  Navigator.of(context).popUntil((route) => route is! ModalBottomSheetRoute);
+                  Navigator.of(context, rootNavigator: true).push(ComputerGameScreen.buildRoute());
+                },
+                leading: const Icon(Icons.memory),
+                title: Text(context.l10n.playAgainstComputer),
+              ),
             ListTile(
               onTap: () {
                 Navigator.of(context).popUntil((route) => route is! ModalBottomSheetRoute);

@@ -30,6 +30,8 @@ final class const SavedXiangqiGame({
   final Duration? redTimeLeft,
   final Duration? blackTimeLeft,
 }) {
+  bool get canResume => state.moves.isNotEmpty && !state.isFinished;
+
   Map<String, dynamic> toJson() => {
     'playerSide': state.playerSide.name,
     'difficulty': state.difficulty.name,

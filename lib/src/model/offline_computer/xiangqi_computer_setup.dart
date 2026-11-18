@@ -1,4 +1,3 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/common/time_increment.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
@@ -14,24 +13,3 @@ final class const XiangqiComputerSetup({
   required final TimeIncrement timeIncrement,
   required final bool practiceMode,
 });
-
-final pendingXiangqiComputerSetupProvider =
-    NotifierProvider<XiangqiComputerSetupNotifier, XiangqiComputerSetup?>(
-      XiangqiComputerSetupNotifier.new,
-      name: 'PendingXiangqiComputerSetupProvider',
-    );
-
-class XiangqiComputerSetupNotifier() extends Notifier<XiangqiComputerSetup?> {
-  @override
-  XiangqiComputerSetup? build() => null;
-
-  XiangqiComputerSetup? get setup => state;
-
-  set setup(XiangqiComputerSetup value) {
-    state = value;
-  }
-
-  void clear() {
-    state = null;
-  }
-}

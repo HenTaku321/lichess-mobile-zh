@@ -962,10 +962,13 @@ class _XiangqiBoardState() extends State<XiangqiBoard> with SingleTickerProvider
   void _pointerDown(PointerDownEvent event, XiangqiBoardGeometry geometry) {
     _activePointers++;
     final square = geometry.squareAt(event.localPosition, widget.orientation);
-    if (event.buttons != kPrimaryButton || square == null) return;
-    widget.onTouchedSquare?.call(square);
-    if (_drawShapes && _shapeLockPointer != null && _shapeLockPointer != event.pointer) {
-      _cancelGesture();
+    if (square == null) return;
+    final mouseDraw =
+        event.kind == PointerDeviceKind.mouse && event.buttons == kSecondaryMouseButton;
+    if (!mouseDraw && event.buttons != kPrimaryButton) return;
+    final touchDraw = !mouseDraw && _shapeLockPointer != null && _shapeLockPointer != event.pointer;
+    if (_drawShapes && (mouseDraw || touchDraw)) {
+      if (touchDraw) _cancelGesture();
       setState(() {
         _shapeGesture = true;
         _shapePointer = event.pointer;
@@ -974,6 +977,8 @@ class _XiangqiBoardState() extends State<XiangqiBoard> with SingleTickerProvider
       });
       return;
     }
+    if (mouseDraw) return;
+    widget.onTouchedSquare?.call(square);
     if (_activePointers > 1) {
       _cancelGesture();
       return;

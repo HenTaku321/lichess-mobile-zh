@@ -9,7 +9,6 @@ import 'package:lichess_mobile/src/model/common/eval.dart';
 import 'package:lichess_mobile/src/model/common/time_increment.dart';
 import 'package:lichess_mobile/src/model/engine/evaluation_preferences.dart';
 import 'package:lichess_mobile/src/model/offline_computer/offline_computer_game_preferences.dart';
-import 'package:lichess_mobile/src/model/offline_computer/xiangqi_computer_setup.dart';
 import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_analysis_options.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_clock.dart';
@@ -78,6 +77,7 @@ class const XiangqiGameScreen({
   final XiangqiDifficulty? initialDifficulty,
   final TimeIncrement? initialTimeIncrement,
   final bool initialPracticeMode = false,
+  final VoidCallback? onSwitchToChess,
 }) extends ConsumerWidget {
   static Route<void> buildRoute({
     String? initialFen,
@@ -117,11 +117,14 @@ class const XiangqiGameScreen({
           context: context,
           builder: (_) => UncontrolledProviderScope(
             container: container,
-            child: _XiangqiGameSettingsSheet(onNewGame: () => _showNewGameSheet(context, ref)),
+            child: _XiangqiGameSettingsSheet(
+              onNewGame: () => _showNewGameSheet(context, ref, onSwitchToChess: onSwitchToChess),
+            ),
           ),
         );
       },
       body: _Body(
+        onSwitchToChess: onSwitchToChess,
         initialFen: initialFen,
         initialSide: initialSide,
         initialDifficulty: initialDifficulty,
@@ -141,7 +144,12 @@ class const XiangqiGameScreen({
 /// was opened with one: the sheet then becomes the way that position is turned into a game. Every
 /// later visit — the settings sheet, the result dialog, the bar's own button — leaves it out, and
 /// starts over from the standard opening.
-void _showNewGameSheet(BuildContext context, WidgetRef ref, {String? initialFen}) {
+void _showNewGameSheet(
+  BuildContext context,
+  WidgetRef ref, {
+  String? initialFen,
+  VoidCallback? onSwitchToChess,
+}) {
   final gameState = ref.read(xiangqiGameControllerProvider);
   final container = ProviderScope.containerOf(context);
   showModalBottomSheet<void>(
@@ -149,6 +157,7 @@ void _showNewGameSheet(BuildContext context, WidgetRef ref, {String? initialFen}
     builder: (_) => UncontrolledProviderScope(
       container: container,
       child: _NewGameSheet(
+        onSwitchToChess: onSwitchToChess,
         side: gameState.playerSide,
         difficulty: gameState.difficulty,
         initialFen: initialFen,
@@ -179,6 +188,7 @@ class _IsBoardFlippedNotifier() extends Notifier<bool> {
 }
 
 class const _Body({
+  final VoidCallback? onSwitchToChess,
   final String? initialFen,
   required final XiangqiSide? initialSide,
   required final XiangqiDifficulty? initialDifficulty,
@@ -277,7 +287,6 @@ class _BodyState() extends ConsumerState<_Body> {
               .read(xiangqiClockProvider.notifier)
               .resume(ref.read(xiangqiGameControllerProvider).turn);
         }
-        ref.read(pendingXiangqiComputerSetupProvider.notifier).clear();
         _syncEvaluation(ref.read(xiangqiGameControllerProvider));
       });
       return;
@@ -286,7 +295,13 @@ class _BodyState() extends ConsumerState<_Body> {
     final initialFen = widget.initialFen;
     if (initialFen != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _showNewGameSheet(context, ref, initialFen: initialFen);
+        if (mounted)
+          _showNewGameSheet(
+            context,
+            ref,
+            initialFen: initialFen,
+            onSwitchToChess: widget.onSwitchToChess,
+          );
       });
       return;
     }
@@ -297,7 +312,7 @@ class _BodyState() extends ConsumerState<_Body> {
     final original = ref.read(xiangqiGameControllerProvider);
     final saved = await ref.read(xiangqiGameStorageProvider).fetchGame();
     if (!mounted || !identical(original, ref.read(xiangqiGameControllerProvider))) return;
-    if (saved != null && saved.state.moves.isNotEmpty && !saved.state.isFinished) {
+    if (saved != null && saved.canResume) {
       ref
           .read(xiangqiGameControllerProvider.notifier)
           .restoreGame(
@@ -310,7 +325,7 @@ class _BodyState() extends ConsumerState<_Body> {
       return;
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _showNewGameSheet(context, ref);
+      if (mounted) _showNewGameSheet(context, ref, onSwitchToChess: widget.onSwitchToChess);
     });
   }
 
@@ -435,7 +450,7 @@ class _BodyState() extends ConsumerState<_Body> {
               state: newState,
               onNewGame: () {
                 Navigator.pop(dialogContext);
-                _showNewGameSheet(context, ref);
+                _showNewGameSheet(context, ref, onSwitchToChess: widget.onSwitchToChess);
               },
               onAnalysis: () {
                 Navigator.pop(dialogContext);
@@ -689,7 +704,7 @@ class _BodyState() extends ConsumerState<_Body> {
       onFlipBoard: () => ref.read(_isBoardFlippedProvider.notifier).toggle(),
       onAnalysis: () => unawaited(_openAnalysis()),
       onResign: game.isFinished ? null : _confirmResign,
-      onNewGame: () => _showNewGameSheet(context, ref),
+      onNewGame: () => _showNewGameSheet(context, ref, onSwitchToChess: widget.onSwitchToChess),
     );
   }
 
@@ -1159,6 +1174,7 @@ enum _XiangqiComputerOpponent() {
 /// one; the sheet then opens on [XiangqiPosition.turn] as the player's own side and draws the
 /// position above the controls, so that what is being set up is read rather than imagined.
 class const _NewGameSheet({
+  final VoidCallback? onSwitchToChess,
   required final XiangqiSide side,
   required final XiangqiDifficulty difficulty,
   final String? initialFen,
@@ -1195,24 +1211,24 @@ class _NewGameSheetState() extends ConsumerState<_NewGameSheet> {
             SettingsListTile(
               settingsLabel: Text(context.l10n.opponent),
               settingsValue: 'Pikafish',
-              onTap: () {
-                showChoicePicker<_XiangqiComputerOpponent>(
-                  context,
-                  title: Text(context.l10n.opponent),
-                  choices: _XiangqiComputerOpponent.values,
-                  selectedItem: _XiangqiComputerOpponent.pikafish,
-                  labelBuilder: (opponent) => Text(
-                    opponent == _XiangqiComputerOpponent.pikafish ? 'Pikafish' : 'Stockfish',
-                  ),
-                  onSelectedItemChanged: (opponent) {
-                    if (opponent != _XiangqiComputerOpponent.stockfish) return;
-                    ref
-                        .read(offlineComputerGamePreferencesProvider.notifier)
-                        .setLastGameWasXiangqi(false);
-                    Navigator.pop(context);
-                  },
-                );
-              },
+              onTap: widget.onSwitchToChess == null
+                  ? null
+                  : () {
+                      showChoicePicker<_XiangqiComputerOpponent>(
+                        context,
+                        title: Text(context.l10n.opponent),
+                        choices: _XiangqiComputerOpponent.values,
+                        selectedItem: _XiangqiComputerOpponent.pikafish,
+                        labelBuilder: (opponent) => Text(
+                          opponent == _XiangqiComputerOpponent.pikafish ? 'Pikafish' : 'Stockfish',
+                        ),
+                        onSelectedItemChanged: (opponent) {
+                          if (opponent != _XiangqiComputerOpponent.stockfish) return;
+                          Navigator.pop(context);
+                          widget.onSwitchToChess!();
+                        },
+                      );
+                    },
             ),
             SettingsListTile(
               settingsLabel: Text(context.l10n.side),

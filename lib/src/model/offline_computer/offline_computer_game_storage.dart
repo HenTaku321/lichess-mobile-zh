@@ -23,6 +23,8 @@ sealed class const SavedOfflineComputerGame._() with _$SavedOfflineComputerGame 
     Duration? blackTimeLeft,
   }) = _SavedOfflineComputerGame;
 
+  bool get canResume => game.playable && game.steps.length > 1;
+
   factory fromJson(Map<String, dynamic> json) => _$SavedOfflineComputerGameFromJson(json);
 }
 

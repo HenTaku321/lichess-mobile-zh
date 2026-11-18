@@ -15,15 +15,18 @@ import 'package:lichess_mobile/src/model/auth/auth_controller.dart';
 import 'package:lichess_mobile/src/model/blog/blog.dart';
 import 'package:lichess_mobile/src/model/blog/blog_repository.dart';
 import 'package:lichess_mobile/src/model/challenge/challenges.dart';
+import 'package:lichess_mobile/src/model/common/game_family.dart';
 import 'package:lichess_mobile/src/model/common/id.dart';
 import 'package:lichess_mobile/src/model/correspondence/correspondence_game_storage.dart';
 import 'package:lichess_mobile/src/model/correspondence/offline_correspondence_game.dart';
 import 'package:lichess_mobile/src/model/game/game_history.dart';
 import 'package:lichess_mobile/src/model/message/message_repository.dart';
+import 'package:lichess_mobile/src/model/offline_computer/computer_game_slots.dart';
 import 'package:lichess_mobile/src/model/relation/following_user.dart';
 import 'package:lichess_mobile/src/model/tournament/tournament.dart';
 import 'package:lichess_mobile/src/model/tournament/tournament_providers.dart';
 import 'package:lichess_mobile/src/model/user/user.dart';
+import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
 import 'package:lichess_mobile/src/network/connectivity.dart';
 import 'package:lichess_mobile/src/styles/lichess_icons.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
@@ -43,6 +46,7 @@ import 'package:lichess_mobile/src/view/game/game_screen.dart';
 import 'package:lichess_mobile/src/view/game/game_screen_providers.dart';
 import 'package:lichess_mobile/src/view/game/offline_correspondence_games_screen.dart';
 import 'package:lichess_mobile/src/view/home/blog_carousel.dart';
+import 'package:lichess_mobile/src/view/home/computer_games_section.dart';
 import 'package:lichess_mobile/src/view/home/following_carousel.dart';
 import 'package:lichess_mobile/src/view/home/games_carousel.dart';
 import 'package:lichess_mobile/src/view/message/conversation_screen.dart';
@@ -191,8 +195,15 @@ class _HomeScreenState() extends ConsumerState<HomeTabScreen> {
 
             // Show the welcome screen if not logged in and there are no recent games and no stored games
             // (i.e. first installation, or the user has never played a game)
+            final hasXiangqiAccount = ref.watch(isXiangqiLoggedInProvider);
+            final chessSlot = ref.watch(computerGameSlotProvider(GameFamily.chess)).value;
+            final xiangqiSlot = ref.watch(computerGameSlotProvider(GameFamily.xiangqi)).value;
             final shouldShowWelcomeScreen =
                 authUser == null &&
+                !hasXiangqiAccount &&
+                chessSlot == ComputerSlotStatus.empty &&
+                xiangqiSlot == ComputerSlotStatus.empty &&
+                (ongoingGames.value?.isEmpty ?? true) &&
                 recentGames.maybeWhen(data: (data) => data.isEmpty, orElse: () => false);
 
             List<Widget> widgets;
@@ -205,6 +216,7 @@ class _HomeScreenState() extends ConsumerState<HomeTabScreen> {
                   child: _GreetingWidget(),
                 ),
                 if (showOutage) const ServerOutageDisplay(),
+                if (!widget.editModeEnabled) const ComputerGamesSection(),
                 if (!widget.editModeEnabled) ...[
                   Padding(
                     padding: Styles.bodySectionPadding,
@@ -287,6 +299,7 @@ class _HomeScreenState() extends ConsumerState<HomeTabScreen> {
                 ),
                 if (!widget.editModeEnabled) ...[const _HomeCustomizationTip()],
                 if (showOutage) const ServerOutageDisplay(),
+                if (!widget.editModeEnabled) const ComputerGamesSection(),
                 if (hasServerContent)
                   _EditableWidget(
                     widget: HomeEditableWidget.perfCards,
@@ -357,6 +370,7 @@ class _HomeScreenState() extends ConsumerState<HomeTabScreen> {
                 ),
                 if (!widget.editModeEnabled) ...[const _HomeCustomizationTip()],
                 if (showOutage) const ServerOutageDisplay(),
+                if (!widget.editModeEnabled) const ComputerGamesSection(),
                 _EditableWidget(
                   widget: HomeEditableWidget.perfCards,
                   shouldShow: authUser != null && hasServerContent,
@@ -418,6 +432,7 @@ class _HomeScreenState() extends ConsumerState<HomeTabScreen> {
               },
               onFocusRegained: () {
                 if (context.mounted && _focusLostAt != null) {
+                  ref.invalidate(computerGameSlotProvider);
                   final duration = DateTime.now().difference(_focusLostAt!);
                   if (duration.inSeconds < 10) {
                     return;
@@ -487,6 +502,7 @@ class _HomeScreenState() extends ConsumerState<HomeTabScreen> {
 
   Future<void> _refreshData({required bool isOnline}) async {
     try {
+      ref.invalidate(computerGameSlotProvider);
       await Future.wait([
         ref.refresh(myRecentGamesProvider.future),
         if (isOnline) ref.refresh(challengesProvider.future),
@@ -713,7 +729,7 @@ class const _TabletCreateAGameSection() extends StatelessWidget {
           shouldShow: true,
           child: Padding(padding: Styles.bodySectionPadding, child: QuickGameMatrix()),
         ),
-        PlayMenu(),
+        PlayMenu(showComputerGame: false),
       ],
     );
   }

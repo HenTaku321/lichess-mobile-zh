@@ -57,6 +57,7 @@ class const OfflineComputerGameScreen({
 
   /// Optional initial FEN to start the game from a custom position.
   final String? initialFen,
+  final ValueChanged<XiangqiComputerSetup>? onStartXiangqi,
   super.key,
 }) extends ConsumerWidget {
   static Route<void> buildRoute({Variant? initialVariant, String? initialFen}) {
@@ -78,13 +79,20 @@ class const OfflineComputerGameScreen({
           builder: (_) => const _OfflineComputerGameSettingsSheet(),
         );
       },
-      body: _Body(initialVariant: initialVariant, initialFen: initialFen),
+      body: _Body(
+        initialVariant: initialVariant,
+        initialFen: initialFen,
+        onStartXiangqi: onStartXiangqi,
+      ),
     );
   }
 }
 
-class const _Body({required final Variant? initialVariant, final String? initialFen})
-    extends ConsumerStatefulWidget {
+class const _Body({
+  required final Variant? initialVariant,
+  final String? initialFen,
+  final ValueChanged<XiangqiComputerSetup>? onStartXiangqi,
+}) extends ConsumerStatefulWidget {
   @override
   ConsumerState<_Body> createState() => _BodyState();
 }
@@ -97,18 +105,18 @@ class _BodyState() extends ConsumerState<_Body> {
     super.initState();
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
       // If we have an initial FEN, always show the new game dialog
       if (widget.initialFen != null) {
-        if (!mounted) return;
         _showNewGameDialog(initialVariant: widget.initialVariant);
         return;
       }
 
       final savedGame = await ref.read(offlineComputerGameStorageProvider).fetchGame();
-      if (savedGame != null && savedGame.game.steps.length > 1) {
+      if (!mounted) return;
+      if (savedGame != null && savedGame.canResume) {
         ref.read(offlineComputerGameControllerProvider.notifier).loadGame(savedGame);
       } else {
-        if (!mounted) return;
         _showNewGameDialog(initialVariant: widget.initialVariant);
       }
     });
@@ -263,8 +271,11 @@ class _BodyState() extends ConsumerState<_Body> {
       context: context,
       isScrollControlled: true,
       constraints: BoxConstraints(maxHeight: screenHeight - (screenHeight / 10)),
-      builder: (context) =>
-          _NewGameSheet(initialVariant: initialVariant, initialFen: widget.initialFen),
+      builder: (context) => _NewGameSheet(
+        initialVariant: initialVariant,
+        initialFen: widget.initialFen,
+        onStartXiangqi: widget.onStartXiangqi,
+      ),
     );
   }
 
@@ -496,8 +507,11 @@ class const _PlayerClock({required final Side side, required final Key clockKey}
   }
 }
 
-class const _NewGameSheet({required final Variant? initialVariant, final String? initialFen})
-    extends ConsumerStatefulWidget {
+class const _NewGameSheet({
+  required final Variant? initialVariant,
+  final String? initialFen,
+  final ValueChanged<XiangqiComputerSetup>? onStartXiangqi,
+}) extends ConsumerStatefulWidget {
   @override
   ConsumerState<_NewGameSheet> createState() => _NewGameSheetState();
 }
@@ -911,18 +925,14 @@ class _NewGameSheetState() extends ConsumerState<_NewGameSheet> {
                     if (_selectedOpponent.isPikafish) {
                       final side = _selectedSideChoice.toSide() ?? Side.values[Random().nextInt(2)];
                       final xiangqiSide = side == Side.white ? XiangqiSide.red : XiangqiSide.black;
-                      ref
-                          .read(pendingXiangqiComputerSetupProvider.notifier)
-                          .setup = XiangqiComputerSetup(
+                      final setup = XiangqiComputerSetup(
                         side: xiangqiSide,
                         difficulty: _xiangqiDifficulty,
                         timeIncrement: _timeIncrement,
                         practiceMode: _practiceMode,
                       );
-                      ref
-                          .read(offlineComputerGamePreferencesProvider.notifier)
-                          .setLastGameWasXiangqi(true);
                       Navigator.pop(context);
+                      widget.onStartXiangqi!(setup);
                       return;
                     }
                     final effectiveFen =
@@ -960,7 +970,7 @@ class _NewGameSheetState() extends ConsumerState<_NewGameSheet> {
       context,
       selected: _selectedOpponent.chessSpec ?? OpponentSpec.defaultSpec,
       variant: _selectedVariant,
-      showPikafish: _engines.pikafish,
+      showPikafish: _engines.pikafish && widget.onStartXiangqi != null,
       selectedPikafish: _selectedOpponent.isPikafish,
       selectedXiangqiDifficulty: _xiangqiDifficulty,
     );

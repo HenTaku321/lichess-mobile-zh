@@ -1,10 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lichess_mobile/src/model/engine/engine_factory.dart';
+import 'package:lichess_mobile/src/model/engine/engine_spec.dart';
 import 'package:lichess_mobile/src/service/window_service.dart';
 import 'package:screen_retriever/screen_retriever.dart';
+import 'package:window_manager/window_manager.dart';
 
 import '../binding.dart';
+import '../model/engine/fake_engine.dart';
 import 'fake_window_manager.dart';
 
 /// The preference key the service stores its record under. A literal, because the service keeps it
@@ -306,12 +312,15 @@ void main() {
 
   group('WindowService.start, close and the window events', () {
     late FakeWindowChannel channel;
+    late WindowService service;
 
     setUp(() {
       channel = FakeWindowChannel()..install();
+      service = WindowService();
       debugDefaultTargetPlatformOverride = TargetPlatform.linux;
       addTearDown(testBinding.reset);
       addTearDown(() {
+        windowManager.removeListener(service);
         debugDefaultTargetPlatformOverride = null;
         channel.uninstall();
       });
@@ -319,30 +328,71 @@ void main() {
 
     test('remembers what the window was when the app closes', () async {
       channel.bounds = const Rect.fromLTWH(100, 50, 1600, 900);
-      final service = WindowService();
       await service.start();
       await service.close();
 
-      expect(channel.methods, contains('close'));
+      expect(channel.methods, contains('destroy'));
       expect(stored()?.size, const Size(1600, 900));
       expect(stored()?.isMaximized, isFalse);
     });
 
     test('routes the native close event through the saved close flow', () async {
       channel.bounds = const Rect.fromLTWH(100, 50, 1600, 900);
-      final service = WindowService();
       await service.start();
 
-      service.onWindowClose();
+      expect(channel.argsOf('setPreventClose'), {'isPreventClose': true});
+      await channel.emitClose();
       await pumpEventQueue();
 
-      expect(channel.methods, contains('close'));
+      expect(channel.methods, contains('destroy'));
       expect(stored()?.size, const Size(1600, 900));
+    });
+
+    test('a native close and title-bar clicks wait for the same engine shutdown', () async {
+      final engine = FakeEngine();
+      final factory = EngineFactory(connect: engine.connect);
+      await factory.create(const StockfishSpec.light());
+      final allowQuit = Completer<void>();
+      var cleanups = 0;
+      await service.start(
+        beforeClose: () async {
+          cleanups++;
+          await allowQuit.future;
+          await factory.shutdown();
+        },
+      );
+      bool? runningAtDestroy;
+      channel.install(
+        onCall: (_, method) {
+          if (method == 'destroy') {
+            runningAtDestroy = engine.isRunning;
+            service.onWindowClose(); // GTK echoes the final close too.
+          }
+        },
+      );
+
+      await channel.emitClose();
+      final closing = service.close();
+      expect(service.close(), same(closing));
+      expect(engine.isRunning, isTrue);
+      expect(channel.methods, isNot(contains('destroy')));
+      allowQuit.complete();
+      await closing;
+      await channel.emitClose();
+      expect(runningAtDestroy, isFalse);
+      expect(engine.quitCount, 1);
+      expect(cleanups, 1);
+      expect(channel.methods.where((method) => method == 'destroy'), hasLength(1));
+    });
+
+    test('a failed cleanup still releases the intercepted close', () async {
+      await service.start(beforeClose: () async => throw StateError('shutdown failed'));
+      await service.close();
+      expect(channel.methods.last, 'destroy');
     });
 
     test('watches nothing off Linux, not even to initialize', () async {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
-      final service = WindowService();
       await service.start();
 
       expect(channel.methods, isEmpty);
@@ -351,7 +401,6 @@ void main() {
 
     test('closing while maximized keeps the size it was maximized from', () async {
       channel.bounds = const Rect.fromLTWH(0, 0, 1280, 720);
-      final service = WindowService();
       await service.start();
 
       // What the window reports once it is maximized, which is what must not be remembered.
@@ -370,7 +419,6 @@ void main() {
 
     test('restoring goes back to the size it had before it was maximized', () async {
       channel.bounds = const Rect.fromLTWH(0, 0, 1280, 720);
-      final service = WindowService();
       await service.start();
 
       channel.bounds = const Rect.fromLTWH(0, 0, 1920, 1080);
@@ -387,7 +435,6 @@ void main() {
     });
 
     test('says which way the window is maximized only once per change', () async {
-      final service = WindowService();
       await service.start();
 
       var changes = 0;

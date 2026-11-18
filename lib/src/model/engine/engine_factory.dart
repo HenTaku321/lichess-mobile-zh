@@ -73,6 +73,27 @@ class EngineFactory({EngineConnector? connect}) {
   /// Never completes with an error, so a failed create does not take its successor down with it.
   final Map<EngineSlot, Future<void>> _starting = {};
 
+  Future<void>? _shutdown;
+
+  /// Seal the factory before draining it. Each slot's last claim also waits for its predecessors.
+  Future<void> shutdown() => _shutdown ??= Future.microtask(() async {
+    await Future.wait<void>([
+      ..._starting.values,
+      for (final engine in _live.values) engine.dispose(),
+    ]);
+  });
+
+  void _checkOpen(EngineSpec spec) {
+    if (_shutdown == null) return;
+    throw EngineCreationException(
+      EngineFailure(
+        kind: EngineFailureKind.start,
+        message: 'The app is shutting down',
+        engine: spec.label,
+      ),
+    );
+  }
+
   /// Creates and starts an engine, completing when it answers `uciok`.
   ///
   /// [hashSizeInMb] is the transposition table the engine will hold for its whole life; see
@@ -80,6 +101,7 @@ class EngineFactory({EngineConnector? connect}) {
   ///
   /// Throws an [EngineCreationException] describing what went wrong if it does not get that far.
   Future<Engine> create(EngineSpec spec, {int hashSizeInMb = 16}) async {
+    _checkOpen(spec);
     final attempt = _Attempt();
     final queued = _starting[spec.slot];
 
@@ -153,15 +175,17 @@ class EngineFactory({EngineConnector? connect}) {
       // Hand-off: the engine has been let go but the native library does not free the slot until
       // it has actually exited.
       _logger.fine('Waiting for the previous ${spec.slot.name} engine to exit');
-      await incumbent.death;
+      await incumbent.dispose();
     }
 
+    // A queued request may have passed the entry check before shutdown began.
+    _checkOpen(spec);
     _logger.fine('Creating engine: $spec');
 
     final transport = await _connect(spec);
     final engine = Engine(transport, hashSizeInMb: hashSizeInMb);
 
-    if (attempt.abandoned) {
+    if (attempt.abandoned || _shutdown != null) {
       // Nobody is waiting for this engine any more, and an engine nobody owns is never disposed:
       // it keeps its native slot until the process restarts, and every later engine of this kind
       // is refused.
@@ -170,14 +194,18 @@ class EngineFactory({EngineConnector? connect}) {
       // in [_starting] that the next create on this slot is queued behind. This engine never
       // reached [_live], so that claim is the only thing standing between a dying engine and the
       // next [_connect] into a native library that hosts one engine per slot.
-      _logger.warning('Disposing the $spec that arrived after its create had given up');
+      _logger.fine('Disposing the $spec that is no longer wanted');
       await engine.dispose();
+      _checkOpen(spec);
       throw EngineCreationAbandoned(spec);
     }
 
     _live[spec.slot] = engine;
     unawaited(
-      engine.death.then((_) {
+      engine.death.then((failure) async {
+        // A transport can report a failed session while the native reader is still alive.
+        // Keep it reachable by shutdown until the owning handle has actually been disposed.
+        if (failure != null || engine.isDisposed) await engine.dispose();
         if (identical(_live[spec.slot], engine)) _live.remove(spec.slot);
       }),
     );

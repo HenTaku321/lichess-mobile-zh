@@ -183,6 +183,7 @@ class Engine(
   /// sent none. What makes the table the engine builds up this game's rather than the last one's.
   Object? _lastGame;
   bool _disposed = false;
+  late final Future<void> _disposal = _dispose();
 
   /// The variant of the last search started, so that a failure can name what the engine was doing.
   Variant? _lastVariant;
@@ -251,9 +252,12 @@ class Engine(
     _stopRunning();
   }
 
-  Future<void> dispose() async {
-    if (_disposed) return;
+  Future<void> dispose() {
     _disposed = true;
+    return _disposal;
+  }
+
+  Future<void> _dispose() async {
     _next?._finish(null);
     _next = null;
     _running?._finish(null);
@@ -262,9 +266,12 @@ class Engine(
     // front of the quit would delay every caller waiting on this engine to be gone — the next
     // create, most of all. [_onLine] ignores whatever arrives in the meantime.
     unawaited(_linesSubscription.cancel());
-    await _transport.dispose();
-    _name.dispose();
-    _isSearching.dispose();
+    try {
+      await _transport.dispose();
+    } finally {
+      _name.dispose();
+      _isSearching.dispose();
+    }
   }
 
   // ---------------------------------------------------------------------------

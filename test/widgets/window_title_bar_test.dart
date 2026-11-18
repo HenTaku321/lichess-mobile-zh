@@ -94,7 +94,7 @@ void main() {
 
       await tester.tap(find.byIcon(Icons.close));
       await tester.pump();
-      expect(channel.methods, contains('close'));
+      expect(channel.methods, contains('destroy'));
     });
 
     testWidgets('the second tap on the same button restores', (tester) async {

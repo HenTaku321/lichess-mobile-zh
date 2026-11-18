@@ -13,13 +13,14 @@ import 'package:lichess_mobile/src/model/engine/engine_spec.dart';
 import 'fake_engine.dart';
 
 /// A minimal search, for checking which engine answers it.
-SearchRequest makeRequest() => const SearchRequest(
-  initialPosition: Chess.initial,
-  moves: IListConst([]),
-  variant: Variant.standard,
-  limit: SearchLimit.movetime(Duration(seconds: 1)),
-  game: 'test',
-);
+SearchRequest makeRequest({SearchLimit limit = const SearchLimit.movetime(Duration(seconds: 1))}) =>
+    SearchRequest(
+      initialPosition: Chess.initial,
+      moves: const IListConst([]),
+      variant: Variant.standard,
+      limit: limit,
+      game: 'test',
+    );
 
 /// A factory that starts [engine] instead of a real one.
 EngineFactory factoryFor(FakeEngine engine) => EngineFactory(connect: engine.connect);
@@ -195,6 +196,56 @@ void main() {
       expect(engine.quitCount, 0);
       expect(light.spec, isNot(fairy.spec));
     });
+
+    test('shutdown joins a quit in progress and drains every live slot', () async {
+      final engine = FakeEngine(quitDelay: const Duration(milliseconds: 50));
+      final factory = factoryFor(engine);
+      final light = await factory.create(const StockfishSpec.light());
+      final fairy = await factory.create(const StockfishSpec.fairy());
+      final analysis = fairy.search(makeRequest(limit: const SearchLimit.infinite()));
+      await pumpEventQueue();
+      expect(fairy.isSearching.value, isTrue);
+      final quitting = light.dispose();
+      final closing = factory.shutdown();
+
+      expect(light.dispose(), same(quitting));
+      expect(factory.shutdown(), same(closing));
+      await closing;
+      expect(await analysis.bestMove, isNull);
+      expect(engine.isRunning, isFalse);
+      expect(engine.quitCount, 2);
+      await expectLater(factory.create(const Lc0Spec()), throwsA(isA<EngineCreationException>()));
+      expect(engine.startCount, 2);
+    });
+
+    test(
+      'shutdown drains an engine still starting without starting its queued replacement',
+      () async {
+        final engine = FakeEngine();
+        final releaseStart = Completer<void>();
+        var starts = 0;
+        final factory = EngineFactory(
+          connect: (spec) async {
+            starts++;
+            await releaseStart.future;
+            return engine.connect(spec);
+          },
+        );
+        const spec = StockfishSpec.light();
+        final starting = expectLater(factory.create(spec), throwsA(isA<EngineCreationException>()));
+        final queued = expectLater(factory.create(spec), throwsA(isA<EngineCreationException>()));
+        var closed = false;
+        final closing = factory.shutdown().then((_) => closed = true);
+        await pumpEventQueue();
+        expect(closed, isFalse);
+        releaseStart.complete();
+        await closing;
+        expect(starts, 1);
+        expect(engine.quitCount, 1);
+        expect(engine.isRunning, isFalse);
+        await Future.wait([starting, queued]);
+      },
+    );
 
     test('an LC0 engine and a Stockfish engine are live at once, each with its '
         'own output', () async {

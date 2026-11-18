@@ -218,8 +218,11 @@ class WindowService() with WindowListener {
   /// Long enough that dragging a window edge does not write a preference per frame, short enough
   /// that quitting straight after a resize still remembers it.
   static const _saveDebounce = Duration(milliseconds: 600);
+  static const _closeTimeout = Duration(seconds: 20);
 
   Timer? _saveTimer;
+  Future<void> Function()? _beforeClose;
+  Future<void>? _closing;
 
   /// The geometry the window last had while it was not maximized. A maximized window reports the
   /// maximized size, so this is the only record of the size to go back to, and it must not be
@@ -282,11 +285,13 @@ class WindowService() with WindowListener {
 
   /// Starts recording what the user does to the window. Called from `_AppState.initState`, with
   /// the other long-running services.
-  Future<void> start() async {
+  Future<void> start({Future<void> Function()? beforeClose}) async {
     if (defaultTargetPlatform != TargetPlatform.linux) return;
+    _beforeClose = beforeClose;
     try {
       await windowManager.ensureInitialized();
-      windowManager.addListener(this);
+      if (!windowManager.listeners.contains(this)) windowManager.addListener(this);
+      await windowManager.setPreventClose(true);
       // One reading now, so that a window maximized a moment later has something to go back to.
       final alreadyMaximized = await windowManager.isMaximized();
       maximized.value = alreadyMaximized;
@@ -319,20 +324,32 @@ class WindowService() with WindowListener {
     }
   }
 
-  /// Closes the window, for the app's own title bar.
-  ///
-  /// The pending save is written first: the window goes with the process, and a resize in the last
-  /// fraction of a second before that would otherwise be lost. The write reaches the disk before
-  /// the close does, so the next start finds it.
-  Future<void> close() async {
+  /// GTK must keep dispatching Dart events until the engine and its stdout reader have quit.
+  /// Both the title bar and a native delete event join this same transaction.
+  Future<void> close() => _closing ??= Future.microtask(_finishClose);
+
+  @override
+  void onWindowClose() => unawaited(close());
+
+  Future<void> _finishClose() async {
     _saveTimer?.cancel();
     _saveTimer = null;
-    if (maximized.value) {
-      await _saveMaximized();
-    } else {
-      await _saveNormal();
+    try {
+      await Future.wait<void>([
+        if (_beforeClose case final cleanup?) Future<void>.sync(cleanup),
+        maximized.value ? _saveMaximized() : _saveNormal(),
+      ]).timeout(_closeTimeout);
+    } catch (error, stack) {
+      _logger.warning('Could not finish cleanup before closing the window', error, stack);
     }
-    await _guard(windowManager.close(), 'close');
+    try {
+      // On Linux destroy releases preventClose and closes in one native call. GTK still echoes
+      // the close event, so keep the completed transaction unless the call itself failed.
+      await windowManager.destroy();
+    } catch (error, stack) {
+      _closing = null;
+      _logger.warning('Could not close the window', error, stack);
+    }
   }
 
   /// Lets the user drag the window by the app's own title bar.
@@ -357,12 +374,13 @@ class WindowService() with WindowListener {
   /// Notes that the window is or is not maximized, wherever that was learned from — the plugin's
   /// event or the app's own button — and writes the record that goes with it.
   void _noteMaximized(bool value) {
-    if (maximized.value == value) return;
+    if (_closing != null || maximized.value == value) return;
     maximized.value = value;
     unawaited(value ? _saveMaximized() : _saveRestored());
   }
 
   void _scheduleSave() {
+    if (_closing != null) return;
     _saveTimer?.cancel();
     _saveTimer = Timer(_saveDebounce, () => unawaited(_saveNormal()));
   }

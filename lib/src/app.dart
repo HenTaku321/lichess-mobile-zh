@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:home_widget/home_widget.dart';
@@ -13,6 +14,7 @@ import 'package:lichess_mobile/src/model/account/ongoing_games_notifier.dart';
 import 'package:lichess_mobile/src/model/analysis/analysis_preferences.dart';
 import 'package:lichess_mobile/src/model/broadcast/broadcast_preferences.dart';
 import 'package:lichess_mobile/src/model/common/preloaded_data.dart';
+import 'package:lichess_mobile/src/model/engine/engine_factory.dart';
 import 'package:lichess_mobile/src/model/settings/board_preferences.dart';
 import 'package:lichess_mobile/src/model/settings/general_preferences.dart';
 import 'package:lichess_mobile/src/model/study/study_preferences.dart';
@@ -152,8 +154,13 @@ class _AppState() extends ConsumerState<Application> {
     ref.read(sharedPgnServiceProvider).start();
     ref.read(broadcastServiceProvider).start();
     ref.read(recapServiceProvider).start();
-    // Watches the window's size so the next start opens the same way. Does nothing off Linux.
-    ref.read(windowServiceProvider).start();
+    if (defaultTargetPlatform == TargetPlatform.linux) {
+      unawaited(
+        ref
+            .read(windowServiceProvider)
+            .start(beforeClose: ref.read(engineFactoryProvider).shutdown),
+      );
+    }
 
     if (Platform.isIOS) {
       HomeWidget.setAppGroupId(_kIosAppGroupId);

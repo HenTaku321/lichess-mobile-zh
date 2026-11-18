@@ -17,6 +17,16 @@ class FakeWindowChannel() {
   /// The methods the app called, in order.
   List<String> get methods => [for (final call in calls) call.method];
 
+  Future<void> emitClose() async {
+    await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.handlePlatformMessage(
+      'window_manager',
+      const StandardMethodCodec().encodeMethodCall(
+        const MethodCall('onEvent', {'eventName': 'close'}),
+      ),
+      null,
+    );
+  }
+
   Map<Object?, Object?>? argsOf(String method) {
     for (final call in calls) {
       if (call.method == method) return call.arguments as Map<Object?, Object?>;

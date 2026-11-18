@@ -43,7 +43,7 @@ import 'package:material_ui/material_ui.dart';
 /// A screen of its own rather than a mode of the chess puzzle screen, for the reason every xiangqi
 /// screen here is: the board is nine files by ten ranks and the pieces are not chess pieces, so
 /// nothing of the chess puzzle screen's own machinery survives the crossing. What is shared is the
-/// arrangement — a board, a move list, a row of actions — and that is [XiangqiGameLayout]'s.
+/// arrangement — a board, a move list, a row of actions — and that comes from [XiangqiTrainingLayout].
 ///
 /// ## What a puzzle is, and who moves first
 ///
@@ -377,113 +377,111 @@ class _PuzzleBodyState() extends ConsumerState<_PuzzleBody> {
         }
         _feedbackTimers.clear();
       },
-      child: SafeArea(
-        child: XiangqiGameLayout(
-          board: BrightnessHueFilter(
-            brightness: boardPrefs.brightness,
-            hue: boardPrefs.hue,
-            child: XiangqiBoard(
-              position: position,
-              orientation: orientation,
-              selected: selected,
-              moves: boardPrefs.showLegalMoves ? selectedMoves : const IListConst([]),
-              lastMove: lastMove,
-              onTapSquare: _onTapSquare,
-              onDragMove: (from, to) {
-                final move = XiangqiMove(from, to);
-                if (!state.isPlayable ||
-                    !state.isSolverTurn ||
-                    !rules.isLegal(state.position, move)) {
-                  return;
-                }
-                setState(() => _selected = null);
-                controller.onUserMove(move);
-              },
-              onCancelInteraction: () => setState(() => _selected = null),
-              animationDuration: browsing && !_historyAnimate
-                  ? Duration.zero
-                  : boardPrefs.pieceAnimationDuration,
-              showCoordinates: boardPrefs.coordinates,
-              showLastMove: boardPrefs.boardHighlights,
-              showBorder: boardPrefs.showBorder,
-              hint: state.hint,
-              arrows: state.hint == null
-                  ? const IListConst([])
-                  : IList([XiangqiBoardArrow(move: state.hint!)]),
-              magnifyDraggedPiece: boardPrefs.magnifyDraggedPiece,
-              dragTargetKind: boardPrefs.dragTargetKind,
-              settings: XiangqiBoardSettings.fromPreferences(boardPrefs),
-              canStartDrag: (piece) =>
-                  state.isPlayable && state.isSolverTurn && piece.side == state.position.turn,
-              style: style,
-            ),
+      child: XiangqiTrainingLayout(
+        board: BrightnessHueFilter(
+          brightness: boardPrefs.brightness,
+          hue: boardPrefs.hue,
+          child: XiangqiBoard(
+            position: position,
+            orientation: orientation,
+            selected: selected,
+            moves: boardPrefs.showLegalMoves ? selectedMoves : const IListConst([]),
+            lastMove: lastMove,
+            onTapSquare: _onTapSquare,
+            onDragMove: (from, to) {
+              final move = XiangqiMove(from, to);
+              if (!state.isPlayable ||
+                  !state.isSolverTurn ||
+                  !rules.isLegal(state.position, move)) {
+                return;
+              }
+              setState(() => _selected = null);
+              controller.onUserMove(move);
+            },
+            onCancelInteraction: () => setState(() => _selected = null),
+            animationDuration: browsing && !_historyAnimate
+                ? Duration.zero
+                : boardPrefs.pieceAnimationDuration,
+            showCoordinates: boardPrefs.coordinates,
+            showLastMove: boardPrefs.boardHighlights,
+            showBorder: boardPrefs.showBorder,
+            hint: state.hint,
+            arrows: state.hint == null
+                ? const IListConst([])
+                : IList([XiangqiBoardArrow(move: state.hint!)]),
+            magnifyDraggedPiece: boardPrefs.magnifyDraggedPiece,
+            dragTargetKind: boardPrefs.dragTargetKind,
+            settings: XiangqiBoardSettings.fromPreferences(boardPrefs),
+            canStartDrag: (piece) =>
+                state.isPlayable && state.isSolverTurn && piece.side == state.position.turn,
+            style: style,
           ),
-          topTable: _PuzzleFacts(puzzle: puzzle),
-          bottomTable: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _SolverRow(side: orientation, style: style, state: state),
-              if (state.phase == XiangqiPuzzlePhase.submitting ||
-                  state.phase == XiangqiPuzzlePhase.unrecorded)
-                Text(_statusText(context, state)),
-              if (_loadingNext || state.phase == XiangqiPuzzlePhase.submitting)
-                const LinearProgressIndicator(),
-            ],
-          ),
-          moves: xiangqiGameNotation(state.positions, state.moves),
-          currentMoveIndex: cursor,
-          onSelectMove: canReplay ? _viewHistory : null,
-          userActionsBar: BottomBar(
-            children: [
-              if (canReplay)
-                BottomBarButton(
-                  label: context.l10n.menu,
-                  icon: Icons.menu,
-                  onTap: _loadingNext ? null : _showMenu,
-                ),
-              if (canReplay)
-                BottomBarButton(
-                  label: context.l10n.analysis,
-                  icon: Icons.biotech,
-                  onTap: _loadingNext || _analysisOpen ? null : _openAnalysis,
-                ),
-              if (!canReplay)
-                BottomBarButton(
-                  label: context.l10n.getAHint,
-                  onTap: state.canHint ? _hint : null,
-                  icon: CupertinoIcons.lightbulb,
-                  highlighted: state.hint != null,
-                ),
-              if (state.phase == XiangqiPuzzlePhase.unrecorded)
-                BottomBarButton(
-                  label: context.l10n.retry,
-                  onTap: () => unawaited(controller.retrySubmit()),
-                  icon: CupertinoIcons.arrow_clockwise,
-                ),
-              if (canReplay) ...[
-                HistoryNavigationButton(
-                  forward: false,
-                  onTap: cursor > 0 && !_loadingNext ? () => _viewHistory(cursor - 1) : null,
-                  onRepeat: () => _viewHistory(cursor - 1, fastSeek: true),
-                ),
-                HistoryNavigationButton(
-                  forward: true,
-                  onTap: cursor < state.moves.length && !_loadingNext
-                      ? () => _viewHistory(cursor + 1)
-                      : null,
-                  onRepeat: () => _viewHistory(cursor + 1, fastSeek: true),
-                ),
-              ],
+        ),
+        feedback: _SolverRow(side: orientation, style: style, state: state),
+        status: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _PuzzleFacts(puzzle: puzzle),
+            if (state.phase == XiangqiPuzzlePhase.submitting ||
+                state.phase == XiangqiPuzzlePhase.unrecorded)
+              Text(_statusText(context, state)),
+            if (_loadingNext || state.phase == XiangqiPuzzlePhase.submitting)
+              const LinearProgressIndicator(),
+          ],
+        ),
+        moves: xiangqiGameNotation(state.positions, state.moves),
+        currentMoveIndex: cursor,
+        onSelectMove: canReplay ? _viewHistory : null,
+        actions: BottomBar(
+          children: [
+            if (canReplay)
               BottomBarButton(
-                label: canReplay
-                    ? context.l10n.puzzleContinueTraining
-                    : context.l10n.puzzleNextPuzzle,
-                onTap: state.isLineComplete && !_loadingNext ? () => unawaited(nextPuzzle()) : null,
-                icon: canReplay ? CupertinoIcons.play_arrow_solid : CupertinoIcons.arrow_right,
-                highlighted: canReplay,
+                label: context.l10n.menu,
+                icon: Icons.menu,
+                onTap: _loadingNext ? null : _showMenu,
+              ),
+            if (canReplay)
+              BottomBarButton(
+                label: context.l10n.analysis,
+                icon: Icons.biotech,
+                onTap: _loadingNext || _analysisOpen ? null : _openAnalysis,
+              ),
+            if (!canReplay)
+              BottomBarButton(
+                label: context.l10n.getAHint,
+                onTap: state.canHint ? _hint : null,
+                icon: CupertinoIcons.lightbulb,
+                highlighted: state.hint != null,
+              ),
+            if (state.phase == XiangqiPuzzlePhase.unrecorded)
+              BottomBarButton(
+                label: context.l10n.retry,
+                onTap: () => unawaited(controller.retrySubmit()),
+                icon: CupertinoIcons.arrow_clockwise,
+              ),
+            if (canReplay) ...[
+              HistoryNavigationButton(
+                forward: false,
+                onTap: cursor > 0 && !_loadingNext ? () => _viewHistory(cursor - 1) : null,
+                onRepeat: () => _viewHistory(cursor - 1, fastSeek: true),
+              ),
+              HistoryNavigationButton(
+                forward: true,
+                onTap: cursor < state.moves.length && !_loadingNext
+                    ? () => _viewHistory(cursor + 1)
+                    : null,
+                onRepeat: () => _viewHistory(cursor + 1, fastSeek: true),
               ),
             ],
-          ),
+            BottomBarButton(
+              label: canReplay
+                  ? context.l10n.puzzleContinueTraining
+                  : context.l10n.puzzleNextPuzzle,
+              onTap: state.isLineComplete && !_loadingNext ? () => unawaited(nextPuzzle()) : null,
+              icon: canReplay ? CupertinoIcons.play_arrow_solid : CupertinoIcons.arrow_right,
+              highlighted: canReplay,
+            ),
+          ],
         ),
       ),
     );

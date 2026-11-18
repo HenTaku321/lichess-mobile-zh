@@ -318,124 +318,120 @@ class _XiangqiLessonPlayerScreenState() extends ConsumerState<XiangqiLessonPlaye
           _transitionGeneration++;
           _autoDelayElapsed = false;
         },
-        child: SafeArea(
-          child: XiangqiGameLayout(
-            board: BrightnessHueFilter(
-              brightness: boardPrefs.brightness,
-              hue: boardPrefs.hue,
-              child: XiangqiBoard(
-                position: displayedPosition,
-                orientation: orientation,
-                selected: state.selected,
-                moves: boardPrefs.showLegalMoves ? state.selectedMoves : const IListConst([]),
-                lastMove: displayedMove,
-                wrongMove: state.wrongMove,
-                marked: state.intersections,
-                onTapSquare: controller.tapSquare,
-                onDragMove: controller.movePiece,
-                onCancelInteraction: controller.clearSelection,
-                animationDuration: browsing && !_historyAnimate
-                    ? Duration.zero
-                    : boardPrefs.pieceAnimationDuration,
-                showCoordinates: boardPrefs.coordinates,
-                showLastMove: boardPrefs.boardHighlights,
-                showBorder: boardPrefs.showBorder,
-                hint: hint,
-                arrows: arrows,
-                magnifyDraggedPiece: boardPrefs.magnifyDraggedPiece,
-                dragTargetKind: boardPrefs.dragTargetKind,
-                settings: XiangqiBoardSettings.fromPreferences(boardPrefs),
-                canStartDrag: (_) => state.isPlayable,
-                style: style,
+        child: XiangqiTrainingLayout(
+          board: BrightnessHueFilter(
+            brightness: boardPrefs.brightness,
+            hue: boardPrefs.hue,
+            child: XiangqiBoard(
+              position: displayedPosition,
+              orientation: orientation,
+              selected: state.selected,
+              moves: boardPrefs.showLegalMoves ? state.selectedMoves : const IListConst([]),
+              lastMove: displayedMove,
+              wrongMove: state.wrongMove,
+              marked: state.intersections,
+              onTapSquare: controller.tapSquare,
+              onDragMove: controller.movePiece,
+              onCancelInteraction: controller.clearSelection,
+              animationDuration: browsing && !_historyAnimate
+                  ? Duration.zero
+                  : boardPrefs.pieceAnimationDuration,
+              showCoordinates: boardPrefs.coordinates,
+              showLastMove: boardPrefs.boardHighlights,
+              showBorder: boardPrefs.showBorder,
+              hint: hint,
+              arrows: arrows,
+              magnifyDraggedPiece: boardPrefs.magnifyDraggedPiece,
+              dragTargetKind: boardPrefs.dragTargetKind,
+              settings: XiangqiBoardSettings.fromPreferences(boardPrefs),
+              canStartDrag: (_) => state.isPlayable,
+              style: style,
+            ),
+          ),
+          feedback: _ChapterTable(
+            description: chapter.description,
+            status: state.isSolved
+                ? context.l10n.mobileXiangqiLessonGreatJob
+                : state.isVerifying
+                ? context.l10n.mobileXiangqiLessonThinking
+                : state.wrongMove != null
+                ? context.l10n.mobileXiangqiLessonWrongMove
+                : state.expectedMove == null
+                ? context.l10n.mobileXiangqiLessonScriptEmpty
+                : null,
+            statusColor: state.isSolved
+                ? context.lichessColors.good
+                : saveState == XiangqiLessonSaveState.failed
+                ? context.lichessColors.error
+                : state.wrongMove != null
+                ? context.lichessColors.error
+                : null,
+            busy: state.isVerifying,
+          ),
+          status: _ChapterTable(
+            description: null,
+            status: saveState == XiangqiLessonSaveState.saving
+                ? '${context.l10n.save} · ${context.l10n.waiting}'
+                : saveState == XiangqiLessonSaveState.failed
+                ? '${context.l10n.save} · ${context.l10n.mobileSomethingWentWrong}'
+                : state.isSolved && !chapter.autoTransition
+                ? context.l10n.mobileXiangqiLessonNextChapter
+                : null,
+            statusColor: saveState == XiangqiLessonSaveState.failed
+                ? context.lichessColors.error
+                : null,
+            busy: saveState == XiangqiLessonSaveState.saving,
+          ),
+          moves: notation,
+          currentMoveIndex: cursor,
+          onSelectMove: state.isSolved ? _viewHistory : null,
+          moveListVisible: notation.isNotEmpty,
+          actions: BottomBar(
+            children: [
+              if (state.isSolved)
+                BottomBarButton(label: context.l10n.menu, icon: Icons.menu, onTap: _showMenu),
+              BottomBarButton(
+                label: context.l10n.mobileXiangqiLessonHint,
+                onTap: state.isPlayable && state.expectedMove != null ? controller.showHint : null,
+                icon: CupertinoIcons.lightbulb,
+                highlighted: state.hint != null,
               ),
-            ),
-            topTable: _ChapterTable(
-              description: chapter.description,
-              status: state.isSolved
-                  ? context.l10n.mobileXiangqiLessonGreatJob
-                  : state.isVerifying
-                  ? context.l10n.mobileXiangqiLessonThinking
-                  : state.wrongMove != null
-                  ? context.l10n.mobileXiangqiLessonWrongMove
-                  : state.expectedMove == null
-                  ? context.l10n.mobileXiangqiLessonScriptEmpty
-                  : null,
-              statusColor: state.isSolved
-                  ? context.lichessColors.good
-                  : saveState == XiangqiLessonSaveState.failed
-                  ? context.lichessColors.error
-                  : state.wrongMove != null
-                  ? context.lichessColors.error
-                  : null,
-              busy: state.isVerifying,
-            ),
-            bottomTable: _ChapterTable(
-              description: null,
-              status: saveState == XiangqiLessonSaveState.saving
-                  ? '${context.l10n.save} · ${context.l10n.waiting}'
-                  : saveState == XiangqiLessonSaveState.failed
-                  ? '${context.l10n.save} · ${context.l10n.mobileSomethingWentWrong}'
-                  : state.isSolved && !chapter.autoTransition
-                  ? context.l10n.mobileXiangqiLessonNextChapter
-                  : null,
-              statusColor: saveState == XiangqiLessonSaveState.failed
-                  ? context.lichessColors.error
-                  : null,
-              busy: saveState == XiangqiLessonSaveState.saving,
-            ),
-            moves: notation,
-            currentMoveIndex: cursor,
-            onSelectMove: state.isSolved ? _viewHistory : null,
-            moveListVisible: notation.isNotEmpty,
-            userActionsBar: BottomBar(
-              children: [
-                if (state.isSolved)
-                  BottomBarButton(label: context.l10n.menu, icon: Icons.menu, onTap: _showMenu),
+              BottomBarButton(
+                label: context.l10n.mobileXiangqiLessonUndo,
+                onTap: state.cursor > 0 && !state.isVerifying ? controller.undo : null,
+                icon: CupertinoIcons.arrow_uturn_left,
+              ),
+              if (saveState == XiangqiLessonSaveState.failed)
                 BottomBarButton(
-                  label: context.l10n.mobileXiangqiLessonHint,
-                  onTap: state.isPlayable && state.expectedMove != null
-                      ? controller.showHint
+                  label: context.l10n.retry,
+                  onTap: () => unawaited(controller.retryComplete()),
+                  icon: CupertinoIcons.arrow_clockwise,
+                ),
+              if (state.isSolved) ...[
+                HistoryNavigationButton(
+                  forward: false,
+                  onTap: cursor > 0 ? () => _viewHistory(cursor - 1) : null,
+                  onRepeat: () => _viewHistory(cursor - 1, fastSeek: true),
+                ),
+                HistoryNavigationButton(
+                  forward: true,
+                  onTap: cursor < state.acceptedMoves.length
+                      ? () => _viewHistory(cursor + 1)
                       : null,
-                  icon: CupertinoIcons.lightbulb,
-                  highlighted: state.hint != null,
-                ),
-                BottomBarButton(
-                  label: context.l10n.mobileXiangqiLessonUndo,
-                  onTap: state.cursor > 0 && !state.isVerifying ? controller.undo : null,
-                  icon: CupertinoIcons.arrow_uturn_left,
-                ),
-                if (saveState == XiangqiLessonSaveState.failed)
-                  BottomBarButton(
-                    label: context.l10n.retry,
-                    onTap: () => unawaited(controller.retryComplete()),
-                    icon: CupertinoIcons.arrow_clockwise,
-                  ),
-                if (state.isSolved) ...[
-                  HistoryNavigationButton(
-                    forward: false,
-                    onTap: cursor > 0 ? () => _viewHistory(cursor - 1) : null,
-                    onRepeat: () => _viewHistory(cursor - 1, fastSeek: true),
-                  ),
-                  HistoryNavigationButton(
-                    forward: true,
-                    onTap: cursor < state.acceptedMoves.length
-                        ? () => _viewHistory(cursor + 1)
-                        : null,
-                    onRepeat: () => _viewHistory(cursor + 1, fastSeek: true),
-                  ),
-                ],
-                BottomBarButton(
-                  label: context.l10n.mobileXiangqiLessonPreviousChapter,
-                  onTap: _index > 0 ? () => _goTo(_index - 1) : null,
-                  icon: CupertinoIcons.chevron_left,
-                ),
-                BottomBarButton(
-                  label: context.l10n.mobileXiangqiLessonNextChapter,
-                  onTap: _index + 1 < widget.chapters.length ? () => _goTo(_index + 1) : null,
-                  icon: CupertinoIcons.chevron_right,
+                  onRepeat: () => _viewHistory(cursor + 1, fastSeek: true),
                 ),
               ],
-            ),
+              BottomBarButton(
+                label: context.l10n.mobileXiangqiLessonPreviousChapter,
+                onTap: _index > 0 ? () => _goTo(_index - 1) : null,
+                icon: CupertinoIcons.chevron_left,
+              ),
+              BottomBarButton(
+                label: context.l10n.mobileXiangqiLessonNextChapter,
+                onTap: _index + 1 < widget.chapters.length ? () => _goTo(_index + 1) : null,
+                icon: CupertinoIcons.chevron_right,
+              ),
+            ],
           ),
         ),
       ),

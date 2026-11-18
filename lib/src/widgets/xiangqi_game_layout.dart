@@ -11,6 +11,7 @@ import 'package:lichess_mobile/src/utils/screen.dart';
 import 'package:lichess_mobile/src/widgets/evaluation_gauge.dart';
 import 'package:lichess_mobile/src/widgets/game_surface_layout.dart';
 import 'package:lichess_mobile/src/widgets/move_list.dart';
+import 'package:lichess_mobile/src/widgets/training_board_layout.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// Compatibility helpers; both games use the same evaluation-gauge presentation.
@@ -79,15 +80,8 @@ class const XiangqiGameLayout({
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final prefs = ref.watch(boardPreferencesProvider);
-    final radius = boardRadius ?? (isTabletOrLarger(context) ? Styles.boardBorderRadius : null);
-    final framedBoard = radius == null
-        ? board
-        : Container(
-            decoration: BoxDecoration(borderRadius: radius, boxShadow: boardShadows),
-            child: ClipRRect(borderRadius: radius, child: board),
-          );
     return GameSurfaceLayout(
-      boardBuilder: (_, _) => framedBoard,
+      boardBuilder: (_, _) => _framedBoard(context, board, boardRadius),
       boardHeightRatio: xiangqiBoardHeightRatio(prefs),
       topTableBuilder: (_, _) =>
           RotatedBox(quarterTurns: topTableUpsideDown ? 2 : 0, child: topTable),
@@ -100,14 +94,61 @@ class const XiangqiGameLayout({
       moveListVisible: moveListVisible,
       moveListBuilder: moves == null
           ? null
-          : (type) => MoveList(
-              type: type,
-              slicedMoves: moves!.asMap().entries.slices(2),
-              currentMoveIndex: currentMoveIndex,
-              pieceNotation: PieceNotation.letter,
-              onSelectMove: onSelectMove,
-            ),
+          : (type) => _notationList(type, moves!, currentMoveIndex, onSelectMove),
       userActionsBar: userActionsBar,
+    );
+  }
+}
+
+Widget _framedBoard(BuildContext context, Widget board, [BorderRadius? boardRadius]) {
+  final radius = boardRadius ?? (isTabletOrLarger(context) ? Styles.boardBorderRadius : null);
+  return radius == null
+      ? board
+      : Container(
+          decoration: BoxDecoration(borderRadius: radius, boxShadow: boardShadows),
+          child: ClipRRect(borderRadius: radius, child: board),
+        );
+}
+
+MoveList _notationList(
+  MoveListType type,
+  IList<String> moves,
+  int cursor,
+  ValueChanged<int>? select,
+) => MoveList(
+  type: type,
+  slicedMoves: moves.asMap().entries.slices(2),
+  currentMoveIndex: cursor,
+  pieceNotation: PieceNotation.letter,
+  onSelectMove: select,
+);
+
+/// Adapts the board artwork and the visible line to the shared solver page.
+class const XiangqiTrainingLayout({
+  required final Widget board,
+  required final Widget feedback,
+  required final Widget status,
+  required final IList<String> moves,
+  required final int currentMoveIndex,
+  final ValueChanged<int>? onSelectMove,
+  required final Widget actions,
+  super.key,
+}) extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final prefs = ref.watch(boardPreferencesProvider);
+    Widget history(MoveListType type) => _notationList(type, moves, currentMoveIndex, onSelectMove);
+    return TrainingBoardLayout(
+      boardHeightRatio: xiangqiBoardHeightRatio(prefs),
+      boardOnRight: prefs.landscapeBoardPosition == .right,
+      boardBuilder: (_) => _framedBoard(context, board),
+      feedback: feedback,
+      status: status,
+      landscapeHistory: prefs.moveListDisplay ? history(.stacked) : null,
+      portraitHistory: prefs.moveListDisplay && !isShortVerticalScreen(context)
+          ? history(.inline)
+          : null,
+      actions: actions,
     );
   }
 }

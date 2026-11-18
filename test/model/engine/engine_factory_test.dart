@@ -228,7 +228,7 @@ void main() {
           connect: (spec) async {
             starts++;
             await releaseStart.future;
-            return engine.connect(spec);
+            return await engine.connect(spec);
           },
         );
         const spec = StockfishSpec.light();

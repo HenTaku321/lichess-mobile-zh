@@ -337,7 +337,7 @@ class WindowService() with WindowListener {
     try {
       await Future.wait<void>([
         if (_beforeClose case final cleanup?) Future<void>.sync(cleanup),
-        maximized.value ? _saveMaximized() : _saveNormal(),
+        if (maximized.value) _saveMaximized() else _saveNormal(),
       ]).timeout(_closeTimeout);
     } catch (error, stack) {
       _logger.warning('Could not finish cleanup before closing the window', error, stack);

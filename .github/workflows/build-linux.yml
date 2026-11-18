@@ -48,11 +48,16 @@ name: Build Linux desktop bundle
 
 on:
   workflow_dispatch:
+    inputs:
+      verification_only:
+        description: Upload the bundle for native testing without replacing the rolling release
+        type: boolean
+        default: false
 
 # Not per-ref, like the iOS build: a newer dispatch cancels the one running,
 # so at most one Linux runner is active.
 concurrency:
-  group: build-linux-desktop
+  group: build-linux-${{ inputs.verification_only && github.ref || 'desktop' }}
   cancel-in-progress: true
 
 permissions:
@@ -179,8 +184,18 @@ jobs:
           ls -lh out/lichess-zh-linux-x86_64.tar.gz
           sha256sum out/lichess-zh-linux-x86_64.tar.gz
 
+      - name: Upload verification bundle
+        if: inputs.verification_only
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: linux-verification-${{ github.sha }}
+          path: out/lichess-zh-linux-x86_64.tar.gz
+          compression-level: 0
+          retention-days: 3
+
       # Publish to the rolling "linux-latest" release so exactly one tarball is kept.
       - name: Publish to rolling GitHub Release
+        if: ${{ !inputs.verification_only }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

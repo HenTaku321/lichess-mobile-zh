@@ -1,5 +1,8 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/styles/styles.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
+import 'package:lichess_mobile/src/widgets/list.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_refresh.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// One source's block on a page that shows Lichess and xiangqi.com together.
@@ -54,4 +57,30 @@ class const SourcePreviewBlock({
       ],
     );
   }
+}
+
+/// Keeps loading and retry feedback next to the data that a single request owns.
+class const SourceResult<T>({
+  required final AsyncValue<T> state,
+  required final VoidCallback onRetry,
+  required final Widget Function(T) data,
+  final Widget? header,
+}) extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => state.when(
+    skipLoadingOnRefresh: state.hasValue,
+    data: data,
+    loading: () => ListSection(
+      header: header,
+      children: const [
+        Center(
+          child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator.adaptive()),
+        ),
+      ],
+    ),
+    error: (_, _) => ListSection(
+      header: header,
+      children: [XiangqiRetryTile(onRetry: onRetry)],
+    ),
+  );
 }

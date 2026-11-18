@@ -1,4 +1,3 @@
-import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/account/account_preferences.dart';
 import 'package:lichess_mobile/src/model/common/perf.dart';
@@ -14,17 +13,6 @@ import 'package:lichess_mobile/src/widgets/list.dart';
 import 'package:lichess_mobile/src/widgets/source_preview_block.dart';
 import 'package:material_ui/material_ui.dart';
 
-final _xiangqiHubLeaderboardsProvider =
-    FutureProvider.autoDispose<IList<(XiangqiRatingType, XiangqiLeaderboard)>>((ref) async {
-      final boards = await Future.wait([
-        for (final mode in XiangqiRatingType.values)
-          ref
-              .watch(xiangqiLeaderboardProvider((mode, null, 1)).future)
-              .then((board) => (mode, board)),
-      ]);
-      return boards.lock;
-    });
-
 /// Leaderboards from both sites on one page.
 class const LeaderboardHubScreen({super.key}) extends ConsumerStatefulWidget {
   static Route<void> buildRoute() => buildScreenRoute(screen: const LeaderboardHubScreen());
@@ -39,10 +27,6 @@ class _LeaderboardHubScreenState() extends ConsumerState<LeaderboardHubScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final lichessTop = ref.watch(top1Provider);
-    final lichessAll = ref.watch(leaderboardProvider);
-    final xiangqi = ref.watch(_xiangqiHubLeaderboardsProvider);
-
     return Scaffold(
       appBar: AppBar(title: Text(context.l10n.leaderboard)),
       body: ListView(
@@ -52,8 +36,8 @@ class _LeaderboardHubScreenState() extends ConsumerState<LeaderboardHubScreen> {
             title: const Text('Lichess'),
             expandedState: _lichessExpanded,
             onToggle: () => setState(() => _lichessExpanded = !_lichessExpanded),
-            preview: _LichessLeaderboard(state: lichessTop, expanded: false, all: lichessAll),
-            expanded: _LichessLeaderboard(state: lichessTop, expanded: true, all: lichessAll),
+            preview: const _LichessLeaderboard(expanded: false),
+            expanded: const _LichessLeaderboard(expanded: true),
           ),
           const Divider(height: 1),
           SourcePreviewBlock(
@@ -61,8 +45,8 @@ class _LeaderboardHubScreenState() extends ConsumerState<LeaderboardHubScreen> {
             title: const Text('Xiangqi.com'),
             expandedState: _xiangqiExpanded,
             onToggle: () => setState(() => _xiangqiExpanded = !_xiangqiExpanded),
-            preview: _XiangqiLeaderboards(state: xiangqi, expanded: false),
-            expanded: _XiangqiLeaderboards(state: xiangqi, expanded: true),
+            preview: const _XiangqiLeaderboards(expanded: false),
+            expanded: const _XiangqiLeaderboards(expanded: true),
           ),
           const SizedBox(height: 24.0),
         ],
@@ -71,15 +55,13 @@ class _LeaderboardHubScreenState() extends ConsumerState<LeaderboardHubScreen> {
   }
 }
 
-class const _LichessLeaderboard({
-  required final AsyncValue<Top1Leaderboard> state,
-  required final AsyncValue<Leaderboard> all,
-  required final bool expanded,
-}) extends StatelessWidget {
+class const _LichessLeaderboard({required final bool expanded}) extends ConsumerWidget {
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     if (!expanded) {
-      return state.when(
+      return SourceResult(
+        state: ref.watch(top1Provider),
+        onRetry: () => ref.invalidate(top1Provider),
         data: (top1) {
           const previewPerfs = [Perf.bullet, Perf.blitz, Perf.rapid, Perf.classical];
           final entries = [
@@ -88,7 +70,9 @@ class const _LichessLeaderboard({
           ];
           if (entries.isEmpty) {
             return ListSection(
-              children: [ListTile(dense: true, title: Text(context.l10n.mobileSomethingWentWrong))],
+              children: [
+                ListTile(dense: true, title: Text(context.l10n.mobileXiangqiLeaderboardEmpty)),
+              ],
             );
           }
           return ListSection(
@@ -99,18 +83,11 @@ class const _LichessLeaderboard({
             ],
           );
         },
-        loading: () => const Center(
-          child: Padding(
-            padding: EdgeInsets.all(24.0),
-            child: CircularProgressIndicator.adaptive(),
-          ),
-        ),
-        error: (error, stackTrace) => ListSection(
-          children: [ListTile(dense: true, title: Text(context.l10n.mobileSomethingWentWrong))],
-        ),
       );
     }
-    return all.when(
+    return SourceResult(
+      state: ref.watch(leaderboardProvider),
+      onRetry: () => ref.invalidate(leaderboardProvider),
       data: (data) {
         final categories = <(Perf, List<LeaderboardUser>)>[
           (Perf.bullet, data.bullet),
@@ -142,52 +119,45 @@ class const _LichessLeaderboard({
           ],
         );
       },
-      loading: () => const Center(
-        child: Padding(padding: EdgeInsets.all(24.0), child: CircularProgressIndicator.adaptive()),
-      ),
-      error: (error, stackTrace) => ListSection(
-        children: [ListTile(dense: true, title: Text(context.l10n.mobileSomethingWentWrong))],
-      ),
     );
   }
 }
 
-class const _XiangqiLeaderboards({
-  required final AsyncValue<IList<(XiangqiRatingType, XiangqiLeaderboard)>> state,
-  required final bool expanded,
-}) extends ConsumerWidget {
+class const _XiangqiLeaderboards({required final bool expanded}) extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => Column(
+    children: [
+      for (final mode in XiangqiRatingType.values)
+        _SpeedLeaderboard(mode: mode, expanded: expanded),
+    ],
+  );
+}
+
+class const _SpeedLeaderboard({required final XiangqiRatingType mode, required final bool expanded})
+    extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return state.when(
-      data: (boards) => Column(
+    final provider = xiangqiLeaderboardProvider((mode, null, 1));
+    final showRatings = ref.watch(ratingsVisibleProvider(false));
+    final header = Text(_modeLabel(context, mode));
+    return SourceResult(
+      state: ref.watch(provider),
+      onRetry: () => ref.invalidate(provider),
+      header: header,
+      data: (board) => ListSection(
+        hasLeading: board.entries.isNotEmpty,
+        header: header,
         children: [
-          for (final (mode, board) in boards)
-            if (board.entries.isNotEmpty)
-              ListSection(
-                hasLeading: true,
-                header: Text(_modeLabel(context, mode)),
-                children: [
-                  for (final entry in (expanded ? board.entries : board.entries.take(1)))
-                    ListTile(
-                      dense: true,
-                      leading: SizedBox(
-                        width: 24,
-                        child: Text('${entry.rank}', textAlign: TextAlign.end),
-                      ),
-                      title: Text(entry.player.name, overflow: TextOverflow.ellipsis),
-                      trailing: ref.watch(ratingsVisibleProvider(false))
-                          ? Text('${entry.rating}')
-                          : null,
-                    ),
-                ],
-              ),
+          if (board.entries.isEmpty)
+            ListTile(dense: true, title: Text(context.l10n.mobileXiangqiLeaderboardEmpty)),
+          for (final entry in (expanded ? board.entries : board.entries.take(1)))
+            ListTile(
+              dense: true,
+              leading: SizedBox(width: 24, child: Text('${entry.rank}', textAlign: TextAlign.end)),
+              title: Text(entry.player.name, overflow: TextOverflow.ellipsis),
+              trailing: showRatings ? Text('${entry.rating}') : null,
+            ),
         ],
-      ),
-      loading: () => const Center(
-        child: Padding(padding: EdgeInsets.all(24.0), child: CircularProgressIndicator.adaptive()),
-      ),
-      error: (error, stackTrace) => ListSection(
-        children: [ListTile(dense: true, title: Text(context.l10n.mobileSomethingWentWrong))],
       ),
     );
   }

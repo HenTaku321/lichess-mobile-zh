@@ -31,14 +31,16 @@ class _TournamentsHubScreenState() extends ConsumerState<TournamentsHubScreen> {
   Widget build(BuildContext context) {
     final lichess = ref.watch(tournamentsProvider);
     final xiangqi = ref.watch(xiangqiTournamentsProvider);
+    void retryLichess() => ref.invalidate(tournamentsProvider);
+    void retryXiangqi() => ref.invalidate(xiangqiTournamentsProvider);
 
     return Scaffold(
       appBar: AppBar(title: Text(context.l10n.arenaArenaTournaments)),
       body: RefreshIndicator.adaptive(
         onRefresh: () async {
           await Future.wait([
-            ref.refresh(tournamentsProvider.future),
-            ref.refresh(xiangqiTournamentsProvider.future),
+            AsyncValue.guard(() => ref.refresh(tournamentsProvider.future)),
+            AsyncValue.guard(() => ref.refresh(xiangqiTournamentsProvider.future)),
           ]);
         },
         child: ListView(
@@ -51,8 +53,8 @@ class _TournamentsHubScreenState() extends ConsumerState<TournamentsHubScreen> {
               summary: _Summary(
                 value: lichess.value == null ? null : _lichessCount(lichess.value!),
               ),
-              preview: _LichessTournaments(state: lichess, expanded: false),
-              expanded: _LichessTournaments(state: lichess, expanded: true),
+              preview: _LichessTournaments(state: lichess, onRetry: retryLichess, expanded: false),
+              expanded: _LichessTournaments(state: lichess, onRetry: retryLichess, expanded: true),
             ),
             const Divider(height: 1),
             SourcePreviewBlock(
@@ -63,8 +65,8 @@ class _TournamentsHubScreenState() extends ConsumerState<TournamentsHubScreen> {
               summary: _Summary(
                 value: xiangqi.value == null ? null : _xiangqiCount(xiangqi.value!),
               ),
-              preview: _XiangqiTournaments(state: xiangqi, expanded: false),
-              expanded: _XiangqiTournaments(state: xiangqi, expanded: true),
+              preview: _XiangqiTournaments(state: xiangqi, onRetry: retryXiangqi, expanded: false),
+              expanded: _XiangqiTournaments(state: xiangqi, onRetry: retryXiangqi, expanded: true),
             ),
             const SizedBox(height: 24.0),
           ],
@@ -87,10 +89,13 @@ class const _Summary({required final int? value}) extends StatelessWidget {
 class const _LichessTournaments({
   required final AsyncValue<TournamentLists> state,
   required final bool expanded,
+  required final VoidCallback onRetry,
 }) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return state.when(
+    return SourceResult(
+      state: state,
+      onRetry: onRetry,
       data: (lists) {
         final rows = expanded
             ? [...lists.started, ...lists.created, ...lists.finished]
@@ -107,12 +112,6 @@ class const _LichessTournaments({
           children: [for (final tournament in rows) _LichessTournamentRow(tournament: tournament)],
         );
       },
-      loading: () => const Center(
-        child: Padding(padding: EdgeInsets.all(24.0), child: CircularProgressIndicator.adaptive()),
-      ),
-      error: (error, stackTrace) => ListSection(
-        children: [ListTile(dense: true, title: Text(context.l10n.mobileSomethingWentWrong))],
-      ),
     );
   }
 }
@@ -142,10 +141,13 @@ class const _LichessTournamentRow({required final LightTournament tournament})
 class const _XiangqiTournaments({
   required final AsyncValue<XiangqiTournaments> state,
   required final bool expanded,
+  required final VoidCallback onRetry,
 }) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return state.when(
+    return SourceResult(
+      state: state,
+      onRetry: onRetry,
       data: (lists) {
         final rows = expanded
             ? [...lists.active, ...lists.previous]
@@ -162,12 +164,6 @@ class const _XiangqiTournaments({
           children: [for (final tournament in rows) _XiangqiTournamentRow(tournament: tournament)],
         );
       },
-      loading: () => const Center(
-        child: Padding(padding: EdgeInsets.all(24.0), child: CircularProgressIndicator.adaptive()),
-      ),
-      error: (error, stackTrace) => ListSection(
-        children: [ListTile(dense: true, title: Text(context.l10n.mobileSomethingWentWrong))],
-      ),
     );
   }
 }

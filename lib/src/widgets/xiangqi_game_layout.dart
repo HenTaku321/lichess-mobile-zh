@@ -130,6 +130,7 @@ class const XiangqiTrainingLayout({
   required final Widget status,
   required final IList<String> moves,
   required final int currentMoveIndex,
+  final bool moveListVisible = true,
   final ValueChanged<int>? onSelectMove,
   required final Widget actions,
   super.key,
@@ -137,6 +138,7 @@ class const XiangqiTrainingLayout({
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final prefs = ref.watch(boardPreferencesProvider);
+    final showMoves = prefs.moveListDisplay && moveListVisible;
     Widget history(MoveListType type) => _notationList(type, moves, currentMoveIndex, onSelectMove);
     return TrainingBoardLayout(
       boardHeightRatio: xiangqiBoardHeightRatio(prefs),
@@ -144,10 +146,8 @@ class const XiangqiTrainingLayout({
       boardBuilder: (_) => _framedBoard(context, board),
       feedback: feedback,
       status: status,
-      landscapeHistory: prefs.moveListDisplay ? history(.stacked) : null,
-      portraitHistory: prefs.moveListDisplay && !isShortVerticalScreen(context)
-          ? history(.inline)
-          : null,
+      landscapeHistory: showMoves ? history(.stacked) : null,
+      portraitHistory: showMoves && !isShortVerticalScreen(context) ? history(.inline) : null,
       actions: actions,
     );
   }

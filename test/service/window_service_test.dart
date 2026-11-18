@@ -328,6 +328,18 @@ void main() {
       expect(stored()?.isMaximized, isFalse);
     });
 
+    test('routes the native close event through the saved close flow', () async {
+      channel.bounds = const Rect.fromLTWH(100, 50, 1600, 900);
+      final service = WindowService();
+      await service.start();
+
+      service.onWindowClose();
+      await pumpEventQueue();
+
+      expect(channel.methods, contains('close'));
+      expect(stored()?.size, const Size(1600, 900));
+    });
+
     test('watches nothing off Linux, not even to initialize', () async {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
       final service = WindowService();

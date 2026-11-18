@@ -5,7 +5,11 @@ import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_storage.dart';
 
 /// The home screen reads the same save slots and eligibility checks as the game screens.
 /// A finished game still identifies a returning player.
-enum ComputerSlotStatus { empty, resumable, finished }
+enum ComputerSlotStatus() {
+  empty,
+  resumable,
+  finished,
+}
 
 final computerGameSlotProvider = FutureProvider.autoDispose.family<ComputerSlotStatus, GameFamily>((
   ref,

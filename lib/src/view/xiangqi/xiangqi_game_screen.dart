@@ -295,13 +295,13 @@ class _BodyState() extends ConsumerState<_Body> {
     final initialFen = widget.initialFen;
     if (initialFen != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted)
-          _showNewGameSheet(
-            context,
-            ref,
-            initialFen: initialFen,
-            onSwitchToChess: widget.onSwitchToChess,
-          );
+        if (!mounted) return;
+        _showNewGameSheet(
+          context,
+          ref,
+          initialFen: initialFen,
+          onSwitchToChess: widget.onSwitchToChess,
+        );
       });
       return;
     }

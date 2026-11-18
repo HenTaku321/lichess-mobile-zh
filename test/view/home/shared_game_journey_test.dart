@@ -12,7 +12,6 @@ import 'package:lichess_mobile/src/view/home/home_tab_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_analysis_screen.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_game_screen.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
-import 'package:material_ui/material_ui.dart';
 
 import '../../binding.dart';
 import '../../test_provider_scope.dart';
@@ -21,7 +20,7 @@ import '../xiangqi/xiangqi_game_screen_test.dart' as game;
 
 // Only the filesystem boundary is replaced. Read the installed release's record through the
 // production decoder each time so a return visit cannot reuse the first route's controller.
-class _LegacySlot(this.record) implements XiangqiGameStorage {
+class _LegacySlot(var Map<String, dynamic>? record) implements XiangqiGameStorage {
   @override
   Future<SavedXiangqiGame?> fetchGame() async =>
       record == null ? null : SavedXiangqiGame.fromJson(record!);
@@ -31,8 +30,6 @@ class _LegacySlot(this.record) implements XiangqiGameStorage {
 
   @override
   Future<void> delete() async => record = null;
-
-  Map<String, dynamic>? record;
 }
 
 void main() {

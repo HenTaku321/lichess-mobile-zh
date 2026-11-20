@@ -11,6 +11,7 @@ import 'package:lichess_mobile/src/model/engine/engine_failure.dart';
 import 'package:lichess_mobile/src/model/engine/engine_spec.dart';
 
 import 'fake_engine.dart';
+import 'fake_transport.dart';
 
 /// A minimal search, for checking which engine answers it.
 SearchRequest makeRequest({SearchLimit limit = const SearchLimit.movetime(Duration(seconds: 1))}) =>
@@ -24,6 +25,11 @@ SearchRequest makeRequest({SearchLimit limit = const SearchLimit.movetime(Durati
 
 /// A factory that starts [engine] instead of a real one.
 EngineFactory factoryFor(FakeEngine engine) => EngineFactory(connect: engine.connect);
+
+class FailedDisposeTransport() extends FakeTransport {
+  @override
+  Future<void> dispose() async => throw TimeoutException('native reader is still alive');
+}
 
 void main() {
   group('EngineFactory', () {
@@ -195,6 +201,21 @@ void main() {
 
       expect(engine.quitCount, 0);
       expect(light.spec, isNot(fairy.spec));
+    });
+
+    test('failed background cleanup remains visible to shutdown', () async {
+      final transport = FailedDisposeTransport();
+      final factory = EngineFactory(connect: (_) async => transport);
+      await factory.create(const StockfishSpec.light());
+      transport.die(
+        const EngineFailure(
+          kind: EngineFailureKind.runtime,
+          message: 'native reader failed',
+          engine: 'test',
+        ),
+      );
+      await pumpEventQueue();
+      await expectLater(factory.shutdown(), throwsA(isA<TimeoutException>()));
     });
 
     test('shutdown joins a quit in progress and drains every live slot', () async {

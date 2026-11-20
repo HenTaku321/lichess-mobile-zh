@@ -9,6 +9,7 @@ import 'package:lichess_mobile/src/model/engine/engine_spec.dart';
 import 'package:lichess_mobile/src/model/engine/engine_transport.dart';
 import 'package:lichess_mobile/src/model/engine/system_stockfish_transport.dart';
 import 'package:logging/logging.dart';
+import 'package:multistockfish/multistockfish.dart';
 
 final _logger = Logger('EngineFactory');
 
@@ -77,10 +78,15 @@ class EngineFactory({EngineConnector? connect}) {
 
   /// Seal the factory before draining it. Each slot's last claim also waits for its predecessors.
   Future<void> shutdown() => _shutdown ??= Future.microtask(() async {
-    await Future.wait<void>([
-      ..._starting.values,
-      for (final engine in _live.values) engine.dispose(),
-    ]);
+    try {
+      await Future.wait<void>([
+        ..._starting.values,
+        for (final engine in _live.values) engine.dispose(),
+      ]);
+    } finally {
+      // Failed plugin creates can retain native workers without yielding a transport.
+      await Stockfish.shutdownAll();
+    }
   });
 
   void _checkOpen(EngineSpec spec) {
@@ -205,8 +211,13 @@ class EngineFactory({EngineConnector? connect}) {
       engine.death.then((failure) async {
         // A transport can report a failed session while the native reader is still alive.
         // Keep it reachable by shutdown until the owning handle has actually been disposed.
-        if (failure != null || engine.isDisposed) await engine.dispose();
-        if (identical(_live[spec.slot], engine)) _live.remove(spec.slot);
+        try {
+          // Even a clean main exit can precede its native stdout reader stopping.
+          await engine.dispose();
+          if (identical(_live[spec.slot], engine)) _live.remove(spec.slot);
+        } catch (error, stack) {
+          _logger.severe('The native engine has not finished shutting down', error, stack);
+        }
       }),
     );
 

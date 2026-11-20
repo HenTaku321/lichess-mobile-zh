@@ -116,27 +116,27 @@ dependency_overrides:
   multistockfish:
     git:
       url: https://github.com/HenTaku321/dart-multistockfish.git
-      ref: f9dd136b39b0e5b81030ca52db242f6db53287a9
+      ref: 000806a18c892652f26e194093e5e0e61dbc2a27
       path: pkgs/multistockfish
   multistockfish_chess:
     git:
       url: https://github.com/HenTaku321/dart-multistockfish.git
-      ref: f9dd136b39b0e5b81030ca52db242f6db53287a9
+      ref: 000806a18c892652f26e194093e5e0e61dbc2a27
       path: pkgs/multistockfish_chess
   multistockfish_light:
     git:
       url: https://github.com/HenTaku321/dart-multistockfish.git
-      ref: f9dd136b39b0e5b81030ca52db242f6db53287a9
+      ref: 000806a18c892652f26e194093e5e0e61dbc2a27
       path: pkgs/multistockfish_light
   multistockfish_pikafish:
     git:
       url: https://github.com/HenTaku321/dart-multistockfish.git
-      ref: f9dd136b39b0e5b81030ca52db242f6db53287a9
+      ref: 000806a18c892652f26e194093e5e0e61dbc2a27
       path: pkgs/multistockfish_pikafish
   multistockfish_variant:
     git:
       url: https://github.com/HenTaku321/dart-multistockfish.git
-      ref: f9dd136b39b0e5b81030ca52db242f6db53287a9
+      ref: 000806a18c892652f26e194093e5e0e61dbc2a27
       path: pkgs/multistockfish_variant
 
 flutter:

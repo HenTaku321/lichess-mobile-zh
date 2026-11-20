@@ -226,7 +226,7 @@ jobs:
 
       - name: Run desktop shutdown regressions
         if: ${{ !cancelled() }}
-        run: flutter test --no-pub --reporter expanded test/service/window_service_test.dart test/model/engine/system_stockfish_transport_test.dart test/service/linux_audio_processes_test.dart
+        run: flutter test --no-pub --reporter expanded test/service/window_service_test.dart test/model/engine/system_stockfish_transport_test.dart test/service/linux_audio_processes_test.dart test/model/engine/engine_factory_test.dart test/model/engine/engine_providers_test.dart
 
       - name: Analyze project source
         id: analyze

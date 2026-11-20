@@ -1098,8 +1098,8 @@ packages:
     dependency: "direct main"
     description:
       path: "pkgs/multistockfish"
-      ref: f9dd136b39b0e5b81030ca52db242f6db53287a9
-      resolved-ref: f9dd136b39b0e5b81030ca52db242f6db53287a9
+      ref: 000806a18c892652f26e194093e5e0e61dbc2a27
+      resolved-ref: 000806a18c892652f26e194093e5e0e61dbc2a27
       url: "https://github.com/HenTaku321/dart-multistockfish.git"
     source: git
     version: "0.6.1"
@@ -1107,8 +1107,8 @@ packages:
     dependency: "direct overridden"
     description:
       path: "pkgs/multistockfish_chess"
-      ref: f9dd136b39b0e5b81030ca52db242f6db53287a9
-      resolved-ref: f9dd136b39b0e5b81030ca52db242f6db53287a9
+      ref: 000806a18c892652f26e194093e5e0e61dbc2a27
+      resolved-ref: 000806a18c892652f26e194093e5e0e61dbc2a27
       url: "https://github.com/HenTaku321/dart-multistockfish.git"
     source: git
     version: "0.6.0"
@@ -1116,8 +1116,8 @@ packages:
     dependency: "direct overridden"
     description:
       path: "pkgs/multistockfish_light"
-      ref: f9dd136b39b0e5b81030ca52db242f6db53287a9
-      resolved-ref: f9dd136b39b0e5b81030ca52db242f6db53287a9
+      ref: 000806a18c892652f26e194093e5e0e61dbc2a27
+      resolved-ref: 000806a18c892652f26e194093e5e0e61dbc2a27
       url: "https://github.com/HenTaku321/dart-multistockfish.git"
     source: git
     version: "0.1.0"
@@ -1125,8 +1125,8 @@ packages:
     dependency: "direct overridden"
     description:
       path: "pkgs/multistockfish_pikafish"
-      ref: f9dd136b39b0e5b81030ca52db242f6db53287a9
-      resolved-ref: f9dd136b39b0e5b81030ca52db242f6db53287a9
+      ref: 000806a18c892652f26e194093e5e0e61dbc2a27
+      resolved-ref: 000806a18c892652f26e194093e5e0e61dbc2a27
       url: "https://github.com/HenTaku321/dart-multistockfish.git"
     source: git
     version: "0.1.0"
@@ -1134,8 +1134,8 @@ packages:
     dependency: "direct overridden"
     description:
       path: "pkgs/multistockfish_variant"
-      ref: f9dd136b39b0e5b81030ca52db242f6db53287a9
-      resolved-ref: f9dd136b39b0e5b81030ca52db242f6db53287a9
+      ref: 000806a18c892652f26e194093e5e0e61dbc2a27
+      resolved-ref: 000806a18c892652f26e194093e5e0e61dbc2a27
       url: "https://github.com/HenTaku321/dart-multistockfish.git"
     source: git
     version: "0.4.0"

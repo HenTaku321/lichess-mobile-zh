@@ -63,7 +63,11 @@ class EngineHolder(final EngineSpec spec) extends AsyncNotifier<Engine> {
     // plugin refuses the next engine over.
     if (!ref.mounted) {
       _logger.info('Nobody is waiting for $spec any more; disposing the engine that just started');
-      unawaited(engine.dispose());
+      unawaited(
+        engine.dispose().catchError((Object error, StackTrace stack) {
+          _logger.severe('Could not dispose $spec', error, stack);
+        }),
+      );
       throw EngineNoLongerWatched(spec);
     }
 
@@ -72,7 +76,11 @@ class EngineHolder(final EngineSpec spec) extends AsyncNotifier<Engine> {
     ref.onDispose(() {
       // Fire and forget: the factory holds the slot until the engine has actually exited, and
       // makes the next create wait for it.
-      unawaited(engine.dispose());
+      unawaited(
+        engine.dispose().catchError((Object error, StackTrace stack) {
+          _logger.severe('Could not dispose $spec', error, stack);
+        }),
+      );
     });
 
     // Only a working engine is worth holding on to: a failed one should be built again from

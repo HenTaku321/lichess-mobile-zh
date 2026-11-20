@@ -158,8 +158,9 @@ class PluginTransport._(@override final PluginEngineSpec spec, final Stockfish _
         .dispose()
         .catchError((Object e, StackTrace st) {
           _logger.warning('The engine could not be disposed cleanly', e, st);
+          Error.throwWithStackTrace(e, st);
         })
-        .whenComplete(() {
+        .then((_) {
           _die(null);
           _stockfish.state.removeListener(_onStockfishStateChange);
           if (!_controller.isClosed) _controller.close();
@@ -336,8 +337,9 @@ class Lc0Transport._(@override final Lc0Spec spec, final Lc0 _lc0) implements En
         .dispose()
         .catchError((Object e, StackTrace st) {
           _logger.warning('The engine could not be disposed cleanly', e, st);
+          Error.throwWithStackTrace(e, st);
         })
-        .whenComplete(() {
+        .then((_) {
           _die(null);
           _lc0.state.removeListener(_onLc0StateChange);
           if (!_controller.isClosed) _controller.close();

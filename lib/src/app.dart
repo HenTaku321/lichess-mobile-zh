@@ -31,6 +31,7 @@ import 'package:lichess_mobile/src/service/notification_service.dart';
 import 'package:lichess_mobile/src/service/quick_actions.dart';
 import 'package:lichess_mobile/src/service/recap_service.dart';
 import 'package:lichess_mobile/src/service/shared_pgn_service.dart';
+import 'package:lichess_mobile/src/service/sound_service.dart';
 import 'package:lichess_mobile/src/service/window_service.dart';
 import 'package:lichess_mobile/src/tab_navigation.dart';
 import 'package:lichess_mobile/src/tab_scaffold.dart';
@@ -158,7 +159,14 @@ class _AppState() extends ConsumerState<Application> {
       unawaited(
         ref
             .read(windowServiceProvider)
-            .start(beforeClose: ref.read(engineFactoryProvider).shutdown),
+            .start(
+              beforeClose: () async {
+                await Future.wait<void>([
+                  SoundService.shutdown(),
+                  ref.read(engineFactoryProvider).shutdown(),
+                ]);
+              },
+            ),
       );
     }
 

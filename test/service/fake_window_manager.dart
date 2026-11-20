@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 /// otherwise have to keep two answers to the same question in step by hand.
 class FakeWindowChannel() {
   final List<MethodCall> calls = [];
+  final List<MethodCall> shutdownCalls = [];
 
   /// The bounds [getBounds] answers with.
   Rect bounds = const Rect.fromLTWH(100, 50, 1280, 720);
@@ -66,6 +67,13 @@ class FakeWindowChannel() {
   /// window to react the way the plugin would.
   void install({void Function(FakeWindowChannel channel, String method)? onCall}) {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+      const MethodChannel('lichess/desktop_shutdown'),
+      (call) async {
+        shutdownCalls.add(call);
+        return null;
+      },
+    );
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
       const MethodChannel('window_manager'),
       (call) async {
         calls.add(call);
@@ -96,6 +104,10 @@ class FakeWindowChannel() {
   }
 
   void uninstall() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+      const MethodChannel('lichess/desktop_shutdown'),
+      null,
+    );
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
       const MethodChannel('window_manager'),
       null,

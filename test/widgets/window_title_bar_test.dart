@@ -94,6 +94,7 @@ void main() {
 
       await tester.tap(find.byIcon(Icons.close));
       await tester.pump();
+      expect(channel.shutdownCalls.map((call) => call.method), ['arm']);
       expect(channel.methods, contains('destroy'));
     });
 

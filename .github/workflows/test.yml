@@ -219,6 +219,9 @@ jobs:
           dart format --output=none --set-exit-if-changed $(find test -name "*.dart" -not \( -name "*.*freezed.dart" -o -name "*.*g.dart" \) )
         # run: dart format --output=none --set-exit-if-changed .
 
+      - name: Run desktop shutdown regressions
+        run: flutter test --no-pub --reporter expanded test/service/window_service_test.dart test/model/engine/system_stockfish_transport_test.dart
+
       - name: Analyze project source
         id: analyze
         run: |

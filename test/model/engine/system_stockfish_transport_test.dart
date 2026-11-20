@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lichess_mobile/src/model/engine/engine.dart';
@@ -193,6 +194,32 @@ void main() {
       expect(process.hasExited, isTrue);
       expect(transport.isDead, isTrue);
       expect(await transport.death, isNull);
+    });
+
+    test('reaps a real child that ignores quit and SIGTERM', () async {
+      if (!Platform.isLinux) return;
+      final process = await Process.start('python3', [
+        '-u',
+        '-c',
+        'import signal, sys, time\n'
+            'signal.signal(signal.SIGTERM, signal.SIG_IGN)\n'
+            'print("uciok", flush=True)\n'
+            'time.sleep(60)\n',
+      ]);
+      int? exitCode;
+      final exited = process.exitCode.then((code) => exitCode = code);
+      addTearDown(() async {
+        if (exitCode == null) process.kill(ProcessSignal.sigkill);
+        await exited.timeout(const Duration(seconds: 3));
+      });
+      final transport = await SystemStockfishTransport.connect(
+        const SystemStockfishSpec(),
+        start: () async => SystemEngineProcess(process),
+        quitTimeout: const Duration(milliseconds: 50),
+      );
+      await transport.dispose();
+      expect(exitCode, isNotNull, reason: 'disposal must reap the child, not only mark it dead');
+      expect(exitCode, -9);
     });
 
     test('fails, and lets the engine go, when it never answers uci', () async {

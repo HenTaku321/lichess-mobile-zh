@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lichess_mobile/src/model/engine/engine_factory.dart';
@@ -382,6 +383,33 @@ void main() {
       expect(runningAtDestroy, isFalse);
       expect(engine.quitCount, 1);
       expect(cleanups, 1);
+      expect(channel.methods.where((method) => method == 'destroy'), hasLength(1));
+    });
+
+    test('arms a native shutdown deadline before invoking Dart cleanup', () async {
+      final nativeCalls = <String>[];
+      final order = <String>[];
+      const shutdownChannel = MethodChannel('lichess/desktop_shutdown');
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+        shutdownChannel,
+        (call) async {
+          nativeCalls.add(call.method);
+          order.add(call.method);
+          return null;
+        },
+      );
+      addTearDown(() {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+          shutdownChannel,
+          null,
+        );
+      });
+      await service.start(beforeClose: () async => order.add('cleanup'));
+      final first = service.close();
+      await service.close();
+      await first;
+      expect(nativeCalls, ['arm']);
+      expect(order, ['arm', 'cleanup']);
       expect(channel.methods.where((method) => method == 'destroy'), hasLength(1));
     });
 

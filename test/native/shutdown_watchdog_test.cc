@@ -2,6 +2,7 @@
 #include <cassert>
 #include <chrono>
 #include <cstdlib>
+#include <initializer_list>
 #include <sys/wait.h>
 #include <thread>
 #include <unistd.h>

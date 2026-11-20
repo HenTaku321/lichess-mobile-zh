@@ -43,17 +43,28 @@ abstract class EngineProcess() {
   void write(String line);
 
   /// Kills the process.
-  void kill();
+  void kill([ProcessSignal signal = ProcessSignal.sigterm]);
 }
 
 /// An [EngineProcess] over the `dart:io` process API.
 class SystemEngineProcess(final Process _process) implements EngineProcess {
+  this {
+    // Pipe errors complete IOSink.done asynchronously, outside writeln's try/catch.
+    unawaited(
+      _process.stdin.done.catchError((Object error, StackTrace stack) {
+        _logger.fine('The engine input pipe closed', error, stack);
+      }),
+    );
+  }
+
   /// Starts the stockfish installed on this machine.
   ///
   /// Throws a [ProcessException] when there is no such executable on `PATH`: the one failure of
   /// this backend the user can do something about, and the one `EngineFactory` words for them.
-  static Future<SystemEngineProcess> start() async =>
-      SystemEngineProcess(await Process.start(kSystemStockfishExecutable, const []));
+  static Future<SystemEngineProcess> start() async {
+    final process = await Process.start(kSystemStockfishExecutable, const []);
+    return SystemEngineProcess(process);
+  }
 
   // A process's output streams are single-subscription, and are read here once each: they are
   // built on first use rather than in the constructor.
@@ -73,7 +84,7 @@ class SystemEngineProcess(final Process _process) implements EngineProcess {
   void write(String line) => _process.stdin.writeln(line);
 
   @override
-  void kill() => _process.kill();
+  void kill([ProcessSignal signal = ProcessSignal.sigterm]) => _process.kill(signal);
 }
 
 /// An [EngineTransport] over a UCI engine running as a child process.
@@ -244,7 +255,11 @@ class SystemStockfishTransport._(
       _logger.warning('The engine did not exit when told to quit; killing it');
       _process.kill();
       if (!await _exited()) {
-        _logger.severe('The engine could not be killed; its process may outlive the app');
+        _logger.warning('The engine ignored SIGTERM; sending SIGKILL');
+        _process.kill(ProcessSignal.sigkill);
+        if (!await _exited()) {
+          throw TimeoutException('The system engine did not exit after SIGKILL', _quitTimeout);
+        }
       }
     }
 

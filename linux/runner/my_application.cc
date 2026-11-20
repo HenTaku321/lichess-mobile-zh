@@ -1,4 +1,5 @@
 #include "my_application.h"
+#include "shutdown_watchdog.h"
 
 #include <flutter_linux/flutter_linux.h>
 
@@ -15,6 +16,18 @@ G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
 static void first_frame_cb(MyApplication* self, FlView *view)
 {
   gtk_widget_show(gtk_widget_get_toplevel(GTK_WIDGET(view)));
+}
+
+static void shutdown_method_call(FlMethodChannel*, FlMethodCall* call, gpointer) {
+  const gchar* method = fl_method_call_get_name(call);
+  if (g_strcmp0(method, "arm") == 0) {
+    arm_shutdown_watchdog(std::chrono::seconds(25));
+    g_autoptr(FlMethodResponse) response = FL_METHOD_RESPONSE(fl_method_success_response_new(nullptr));
+    fl_method_call_respond(call, response, nullptr);
+  } else {
+    g_autoptr(FlMethodResponse) response = FL_METHOD_RESPONSE(fl_method_not_implemented_response_new());
+    fl_method_call_respond(call, response, nullptr);
+  }
 }
 
 // Implements GApplication::activate.
@@ -61,6 +74,12 @@ static void my_application_activate(GApplication* application) {
   gtk_widget_realize(GTK_WIDGET(view));
 
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
+
+  g_autoptr(FlStandardMethodCodec) shutdown_codec = fl_standard_method_codec_new();
+  g_autoptr(FlMethodChannel) shutdown_channel = fl_method_channel_new(
+      fl_engine_get_binary_messenger(fl_view_get_engine(view)),
+      "lichess/desktop_shutdown", FL_METHOD_CODEC(shutdown_codec));
+  fl_method_channel_set_method_call_handler(shutdown_channel, shutdown_method_call, nullptr, nullptr);
 
   gtk_widget_grab_focus(GTK_WIDGET(view));
 }

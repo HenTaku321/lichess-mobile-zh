@@ -219,8 +219,13 @@ jobs:
           dart format --output=none --set-exit-if-changed $(find test -name "*.dart" -not \( -name "*.*freezed.dart" -o -name "*.*g.dart" \) )
         # run: dart format --output=none --set-exit-if-changed .
 
+      - name: Verify native shutdown deadline
+        run: |
+          c++ -std=c++17 -Wall -Wextra -Werror -pthread test/native/shutdown_watchdog_test.cc linux/runner/shutdown_watchdog.cc -o /tmp/lichess-shutdown-test
+          /tmp/lichess-shutdown-test
+
       - name: Run desktop shutdown regressions
-        run: flutter test --no-pub --reporter expanded test/service/window_service_test.dart test/model/engine/system_stockfish_transport_test.dart
+        run: flutter test --no-pub --reporter expanded test/service/window_service_test.dart test/model/engine/system_stockfish_transport_test.dart test/service/linux_audio_processes_test.dart
 
       - name: Analyze project source
         id: analyze

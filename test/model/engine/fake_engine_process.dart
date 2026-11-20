@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:lichess_mobile/src/model/engine/system_stockfish_transport.dart';
 
@@ -48,10 +49,10 @@ class FakeEngineProcess({final bool ignoresQuit = false}) implements EngineProce
   }
 
   @override
-  void kill() {
+  void kill([ProcessSignal signal = ProcessSignal.sigterm]) {
     _killed = true;
     // What a process killed the way [Process.kill] kills one exits with.
-    exit(-15);
+    exit(-signal.signalNumber);
   }
 
   /// Answers with a line on the process's standard output, as the engine would.

@@ -4,6 +4,7 @@ import 'dart:io' show Platform;
 import 'dart:math' show max;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/binding.dart';
@@ -334,6 +335,13 @@ class WindowService() with WindowListener {
   Future<void> _finishClose() async {
     _saveTimer?.cancel();
     _saveTimer = null;
+    try {
+      await const MethodChannel('lichess/desktop_shutdown')
+          .invokeMethod<void>('arm')
+          .timeout(const Duration(seconds: 1));
+    } catch (error, stack) {
+      _logger.warning('Could not arm the native shutdown deadline', error, stack);
+    }
     try {
       await Future.wait<void>([
         if (_beforeClose case final cleanup?) Future<void>.sync(cleanup),

@@ -9,13 +9,15 @@ import 'package:mocktail/mocktail.dart';
 Future<Process> sleeper() => Process.start('python3', [
   '-u',
   '-c',
-  'import signal, time\n'
-      'signal.signal(signal.SIGTERM, signal.SIG_IGN)\n'
-      'print("ready", flush=True)\n'
-      'time.sleep(60)\n',
+  '''
+import signal, time
+signal.signal(signal.SIGTERM, signal.SIG_IGN)
+print("ready", flush=True)
+time.sleep(60)
+''',
 ]);
 
-class ObservedProcess extends Mock implements Process {}
+class ObservedProcess() extends Mock implements Process;
 
 void main() {
   test('shutdown reaps playback even when SIGTERM is ignored', () async {
@@ -91,7 +93,7 @@ void main() {
 
   test('a failed process start does not escape to the UI', () async {
     final player = LinuxAudioProcesses(
-      start: (_, _) async {
+      start: (_, _) {
         throw const ProcessException('player', [], 'unavailable');
       },
     );

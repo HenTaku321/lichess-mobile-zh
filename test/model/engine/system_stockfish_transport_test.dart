@@ -201,10 +201,12 @@ void main() {
       final process = await Process.start('python3', [
         '-u',
         '-c',
-        'import signal, sys, time\n'
-            'signal.signal(signal.SIGTERM, signal.SIG_IGN)\n'
-            'print("uciok", flush=True)\n'
-            'time.sleep(60)\n',
+        '''
+import signal, time
+signal.signal(signal.SIGTERM, signal.SIG_IGN)
+print("uciok", flush=True)
+time.sleep(60)
+''',
       ]);
       int? exitCode;
       final exited = process.exitCode.then((code) => exitCode = code);

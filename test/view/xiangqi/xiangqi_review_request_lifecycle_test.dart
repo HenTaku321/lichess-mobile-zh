@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_refresh.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';

@@ -7,13 +7,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:lichess_mobile/src/model/common/chess.dart';
 import 'package:lichess_mobile/src/model/engine/engine.dart';
-import 'package:lichess_mobile/src/model/engine/engine_providers.dart';
 import 'package:lichess_mobile/src/model/ui_events.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_analysis_options.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_analysis_tree.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_export.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_controller.dart'
-    show xiangqiEngineProvider;
+    show retryXiangqiEngine, xiangqiEngineProvider;
 // `$XiangqiEvaluationCopyWith` is freezed's own generated type and is named here for the same reason
 // `XiangqiEvaluation` is: [XiangqiEngineLine] holds an evaluation, and the `copyWith` freezed writes
 // for that field is written in terms of this type. A `show` clause hides it along with everything
@@ -318,13 +317,7 @@ class XiangqiAnalysisController({final XiangqiAnalysisOptions? options})
   void startEngine() {
     if (!engineAllowed) return;
     if (state.isEngineRunning) return;
-    final cached = ref.read(xiangqiEngineProvider);
-    if (cached.value?.isDead == true) {
-      ref.invalidate(engineProvider(cached.requireValue.spec));
-    }
-    if (cached.hasError || cached.value?.isDead == true) {
-      ref.invalidate(xiangqiEngineProvider);
-    }
+    retryXiangqiEngine(ref);
     _engineError = null;
     state = _latest = state.copyWith(isEngineRunning: true);
     _restart();

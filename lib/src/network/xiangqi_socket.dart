@@ -460,13 +460,16 @@ class XiangqiSocketClient({
       // consumers so a later explicit login can reopen their connection.
       _wantsConnection = reconnect;
       if (session != null && reconnect) {
+        final generation = _attemptGeneration;
         Future<void> reopen() async {
           try {
             await pending;
           } on Object {
             /* The old handshake was deliberately cancelled. */
           }
-          if (!_isDisposed) await connect();
+          if (!_isDisposed && _wantsConnection && generation == _attemptGeneration) {
+            await connect();
+          }
         }
 
         reopen().ignore();

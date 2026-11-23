@@ -124,17 +124,35 @@ enum XiangqiGameEnd() {
 /// The engine itself is the app's shared one and is held exactly the way every other caller holds
 /// it: a listener for the life of this provider, so that the engine cannot be disposed between two
 /// of this game's searches. See [EngineHolder].
-final xiangqiEngineProvider = FutureProvider.autoDispose<Engine>((Ref ref) async {
+final _xiangqiEngineSpecProvider = FutureProvider.autoDispose<PikafishSpec>((ref) async {
   final nnuePath = await ref.read(pikafishNnueServiceProvider).ensureNnue();
-  final spec = PikafishSpec(nnuePath: nnuePath);
+  return PikafishSpec(nnuePath: nnuePath);
+}, retry: (_, _) => null);
 
-  // Writing the network out is a file write of 48 MB, which is long enough for the screen to be
-  // left while it happens.
-  if (!ref.mounted) throw EngineNoLongerWatched(spec);
+final xiangqiEngineProvider = FutureProvider.autoDispose<Engine>(
+  (Ref ref) async {
+    final spec = await ref.watch(_xiangqiEngineSpecProvider.future);
+    // Writing the bundled network may outlive the screen that requested it.
+    if (!ref.mounted) throw EngineNoLongerWatched(spec);
+    // Watching the future propagates a later engine failure instead of caching a dead handle.
+    return await ref.watch(engineProvider(spec).future);
+  },
+  name: 'XiangqiEngineProvider',
+  retry: (_, _) => null,
+);
 
-  ref.listen(engineProvider(spec), (_, _) {});
-  return await ref.read(engineProvider(spec).future);
-}, name: 'XiangqiEngineProvider');
+/// Retries a failed engine on an explicit new game or analysis restart. The factory still waits
+/// for the previous engine's native cleanup before handing its slot to a replacement.
+void retryXiangqiEngine(Ref ref) {
+  final cached = ref.read(xiangqiEngineProvider);
+  final engine = cached.value;
+  if (!cached.hasError && engine?.isDead != true && engine?.isDisposed != true) return;
+  final spec =
+      engine?.spec ??
+      (ref.exists(_xiangqiEngineSpecProvider) ? ref.read(_xiangqiEngineSpecProvider).value : null);
+  if (spec != null) ref.invalidate(engineProvider(spec));
+  ref.invalidate(xiangqiEngineProvider);
+}
 
 /// One evaluation of a move the player made in practice mode.
 @immutable
@@ -478,6 +496,7 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
     _gameIdentity = ++_nextLocalGameIdentity;
     _epoch++;
     _stopSearches();
+    if (opponent == XiangqiOpponent.engine) retryXiangqiEngine(ref);
     final effectiveTimeIncrement = timeIncrement ?? ref.read(xiangqiClockProvider).timeIncrement;
     state = XiangqiGameState(
       playerSide: side,
@@ -507,6 +526,7 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
     _gameIdentity = ++_nextLocalGameIdentity;
     _epoch++;
     _stopSearches();
+    if (game.opponent == XiangqiOpponent.engine) retryXiangqiEngine(ref);
     state = game.copyWith(
       isSuspended: false,
       isEngineThinking: false,
@@ -787,8 +807,13 @@ class XiangqiGameController() extends Notifier<XiangqiGameState> {
 
       final best = await search.bestMove;
       if (identical(_search, search)) _search = null;
-      // Null means the search was superseded or the engine died; either way this answer is not one.
-      if (best == null || epoch != _epoch || !ref.mounted) return;
+      if (epoch != _epoch || !ref.mounted) return;
+      if (best == null) {
+        // Superseding a search is normal; losing its engine while this game still needs a move
+        // is a failure the player must be told about.
+        if (engine.isDead || engine.isDisposed) _reportFailure();
+        return;
+      }
 
       final move = XiangqiMove.parseIccs(best);
       if (move == null || !isLegal(state.gamePosition, move)) {

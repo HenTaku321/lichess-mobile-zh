@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -140,7 +141,7 @@ class XiangqiClient({
   final Set<_RequestDeadline> _requests = {};
   bool _closed = false;
 
-  /// How long a request may wait for the response headers.
+  /// The complete request budget, including queuing, refresh, retry and response body.
   static const defaultRequestTimeout = Duration(seconds: 30);
 
   /// How long between two requests to this host. See [kXiangqiMinRequestSpacing].
@@ -163,9 +164,11 @@ class XiangqiClient({
   @override
   Future<StreamedResponse> send(BaseRequest request) async {
     if (_closed) throw StateError('The xiangqi.com HTTP client is closed.');
-    late final _RequestDeadline deadline;
-    deadline = _RequestDeadline(defaultRequestTimeout, onFinish: () => _requests.remove(deadline));
-    _requests.add(deadline);
+    final deadline = _newDeadline(defaultRequestTimeout);
+    if (request is Abortable) {
+      final trigger = (request as Abortable).abortTrigger;
+      if (trigger != null) unawaited(trigger.then((_) => deadline.cancel()));
+    }
     try {
       final response = await deadline.run(_send(request, deadline));
       return StreamedResponse(
@@ -194,17 +197,20 @@ class XiangqiClient({
 
     var session = await deadline.run(_sessions.read());
     final ownsAuth = !request.headers.containsKey('Authorization') && !_anonymous(request.url);
-    await deadline.run(_throttle.acquire());
-    final beforeSend = await _sessions.read();
-    if (ownsAuth && !_sameIdentity(beforeSend, session)) {
-      throw StateError('The xiangqi.com session changed while the request was queued.');
-    }
-    if (ownsAuth) session = beforeSend;
-    _applyHeaders(request, ownsAuth ? session : null);
+    var response = await deadline.run(
+      _throttle.send(deadline, () {
+        final beforeSend = _sessions.current;
+        if (ownsAuth && !_sameIdentity(beforeSend, session)) {
+          throw StateError('The xiangqi.com session changed while the request was queued.');
+        }
+        if (ownsAuth) session = beforeSend;
+        _applyHeaders(request, ownsAuth ? session : null);
+        return _sendAttempt(request, deadline);
+      }),
+    );
 
-    var response = await _sendAttempt(request, deadline);
-
-    if (response.statusCode != 401 || replay == null || !ownsAuth || session == null) {
+    final sentSession = session;
+    if (response.statusCode != 401 || replay == null || !ownsAuth || sentSession == null) {
       return response;
     }
 
@@ -217,31 +223,36 @@ class XiangqiClient({
       reasonPhrase: response.reasonPhrase,
     );
     final current = await _sessions.read();
-    if (!_sameIdentity(current, session)) {
+    if (!_sameIdentity(current, sentSession)) {
       throw StateError('The xiangqi.com session changed during the request.');
     }
 
-    final refreshed = current?.accessToken != session.accessToken
+    final refreshed = current?.accessToken != sentSession.accessToken
         ? _RefreshResult.refreshed
         : await deadline.run(_refresh(budget: deadline.remaining));
     if (refreshed != _RefreshResult.refreshed) {
-      if (refreshed == _RefreshResult.rejected) await _clearSessionOnce(session.accessToken);
+      if (refreshed == _RefreshResult.rejected) await _clearSessionOnce(sentSession.accessToken);
       return original;
     }
 
     // The 401 body is of no use now that it is about to be replaced; draining it lets the
     // connection go back to the pool.
     final retry = replay.build();
-    await deadline.run(_throttle.acquire());
-    final latest = await _sessions.read();
-    if (!_sameIdentity(latest, session)) {
-      throw StateError('The xiangqi.com session changed before retry.');
-    }
-    _applyHeaders(retry, latest);
-    response = await _sendAttempt(retry, deadline);
+    XiangqiSession? retriedSession;
+    response = await deadline.run(
+      _throttle.send(deadline, () {
+        final latest = _sessions.current;
+        if (!_sameIdentity(latest, sentSession)) {
+          throw StateError('The xiangqi.com session changed before retry.');
+        }
+        retriedSession = latest;
+        _applyHeaders(retry, latest);
+        return _sendAttempt(retry, deadline);
+      }),
+    );
 
     if (response.statusCode == 401) {
-      await _clearSessionOnce(latest!.accessToken);
+      await _clearSessionOnce(retriedSession!.accessToken);
     }
     return response;
   }
@@ -259,7 +270,16 @@ class XiangqiClient({
   bool _sameIdentity(XiangqiSession? a, XiangqiSession? b) =>
       a?.userId == b?.userId && a?.refreshToken == b?.refreshToken && a?.isGuest == b?.isGuest;
 
+  _RequestDeadline _newDeadline(Duration duration) {
+    if (_closed) throw StateError('The xiangqi.com HTTP client is closed.');
+    late final _RequestDeadline deadline;
+    deadline = _RequestDeadline(duration, onFinish: () => _requests.remove(deadline));
+    _requests.add(deadline);
+    return deadline;
+  }
+
   Future<StreamedResponse> _sendAttempt(BaseRequest request, _RequestDeadline deadline) {
+    deadline.throwIfCancelled();
     if (request is! Request) return deadline.run(_inner.send(request));
     final wire = AbortableRequest(request.method, request.url, abortTrigger: deadline.abort.future)
       ..headers.addAll(request.headers)
@@ -267,10 +287,6 @@ class XiangqiClient({
       ..followRedirects = request.followRedirects
       ..maxRedirects = request.maxRedirects
       ..persistentConnection = request.persistentConnection;
-    if (request is Abortable) {
-      final trigger = (request as Abortable).abortTrigger;
-      if (trigger != null) unawaited(trigger.then((_) => deadline.cancel()));
-    }
     return deadline.run(_inner.send(wire));
   }
 
@@ -300,7 +316,7 @@ class XiangqiClient({
 
   /// Asks for a new access token, keeping the refresh token (the server does not rotate it).
   Future<_RefreshResult> _doRefresh(Duration budget) async {
-    final deadline = _RequestDeadline(budget);
+    final deadline = _newDeadline(budget);
     try {
       final session = await _sessions.read();
       final generation = _sessions.generation;
@@ -309,13 +325,19 @@ class XiangqiClient({
         return _RefreshResult.rejected;
       }
 
-      await deadline.run(_throttle.acquire());
       final request = Request('POST', xiangqiUri('users/jwt/refresh'));
       request.headers['Authorization'] = 'Bearer $refreshToken';
       request.headers['User-Agent'] = kXiangqiUserAgent;
       request.headers['Accept'] = 'application/json';
 
-      final response = await _sendAttempt(request, deadline);
+      final response = await deadline.run(
+        _throttle.send(deadline, () {
+          if (generation != _sessions.generation) {
+            throw StateError('The xiangqi.com session changed before refresh.');
+          }
+          return _sendAttempt(request, deadline);
+        }),
+      );
       final body = await deadline.run(response.stream.toBytes());
       if (response.statusCode != 200) {
         _logger.warning('xiangqi.com token refresh answered ${response.statusCode}.');
@@ -510,6 +532,14 @@ class _RequestDeadline(final Duration duration, {final void Function()? onFinish
     return left > Duration.zero ? left : Duration.zero;
   }
 
+  bool get isCancelled => abort.isCompleted;
+
+  void throwIfCancelled() {
+    if (isCancelled) {
+      throw TimeoutException('xiangqi.com request cancelled or deadline exceeded', duration);
+    }
+  }
+
   Future<T> run<T>(Future<T> work) {
     _elapsed.start();
     _timer ??= Timer(duration, () {
@@ -598,35 +628,67 @@ void _checkResponseSuccess(Uri url, Response response) {
   throw ServerException(response.statusCode, message, url, jsonError);
 }
 
-/// Keeps requests to one host at least [minSpacing] apart and lets only one run at a time.
-///
-/// Each [acquire] waits its turn — the previous acquisition has to have finished — and then, if the
-/// previous request *started* less than [minSpacing] ago, waits out the remainder. Starting times,
-/// not finishing ones: a slow request does not push the next one further away than the spacing
-/// already asked for, but no burst can begin inside the window either.
-///
-/// The clock is `package:clock`'s, so a test can drive it with `FakeAsync` and never sleep for real.
+/// Spaces actual sends to one host, removing cancelled entries while they are still queued.
+/// Only dispatching a request consumes a spacing; stale sessions and expired work consume none.
 class _RequestThrottle(final Duration minSpacing) {
   DateTime? _lastStart;
-  Future<void> _turn = Future<void>.value();
+  final Queue<_QueuedRequest> _queue = Queue();
+  Timer? _timer;
 
-  Future<void> acquire() {
-    final previous = _turn;
-    final completer = Completer<void>();
-    _turn = completer.future;
-    return _wait(previous, completer);
+  Future<StreamedResponse> send(
+    _RequestDeadline deadline,
+    Future<StreamedResponse> Function() dispatch,
+  ) {
+    deadline.throwIfCancelled();
+    final entry = _QueuedRequest(deadline, dispatch);
+    _queue.add(entry);
+    unawaited(
+      deadline.abort.future.then((_) {
+        if (_queue.remove(entry)) {
+          entry.cancel();
+          _drain();
+        }
+      }),
+    );
+    _drain();
+    return entry.result.future;
   }
 
-  Future<void> _wait(Future<void> previous, Completer<void> completer) async {
-    await previous;
-    final last = _lastStart;
-    if (last != null) {
-      final wait = minSpacing - clock.now().difference(last);
-      if (wait > Duration.zero) {
-        await Future<void>.delayed(wait);
+  void _drain() {
+    _timer?.cancel();
+    _timer = null;
+    while (_queue.isNotEmpty) {
+      if (_queue.first.deadline.isCancelled) {
+        _queue.removeFirst().cancel();
+        continue;
+      }
+      final last = _lastStart;
+      if (last != null) {
+        final wait = minSpacing - clock.now().difference(last);
+        if (wait > Duration.zero) {
+          _timer = Timer(wait, _drain);
+          return;
+        }
+      }
+      final entry = _queue.removeFirst();
+      try {
+        final response = entry.dispatch();
+        _lastStart = clock.now();
+        entry.result.complete(response);
+      } catch (error, stack) {
+        entry.result.completeError(error, stack);
       }
     }
-    _lastStart = clock.now();
-    completer.complete();
+  }
+}
+
+class _QueuedRequest(
+  final _RequestDeadline deadline,
+  final Future<StreamedResponse> Function() dispatch,
+) {
+  final result = Completer<StreamedResponse>();
+
+  void cancel() {
+    result.completeError(TimeoutException('xiangqi.com request cancelled while queued'));
   }
 }

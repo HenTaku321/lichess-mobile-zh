@@ -499,22 +499,28 @@ class _DeleteAccountState() extends ConsumerState<_DeleteAccount> {
 
     setState(() => _deleting = true);
     try {
-      await ref
+      final signedOut = await ref
           .read(xiangqiAuthControllerProvider.notifier)
           .deleteAccount(password: result.password, reason: result.reason);
-      if (!mounted) return;
+      if (!mounted || !signedOut) return;
+      // Clearing this login advances the account generation once. A later login or logout
+      // belongs to another UI action, so a delayed storage write must not navigate for it.
+      if (ref.read(xiangqiAccountGenerationProvider) != generation + 1 ||
+          ref.read(xiangqiAuthControllerProvider) != null) {
+        return;
+      }
       // The account is gone, so this screen has nothing left to show: back to wherever it was
       // opened from, which is the account menu and its row that now offers a sign-in again.
       Navigator.of(context, rootNavigator: true).popUntil((route) => route.isFirst);
     } on XiangqiWrongPasswordException {
-      if (!mounted) return;
-      setState(() => _deleting = false);
+      if (!mounted || generation != ref.read(xiangqiAccountGenerationProvider)) return;
       showSnackBar(context, context.l10n.mobileXiangqiInvalidCredentials, type: SnackBarType.error);
     } on Object catch (error, stackTrace) {
-      if (!mounted) return;
-      setState(() => _deleting = false);
+      if (!mounted || generation != ref.read(xiangqiAccountGenerationProvider)) return;
       showSnackBar(context, context.l10n.mobileSomethingWentWrong, type: SnackBarType.error);
       debugPrint('xiangqi account deletion failed: $error\n$stackTrace');
+    } finally {
+      if (mounted) setState(() => _deleting = false);
     }
   }
 

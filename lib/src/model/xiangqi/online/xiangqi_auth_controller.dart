@@ -303,11 +303,14 @@ class XiangqiAuthController() extends Notifier<XiangqiSession?> {
   /// * a wrong password is `{"message": "无效密码", "errors": "Please Enter correct password"}`;
   /// * a dead token is `{"msg": "...", "status": 401, "sub_status": 42}`.
   ///
-  /// So a wrong password puts the session back: the transport dropped it on the way past, and the
-  /// account it names is still there, still signed in on this device, and still the reader's.
-  Future<void> deleteAccount({required String password, required String reason}) async {
+  /// The explicit Authorization header opts out of automatic refresh and invalidation. A wrong
+  /// password leaves storage untouched. Success only clears the login that issued the request,
+  /// even if its access token has since refreshed. Returns whether that login was cleared.
+  Future<bool> deleteAccount({required String password, required String reason}) async {
+    final sessions = _sessions;
     final session = state;
-    if (session == null || session.isGuest) return;
+    if (session == null || session.isGuest) return false;
+    final accountGeneration = sessions.accountGeneration;
     final uri = xiangqiUri('users/account/delete/');
     final response = await _client.post(
       uri,
@@ -321,9 +324,6 @@ class XiangqiAuthController() extends Notifier<XiangqiSession?> {
     if (response.statusCode == 401) {
       final json = _tryDecodeObject(_bodyText(response));
       if (json != null && json.containsKey('message')) {
-        // The password, and not the token. Whatever the transport did to the session on the way
-        // past is undone here, because the account it names still exists.
-        await _store(session);
         throw const XiangqiWrongPasswordException();
       }
       throw ServerException(response.statusCode, 'xiangqi.com account deletion failed.', uri, null);
@@ -331,7 +331,7 @@ class XiangqiAuthController() extends Notifier<XiangqiSession?> {
     if (response.statusCode >= 400) {
       throw ServerException(response.statusCode, 'xiangqi.com account deletion failed.', uri, null);
     }
-    await signOut();
+    return sessions.write(null, expectedAccountGeneration: accountGeneration);
   }
 
   /// Takes a guest token from xiangqi.com, with no account behind it.

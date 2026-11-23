@@ -412,6 +412,8 @@ class PositionEvaluator(
   /// with nobody watching, which is what lets one analysis screen hand its engine to the next.
   /// [invalidate] skips that, for an engine that is already broken.
   void _releaseEngine({bool invalidate = false}) {
+    // A checksum still resolving the old spec must not reacquire an engine after this release.
+    _generation++;
     _pauseTimer?.cancel();
     _pauseTimer = null;
 

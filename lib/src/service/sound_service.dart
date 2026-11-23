@@ -50,7 +50,35 @@ final soundServiceProvider = Provider<SoundService>((Ref ref) {
 
 final _extension = defaultTargetPlatform == TargetPlatform.iOS ? 'aifc' : 'mp3';
 
-const Set<Sound> _emtpySet = {};
+// The players are process-wide, so initialization, theme changes and release must share a queue
+// even when a SoundService provider is disposed and recreated while an asset load is pending.
+Future<void> _soundOperations = Future<void>.value();
+Future<void>? _soundShutdown;
+int _soundGeneration = 0;
+bool _soundsReady = false;
+
+bool _isCurrentSoundLoad(int generation) =>
+    _soundShutdown == null && generation == _soundGeneration;
+
+Future<void> _queueSoundOperation(Future<void> Function() operation) {
+  final result = _soundOperations.then((_) => operation());
+  _soundOperations = result.catchError((Object error, StackTrace stack) {
+    _logger.warning('Sound operation failed:', error, stack);
+  });
+  return result;
+}
+
+Future<void> _releaseSounds() => defaultTargetPlatform == TargetPlatform.linux
+    ? _linuxSoundPlayer.release()
+    : _soundEffectPlugin.release();
+
+Future<void> _initializeSoundPlayer() async {
+  if (defaultTargetPlatform == TargetPlatform.linux) {
+    _linuxSoundPlayer.initialize();
+  } else {
+    await _soundEffectPlugin.initialize(maxStreams: _kMaxConcurrentStreams);
+  }
+}
 
 final _linuxSoundPlayer = _LinuxSoundPlayer();
 
@@ -60,6 +88,7 @@ class _LinuxSoundPlayer() {
   String? _playerCmd;
   LinuxAudioProcesses _processes = LinuxAudioProcesses();
   bool _closed = false;
+  int _generation = 0;
 
   void initialize() {
     if (_hasCmd('pw-play')) {
@@ -84,6 +113,8 @@ class _LinuxSoundPlayer() {
   }
 
   Future<void> load(SoundTheme theme, String soundId, String fullPath) async {
+    if (_closed) return;
+    final generation = _generation;
     try {
       final tmpDir = Directory('${Directory.systemTemp.path}/lichess_sounds');
       if (!tmpDir.existsSync()) {
@@ -94,7 +125,7 @@ class _LinuxSoundPlayer() {
         final byteData = await rootBundle.load(fullPath);
         await destFile.writeAsBytes(byteData.buffer.asUint8List(), flush: true);
       }
-      if (!_closed) _soundPaths[soundId] = destFile.path;
+      if (!_closed && generation == _generation) _soundPaths[soundId] = destFile.path;
     } catch (e) {
       _logger.warning('Failed to cache Linux sound $soundId ($fullPath):', e);
     }
@@ -116,6 +147,7 @@ class _LinuxSoundPlayer() {
   }
 
   Future<void> release() async {
+    _generation++;
     _soundPaths.clear();
     await _processes.shutdown();
     if (!_closed) _processes = LinuxAudioProcesses();
@@ -123,20 +155,20 @@ class _LinuxSoundPlayer() {
 
   Future<void> shutdown() {
     _closed = true;
+    _generation++;
     _soundPaths.clear();
     return _processes.shutdown();
   }
 }
 
 /// Loads all sounds of the given [SoundTheme].
-Future<void> _loadAllSounds(SoundTheme soundTheme, {Set<Sound> excluded = _emtpySet}) async {
-  await Future.wait(
-    Sound.values.where((s) => !excluded.contains(s)).map((sound) => _loadSound(soundTheme, sound)),
-  );
+Future<void> _loadAllSounds(SoundTheme soundTheme, int generation) async {
+  await Future.wait(Sound.values.map((sound) => _loadSound(soundTheme, sound, generation)));
 }
 
 /// Loads a single sound from the given [SoundTheme].
-Future<void> _loadSound(SoundTheme theme, Sound sound) async {
+Future<void> _loadSound(SoundTheme theme, Sound sound, int generation) async {
+  if (!_isCurrentSoundLoad(generation)) return;
   final themePath = 'assets/sounds/${theme.name}';
   const standardPath = 'assets/sounds/standard';
   final soundId = sound.name;
@@ -148,6 +180,7 @@ Future<void> _loadSound(SoundTheme theme, Sound sound) async {
   } catch (_) {
     fullPath = '$standardPath/$file';
   }
+  if (!_isCurrentSoundLoad(generation)) return;
   if (defaultTargetPlatform == TargetPlatform.linux) {
     await _linuxSoundPlayer.load(theme, soundId, fullPath);
   } else {
@@ -158,28 +191,42 @@ Future<void> _loadSound(SoundTheme theme, Sound sound) async {
 /// Service to play game sounds.
 class SoundService(final Ref _ref) {
   /// Stop accepting Linux sounds before waiting for player processes to exit.
-  static Future<void> shutdown() => _linuxSoundPlayer.shutdown();
+  static Future<void> shutdown() {
+    if (_soundShutdown case final pending?) return pending;
+    _soundsReady = false;
+    _soundGeneration++;
+    // Stop Linux players immediately, including launches already pending. Asset loads drain
+    // before the shutdown future completes and cannot publish sounds after the player is sealed.
+    final linuxShutdown = _linuxSoundPlayer.shutdown();
+    return _soundShutdown = _queueSoundOperation(() async {
+      await linuxShutdown;
+      if (defaultTargetPlatform != TargetPlatform.linux) await _soundEffectPlugin.release();
+    });
+  }
 
   /// Initialize the sound service.
   ///
   /// This will load the sounds from assets and make them ready to be played.
   /// This should be called once when the app starts.
   static Future<void> initialize() async {
+    if (_soundShutdown != null) return;
+    final generation = ++_soundGeneration;
+    _soundsReady = false;
     try {
-      final stored = LichessBinding.instance.sharedPreferences.getString(
-        PrefCategory.general.storageKey,
-      );
-      final theme =
-          (stored != null
-                  ? GeneralPrefs.fromJson(jsonDecode(stored) as Map<String, dynamic>)
-                  : GeneralPrefs.defaults)
-              .soundTheme;
-      if (defaultTargetPlatform == TargetPlatform.linux) {
-        _linuxSoundPlayer.initialize();
-      } else {
-        await _soundEffectPlugin.initialize(maxStreams: _kMaxConcurrentStreams);
-      }
-      await _loadAllSounds(theme);
+      await _queueSoundOperation(() async {
+        if (!_isCurrentSoundLoad(generation)) return;
+        final stored = LichessBinding.instance.sharedPreferences.getString(
+          PrefCategory.general.storageKey,
+        );
+        final theme =
+            (stored != null
+                    ? GeneralPrefs.fromJson(jsonDecode(stored) as Map<String, dynamic>)
+                    : GeneralPrefs.defaults)
+                .soundTheme;
+        await _initializeSoundPlayer();
+        await _loadAllSounds(theme, generation);
+        if (_isCurrentSoundLoad(generation)) _soundsReady = true;
+      });
     } catch (e, st) {
       _logger.warning('Failed to initialize sound service:', e, st);
     }
@@ -188,6 +235,7 @@ class SoundService(final Ref _ref) {
   /// Play the given sound if sound is enabled.
   Future<void> play(Sound sound, {double volume = 1.0}) async {
     assert((volume >= 0.0) && (volume <= 1.0));
+    if (!_soundsReady || _soundShutdown != null) return;
     final isEnabled = _ref.read(generalPreferencesProvider).isSoundEnabled;
     final finalVolume = _ref.read(generalPreferencesProvider).masterVolume * volume;
     if (!isEnabled || finalVolume == 0.0) {
@@ -196,7 +244,7 @@ class SoundService(final Ref _ref) {
     if (defaultTargetPlatform == TargetPlatform.linux) {
       await _linuxSoundPlayer.play(sound.name, volume: finalVolume);
     } else {
-      _soundEffectPlugin.play(sound.name, volume: finalVolume);
+      await _soundEffectPlugin.play(sound.name, volume: finalVolume);
     }
   }
 
@@ -210,25 +258,26 @@ class SoundService(final Ref _ref) {
   /// This will release the previous sounds and load the new ones.
   ///
   /// If [playSound] is true, a move sound will be played.
-  Future<void> changeTheme(SoundTheme theme, {bool playSound = false}) async {
-    if (defaultTargetPlatform == TargetPlatform.linux) {
-      await _linuxSoundPlayer.release();
-    } else {
-      await _soundEffectPlugin.release();
-      await _soundEffectPlugin.initialize(maxStreams: _kMaxConcurrentStreams);
-    }
-    await _loadSound(theme, Sound.move);
-    if (playSound) {
-      play(Sound.move);
-    }
-    await _loadAllSounds(theme, excluded: {Sound.move});
+  Future<void> changeTheme(SoundTheme theme, {bool playSound = false}) {
+    if (_soundShutdown != null) return Future<void>.value();
+    final generation = ++_soundGeneration;
+    _soundsReady = false;
+    return _queueSoundOperation(() async {
+      if (!_isCurrentSoundLoad(generation)) return;
+      await _releaseSounds();
+      if (!_isCurrentSoundLoad(generation)) return;
+      await _initializeSoundPlayer();
+      await _loadAllSounds(theme, generation);
+      if (!_isCurrentSoundLoad(generation)) return;
+      _soundsReady = true;
+      if (playSound && _ref.mounted) await play(Sound.move);
+    });
   }
 
-  Future<void> release() async {
-    if (defaultTargetPlatform == TargetPlatform.linux) {
-      await _linuxSoundPlayer.release();
-    } else {
-      await _soundEffectPlugin.release();
-    }
+  Future<void> release() {
+    if (_soundShutdown case final pending?) return pending;
+    _soundGeneration++;
+    _soundsReady = false;
+    return _queueSoundOperation(_releaseSounds);
   }
 }

@@ -39,9 +39,16 @@ class XiangqiSessionStore(final XiangqiAuthStorage storage) {
     return _session;
   }
 
-  Future<bool> write(XiangqiSession? session, {int? expectedGeneration}) async {
+  Future<bool> write(
+    XiangqiSession? session, {
+    int? expectedGeneration,
+    int? expectedAccountGeneration,
+  }) async {
     await ready;
     if (expectedGeneration != null && expectedGeneration != _generation) return false;
+    if (expectedAccountGeneration != null && expectedAccountGeneration != _accountGeneration) {
+      return false;
+    }
     final identityChanged =
         _session?.userId != session?.userId || _session?.isGuest != session?.isGuest;
     _generation++;

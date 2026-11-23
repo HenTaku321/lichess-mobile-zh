@@ -32,6 +32,16 @@ final stockfishNnueServiceProvider = Provider<StockfishNnueService>((Ref ref) {
 class StockfishNnueService(final Ref _ref) {
   final ValueNotifier<double> _nnueDownloadProgress = ValueNotifier(0.0);
   bool _nnueOperationInProgress = false;
+  Future<void> _nnueFiles = Future<void>.value();
+  int _nnueRevision = 0;
+
+  // Only published-file operations share this queue. Network I/O writes an isolated candidate,
+  // so checking availability never waits for a download or hashes a file that is still changing.
+  Future<T> _withNNUEFiles<T>(Future<T> Function() operation) {
+    final result = _nnueFiles.then((_) => operation());
+    _nnueFiles = result.then<void>((_) {}, onError: (Object _, StackTrace _) {});
+    return result;
+  }
 
   /// Cache the result of the NNUE checksum verification.
   bool? _nnueSumCheckResult;
@@ -94,7 +104,9 @@ class StockfishNnueService(final Ref _ref) {
   ///
   /// A file that fails the checksum is deleted: it is useless to the engine, it takes up more
   /// than 60MB, and leaving it on disk makes the next download look like it has nothing to do.
-  Future<bool> checkNNUEFile() async {
+  Future<bool> checkNNUEFile() => _withNNUEFiles(_checkNNUEFile);
+
+  Future<bool> _checkNNUEFile() async {
     final File file;
     try {
       file = nnueFile;
@@ -112,7 +124,8 @@ class StockfishNnueService(final Ref _ref) {
           return true;
         } else {
           _logger.warning('The NNUE file is corrupted, deleting it.');
-          await deleteNNUEFiles();
+          _nnueSumCheckResult = null;
+          await file.delete();
         }
       }
 
@@ -130,6 +143,7 @@ class StockfishNnueService(final Ref _ref) {
     }
 
     _nnueOperationInProgress = true;
+    final revision = _nnueRevision;
 
     try {
       final File file;
@@ -140,29 +154,41 @@ class StockfishNnueService(final Ref _ref) {
         return false;
       }
 
-      // The download only counts as a success if what landed on disk is what the engine needs:
-      // a file that arrives truncated or garbled is deleted rather than kept and reported as
-      // downloaded, which would leave the engine falling back to the light one with no way out.
       Future<bool> doDownload() async {
-        // delete any existing nnue files before downloading
-        await deleteNNUEFiles();
-
         final client = _ref.read(defaultClientProvider);
-        final downloaded = await downloadFile(
-          client,
-          nnueUrl,
-          file,
-          expectedLength: nnueExpectedSize,
-          onProgress: (received, length) {
-            _nnueDownloadProgress.value = received / length;
-          },
-        );
-        if (!downloaded) {
-          await deleteNNUEFiles();
+        final staging = await file.parent.createTemp('.stockfish-download-');
+        final candidate = File('${staging.path}/${Stockfish.latestNNUE}');
+        try {
+          final downloaded = await downloadFile(
+            client,
+            nnueUrl,
+            candidate,
+            expectedLength: nnueExpectedSize,
+            onProgress: (received, length) {
+              _nnueDownloadProgress.value = received / length;
+            },
+          );
+          if (!downloaded) return false;
+          final path = candidate.path;
+          if (!await Isolate.run(() => _checksumMatches(path, nnueHash))) return false;
+          return await _withNNUEFiles(() async {
+            // A user-requested deletion wins over a download already in flight.
+            if (revision != _nnueRevision) return false;
+            await candidate.rename(file.path);
+            _nnueSumCheckResult = true;
+            await _deleteNNUEFiles(except: file.path);
+            return true;
+          });
+        } catch (error, stack) {
+          _logger.warning('Could not publish the NNUE download:', error, stack);
           return false;
+        } finally {
+          try {
+            await staging.delete(recursive: true);
+          } catch (error, stack) {
+            _logger.warning('Could not discard the NNUE candidate:', error, stack);
+          }
         }
-        // Deletes the file itself if it does not check out.
-        return await checkNNUEFile();
       }
 
       final connectivityResult = await _ref.read(connectivityPluginProvider).checkConnectivity();
@@ -211,16 +237,22 @@ class StockfishNnueService(final Ref _ref) {
     }
   }
 
-  Future<void> deleteNNUEFiles() async {
+  Future<void> deleteNNUEFiles() {
+    _nnueRevision++;
+    return _withNNUEFiles(() async {
+      _nnueSumCheckResult = null;
+      await _deleteNNUEFiles();
+    });
+  }
+
+  Future<void> _deleteNNUEFiles({String? except}) async {
     final appSupportDirectory = _ref.read(preloadedDataProvider).requireValue.appSupportDirectory;
     if (appSupportDirectory == null) {
       throw Exception('App support directory is null.');
     }
 
-    _nnueSumCheckResult = null;
-
     await for (final entity in appSupportDirectory.list(followLinks: false)) {
-      if (entity is File && entity.path.endsWith('.nnue')) {
+      if (entity is File && entity.path.endsWith('.nnue') && entity.path != except) {
         _logger.info('Deleting existing nnue ${entity.path}');
         try {
           await entity.delete();

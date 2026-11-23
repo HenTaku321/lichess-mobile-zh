@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,6 +9,7 @@ import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_session.dart';
 import 'package:lichess_mobile/src/network/http.dart';
 import 'package:lichess_mobile/src/network/xiangqi_http.dart';
+import 'package:lichess_mobile/src/network/xiangqi_session_store.dart';
 
 import '../../../network/fake_http_client_factory.dart';
 import '../../../test_container.dart';
@@ -631,6 +633,72 @@ void main() {
   });
 
   group('deleteAccount', () {
+    for (final status in [200, 401]) {
+      for (final boundary in [
+        'logout',
+        'switch account',
+        'same account refresh',
+        'sign in again',
+      ]) {
+        test('late deletion $status respects $boundary', () async {
+          final original = XiangqiSession(
+            userId: '100001',
+            name: 'alice',
+            accessToken: _accessToken,
+            isGuest: false,
+          );
+          final storage = FakeXiangqiAuthStorage(original);
+          final response = Completer<http.Response>();
+          final sent = Completer<void>();
+          final container = await makeControllerContainer(
+            storage: storage,
+            client: MockClient((request) {
+              expect(request.url.path, '/api/users/account/delete/');
+              sent.complete();
+              return response.future;
+            }),
+          );
+          container.listen(xiangqiAuthControllerProvider, (_, _) {});
+          await container.pump();
+          final auth = container.read(xiangqiAuthControllerProvider.notifier);
+          final deletion = auth.deleteAccount(password: 'password', reason: 'test');
+          // Attach the error handler before resolving the held response.
+          final done = status == 401
+              ? expectLater(deletion, throwsA(isA<XiangqiWrongPasswordException>()))
+              : deletion;
+          await sent.future;
+          final store = container.read(xiangqiSessionStoreProvider);
+          XiangqiSession? current;
+          switch (boundary) {
+            case 'logout':
+              await auth.signOut();
+            case 'switch account':
+              current = original.copyWith(userId: '200002', name: 'bob', accessToken: 'bob-token');
+              await store.write(current);
+            case 'same account refresh':
+              current = original.copyWith(accessToken: 'refreshed-token');
+              await store.write(current);
+            case 'sign in again':
+              await auth.signOut();
+              current = original.copyWith(accessToken: 'new-login-token');
+              await store.write(current);
+          }
+          response.complete(
+            http.Response(
+              status == 401 ? '{"message":"Wrong password"}' : '{"message":"Deletion started"}',
+              status,
+            ),
+          );
+          await done;
+          // A successful deletion still invalidates a refreshed token for the same login.
+          final expected = status == 200 && boundary == 'same account refresh' ? null : current;
+          expect(store.current, expected);
+          expect(storage.session, expected);
+          expect(container.read(xiangqiAuthControllerProvider), expected);
+        });
+      }
+    }
+
     test('sends the password and the reason, and signs out', () async {
       final sent = <(String, String)>[];
       final storage = FakeXiangqiAuthStorage(

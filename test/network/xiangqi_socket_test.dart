@@ -184,6 +184,55 @@ FakeXiangqiChannel handshakeNow(
 }
 
 void main() {
+  for (final ending in ['close', 'logout', 'dispose', 'newer login']) {
+    test('pending identity reconnect respects $ending', () {
+      fakeAsync((async) {
+        final changes = StreamController<Object?>.broadcast(sync: true);
+        final factory = DelayedXiangqiChannelFactory();
+        var tokenReads = 0;
+        final client = XiangqiSocketClient(
+          channelFactory: factory,
+          getToken: () async => 'token-${++tokenReads}',
+          sessionChanges: changes.stream,
+        );
+        client.connect().ignore();
+        async.flushMicrotasks();
+        expect(factory.requests, hasLength(1));
+        changes.add('updated token');
+        async.flushMicrotasks();
+        switch (ending) {
+          case 'close':
+            client.close();
+          case 'logout':
+            changes.add(null);
+          case 'dispose':
+            client.dispose().ignore();
+          case 'newer login':
+            changes.add('new account');
+        }
+        final oldChannel = FakeXiangqiChannel();
+        factory.requests.first.complete(oldChannel);
+        async.flushMicrotasks();
+        expect(oldChannel.closed, isTrue);
+        expect(tokenReads, ending == 'newer login' ? 2 : 1);
+        expect(factory.requests, hasLength(ending == 'newer login' ? 2 : 1));
+        if (ending == 'newer login') {
+          final channel = FakeXiangqiChannel();
+          factory.requests.last.complete(channel);
+          async.flushMicrotasks();
+          channel.fromServer(connectAckFrame);
+          async.flushMicrotasks();
+          expect(client.isConnected, isTrue);
+        } else {
+          expect(client.status, XiangqiConnectionStatus.closed);
+        }
+        client.dispose().ignore();
+        changes.close().ignore();
+        async.flushMicrotasks();
+      });
+    });
+  }
+
   group('frame parsing, ported from the Rust parser', () {
     test('v4 event with data', () {
       final event = parseXiangqiSocketEvent(
@@ -824,4 +873,19 @@ class _FakeStorage([var XiangqiSession? session]) extends XiangqiAuthStorage {
 
   @override
   Future<void> delete() async => session = null;
+}
+
+class DelayedXiangqiChannelFactory() implements WebSocketChannelFactory {
+  final List<Completer<WebSocketChannel>> requests = [];
+
+  @override
+  Future<WebSocketChannel> create(
+    String url, {
+    Map<String, dynamic>? headers,
+    Duration timeout = const Duration(seconds: 1),
+  }) {
+    final request = Completer<WebSocketChannel>();
+    requests.add(request);
+    return request.future;
+  }
 }

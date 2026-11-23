@@ -203,6 +203,55 @@ void main() {
     });
 
     group('downloadNNUEFile', () {
+      test('download candidates stay separate from the published NNUE file', () async {
+        final dir = await makeTempDir();
+        final body = StreamController<List<int>>();
+        final receiving = Completer<void>();
+        final container = makeWeightsContainer(
+          appSupportDirectory: dir,
+          mockClient: MockClient.streaming(
+            (request, _) async => http.StreamedResponse(body.stream, 200),
+          ),
+          connectivity: ConfigurableFakeConnectivity(),
+        );
+        final service = container.read(stockfishNnueServiceProvider);
+        service.nnueDownloadProgress.addListener(() {
+          if (service.nnueDownloadProgress.value > 0 && !receiving.isCompleted)
+            receiving.complete();
+        });
+        final download = service.downloadNNUEFile();
+        body.add([1, 2, 3]);
+        await receiving.future;
+        try {
+          expect(
+            await service.nnueFile.exists(),
+            isFalse,
+            reason: 'the engine must never see the partially downloaded file',
+          );
+          expect(await service.checkNNUEFile(), isFalse);
+          expect(await service.hasNNUEFilesOnDisk(), isFalse);
+        } finally {
+          await body.close();
+          expect(await download, isFalse, reason: 'the fixture has an invalid checksum');
+        }
+        expect(await dir.list().toList(), isEmpty, reason: 'failed candidates are discarded');
+      });
+
+      test('a failed replacement preserves the previously published file', () async {
+        final dir = await makeTempDir();
+        final container = makeWeightsContainer(
+          appSupportDirectory: dir,
+          mockClient: MockClient((_) async => http.Response('unavailable', 503)),
+          connectivity: ConfigurableFakeConnectivity(),
+        );
+        final service = container.read(stockfishNnueServiceProvider);
+        final published = service.nnueFile;
+        await published.writeAsString('previously published network');
+        expect(await service.downloadNNUEFile(), isFalse);
+        expect(await published.exists(), isTrue);
+        expect(await published.readAsString(), 'previously published network');
+      });
+
       test('returns false when appSupportDirectory is null', () async {
         final container = makeWeightsContainer(appSupportDirectory: null);
 

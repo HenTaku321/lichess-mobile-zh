@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dartchess/dartchess.dart';
 import 'package:fake_async/fake_async.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
@@ -138,6 +140,59 @@ void main() {
   });
 
   group('PositionEvaluator state transitions', () {
+    test('late NNUE check cannot acquire an engine after the pause window', () async {
+      final nnue = DelayedNnueService();
+      final container = await makeContainer(
+        overrides: {
+          stockfishNnueServiceProvider: stockfishNnueServiceProvider.overrideWithValue(nnue),
+        },
+      );
+      await setEnginePref(container, ChessEnginePref.sfLatest);
+      fakeAsync((async) {
+        final evaluator = readEvaluator(container);
+        evaluator.evaluate(makeWork());
+        async.flushMicrotasks();
+        expect(nnue.checks, hasLength(1));
+        evaluator.release();
+        async.elapse(kEnginePauseDelay + const Duration(milliseconds: 1));
+        nnue.checks.single.complete(true);
+        async.flushMicrotasks();
+        expect(fakeEngine.startCount, 0);
+        expect(evaluator.state, PositionEvaluator.defaultState);
+        container.dispose();
+        async.flushMicrotasks();
+      });
+    });
+
+    test('old NNUE resolution cannot replace a restarted evaluator request', () async {
+      final nnue = DelayedNnueService();
+      final container = await makeContainer(
+        overrides: {
+          stockfishNnueServiceProvider: stockfishNnueServiceProvider.overrideWithValue(nnue),
+        },
+      );
+      await setEnginePref(container, ChessEnginePref.sfLatest);
+      fakeAsync((async) {
+        final evaluator = readEvaluator(container);
+        evaluator.evaluate(makeWork());
+        async.flushMicrotasks();
+        evaluator.release();
+        async.elapse(kEnginePauseDelay + const Duration(milliseconds: 1));
+        evaluator.evaluate(makeWork());
+        async.flushMicrotasks();
+        expect(nnue.checks, hasLength(2));
+        nnue.checks.last.complete(false);
+        async.flushMicrotasks();
+        expect(evaluator.state.spec, const StockfishSpec.light());
+        nnue.checks.first.complete(true);
+        async.flushMicrotasks();
+        expect(evaluator.state.spec, const StockfishSpec.light());
+        expect(fakeEngine.startCount, 1);
+        container.dispose();
+        async.flushMicrotasks();
+      });
+    });
+
     test('initial state is EngineLifecycle.initial', () async {
       final container = await makeContainer();
       final service = readEvaluator(container);
@@ -2009,4 +2064,15 @@ void main() {
       });
     });
   });
+}
+
+class DelayedNnueService() extends FakeStockfishNnueService {
+  final List<Completer<bool>> checks = [];
+
+  @override
+  Future<bool> checkNNUEFile() {
+    final check = Completer<bool>();
+    checks.add(check);
+    return check.future;
+  }
 }

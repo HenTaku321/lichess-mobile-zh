@@ -1,8 +1,12 @@
+import 'dart:io';
+
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lichess_mobile/src/model/common/time_increment.dart';
 import 'package:lichess_mobile/src/model/engine/engine.dart';
+import 'package:lichess_mobile/src/model/engine/engine_factory.dart';
+import 'package:lichess_mobile/src/model/engine/engine_failure.dart';
 import 'package:lichess_mobile/src/model/engine/engine_spec.dart';
 import 'package:lichess_mobile/src/model/ui_events.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_controller.dart';
@@ -10,7 +14,10 @@ import 'package:lichess_mobile/src/model/xiangqi/xiangqi_move.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_rules.dart';
 
+import 'package:lichess_mobile/src/service/pikafish_nnue_service.dart';
+
 import '../../binding.dart';
+import '../../test_container.dart';
 import '../engine/fake_transport.dart';
 
 /// The square named [name], which the tests below write the way a player would.
@@ -90,6 +97,58 @@ Future<void> answer(FakeTransport transport, String iccs) async {
 
 void main() {
   group('XiangqiGameController', () {
+    test('engine death reaches the public provider and reports a stalled opponent', () async {
+      final transports = <FakeTransport>[];
+      final container = await makeEngineLifecycleContainer(transports);
+      final events = <UiEvent>[];
+      final subscription = container.read(uiEventBusProvider).stream.listen(events.add);
+      addTearDown(subscription.cancel);
+      container.listen(xiangqiGameControllerProvider, (_, _) {});
+      await container.read(xiangqiEngineProvider.future);
+      final game = container.read(xiangqiGameControllerProvider.notifier);
+      game.startNewGame(side: .black, difficulty: .level1);
+      await pumpEventQueue();
+      transports.single.emit('readyok');
+      await pumpEventQueue();
+      expect(transports.single.commands.any((c) => c.startsWith('go ')), isTrue);
+      transports.single.die(
+        const EngineFailure(
+          kind: EngineFailureKind.runtime,
+          message: 'test crash',
+          engine: 'pikafish',
+        ),
+      );
+      await pumpEventQueue();
+      expect(container.read(xiangqiGameControllerProvider).isEngineThinking, isFalse);
+      expect(events.whereType<ShowErrorEvent>(), hasLength(1));
+      expect(container.read(xiangqiEngineProvider).hasError, isTrue);
+    });
+
+    test('starting a new game replaces a dead cached engine through the real factory', () async {
+      final transports = <FakeTransport>[];
+      final container = await makeEngineLifecycleContainer(transports);
+      container.listen(xiangqiGameControllerProvider, (_, _) {});
+      final first = await container.read(xiangqiEngineProvider.future);
+      transports.single.die(
+        const EngineFailure(
+          kind: EngineFailureKind.runtime,
+          message: 'test crash',
+          engine: 'pikafish',
+        ),
+      );
+      await pumpEventQueue();
+      container
+          .read(xiangqiGameControllerProvider.notifier)
+          .startNewGame(side: .black, difficulty: .level2);
+      await pumpEventQueue();
+      expect(transports, hasLength(2));
+      final replacement = await container.read(xiangqiEngineProvider.future);
+      expect(identical(first, replacement), isFalse);
+      expect(replacement.isDead, isFalse);
+      await answer(transports.last, 'h2e2');
+      expect(container.read(xiangqiGameControllerProvider).moves, IList([move('h2e2')]));
+    });
+
     test('a new game remembers its clock and practice setting', () async {
       final harness = await makeHarness();
       harness.controller.startNewGame(
@@ -595,3 +654,29 @@ void main() {
     });
   });
 }
+
+class LifecyclePikafishNnueService() implements PikafishNnueService {
+  @override
+  File get nnueFile => File('/test/pikafish.nnue');
+
+  @override
+  Future<String> ensureNnue() async => nnueFile.path;
+}
+
+Future<ProviderContainer> makeEngineLifecycleContainer(List<FakeTransport> transports) =>
+    makeContainer(
+      overrides: {
+        pikafishNnueServiceProvider: pikafishNnueServiceProvider.overrideWithValue(
+          LifecyclePikafishNnueService(),
+        ),
+        engineFactoryProvider: engineFactoryProvider.overrideWith(
+          (ref) => EngineFactory(
+            connect: (spec) async {
+              final transport = FakeTransport(spec: spec, startupLines: kPikafishHandshake);
+              transports.add(transport);
+              return transport;
+            },
+          ),
+        ),
+      },
+    );

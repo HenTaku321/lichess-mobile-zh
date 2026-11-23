@@ -179,6 +179,68 @@ void main() {
   });
 
   group('request throttle', () {
+    test('expired queued requests do not delay fresh requests', () {
+      fakeAsync((async) {
+        withClock(async.getClock(testEpoch), () {
+          final sent = <String>[];
+          final client = XiangqiClient(
+            inner: MockClient((request) async {
+              sent.add(request.url.path);
+              return http.Response('{}', 200);
+            }),
+            storage: FakeXiangqiAuthStorage(),
+            uiEventBus: UiEventBus(),
+          );
+          for (var index = 0; index < 60; index++) {
+            client.get(xiangqiUri('old-$index')).ignore();
+          }
+          async.flushMicrotasks();
+          async.elapse(XiangqiClient.defaultRequestTimeout + kXiangqiMinRequestSpacing);
+          final count = sent.length;
+          client.get(xiangqiUri('fresh')).ignore();
+          async.flushMicrotasks();
+          expect(sent.last, '/api/fresh');
+          expect(sent, hasLength(count + 1));
+          async.elapse(const Duration(minutes: 2));
+          expect(sent, hasLength(count + 1), reason: 'expired work must never reach the transport');
+          client.close();
+          async.flushMicrotasks();
+        });
+      });
+    });
+
+    test('aborting a queued request removes it without consuming a spacing', () {
+      fakeAsync((async) {
+        withClock(async.getClock(testEpoch), () {
+          final sent = <String>[];
+          final client = XiangqiClient(
+            inner: MockClient((request) async {
+              sent.add(request.url.path);
+              return http.Response('{}', 200);
+            }),
+            storage: FakeXiangqiAuthStorage(),
+            uiEventBus: UiEventBus(),
+          );
+          client.get(xiangqiUri('first')).ignore();
+          final abort = Completer<void>();
+          client
+              .send(
+                http.AbortableRequest('GET', xiangqiUri('cancelled'), abortTrigger: abort.future),
+              )
+              .then(http.Response.fromStream)
+              .ignore();
+          client.get(xiangqiUri('last')).ignore();
+          async.flushMicrotasks();
+          abort.complete();
+          async.flushMicrotasks();
+          async.elapse(kXiangqiMinRequestSpacing);
+          expect(sent, ['/api/first', '/api/last']);
+          client.close();
+          async.flushMicrotasks();
+        });
+      });
+    });
+
     test('keeps two requests to the host at least 1.5 s apart', () {
       fakeAsync((async) {
         withClock(async.getClock(testEpoch), () {

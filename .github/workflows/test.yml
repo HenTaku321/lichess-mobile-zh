@@ -205,6 +205,18 @@ jobs:
       - name: Check the network matches the vendored engine
         run: dart run scripts/pikafish_net_hash.dart --check
 
+      - name: Run asynchronous lifecycle regressions
+        if: ${{ !cancelled() }}
+        run: >-
+          flutter test --no-pub --reporter expanded
+          test/model/xiangqi/online/xiangqi_auth_controller_test.dart
+          test/model/xiangqi/xiangqi_game_controller_test.dart
+          test/model/engine/position_evaluator_test.dart
+          test/network/xiangqi_socket_test.dart
+          test/network/xiangqi_http_test.dart
+          test/service/weights_service_test.dart
+          test/service/sound_service_test.dart
+
       - name: Exercise shared home and computer-game journeys
         run: >-
           flutter test --no-pub --reporter expanded

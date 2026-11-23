@@ -88,6 +88,22 @@ void main() {
     });
   }
 
+  test('script-only chapters do not initialise the engine', () async {
+    final transports = <FakeTransport>[];
+    final container = await engine_fixture.makeEngineLifecycleContainer(transports);
+    await container.read(xiangqiSessionReadyProvider.future);
+    final chapter = fixture.chariotChapter();
+    final provider = xiangqiChapterControllerProvider(chapter);
+    final watched = container.listen(provider, (_, _) {});
+    addTearDown(watched.close);
+    final move = fixture.move('i0i9');
+    container.read(provider.notifier).movePiece(move.from, move.to);
+    await pumpEventQueue();
+    expect(container.read(provider).isSolved, isTrue);
+    expect(transports, isEmpty);
+    expect(container.exists(xiangqiEngineProvider), isFalse);
+  });
+
   test('a multi chapter retains its engine while NNUE preparation is pending', () async {
     final nnue = DeferredLessonNnue();
     final transports = <FakeTransport>[];

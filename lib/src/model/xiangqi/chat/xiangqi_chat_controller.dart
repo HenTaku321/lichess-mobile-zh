@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:clock/clock.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
@@ -105,6 +106,8 @@ class XiangqiChatController(final XiangqiChatRoomKey key) extends Notifier<Xiang
   Timer? _historyTimeout;
   int _generation = 0;
   int _historyRevision = 0;
+  int _connectionGeneration = 0;
+  bool _awaitingHistory = false;
 
   /// The page the last history request asked for, which is the page its answer is about.
   int _pendingPage = 1;
@@ -122,7 +125,7 @@ class XiangqiChatController(final XiangqiChatRoomKey key) extends Notifier<Xiang
 
   @override
   XiangqiChatState build() {
-    final generation = ++_generation;
+    _generation++;
     // A cold restore changes accountGeneration too. Do not open a socket under the unknown account
     // and immediately tear it down when the saved session is restored.
     if (ref.watch(xiangqiSessionReadyProvider).isLoading) {
@@ -135,21 +138,13 @@ class XiangqiChatController(final XiangqiChatRoomKey key) extends Notifier<Xiang
     _page = 1;
     _lastRequest = null;
     _turn = Future<void>.value();
-    ref.onDispose(() {
-      _events?.cancel();
-      _connections?.cancel();
-      _status?.cancel();
-      _historyTimeout?.cancel();
-      _spacingTimer?.cancel();
-      _spacingTimer = null;
-      final waiter = _spacingWaiter;
-      _spacingWaiter = null;
-      if (waiter != null && !waiter.isCompleted) waiter.complete();
-      final socket = _socket;
-      _socket = null;
-      if (socket != null) unawaited(socket.dispose());
-    });
+    ref.onDispose(_releaseSocket);
+    unawaited(_connect());
+    return const XiangqiChatState(isLoading: true);
+  }
 
+  XiangqiSocketClient _createSocket() {
+    final generation = _generation;
     final socket = ref.read(xiangqiSocketProvider).fork();
     _socket = socket;
 
@@ -167,7 +162,10 @@ class XiangqiChatController(final XiangqiChatRoomKey key) extends Notifier<Xiang
         return;
       }
       _historyTimeout?.cancel();
+      _historyTimeout = null;
       _historyRevision++;
+      _awaitingHistory = false;
+      _cancelQueuedRequests();
       state = state.copyWith(
         isConnected: false,
         isLoading: false,
@@ -175,21 +173,66 @@ class XiangqiChatController(final XiangqiChatRoomKey key) extends Notifier<Xiang
         error: XiangqiChatError.offline,
       );
     });
-    unawaited(
-      socket.connect().catchError((Object error, StackTrace stackTrace) {
-        _logger.warning('The chat socket could not connect.', error, stackTrace);
-        if (ref.mounted && generation == _generation) {
-          state = state.copyWith(
-            error: XiangqiChatError.offline,
-            isLoading: false,
-            isLoadingMore: false,
-            isConnected: false,
-          );
-        }
-      }),
-    );
+    return socket;
+  }
 
-    return const XiangqiChatState(isLoading: true);
+  Future<void> _connect() async {
+    final socket = _socket ?? _createSocket();
+    final generation = _generation;
+    try {
+      await socket.connect();
+    } on Object catch (error, stackTrace) {
+      _logger.warning('The chat socket could not connect.', error, stackTrace);
+      if (ref.mounted && generation == _generation) {
+        state = state.copyWith(
+          error: XiangqiChatError.offline,
+          isLoading: false,
+          isLoadingMore: false,
+          isConnected: false,
+        );
+      }
+    }
+  }
+
+  void _cancelQueuedRequests() {
+    _connectionGeneration++;
+    _spacingTimer?.cancel();
+    _spacingTimer = null;
+    final waiter = _spacingWaiter;
+    _spacingWaiter = null;
+    if (waiter != null && !waiter.isCompleted) waiter.complete();
+    _turn = Future<void>.value();
+    _lastRequest = null;
+  }
+
+  void _releaseSocket() {
+    _generation++;
+    _historyRevision++;
+    _awaitingHistory = false;
+    unawaited(_events?.cancel());
+    unawaited(_connections?.cancel());
+    unawaited(_status?.cancel());
+    _events = null;
+    _connections = null;
+    _status = null;
+    _historyTimeout?.cancel();
+    _historyTimeout = null;
+    _cancelQueuedRequests();
+    final socket = _socket;
+    _socket = null;
+    if (socket != null) unawaited(socket.dispose());
+  }
+
+  void _failHistory() {
+    // History replies have no page or request id. A late reply on this stream could otherwise
+    // satisfy the next retry, so retire the whole client before accepting another read.
+    _releaseSocket();
+    state = state.copyWith(
+      isConnected: false,
+      isLoading: false,
+      isLoadingMore: false,
+      error: XiangqiChatError.history,
+    );
   }
 
   /// Asks for the first page of the room's history.
@@ -213,7 +256,7 @@ class XiangqiChatController(final XiangqiChatRoomKey key) extends Notifier<Xiang
     } else {
       state = state.copyWith(isLoadingMore: true);
     }
-    _pendingPage = page;
+    _awaitingHistory = false;
     await _waitForTurn();
     if (!ref.mounted ||
         generation != _generation ||
@@ -224,15 +267,13 @@ class XiangqiChatController(final XiangqiChatRoomKey key) extends Notifier<Xiang
     _historyTimeout?.cancel();
     _historyTimeout = Timer(const Duration(seconds: 20), () {
       if (ref.mounted && generation == _generation && revision == _historyRevision) {
-        state = state.copyWith(
-          isLoading: false,
-          isLoadingMore: false,
-          error: XiangqiChatError.history,
-        );
+        _failHistory();
       }
     });
     // No ack is asked for: the answer to this request is the `chat.lobby.messages.success` event,
     // and the site's own client sends the same frame without an ack id. See the class doc.
+    _pendingPage = page;
+    _awaitingHistory = true;
     socket.emitNoAck(
       'chat_v2.messages',
       data: {'type': key.kind.wire, 'room': key.room, 'page': page},
@@ -248,16 +289,9 @@ class XiangqiChatController(final XiangqiChatRoomKey key) extends Notifier<Xiang
   Future<void> retry() async {
     if (state.isLoading || state.isLoadingMore) return;
     final socket = _socket;
-    if (socket == null) return;
-    final generation = _generation;
-    if (!socket.isConnected) {
-      try {
-        await socket.connect();
-      } on Object {
-        if (ref.mounted && generation == _generation) {
-          state = state.copyWith(isLoading: false, error: XiangqiChatError.offline);
-        }
-      }
+    if (socket == null || !socket.isConnected) {
+      state = state.copyWith(isLoading: true, error: null);
+      await _connect();
     } else {
       await _requestHistory(page: 1);
     }
@@ -272,8 +306,14 @@ class XiangqiChatController(final XiangqiChatRoomKey key) extends Notifier<Xiang
     final socket = _socket;
     if (message.isEmpty || socket == null || !socket.isConnected) return false;
     final generation = _generation;
+    final connection = _connectionGeneration;
     await _waitForTurn();
-    if (!ref.mounted || generation != _generation || !socket.isConnected) return false;
+    if (!ref.mounted ||
+        generation != _generation ||
+        connection != _connectionGeneration ||
+        !socket.isConnected) {
+      return false;
+    }
     socket.emitNoAck(
       'chat_v2.new.message',
       data: {'type': key.kind.wire, 'room': key.room, 'message': message},
@@ -288,10 +328,13 @@ class XiangqiChatController(final XiangqiChatRoomKey key) extends Notifier<Xiang
   Future<void> _waitForTurn() {
     final previous = _turn;
     final generation = _generation;
+    final connection = _connectionGeneration;
+    bool current() =>
+        ref.mounted && generation == _generation && connection == _connectionGeneration;
     final turn = previous.then((_) async {
-      if (!ref.mounted || generation != _generation) return;
+      if (!current()) return;
       final last = _lastRequest;
-      final now = DateTime.now();
+      final now = clock.now();
       if (last != null) {
         final earliest = last.add(kXiangqiChatRequestSpacing);
         if (earliest.isAfter(now)) {
@@ -305,8 +348,8 @@ class XiangqiChatController(final XiangqiChatRoomKey key) extends Notifier<Xiang
           }
         }
       }
-      if (!ref.mounted || generation != _generation) return;
-      _lastRequest = DateTime.now();
+      if (!current()) return;
+      _lastRequest = clock.now();
     });
     _turn = turn;
     return turn;
@@ -319,22 +362,24 @@ class XiangqiChatController(final XiangqiChatRoomKey key) extends Notifier<Xiang
       case 'chat.new.lobby.message.success':
         _onMessage(event.data);
       case 'chat.error':
+        if (!ref.mounted) return;
+        if (state.isLoading || state.isLoadingMore) {
+          _failHistory();
+        } else {
+          state = state.copyWith(error: XiangqiChatError.send);
+        }
       case 'chat.new.lobby.message.error':
         if (!ref.mounted) return;
-        _historyTimeout?.cancel();
-        state = state.copyWith(
-          error: state.isLoading || state.isLoadingMore
-              ? XiangqiChatError.history
-              : XiangqiChatError.send,
-          isLoading: false,
-          isLoadingMore: false,
-        );
+        // A rejected message does not answer or cancel the independently pending history page.
+        state = state.copyWith(error: XiangqiChatError.send);
     }
   }
 
   void _onHistory(Object? data) {
-    if (!ref.mounted) return;
+    if (!ref.mounted || !_awaitingHistory) return;
+    _awaitingHistory = false;
     _historyTimeout?.cancel();
+    _historyTimeout = null;
     final page = xiangqiChatMessagesFromJson(data);
     final messages = _mergeHistory(page);
     // Preserve the older cursor only if the refreshed page has actually reached the known history.

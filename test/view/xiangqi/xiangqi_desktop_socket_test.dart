@@ -298,6 +298,32 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testDesktop('disconnect cancels a queued message before the room rejoins', (tester) async {
+    final (:container, :factory) = await pumpRoom(tester);
+    final provider = xiangqiChatControllerProvider(roomKey);
+    await history(tester, factory, [chat.message(id: 3, text: 'current')]);
+    final sent = container.read(provider.notifier).send('keep this draft');
+    await tester.pump();
+    factory.channel.closeFromServer();
+    await tester.pump();
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    for (var i = 0; i < 8; i++) {
+      await tester.pump();
+    }
+    expect(factory.channels, hasLength(2));
+    await online.receive(tester, factory, fx.openFrame);
+    await online.receive(tester, factory, fx.connectAckFrame);
+    await tester.pump(kXiangqiChatRequestSpacing);
+    await tester.pump();
+    expect(await sent, isFalse);
+    expect(requests(factory.channel, 'chat_v2.new.message'), isEmpty);
+    expect(requests(factory.channel, 'chat_v2.messages'), hasLength(1));
+    await history(tester, factory, [chat.message(id: 4, text: 'rejoined')]);
+    expect(container.read(provider).messages.map((message) => message.id), [3, 4]);
+    expect(tester.takeException(), isNull);
+  });
+
   testDesktop('an unsolicited history page cannot replace a loaded room', (tester) async {
     final (:container, :factory) = await pumpRoom(tester);
     final provider = xiangqiChatControllerProvider(roomKey);

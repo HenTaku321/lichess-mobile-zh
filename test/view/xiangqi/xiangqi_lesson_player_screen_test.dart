@@ -16,6 +16,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:lichess_mobile/src/model/xiangqi/lesson/xiangqi_lesson.dart';
+import 'package:lichess_mobile/src/model/xiangqi/lesson/xiangqi_lesson_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_move.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/network/http.dart';
@@ -100,6 +101,41 @@ void main() {
   TestLichessBinding.ensureInitialized();
 
   group('XiangqiLessonPlayerScreen', () {
+    testWidgets('automatic reply disables dragging and hints, and undo returns to the reader', (
+      tester,
+    ) async {
+      await pumpPlayer(
+        tester,
+        chapters: IList([
+          chapter(
+            fen: kXiangqiInitialFen,
+            steps: IList([
+              step(null),
+              step('b0c2', nextMove: 'b'),
+              step('b9c7', nextMove: 'r'),
+              step('h2e2', nextMove: 'b'),
+            ]),
+          ),
+        ]),
+      );
+      await tapSquare(tester, 'b0');
+      await tapSquare(tester, 'c2');
+      final waiting = tester.widget<XiangqiBoard>(find.byType(XiangqiBoard));
+      expect(waiting.canStartDrag!(waiting.position.pieceAt(squareAt('b9'))!), isFalse);
+      expect(barButton(tester, CupertinoIcons.lightbulb).onTap, isNull);
+      expect(find.text('Waiting'), findsOneWidget);
+      await tester.pump(kXiangqiLessonReplyDelay);
+      await tester.pump();
+      expect(barButton(tester, CupertinoIcons.lightbulb).onTap, isNotNull);
+      expect(find.text('Waiting'), findsNothing);
+      await tester.tap(find.byIcon(CupertinoIcons.arrow_uturn_left));
+      await tester.pump();
+      final undone = tester.widget<XiangqiBoard>(find.byType(XiangqiBoard));
+      expect(undone.position, XiangqiPosition.initial());
+      expect(barButton(tester, CupertinoIcons.arrow_uturn_left).onTap, isNull);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('auto-transition waits for a late save without restarting the two-second pause', (
       tester,
     ) async {

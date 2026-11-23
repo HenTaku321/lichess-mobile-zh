@@ -354,6 +354,8 @@ class _XiangqiLessonPlayerScreenState() extends ConsumerState<XiangqiLessonPlaye
                 ? context.l10n.mobileXiangqiLessonGreatJob
                 : state.isVerifying
                 ? context.l10n.mobileXiangqiLessonThinking
+                : state.isWaitingForReply
+                ? context.l10n.waiting
                 : state.wrongMove != null
                 ? context.l10n.mobileXiangqiLessonWrongMove
                 : state.expectedMove == null
@@ -366,7 +368,7 @@ class _XiangqiLessonPlayerScreenState() extends ConsumerState<XiangqiLessonPlaye
                 : state.wrongMove != null
                 ? context.lichessColors.error
                 : null,
-            busy: state.isVerifying,
+            busy: state.isVerifying || state.isWaitingForReply,
           ),
           status: _ChapterTable(
             description: null,

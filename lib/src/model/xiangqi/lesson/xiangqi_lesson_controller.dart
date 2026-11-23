@@ -6,11 +6,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:lichess_mobile/src/model/common/chess.dart';
 import 'package:lichess_mobile/src/model/engine/engine.dart';
+import 'package:lichess_mobile/src/model/ui_events.dart';
 import 'package:lichess_mobile/src/model/xiangqi/lesson/xiangqi_lesson.dart';
 import 'package:lichess_mobile/src/model/xiangqi/lesson/xiangqi_lesson_repository.dart';
 import 'package:lichess_mobile/src/model/xiangqi/online/xiangqi_auth_controller.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_game_controller.dart'
-    show xiangqiEngineProvider;
+    show retryXiangqiEngine, xiangqiEngineProvider;
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_move.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_position.dart';
 import 'package:lichess_mobile/src/model/xiangqi/xiangqi_rules.dart' as rules;
@@ -129,7 +130,21 @@ sealed class const XiangqiChapterState._() with _$XiangqiChapterState {
       cursor + 1 < chapter.steps.length ? chapter.steps[cursor + 1] : null;
 
   /// Whether the board takes the reader's moves at all.
-  bool get isPlayable => !isSolved && !isVerifying && wrongMove == null && chapter.position != null;
+  bool get isPlayable =>
+      !isSolved &&
+      !isVerifying &&
+      !isWaitingForReply &&
+      wrongMove == null &&
+      chapter.position != null;
+
+  /// The next step belongs to the chapter, including the short pause before it is played.
+  bool get isWaitingForReply => _isAutomaticStep(cursor + 1);
+
+  bool _isAutomaticStep(int index) =>
+      index > 1 &&
+      index < chapter.steps.length &&
+      chapter.steps[index - 1].nextSide != null &&
+      chapter.steps[index].nextSide == chapter.startSide;
 
   /// The move the chapter wants next, or null when there is none.
   XiangqiMove? get expectedMove => nextStep?.move;
@@ -181,6 +196,8 @@ final xiangqiChapterControllerProvider = NotifierProvider.autoDispose
 class XiangqiChapterController(final XiangqiChapter chapter) extends Notifier<XiangqiChapterState> {
   Timer? _reply;
   Timer? _revert;
+  Search? _search;
+  StreamSubscription<UciInfo>? _infos;
 
   /// Which run of the chapter this is, so that an answer from a superseded one is dropped.
   int _generation = 0;
@@ -190,10 +207,20 @@ class XiangqiChapterController(final XiangqiChapter chapter) extends Notifier<Xi
     ref.watch(xiangqiAccountGenerationProvider);
     ref.watch(xiangqiLessonSaveStateProvider(chapter.id).notifier);
     _generation++;
+    if (chapter.answerType == XiangqiChapterAnswerType.multi) {
+      // A bare read lets autoDispose tear down NNUE preparation while the chapter is waiting.
+      ref.listen(xiangqiEngineProvider, (_, _) {});
+    }
     ref.onDispose(() {
       _reply?.cancel();
+      _reply = null;
       _revert?.cancel();
+      _revert = null;
       _generation++;
+      unawaited(_infos?.cancel());
+      _infos = null;
+      _search?.stop();
+      _search = null;
     });
 
     final start = chapter.position ?? XiangqiPosition.initial();
@@ -262,12 +289,19 @@ class XiangqiChapterController(final XiangqiChapter chapter) extends Notifier<Xi
     }
     _reply?.cancel();
     _reply = null;
+    _revert?.cancel();
+    _revert = null;
     _generation++;
+    var lastReaderStep = state.cursor;
+    while (state._isAutomaticStep(lastReaderStep)) {
+      lastReaderStep--;
+    }
+    final target = lastReaderStep - 1;
     ref.read(xiangqiLessonSaveStateProvider(chapter.id).notifier).reset();
     state = state.copyWith(
-      positions: state.positions.sublist(0, state.cursor),
-      acceptedMoves: state.acceptedMoves.sublist(0, state.cursor - 1),
-      cursor: state.cursor - 1,
+      positions: state.positions.sublist(0, target + 1),
+      acceptedMoves: state.acceptedMoves.sublist(0, target),
+      cursor: target,
       selected: null,
       wrongMove: null,
       verifyingMove: null,
@@ -313,16 +347,26 @@ class XiangqiChapterController(final XiangqiChapter chapter) extends Notifier<Xi
     // The board shows the move while the engine thinks, exactly as the site's own player does.
     state = state.copyWith(positions: state.positions.add(after), verifyingMove: move);
 
-    bool good;
+    final bool? good;
     try {
-      good = await _isGoodMove(before, move);
+      retryXiangqiEngine(ref);
+      good = await _isGoodMove(before, move, generation);
     } on Object catch (error, stackTrace) {
+      if (generation != _generation || !ref.mounted) return;
       _logger.warning('The lesson engine could not judge a move', error, stackTrace);
-      // An engine that cannot answer is not a wrong move: the reader is let through rather than
-      // told they were wrong by a search that never ran.
-      good = true;
+      // No judgement was made. Restore the attempt without marking it wrong or saving completion.
+      state = state.copyWith(
+        positions: state.acceptedPositions,
+        isVerifying: false,
+        verifyingMove: null,
+        selected: null,
+      );
+      ref
+          .read(uiEventBusProvider)
+          .emit(const ShowErrorEvent('The computer could not judge this move. Please try again.'));
+      return;
     }
-    if (generation != _generation || !ref.mounted) return;
+    if (generation != _generation || !ref.mounted || good == null) return;
 
     if (good) {
       state = state.copyWith(
@@ -351,9 +395,10 @@ class XiangqiChapterController(final XiangqiChapter chapter) extends Notifier<Xi
   ///    the move has to be the best one.
   /// 4. When the second is that much better than the third, the move has to be one of the top two.
   /// 5. Otherwise the lines are close together, and the move is accepted.
-  Future<bool> _isGoodMove(XiangqiPosition before, XiangqiMove move) async {
+  Future<bool?> _isGoodMove(XiangqiPosition before, XiangqiMove move, int generation) async {
     final engine = await ref.read(xiangqiEngineProvider.future);
-    final search = engine.search(
+    if (generation != _generation || !ref.mounted) return null;
+    final search = _search = engine.search(
       SearchRequest(
         initialPosition: Chess.initial,
         moves: const IListConst([]),
@@ -370,7 +415,7 @@ class XiangqiChapterController(final XiangqiChapter chapter) extends Notifier<Xi
 
     final scores = <int?>[];
     final bestMoves = <String?>[];
-    final subscription = search.infos.listen((info) {
+    final subscription = _infos = search.infos.listen((info) {
       final index = info.multiPv - 1;
       if (index < 0 || index >= kXiangqiLessonMultiPv) return;
       while (scores.length <= index) {
@@ -380,8 +425,17 @@ class XiangqiChapterController(final XiangqiChapter chapter) extends Notifier<Xi
       scores[index] = info.cp;
       bestMoves[index] = info.pv.firstOrNull;
     });
-    await search.bestMove;
-    await subscription.cancel();
+    try {
+      final bestMove = await search.bestMove;
+      if (generation != _generation || !ref.mounted) return null;
+      if (bestMove == null) {
+        throw StateError('The lesson search ended without a judgement.');
+      }
+    } finally {
+      await subscription.cancel();
+      if (identical(_infos, subscription)) _infos = null;
+      if (identical(_search, search)) _search = null;
+    }
 
     if (scores.length < 3 || scores[0] == null || scores[1] == null || scores[2] == null) {
       return true;
@@ -432,16 +486,16 @@ class XiangqiChapterController(final XiangqiChapter chapter) extends Notifier<Xi
     // says that the side to move after it is the reader's. The second half is the whole of the
     // judgement: a step after which it is the reader's turn again is a step the reader did not
     // make, so it is the other side's and the chapter makes it.
-    final next = state.nextStep;
-    final played = state.chapter.steps[state.cursor];
-    final nextIsReader = played.nextSide == null || next?.nextSide != state.chapter.startSide;
-    if (nextIsReader) return;
+    if (!state.isWaitingForReply) return;
 
     _reply?.cancel();
+    final generation = _generation;
+    final cursor = state.cursor;
     _reply = Timer(kXiangqiLessonReplyDelay, () {
-      if (!ref.mounted) return;
+      if (!ref.mounted || generation != _generation || cursor != state.cursor) return;
+      _reply = null;
       final move = state.expectedMove;
-      if (move == null) return;
+      if (move == null || !state.isWaitingForReply) return;
       _accept(move, scripted: true);
     });
   }

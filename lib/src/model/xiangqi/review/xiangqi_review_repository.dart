@@ -76,12 +76,14 @@ final xiangqiReviewProvider = FutureProvider.autoDispose.family<XiangqiReview, S
       throw const XiangqiReviewException(XiangqiReviewFailure.offline);
     }
 
-    final socket = ref.watch(xiangqiReviewSocketProvider(gameId));
-    final subscription = socket.stream.listen((_) {});
-    ref.onDispose(subscription.cancel);
+    // A refresh can replace this provider before the previous conversation finishes. Give every
+    // invocation its own transport so old replies and cleanup cannot touch the replacement.
+    final socket = ref.read(xiangqiSocketProvider).fork();
+    ref.onDispose(socket.dispose);
 
     try {
       await socket.connect();
+      if (socket.isDisposed) throw const XiangqiReviewException(XiangqiReviewFailure.failed);
 
       // The snapshot first: without the moves there is nothing for the analysis to be keyed against.
       final snapshot = await _snapshotOf(socket, gameId);
@@ -118,8 +120,8 @@ final xiangqiReviewProvider = FutureProvider.autoDispose.family<XiangqiReview, S
       _logger.warning('The review of game $gameId failed.', error, stackTrace);
       throw const XiangqiReviewException(XiangqiReviewFailure.failed);
     } finally {
-      // The finite review conversation needs no idle heartbeat after its result.
-      socket.close();
+      // The finite review conversation needs no idle heartbeat or anonymous response stream.
+      unawaited(socket.dispose());
     }
   },
   name: 'XiangqiReviewProvider',
@@ -143,16 +145,18 @@ Future<Map<String, dynamic>> _snapshotOf(XiangqiSocketClient socket, String game
   final events = <String>{'game.get.success'};
   final frame = await _requestFrame(
     socket,
+    gameId,
     (event) {
       if (!events.contains(event.name)) return false;
       final map = _asMap(_unwrap(event.data));
       return map?['id'] == gameId || map?['game_id'] == gameId;
     },
-    () async {
+    (isPending) async {
       var name = 'g_v2.get';
       final followed = <String>{name};
-      while (true) {
+      while (isPending()) {
         final ack = _asMap(await socket.emit(name, data: {'game_id': gameId}));
+        if (!isPending()) return;
         if (ack == null) throw const XiangqiReviewException(XiangqiReviewFailure.failed);
         final redirect = ack['event'];
         if (ack['status'] != 'REDIRECT' || redirect is! String || redirect.isEmpty) break;
@@ -182,8 +186,9 @@ Future<({IList<XiangqiMoveReview> reviews, IList<XiangqiEvaluation> evaluations}
 ) async {
   final frame = await _requestFrame(
     socket,
+    gameId,
     (event) => event.name == kXiangqiReviewSuccessEvent,
-    () async {
+    (_) async {
       await socket.emit(
         kXiangqiReviewEvent,
         data: {'game_id': gameId, 'skip_missions': true},
@@ -243,16 +248,25 @@ Future<({IList<XiangqiMoveReview> reviews, IList<XiangqiEvaluation> evaluations}
 /// Subscribe before sending, and always release the listener/timer on failure or disposal.
 Future<XiangqiSocketEvent> _requestFrame(
   XiangqiSocketClient socket,
+  String gameId,
   bool Function(XiangqiSocketEvent) matches,
-  Future<void> Function() send,
+  Future<void> Function(bool Function() isPending) send,
 ) async {
   final answer = Completer<XiangqiSocketEvent>();
   answer.future.ignore();
   final subscription = socket.stream.listen(
     (event) {
+      if (answer.isCompleted) return;
+      final data = _asMap(_unwrap(event.data));
+      final id = data?['game_id'] ?? data?['id'];
+      if (id != null && id.toString() != gameId) return;
+      if (event.name == 'game.error' && _string(data?['message']) != null) {
+        answer.completeError(const XiangqiReviewException(XiangqiReviewFailure.failed));
+        return;
+      }
       final matched = matches(event);
       _logger.fine('Review response ${event.name}: matched=$matched.');
-      if (!answer.isCompleted && matched) answer.complete(event);
+      if (matched) answer.complete(event);
     },
     onDone: () {
       if (!answer.isCompleted) {
@@ -272,8 +286,16 @@ Future<XiangqiSocketEvent> _requestFrame(
     }
   });
   try {
-    await send().timeout(kXiangqiReviewTimeout);
-    _logger.fine('Review request acknowledged; waiting for response.');
+    // The response is authoritative; its separate ACK only drives redirects or reports a send
+    // failure while no response has arrived. A late ACK cannot restart a completed redirect walk.
+    unawaited(
+      send(() => !answer.isCompleted).then<void>(
+        (_) {},
+        onError: (Object error, StackTrace stackTrace) {
+          if (!answer.isCompleted) answer.completeError(error, stackTrace);
+        },
+      ),
+    );
     return await answer.future;
   } finally {
     timer.cancel();

@@ -505,6 +505,9 @@ class XiangqiOnlineGameController(final String gameId)
   ///
   /// Returns whether anything was sent.
   Future<bool> playMove(XiangqiMove move, {bool viaDragAndDrop = false}) async {
+    if (!ref.mounted) return false;
+    final generation = _buildGeneration;
+    final revision = _snapshotRevision;
     final state = _latest;
     if (!state.isMyTurn || !state.isConnected || _pendingMove || move.from == move.to) return false;
     if (!rules.isLegal(state.position, move)) return false;
@@ -517,8 +520,9 @@ class XiangqiOnlineGameController(final String gameId)
     _pendingMove = true;
     _submittedDragMove = viaDragAndDrop ? move : null;
     _moveConfirmation = Timer(const Duration(seconds: 10), () {
+      if (!ref.mounted || generation != _buildGeneration || revision != _snapshotRevision) return;
       _pendingMove = false;
-      if (ref.mounted) unawaited(_subscribe());
+      unawaited(_subscribe());
     });
     try {
       await _socket.emit(
@@ -527,9 +531,13 @@ class XiangqiOnlineGameController(final String gameId)
       );
       return true;
     } on Object catch (error, stackTrace) {
+      if (!ref.mounted || generation != _buildGeneration) return false;
       // The confirmation event is authoritative even if its separate ack was
       // absent. Do not turn an already confirmed move into a connection error.
       if (_latest.moves.length > submittedPly && _latest.moves[submittedPly] == move) return true;
+      // A later snapshot settles the old attempt, even when it rejected that move. Its missing
+      // ack must not disconnect the refreshed board or cancel a newer move's confirmation timer.
+      if (revision != _snapshotRevision) return false;
       _pendingMove = false;
       _moveConfirmation?.cancel();
       _logger.warning('Could not send a move for game $gameId.', error, stackTrace);
@@ -636,6 +644,9 @@ class XiangqiOnlineGameController(final String gameId)
   /// `reason` is xiangqi.com's own code for a resignation, and the ack is an empty list — there is
   /// nothing to wait for, and the state changes when `game.server.end` arrives.
   Future<void> resign() async {
+    if (!ref.mounted) return;
+    final generation = _buildGeneration;
+    final revision = _snapshotRevision;
     final state = _latest;
     if (state.mySide == null || state.isFinished || !state.isConnected) return;
     try {
@@ -644,6 +655,12 @@ class XiangqiOnlineGameController(final String gameId)
         data: {'game_id': gameId, 'reason': kXiangqiComEndResign},
       );
     } on Object catch (error, stackTrace) {
+      if (!ref.mounted ||
+          generation != _buildGeneration ||
+          revision != _snapshotRevision ||
+          _latest.isFinished) {
+        return;
+      }
       _logger.warning('Could not resign game $gameId.', error, stackTrace);
       _set(_latest.copyWith(error: kXiangqiOnlineConnectionFailed, isConnected: false));
     }

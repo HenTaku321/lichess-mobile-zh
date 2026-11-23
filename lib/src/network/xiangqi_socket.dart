@@ -811,12 +811,3 @@ final xiangqiGameSocketProvider = Provider.autoDispose.family<XiangqiSocketClien
   ref.onDispose(client.dispose);
   return client;
 }, name: 'XiangqiGameSocketProvider');
-
-final xiangqiReviewSocketProvider = Provider.autoDispose.family<XiangqiSocketClient, String>((
-  ref,
-  gameId,
-) {
-  final client = ref.read(xiangqiSocketProvider).fork();
-  ref.onDispose(client.dispose);
-  return client;
-}, name: 'XiangqiReviewSocketProvider');

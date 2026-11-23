@@ -166,7 +166,7 @@ class XiangqiClient({
     if (_closed) throw StateError('The xiangqi.com HTTP client is closed.');
     final deadline = _newDeadline(defaultRequestTimeout);
     if (request is Abortable) {
-      final trigger = (request as Abortable).abortTrigger;
+      final trigger = request.abortTrigger;
       if (trigger != null) unawaited(trigger.then((_) => deadline.cancel()));
     }
     try {

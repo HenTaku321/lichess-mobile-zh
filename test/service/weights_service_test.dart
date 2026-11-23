@@ -36,9 +36,14 @@ ProviderContainer makeWeightsContainer({
   required Directory? appSupportDirectory,
   MockClient? mockClient,
   ConfigurableFakeConnectivity? connectivity,
+  Future<bool> Function(String)? verifyChecksum,
 }) {
   final container = ProviderContainer(
     overrides: [
+      if (verifyChecksum != null)
+        stockfishNnueServiceProvider.overrideWith(
+          (ref) => StockfishNnueService(ref, verifyChecksum: verifyChecksum),
+        ),
       preloadedDataProvider.overrideWith((ref) {
         return (
           sri: 'test-sri',
@@ -203,6 +208,82 @@ void main() {
     });
 
     group('downloadNNUEFile', () {
+      for (final discard in [false, true]) {
+        test(
+          'validated candidate ${discard ? 'is discarded after deletion' : 'is published atomically'}',
+          () async {
+            final dir = await makeTempDir();
+            final verifying = Completer<String>();
+            final verified = Completer<bool>();
+            var checks = 0;
+            final container = makeWeightsContainer(
+              appSupportDirectory: dir,
+              connectivity: ConfigurableFakeConnectivity(),
+              mockClient: MockClient((_) async => http.Response('complete candidate', 200)),
+              verifyChecksum: (path) {
+                checks++;
+                verifying.complete(path);
+                return verified.future;
+              },
+            );
+            final service = container.read(stockfishNnueServiceProvider);
+            final obsolete = File('${dir.path}/obsolete.nnue');
+            await obsolete.writeAsString('old weights');
+            final download = service.downloadNNUEFile();
+            final candidatePath = await verifying.future;
+            expect(await File(candidatePath).readAsString(), 'complete candidate');
+            expect(candidatePath, isNot(service.nnueFile.path));
+            expect(await service.checkNNUEFile(), isFalse);
+            expect(await service.nnueFile.exists(), isFalse);
+            if (discard) await service.deleteNNUEFiles();
+            verified.complete(true);
+            expect(await download, !discard);
+            expect(await service.nnueFile.exists(), !discard);
+            expect(await File(candidatePath).exists(), isFalse);
+            expect(await obsolete.exists(), isFalse);
+            if (!discard) {
+              expect(await service.nnueFile.readAsString(), 'complete candidate');
+              expect(await service.checkNNUEFile(), isTrue);
+              expect(checks, 1, reason: 'only the published candidate seeds the checksum cache');
+            }
+          },
+        );
+      }
+
+      test('an old failing checksum cannot delete a newly validated download', () async {
+        final dir = await makeTempDir();
+        final oldStarted = Completer<void>();
+        final oldCheck = Completer<bool>();
+        final candidateChecked = Completer<void>();
+        var checks = 0;
+        final container = makeWeightsContainer(
+          appSupportDirectory: dir,
+          connectivity: ConfigurableFakeConnectivity(),
+          mockClient: MockClient((_) async => http.Response('new network', 200)),
+          verifyChecksum: (path) async {
+            checks++;
+            if (path == '${dir.path}/${Stockfish.latestNNUE}') {
+              oldStarted.complete();
+              return await oldCheck.future;
+            }
+            candidateChecked.complete();
+            return true;
+          },
+        );
+        final service = container.read(stockfishNnueServiceProvider);
+        await service.nnueFile.writeAsString('old broken network');
+        final checking = service.checkNNUEFile();
+        await oldStarted.future;
+        final downloading = service.downloadNNUEFile();
+        await candidateChecked.future;
+        oldCheck.complete(false);
+        expect(await checking, isFalse);
+        expect(await downloading, isTrue);
+        expect(await service.checkNNUEFile(), isTrue);
+        expect(await service.nnueFile.readAsString(), 'new network');
+        expect(checks, 2);
+      });
+
       test('download candidates stay separate from the published NNUE file', () async {
         final dir = await makeTempDir();
         final body = StreamController<List<int>>();
@@ -216,8 +297,9 @@ void main() {
         );
         final service = container.read(stockfishNnueServiceProvider);
         service.nnueDownloadProgress.addListener(() {
-          if (service.nnueDownloadProgress.value > 0 && !receiving.isCompleted)
+          if (service.nnueDownloadProgress.value > 0 && !receiving.isCompleted) {
             receiving.complete();
+          }
         });
         final download = service.downloadNNUEFile();
         body.add([1, 2, 3]);

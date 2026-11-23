@@ -81,4 +81,19 @@ void main() {
     expect(loaded, isEmpty);
     expect(previews, isEmpty);
   });
+  test('shutdown seals the service while a load is still pending', () async {
+    final container = await makeContainer(
+      overrides: {soundServiceProvider: soundServiceProvider.overrideWith(SoundService.new)},
+    );
+    final service = container.read(soundServiceProvider);
+    final change = service.changeTheme(SoundTheme.piano, playSound: true);
+    await loading.future;
+    final shutdown = SoundService.shutdown();
+    await service.changeTheme(SoundTheme.nes, playSound: true);
+    oldLoad.complete();
+    await Future.wait([change, shutdown]);
+    await service.play(Sound.move);
+    expect(loaded, isEmpty);
+    expect(previews, isEmpty);
+  });
 }

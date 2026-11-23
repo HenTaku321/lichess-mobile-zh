@@ -29,7 +29,8 @@ final stockfishNnueServiceProvider = Provider<StockfishNnueService>((Ref ref) {
 ///
 /// This service handles downloading, checking, and deleting the NNUE file.
 /// It can be overridden in tests to avoid file system access.
-class StockfishNnueService(final Ref _ref) {
+class StockfishNnueService(final Ref _ref, {Future<bool> Function(String)? verifyChecksum}) {
+  final Future<bool> Function(String) _verifyChecksum = verifyChecksum ?? _verifyStockfishChecksum;
   final ValueNotifier<double> _nnueDownloadProgress = ValueNotifier(0.0);
   bool _nnueOperationInProgress = false;
   Future<void> _nnueFiles = Future<void>.value();
@@ -118,7 +119,7 @@ class StockfishNnueService(final Ref _ref) {
     try {
       if (await file.exists()) {
         final path = file.path;
-        _nnueSumCheckResult ??= await Isolate.run(() => _checksumMatches(path, nnueHash));
+        _nnueSumCheckResult ??= await _verifyChecksum(path);
 
         if (_nnueSumCheckResult == true) {
           return true;
@@ -170,7 +171,7 @@ class StockfishNnueService(final Ref _ref) {
           );
           if (!downloaded) return false;
           final path = candidate.path;
-          if (!await Isolate.run(() => _checksumMatches(path, nnueHash))) return false;
+          if (!await _verifyChecksum(path)) return false;
           return await _withNNUEFiles(() async {
             // A user-requested deletion wins over a download already in flight.
             if (revision != _nnueRevision) return false;
@@ -263,6 +264,9 @@ class StockfishNnueService(final Ref _ref) {
     }
   }
 }
+
+Future<bool> _verifyStockfishChecksum(String path) =>
+    Isolate.run(() => _checksumMatches(path, nnueHash));
 
 /// A provider for [MaiaWeightsService].
 final maiaWeightsServiceProvider = Provider<MaiaWeightsService>((Ref ref) {

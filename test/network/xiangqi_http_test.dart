@@ -179,6 +179,73 @@ void main() {
   });
 
   group('request throttle', () {
+    test('closing the client cancels queued work and a queued refresh', () {
+      fakeAsync((async) {
+        withClock(async.getClock(testEpoch), () {
+          final sent = <String>[];
+          final client = XiangqiClient(
+            inner: MockClient((request) async {
+              sent.add(request.url.path);
+              return http.Response('{}', 401);
+            }),
+            storage: FakeXiangqiAuthStorage(signedInSession),
+            uiEventBus: UiEventBus(),
+          );
+          client.get(xiangqiUri('first')).ignore();
+          async.flushMicrotasks();
+          client.get(xiangqiUri('queued')).ignore();
+          async.flushMicrotasks();
+          client.close();
+          async.flushMicrotasks();
+          async.elapse(const Duration(minutes: 2));
+          expect(sent, ['/api/first']);
+          expect(async.pendingTimerCount, 0);
+        });
+      });
+    });
+
+    test('cancelling queued work preserves spacing between refresh and retry', () {
+      fakeAsync((async) {
+        withClock(async.getClock(testEpoch), () {
+          final sent = <(String, DateTime)>[];
+          final client = XiangqiClient(
+            inner: MockClient((request) async {
+              sent.add((request.url.path, clock.now()));
+              if (request.url.path == '/api/users/jwt/refresh') {
+                return http.Response('{"jwt":"access-new"}', 200);
+              }
+              return http.Response(
+                '{}',
+                request.headers['Authorization'] == 'Bearer access-new' ? 200 : 401,
+              );
+            }),
+            storage: FakeXiangqiAuthStorage(signedInSession),
+            uiEventBus: UiEventBus(),
+          );
+          http.Response? response;
+          client.get(xiangqiUri('first')).then((result) => response = result);
+          async.flushMicrotasks();
+          final abort = Completer<void>();
+          client
+              .send(
+                http.AbortableRequest('GET', xiangqiUri('cancelled'), abortTrigger: abort.future),
+              )
+              .then(http.Response.fromStream)
+              .ignore();
+          async.flushMicrotasks();
+          abort.complete();
+          async.flushMicrotasks();
+          async.elapse(kXiangqiMinRequestSpacing * 2);
+          expect(response?.statusCode, 200);
+          expect(sent.map((r) => r.$1), ['/api/first', '/api/users/jwt/refresh', '/api/first']);
+          expect(sent[1].$2.difference(sent[0].$2), kXiangqiMinRequestSpacing);
+          expect(sent[2].$2.difference(sent[1].$2), kXiangqiMinRequestSpacing);
+          client.close();
+          async.flushMicrotasks();
+        });
+      });
+    });
+
     test('expired queued requests do not delay fresh requests', () {
       fakeAsync((async) {
         withClock(async.getClock(testEpoch), () {

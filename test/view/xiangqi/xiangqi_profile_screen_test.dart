@@ -6,9 +6,12 @@
 //
 // The values are invented. The shapes come from `xiangqi-com-re/captures/profile/`.
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lichess_mobile/src/network/xiangqi_session_store.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:l10n_esperanto/l10n_esperanto.dart';
@@ -264,6 +267,51 @@ void main() {
       expect(find.byIcon(Icons.logout), findsOneWidget);
       await drain(tester);
     });
+
+    for (final status in [200, 401, 503]) {
+      testWidgets('late deletion $status leaves a newer account route alone', (tester) async {
+        final deletion = Completer<http.Response>();
+        final profile = profileClient();
+        var deleting = false;
+        final client = MockClient((request) async {
+          if (request.url.path == '/api/users/account/delete/') {
+            deleting = true;
+            return await deletion.future;
+          }
+          return await profile.post(request.url, body: request.body, headers: request.headers);
+        });
+        await pumpProfile(tester, client: client, isGuest: false);
+        final context = tester.element(find.byType(XiangqiProfileScreen));
+        final container = ProviderScope.containerOf(context);
+        await scrollDown(tester);
+        await tester.tap(find.text('Delete my xiangqi.com account'));
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField).first, 'a-password');
+        await tester.tap(find.widgetWithText(TextButton, 'Delete my xiangqi.com account'));
+        await settle(tester, rounds: 2);
+        expect(deleting, isTrue);
+        unawaited(
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => const Scaffold(body: Text('New account page'))),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final store = container.read(xiangqiSessionStoreProvider);
+        final next = fx.xiangqiTestSession(
+          fx.xiangqiTestToken('bob'),
+          userId: 'bob',
+          isGuest: false,
+        );
+        await store.write(next);
+        deletion.complete(http.Response('{"message":"result"}', status));
+        await tester.pump();
+        await tester.pumpAndSettle();
+        expect(find.text('New account page'), findsOneWidget);
+        expect(find.byType(SnackBar), findsNothing);
+        expect(store.current, next);
+        await drain(tester);
+      });
+    }
 
     testWidgets('offers to delete the account, and deletes it only through the dialog', (
       tester,

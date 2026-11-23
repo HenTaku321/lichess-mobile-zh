@@ -147,10 +147,12 @@ void retryXiangqiEngine(Ref ref) {
   final cached = ref.read(xiangqiEngineProvider);
   final engine = cached.value;
   if (!cached.hasError && engine?.isDead != true && engine?.isDisposed != true) return;
-  final spec =
-      engine?.spec ??
-      (ref.exists(_xiangqiEngineSpecProvider) ? ref.read(_xiangqiEngineSpecProvider).value : null);
+  final specState = ref.exists(_xiangqiEngineSpecProvider)
+      ? ref.read(_xiangqiEngineSpecProvider)
+      : null;
+  final spec = engine?.spec ?? specState?.value;
   if (spec != null) ref.invalidate(engineProvider(spec));
+  if (specState?.hasError == true) ref.invalidate(_xiangqiEngineSpecProvider);
   ref.invalidate(xiangqiEngineProvider);
 }
 

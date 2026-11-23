@@ -97,6 +97,22 @@ Future<void> answer(FakeTransport transport, String iccs) async {
 
 void main() {
   group('XiangqiGameController', () {
+    test('a new game retries a failed NNUE preparation', () async {
+      final transports = <FakeTransport>[];
+      final nnue = LifecyclePikafishNnueService()..failNext = true;
+      final container = await makeEngineLifecycleContainer(transports, nnue: nnue);
+      container.listen(xiangqiGameControllerProvider, (_, _) {});
+      await expectLater(container.read(xiangqiEngineProvider.future), throwsStateError);
+      expect(transports, isEmpty);
+      container
+          .read(xiangqiGameControllerProvider.notifier)
+          .startNewGame(side: .black, difficulty: .level1);
+      await pumpEventQueue();
+      expect(transports, hasLength(1));
+      await answer(transports.single, 'h2e2');
+      expect(container.read(xiangqiGameControllerProvider).moves, IList([move('h2e2')]));
+    });
+
     test('engine death reaches the public provider and reports a stalled opponent', () async {
       final transports = <FakeTransport>[];
       final container = await makeEngineLifecycleContainer(transports);
@@ -656,27 +672,36 @@ void main() {
 }
 
 class LifecyclePikafishNnueService() implements PikafishNnueService {
+  bool failNext = false;
   @override
   File get nnueFile => File('/test/pikafish.nnue');
 
   @override
-  Future<String> ensureNnue() async => nnueFile.path;
+  Future<String> ensureNnue() async {
+    if (failNext) {
+      failNext = false;
+      throw StateError('NNUE fixture failed');
+    }
+    return nnueFile.path;
+  }
 }
 
-Future<ProviderContainer> makeEngineLifecycleContainer(List<FakeTransport> transports) =>
-    makeContainer(
-      overrides: {
-        pikafishNnueServiceProvider: pikafishNnueServiceProvider.overrideWithValue(
-          LifecyclePikafishNnueService(),
-        ),
-        engineFactoryProvider: engineFactoryProvider.overrideWith(
-          (ref) => EngineFactory(
-            connect: (spec) async {
-              final transport = FakeTransport(spec: spec, startupLines: kPikafishHandshake);
-              transports.add(transport);
-              return transport;
-            },
-          ),
-        ),
-      },
-    );
+Future<ProviderContainer> makeEngineLifecycleContainer(
+  List<FakeTransport> transports, {
+  LifecyclePikafishNnueService? nnue,
+}) => makeContainer(
+  overrides: {
+    pikafishNnueServiceProvider: pikafishNnueServiceProvider.overrideWithValue(
+      nnue ?? LifecyclePikafishNnueService(),
+    ),
+    engineFactoryProvider: engineFactoryProvider.overrideWith(
+      (ref) => EngineFactory(
+        connect: (spec) async {
+          final transport = FakeTransport(spec: spec, startupLines: kPikafishHandshake);
+          transports.add(transport);
+          return transport;
+        },
+      ),
+    ),
+  },
+);

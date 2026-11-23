@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:chessground/chessground.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/services.dart';
 import 'package:lichess_mobile/src/model/puzzle/puzzle_angle.dart';
 import 'package:lichess_mobile/src/model/puzzle/puzzle_theme.dart';
 import 'package:lichess_mobile/src/view/puzzle/puzzle_screen.dart';
@@ -20,6 +21,51 @@ void main() {
   final output = Platform.environment['CHESS_LAYOUT_OUTPUT'];
   final reference = Platform.environment['CHESS_LAYOUT_REFERENCE'];
   if (output == null) return;
+
+  // This probe is copied into the fixed reference checkout, whose test harness predates the
+  // device-info mock. Keep the same platform response on both revisions so Android gesture
+  // setup cannot stop the reference run before any geometry has been measured.
+  setUp(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+      const MethodChannel('dev.fluttercommunity.plus/device_info'),
+      (call) async => <String, Object?>{
+        'version': <String, Object?>{
+          'baseOS': '',
+          'codename': 'REL',
+          'incremental': 'test',
+          'previewSdkInt': 0,
+          'release': '9',
+          'sdkInt': 28,
+          'securityPatch': '',
+        },
+        for (final field in [
+          'board',
+          'bootloader',
+          'brand',
+          'device',
+          'display',
+          'fingerprint',
+          'hardware',
+          'host',
+          'id',
+          'manufacturer',
+          'model',
+          'product',
+          'name',
+          'tags',
+          'type',
+        ])
+          field: 'test',
+        'time': 0,
+        'isPhysicalDevice': false,
+        'freeDiskSize': 0,
+        'totalDiskSize': 0,
+        'isLowRamDevice': false,
+        'physicalRamSize': 4096,
+        'availableRamSize': 2048,
+      },
+    );
+  });
 
   for (final size in [const Size(390, 844), const Size(1280, 720)]) {
     testWidgets('opening a chess puzzle preserves its layout at $size', (tester) async {

@@ -331,7 +331,7 @@ class XiangqiAuthController() extends Notifier<XiangqiSession?> {
     if (response.statusCode >= 400) {
       throw ServerException(response.statusCode, 'xiangqi.com account deletion failed.', uri, null);
     }
-    return sessions.write(null, expectedAccountGeneration: accountGeneration);
+    return await sessions.write(null, expectedAccountGeneration: accountGeneration);
   }
 
   /// Takes a guest token from xiangqi.com, with no account behind it.

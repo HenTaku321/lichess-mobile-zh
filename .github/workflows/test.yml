@@ -216,6 +216,7 @@ jobs:
           test/network/xiangqi_http_test.dart
           test/service/weights_service_test.dart
           test/service/sound_service_test.dart
+          test/view/xiangqi/xiangqi_profile_screen_test.dart
 
       - name: Exercise shared home and computer-game journeys
         run: >-

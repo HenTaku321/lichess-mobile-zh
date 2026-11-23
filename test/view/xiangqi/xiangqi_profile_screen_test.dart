@@ -9,15 +9,15 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lichess_mobile/src/network/xiangqi_session_store.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:l10n_esperanto/l10n_esperanto.dart';
 import 'package:lichess_mobile/l10n/l10n.dart';
 import 'package:lichess_mobile/src/network/http.dart';
 import 'package:lichess_mobile/src/network/xiangqi_http.dart' show xiangqiAuthStorageProvider;
+import 'package:lichess_mobile/src/network/xiangqi_session_store.dart';
 import 'package:lichess_mobile/src/view/xiangqi/xiangqi_profile_screen.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -290,10 +290,8 @@ void main() {
         await tester.tap(find.widgetWithText(TextButton, 'Delete my xiangqi.com account'));
         await settle(tester, rounds: 2);
         expect(deleting, isTrue);
-        unawaited(
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => const Scaffold(body: Text('New account page'))),
-          ),
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const Scaffold(body: Text('New account page'))),
         );
         await tester.pumpAndSettle();
         final store = container.read(xiangqiSessionStoreProvider);

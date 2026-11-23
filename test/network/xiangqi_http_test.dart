@@ -199,7 +199,7 @@ void main() {
           async.flushMicrotasks();
           async.elapse(const Duration(minutes: 2));
           expect(sent, ['/api/first']);
-          expect(async.pendingTimerCount, 0);
+          expect(async.pendingTimers, isEmpty);
         });
       });
     });

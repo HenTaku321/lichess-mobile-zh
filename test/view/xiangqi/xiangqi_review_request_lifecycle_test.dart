@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lichess_mobile/src/widgets/xiangqi_refresh.dart';
 import 'package:lichess_mobile/src/widgets/xiangqi_board.dart';
 
 import '../../binding.dart';
@@ -102,6 +103,42 @@ void main() {
       expect(channel.closed, isTrue);
       expect(tester.takeException(), isNull);
     });
+  }
+
+  for (final duringAnalysis in [false, true]) {
+    testWidgets(
+      'refreshing a pending review retires the old conversation, analysis: $duringAnalysis',
+      (tester) async {
+        final factory = await review.pumpReview(tester);
+        final oldChannel = factory.channel;
+        oldChannel.fromServer(fx.openFrame);
+        oldChannel.fromServer(fx.connectAckFrame);
+        await pumpUntil(tester, () => oldChannel.hasSentEvent('g_v2.get'));
+        if (duringAnalysis) await _snapshot(tester, oldChannel);
+
+        await tester.tap(find.byType(DesktopRefreshButton));
+        for (var i = 0; i < 8; i++) {
+          await tester.pump();
+        }
+        expect(oldChannel.closed, isTrue);
+        expect(factory.channels, hasLength(2));
+        final current = factory.channel;
+        current.fromServer(fx.openFrame);
+        current.fromServer(fx.connectAckFrame);
+        await pumpUntil(tester, () => current.hasSentEvent('g_v2.get'));
+        await _snapshot(tester, current);
+
+        // The abandoned frame has the right game and ply count, but belongs to the old request.
+        await _receive(tester, oldChannel, review.reviewFrame());
+        expect(find.byType(XiangqiBoard), findsNothing);
+        expect(current.closed, isFalse);
+        await _receive(tester, current, review.reviewFrame());
+        expect(find.byType(XiangqiBoard), findsOneWidget);
+        expect(current.closed, isTrue);
+        expect(tester.takeException(), isNull);
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.linux),
+    );
   }
 
   testWidgets('an error carrying another game id cannot reject the active review', (tester) async {

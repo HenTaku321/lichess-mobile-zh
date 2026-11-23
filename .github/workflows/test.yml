@@ -210,6 +210,7 @@ jobs:
         run: >-
           flutter test --no-pub --reporter expanded
           test/model/xiangqi/lesson/xiangqi_lesson_lifecycle_test.dart
+          test/view/xiangqi/xiangqi_chat_entry_parity_test.dart
           test/view/xiangqi/xiangqi_lesson_player_screen_test.dart
           test/view/xiangqi/xiangqi_desktop_socket_test.dart
 

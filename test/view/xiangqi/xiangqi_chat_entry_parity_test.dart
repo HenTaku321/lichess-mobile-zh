@@ -80,6 +80,37 @@ void main() {
     },
   );
 
+  for (final dispatched in [false, true]) {
+    testWidgets('leaving a room retains only an unsent queued message ($dispatched)', (
+      tester,
+    ) async {
+      final factory = await chat.pumpHub(tester);
+      final old = await openLoadedRoom(tester, factory, 'English');
+      await tester.enterText(find.byType(TextField), 'A message waiting for its turn');
+      await tester.pump();
+      await tester.tap(find.byIcon(Icons.send));
+      await tester.pump();
+      expect(currentDraft(tester), isEmpty);
+      if (dispatched) {
+        await tester.pump(const Duration(seconds: 2));
+        await tester.pump();
+      }
+      expect(
+        old.sent.whereType<String>().where((frame) => frame.contains('chat_v2.new.message')),
+        hasLength(dispatched ? 1 : 0),
+      );
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await openLoadedRoom(tester, factory, 'English');
+      expect(currentDraft(tester), dispatched ? '' : 'A message waiting for its turn');
+      expect(
+        old.sent.whereType<String>().where((frame) => frame.contains('chat_v2.new.message')),
+        hasLength(dispatched ? 1 : 0),
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('public-room drafts stay separate while moving between two rooms', (tester) async {
     final factory = await chat.pumpHub(tester);
     await openLoadedRoom(tester, factory, 'English');

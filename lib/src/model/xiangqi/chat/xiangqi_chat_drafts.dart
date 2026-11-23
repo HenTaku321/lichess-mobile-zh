@@ -18,6 +18,16 @@ class XiangqiChatDrafts() extends Notifier<IMap<XiangqiChatRoomKey, String>> {
     return const IMapConst({});
   }
 
+  /// Clears the emitted draft without erasing later edits or another account's text.
+  void clearSent(XiangqiChatRoomKey room, String text, {required int accountGeneration}) {
+    if (!ref.mounted ||
+        accountGeneration != ref.read(xiangqiAccountGenerationProvider) ||
+        state[room] != text) {
+      return;
+    }
+    state = state.remove(room);
+  }
+
   void remember(XiangqiChatRoomKey room, String text) {
     if ((state[room] ?? '') == text) return;
     state = text.isEmpty ? state.remove(room) : state.add(room, text);

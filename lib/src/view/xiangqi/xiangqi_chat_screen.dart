@@ -153,8 +153,11 @@ class _XiangqiChatRoomScreenState() extends ConsumerState<XiangqiChatRoomScreen>
     _input.addListener(_rememberDraft);
   }
 
-  void _rememberDraft() =>
-      ref.read(xiangqiChatDraftsProvider.notifier).remember(widget.roomKey, _input.text);
+  void _rememberDraft() {
+    // Clearing the composer is optimistic. Keep queued text across route disposal until emitted.
+    if (_sending && _input.text.isEmpty) return;
+    ref.read(xiangqiChatDraftsProvider.notifier).remember(widget.roomKey, _input.text);
+  }
 
   @override
   void dispose() {
@@ -166,25 +169,29 @@ class _XiangqiChatRoomScreenState() extends ConsumerState<XiangqiChatRoomScreen>
   Future<void> _send() async {
     if (_sending) return;
     final generation = ref.read(xiangqiAccountGenerationProvider);
-    final text = _input.text.trim();
+    final room = widget.roomKey;
+    final draft = _input.text;
+    final text = draft.trim();
     if (text.isEmpty) return;
+    final drafts = ref.read(xiangqiChatDraftsProvider.notifier);
     setState(() {
       _sending = true;
       _submittedText = text;
       _input.clear();
     });
     try {
-      final submitted = await ref
-          .read(xiangqiChatControllerProvider(widget.roomKey).notifier)
-          .send(text);
+      final submitted = await ref.read(xiangqiChatControllerProvider(room).notifier).send(text);
+      if (submitted) {
+        drafts.clearSent(room, draft, accountGeneration: generation);
+      }
       if (!mounted || generation != ref.read(xiangqiAccountGenerationProvider)) return;
       if (!submitted) {
-        _restoreDraft(text);
+        _restoreDraft(draft);
         showSnackBar(context, context.l10n.mobileXiangqiChatOffline, type: SnackBarType.error);
       }
     } on Object {
       if (mounted && generation == ref.read(xiangqiAccountGenerationProvider)) {
-        _restoreDraft(text);
+        _restoreDraft(draft);
         showSnackBar(context, context.l10n.mobileSomethingWentWrong, type: SnackBarType.error);
       }
     } finally {

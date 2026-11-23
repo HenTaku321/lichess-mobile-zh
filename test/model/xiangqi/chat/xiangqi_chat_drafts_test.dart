@@ -36,6 +36,44 @@ void main() {
     },
   );
 
+  for (final change in ['none', 'edit', 'token renewal', 'sign out and back in']) {
+    test('a delayed send only clears its own unchanged draft ($change)', () async {
+      final container = await makeContainer(
+        overrides: {
+          xiangqiAuthStorageProvider: xiangqiAuthStorageProvider.overrideWithValue(
+            FakeXiangqiAuthStorage(signedInSession),
+          ),
+        },
+      );
+      final sessions = container.read(xiangqiSessionStoreProvider);
+      await sessions.read();
+      final subscription = container.listen(xiangqiChatDraftsProvider, (_, _) {});
+      addTearDown(subscription.close);
+      final drafts = container.read(xiangqiChatDraftsProvider.notifier);
+      final account = sessions.accountGeneration;
+      drafts.remember(english, 'Queued message');
+      switch (change) {
+        case 'none':
+          break;
+        case 'edit':
+          drafts.remember(english, 'New draft');
+        case 'token renewal':
+          await sessions.write(signedInSession.copyWith(accessToken: 'renewed-token'));
+        case 'sign out and back in':
+          await sessions.write(null);
+          await sessions.write(signedInSession);
+          await pumpEventQueue();
+          drafts.remember(english, 'Queued message');
+      }
+      drafts.clearSent(english, 'Queued message', accountGeneration: account);
+      expect(container.read(xiangqiChatDraftsProvider)[english], switch (change) {
+        'edit' => 'New draft',
+        'sign out and back in' => 'Queued message',
+        _ => null,
+      });
+    });
+  }
+
   test('token renewal keeps drafts but signing out and back in clears them', () async {
     final container = await makeContainer(
       overrides: {

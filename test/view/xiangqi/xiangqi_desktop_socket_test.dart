@@ -298,6 +298,100 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testDesktop('an unsolicited history page cannot replace a loaded room', (tester) async {
+    final (:container, :factory) = await pumpRoom(tester);
+    final provider = xiangqiChatControllerProvider(roomKey);
+    await history(tester, factory, [chat.message(id: 3, text: 'current')], hasNext: true);
+    await history(tester, factory, [chat.message(id: 1, text: 'unsolicited')]);
+    expect(container.read(provider).messages.map((message) => message.id), [3]);
+    expect(container.read(provider).hasMore, isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
+  testDesktop('history arriving before a paced request cannot acknowledge that page', (
+    tester,
+  ) async {
+    final (:container, :factory) = await pumpRoom(tester);
+    final provider = xiangqiChatControllerProvider(roomKey);
+    await history(tester, factory, [chat.message(id: 3, text: 'current')], hasNext: true);
+    unawaited(container.read(provider.notifier).loadMore());
+    await history(tester, factory, [chat.message(id: 1, text: 'before request')]);
+    expect(container.read(provider).isLoadingMore, isTrue);
+    expect(container.read(provider).messages.map((message) => message.id), [3]);
+    await tester.pump(kXiangqiChatRequestSpacing);
+    await tester.pump();
+    await history(tester, factory, [chat.message(id: 2, text: 'requested page')]);
+    expect(container.read(provider).messages.map((message) => message.id), [2, 3]);
+    expect(container.read(provider).isLoadingMore, isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final failure in ['timeout', 'chat.error']) {
+    testDesktop('room $failure retires anonymous history replies before a retry', (tester) async {
+      final (:container, :factory) = await pumpRoom(tester);
+      final provider = xiangqiChatControllerProvider(roomKey);
+      final controller = container.read(provider.notifier);
+      await history(tester, factory, [chat.message(id: 3, text: 'current')], hasNext: true);
+      unawaited(controller.loadMore());
+      await tester.pump(kXiangqiChatRequestSpacing);
+      await tester.pump();
+      final old = factory.channel;
+      expect(requests(old, 'chat_v2.messages').last['page'], 2);
+      if (failure == 'timeout') {
+        await tester.pump(const Duration(seconds: 20));
+        await tester.pump();
+      } else {
+        await online.receive(
+          tester,
+          factory,
+          fx.xiangqiEventFrame('chat.error', {'error': 'failed'}),
+        );
+      }
+      expect(container.read(provider).error, XiangqiChatError.history);
+      expect(old.closed, isTrue);
+      expect(container.read(provider).messages.map((message) => message.id), [3]);
+      unawaited(controller.retry());
+      for (var i = 0; i < 8; i++) {
+        await tester.pump();
+      }
+      expect(factory.channels, hasLength(2));
+      await online.receive(tester, factory, fx.openFrame);
+      await online.receive(tester, factory, fx.connectAckFrame);
+      expect(requests(factory.channel, 'chat_v2.messages').single['page'], 1);
+      old.fromServer(
+        fx.xiangqiEventFrame(
+          'chat.lobby.messages.success',
+          chat.page([chat.message(id: 1, text: 'late old page')]),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(container.read(provider).isLoading, isTrue);
+      expect(container.read(provider).messages.map((message) => message.id), [3]);
+      await history(tester, factory, [chat.message(id: 4, text: 'fresh')], hasNext: true);
+      expect(container.read(provider).messages.map((message) => message.id), [3, 4]);
+      expect(container.read(provider).isLoading, isFalse);
+      expect(container.read(provider).error, isNull);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testDesktop('a message-send rejection leaves the outstanding history read alive', (tester) async {
+    final (:container, :factory) = await pumpRoom(tester);
+    final provider = xiangqiChatControllerProvider(roomKey);
+    await online.receive(
+      tester,
+      factory,
+      fx.xiangqiEventFrame('chat.new.lobby.message.error', {'error': 'message rejected'}),
+    );
+    expect(container.read(provider).isLoading, isTrue);
+    expect(container.read(provider).error, XiangqiChatError.send);
+    await history(tester, factory, [chat.message(id: 3, text: 'requested')]);
+    expect(container.read(provider).messages.map((message) => message.id), [3]);
+    expect(container.read(provider).isLoading, isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
   testDesktop('room refresh merges latest messages and preserves the older pagination cursor', (
     tester,
   ) async {
